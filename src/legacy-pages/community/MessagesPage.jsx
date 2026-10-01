@@ -3701,6 +3701,10 @@ export default function MessagesPage() {
         columnSpacing={{ xs: 0, md: 2 }}   // 🔹 no side gap on mobile/tablet
         sx={{
           width: "100%",
+          maxWidth: "100%",
+          minWidth: 0,
+          overflow: "hidden",
+          m: 0,
         }}
       >
         {/* LEFT: Conversation list */}
@@ -3709,6 +3713,7 @@ export default function MessagesPage() {
           xs={12}
           md={3}
           sx={{
+            minWidth: 0,
             // Mobile / tablet: only show when in "list" mode
             display: {
               xs: mobileView === "list" ? "block" : "none",
@@ -3720,26 +3725,25 @@ export default function MessagesPage() {
             sx={{
               p: 1.5,
               border: `1px solid ${BORDER}`,
-              borderRadius: 3,
+              borderRadius: "var(--imaa-radius-card)",
               height: PANEL_H,
               display: "flex",
               flexDirection: "column",
 
-              // 🔹 137% width on mobile (xs), normal 100% on tablet & up
-              width: { xs: "137%", sm: "250%", md: "100%" },
-              maxWidth: "none",
-
-              // optional: recentre the block so it doesn’t look shifted
-              ml: { xs: "-1.0%", sm: 0 }, // half of extra 37% = 18.5%
+              width: "100%",
+              maxWidth: "100%",
+              minWidth: 0,
+              boxSizing: "border-box",
             }}
           >
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 800 }}>Messages</Typography>
-              <IconButton size="small"><AttachFileOutlinedIcon fontSize="small" /></IconButton>
+              <IconButton size="small" aria-label="Message attachments"><AttachFileOutlinedIcon fontSize="small" /></IconButton>
             </Stack>
 
             <TextField
               size="small"
+              label="Search conversations"
               placeholder="Search…"
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -3817,6 +3821,7 @@ export default function MessagesPage() {
           xs={12}
           md={9}
           sx={{
+            minWidth: 0,
             display: {
               xs: mobileView === "chat" ? "block" : "none",
               md: "block", // from md and up, chat is always visible
@@ -3829,9 +3834,10 @@ export default function MessagesPage() {
               display: "flex",
               flexDirection: "column",
               minHeight: 0,
-              // 🔹 full width on mobile / tablet
-              width: { xs: "105%", sm: "185%", md: "149%" },
-              maxWidth: "none",  // no cap on tablet/mobile
+              width: "100%",
+              maxWidth: "100%",
+              overflow: "hidden",
+              boxSizing: "border-box",
             }}
           >
             {!activeId ? (
@@ -3839,14 +3845,13 @@ export default function MessagesPage() {
                 sx={{
                   flex: 1,
                   border: `1px solid ${BORDER}`,
-                  borderRadius: 3,
+                  borderRadius: "var(--imaa-radius-card)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
                   textAlign: "center",
                   px: 3,
-                  background:
-                    "radial-gradient(1200px circle at 30% 0%, rgba(99,102,241,0.10), transparent 55%), radial-gradient(1000px circle at 80% 30%, rgba(20,184,166,0.10), transparent 55%)",
+                  bgcolor: "background.paper",
                 }}
               >
                 <Typography variant="body1" color="text.secondary">
@@ -3860,7 +3865,7 @@ export default function MessagesPage() {
             ) : (
               <>
                 {/* Top bar */}
-                <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 1 }}>
+                <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", mb: 1 }}>
                   <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                     {/* CLICKABLE: group avatar + name */}
                     <Stack
@@ -3878,6 +3883,7 @@ export default function MessagesPage() {
                       {isMobileOrTablet && (
                         <IconButton
                           size="small"
+                          aria-label="Back to conversations"
                           onClick={(e) => {
                             e.stopPropagation();
                             setMobileView("list");
@@ -3889,6 +3895,7 @@ export default function MessagesPage() {
 
                       <Avatar
                         src={topLogo}
+                        alt={topTitle || "Conversation"}
                         sx={{ width: 40, height: 40, cursor: hasActiveGroup ? "pointer" : "default" }}
                         onClick={hasActiveGroup ? openActiveGroup : undefined}
                       >
@@ -3938,6 +3945,7 @@ export default function MessagesPage() {
                       {/* ℹ️ Details icon – opens members/attachments popup */}
                       <IconButton
                         size="small"
+                        aria-label="Conversation details"
                         onClick={() => setDetailsOpen(true)}
                       >
                         <InfoOutlinedIcon fontSize="small" />
@@ -3952,7 +3960,7 @@ export default function MessagesPage() {
                   sx={{
                     p: 2,
                     border: `1px solid ${BORDER}`,
-                    borderRadius: 3,
+                    borderRadius: "var(--imaa-radius-card)",
                     flex: 1,
                     minHeight: 0,
                     display: "flex",
@@ -4424,6 +4432,7 @@ export default function MessagesPage() {
                       {/* Existing TextField */}
                       <TextField
                         size="small"
+                        inputProps={{ "aria-label": "Message" }}
                         placeholder="Type a message"
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
@@ -4440,6 +4449,7 @@ export default function MessagesPage() {
                         size="small"
                         endIcon={<SendIcon />}
                         onClick={handleSend}
+                        sx={{ minHeight: 40, flexShrink: 0, textTransform: "none", fontWeight: 700 }}
                       >
                         Send
                       </Button>

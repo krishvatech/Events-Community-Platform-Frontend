@@ -13,7 +13,6 @@ import {
   CircularProgress,
   InputAdornment,
   Pagination,
-  Paper,
   Skeleton,
   Stack,
   TextField,
@@ -28,6 +27,8 @@ import LockRoundedIcon from "@mui/icons-material/LockRounded";
 import PublicRoundedIcon from "@mui/icons-material/PublicRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import PageHeader from "../../components/page/PageHeader.jsx";
+import EmptyState from "../../components/page/EmptyState.jsx";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(
   /\/$/,
@@ -161,7 +162,7 @@ function mergeGroups(exploreGroups, myGroups) {
 
 function ForumCardSkeleton() {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, overflow: "hidden" }}>
+    <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER, overflow: "hidden" }}>
       <Skeleton variant="rectangular" height={140} />
       <CardContent>
         <Stack spacing={1.25}>
@@ -206,17 +207,17 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
       variant="outlined"
       sx={{
         height: "100%",
-        borderRadius: 3,
+        borderRadius: 2,
         borderColor: BORDER,
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         bgcolor: "#fff",
-        transition: "box-shadow .2s ease, transform .2s ease, border-color .2s ease",
+        minWidth: 0,
+        transition: "box-shadow .2s ease, border-color .2s ease",
         "&:hover": {
-          transform: "translateY(-2px)",
           borderColor: "rgba(10,147,150,.45)",
-          boxShadow: "0 12px 32px rgba(15,23,42,.08)",
+          boxShadow: "0 4px 14px rgba(15,23,42,.07)",
         },
       }}
     >
@@ -232,7 +233,7 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
           <Box
             sx={{
               height: "100%",
-              background: "linear-gradient(135deg, rgba(10,147,150,.16), rgba(232,83,47,.16))",
+              bgcolor: "#eef7f6",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -274,8 +275,17 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
         </Stack>
 
         <Typography
+          component="button"
+          type="button"
           onClick={() => onOpen(group)}
           sx={{
+            display: "block",
+            width: "100%",
+            p: 0,
+            border: 0,
+            bgcolor: "transparent",
+            textAlign: "left",
+            fontFamily: "inherit",
             color: NAVY,
             cursor: "pointer",
             fontSize: 18,
@@ -283,6 +293,7 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
             lineHeight: 1.25,
             mb: 0.75,
             "&:hover": { color: TEAL },
+            "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: 2 },
           }}
         >
           {group.name || "Untitled forum"}
@@ -457,62 +468,14 @@ export default function ForumPage() {
   };
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 2, md: 3 }, bgcolor: "#FAF9F7", minHeight: "100vh" }}>
+    <Box sx={{ width: "100%", minWidth: 0, py: { xs: 2, md: 3 }, bgcolor: "#FAF9F7", minHeight: "100vh" }}>
       <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 2, sm: 2.5, md: 3 } }}>
-        <Paper
-          elevation={0}
-          sx={{
-            borderRadius: 4,
-            border: `1px solid ${BORDER}`,
-            background: "linear-gradient(135deg, #ffffff 0%, #f8fffe 55%, #fff7f2 100%)",
-            p: { xs: 3, md: 4 },
-            mb: 3,
-            overflow: "hidden",
-            position: "relative",
-          }}
-        >
-          <Box
-            sx={{
-              position: "absolute",
-              width: 220,
-              height: 220,
-              borderRadius: "50%",
-              bgcolor: "rgba(10,147,150,.10)",
-              right: -70,
-              top: -90,
-            }}
-          />
-          <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems={{ xs: "flex-start", md: "center" }} justifyContent="space-between" sx={{ position: "relative" }}>
-            <Box>
-              <Typography sx={{ fontSize: 11, fontWeight: 900, color: TEAL, textTransform: "uppercase", letterSpacing: ".14em", mb: 1 }}>
-                Community Discussions
-              </Typography>
-              <Typography variant="h4" sx={{ color: NAVY, fontWeight: 900, lineHeight: 1.15, mb: 1 }}>
-                Discussion Forum
-              </Typography>
-              <Typography sx={{ color: "#64748b", fontSize: 15, maxWidth: 680, lineHeight: 1.65 }}>
-                Find forum-enabled groups, follow member conversations, ask questions, share updates, and participate in group posts and polls.
-              </Typography>
-            </Box>
-            <Box
-              sx={{
-                width: 82,
-                height: 82,
-                borderRadius: 4,
-                bgcolor: "#fff",
-                border: `1px solid ${BORDER}`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: TEAL,
-                boxShadow: "0 16px 34px rgba(10,147,150,.14)",
-                flexShrink: 0,
-              }}
-            >
-              <ForumRoundedIcon sx={{ fontSize: 42 }} />
-            </Box>
-          </Stack>
-        </Paper>
+        <PageHeader
+          eyebrow="Community discussions"
+          title="Discussion Forum"
+          subtitle="Find forum-enabled groups, follow member conversations, ask questions, share updates, and participate in group posts and polls."
+          sx={{ mb: 3 }}
+        />
 
         <Box
           sx={{
@@ -533,7 +496,10 @@ export default function ForumPage() {
             ].map((item) => (
               <Box
                 key={item.key}
+                component="button"
+                type="button"
                 onClick={() => setTab(item.key)}
+                aria-pressed={tab === item.key}
                 sx={{
                   px: 2,
                   py: "7px",
@@ -548,6 +514,8 @@ export default function ForumPage() {
                   display: "flex",
                   alignItems: "center",
                   gap: "7px",
+                  fontFamily: "inherit",
+                  "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: 2 },
                 }}
               >
                 {item.key === "all" ? <ForumRoundedIcon sx={{ fontSize: 16 }} /> : <GroupsRoundedIcon sx={{ fontSize: 16 }} />}
@@ -561,6 +529,7 @@ export default function ForumPage() {
 
           <TextField
             size="small"
+            label="Search forums"
             placeholder="Search forums…"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
@@ -637,32 +606,21 @@ export default function ForumPage() {
             )}
           </>
         ) : (
-          <Paper
-            elevation={0}
-            sx={{
-              border: `1px dashed ${BORDER}`,
-              borderRadius: 4,
-              bgcolor: "#fff",
-              p: { xs: 4, md: 6 },
-              textAlign: "center",
-            }}
-          >
-            <ForumRoundedIcon sx={{ fontSize: 48, color: TEAL, mb: 1 }} />
-            <Typography variant="h6" sx={{ fontWeight: 900, color: NAVY, mb: 1 }}>
-              {query ? "No forums match your search." : "No discussion forums are available yet."}
-            </Typography>
-            <Typography sx={{ color: "#64748b", maxWidth: 560, mx: "auto", mb: 2 }}>
-              Forums appear here when a group admin enables the forum setting for a group. You can still explore all groups and join the ones relevant to you.
-            </Typography>
-            <Button
-              variant="outlined"
-              startIcon={<GroupsRoundedIcon />}
-              onClick={() => navigate("/community?view=groups")}
-              sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800, borderColor: TEAL, color: TEAL }}
-            >
-              Explore Groups
-            </Button>
-          </Paper>
+          <EmptyState
+            icon={<ForumRoundedIcon />}
+            title={query ? "No forums match your search." : "No discussion forums are available yet."}
+            description="Forums appear here when a group admin enables the forum setting for a group. You can still explore all groups and join the ones relevant to you."
+            action={(
+              <Button
+                variant="outlined"
+                startIcon={<GroupsRoundedIcon />}
+                onClick={() => navigate("/community?view=groups")}
+                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800, borderColor: TEAL, color: TEAL }}
+              >
+                Explore Groups
+              </Button>
+            )}
+          />
         )}
       </Box>
     </Box>

@@ -59,6 +59,8 @@ import {
 import VerifiedIcon from "@mui/icons-material/Verified";
 import KeyboardArrowUpRoundedIcon from "@mui/icons-material/KeyboardArrowUpRounded";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import PageHeader from "../../components/page/PageHeader.jsx";
+import EmptyState from "../../components/page/EmptyState.jsx";
 
 // -----------------------------------------------------------------------------
 // 1. API Helpers & Constants
@@ -525,9 +527,10 @@ function PostCard({
   const userHasVoted = post.user_votes && post.user_votes.length > 0;
 
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3, mb: 2 }}>
+    <Card variant="outlined" sx={{ borderRadius: 2, mb: 2, width: "100%", minWidth: 0, overflow: "hidden" }}>
       <CardHeader
-        avatar={<Avatar src={photo}>{initial}</Avatar>}
+        avatar={<Avatar src={photo} alt={name}>{initial}</Avatar>}
+        sx={{ alignItems: "flex-start", "& .MuiCardHeader-content": { minWidth: 0 }, "& .MuiCardHeader-action": { m: 0 } }}
         title={
           <Stack direction="row" spacing={0.5} alignItems="center">
             <Typography fontWeight={600}>{name}</Typography>
@@ -542,7 +545,9 @@ function PostCard({
             <Tooltip title="Edit">
               <IconButton
                 size="small"
+                aria-label="Edit post"
                 onClick={() => onEdit(post)}
+                sx={{ minWidth: 40, minHeight: 40 }}
               >
                 <EditRoundedIcon fontSize="small" />
               </IconButton>
@@ -551,7 +556,9 @@ function PostCard({
               <IconButton
                 size="small"
                 color="error"
+                aria-label="Delete post"
                 onClick={() => onDelete(post)}
+                sx={{ minWidth: 40, minHeight: 40 }}
               >
                 <DeleteOutlineRoundedIcon fontSize="small" />
               </IconButton>
@@ -582,7 +589,7 @@ function PostCard({
                     href={post.link}
                     target="_blank"
                     rel="noreferrer"
-                    sx={{ mt: 1, textTransform: "none" }}
+                    sx={{ mt: 1, textTransform: "none", maxWidth: "100%", overflowWrap: "anywhere" }}
                   >
                     {post.link}
                   </Button>
@@ -596,7 +603,7 @@ function PostCard({
                   <Grid key={i} item xs={12} sm={6}>
                     <img
                       src={src}
-                      alt="post"
+                      alt={`${name}'s post image ${i + 1}`}
                       style={{
                         width: "100%",
                         maxHeight: 300,
@@ -748,7 +755,7 @@ function PostCard({
 
         <Divider sx={{ mb: 1 }} />
 
-        <Stack direction="row" justifyContent="space-between">
+        <Stack direction="row" justifyContent="space-between" flexWrap="wrap" useFlexGap sx={{ gap: 0.5, "& .MuiButton-root": { minHeight: 40 } }}>
           {/* Reaction button with popup */}
           <Button
             size="small"
@@ -1745,7 +1752,7 @@ function PostSkeleton() {
   return (
     <Card
       variant="outlined"
-      sx={{ borderRadius: 3, mb: 2 }}
+      sx={{ borderRadius: 2, mb: 2 }}
     >
       {/* Header skeleton */}
       <CardHeader
@@ -2063,18 +2070,13 @@ export default function MyPostsPage() {
 
 
   return (
-    <Box sx={{ width: "100%", pl: 0, pt: 0, pr: 1, pb: 3 }}>
-      <div className="flex items-center justify-between mb-3 sm:mb-4">
-        <div>
-          <Typography variant="h4">
-            My Posts
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Share your thoughts, connect with the community, and manage your posts.
-          </Typography>
-        </div>
-        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)}>Create Post</Button>
-      </div>
+    <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", pl: 0, pt: 0, pr: { xs: 0, sm: 1 }, pb: 3, overflow: "hidden" }}>
+      <PageHeader
+        eyebrow="Community"
+        title="My Posts"
+        subtitle="Share your thoughts, connect with the community, and manage your posts."
+        actions={<Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => setCreateOpen(true)}>Create Post</Button>}
+      />
       {loading ? (
         // 🔹 Initial loading → show 4 skeleton cards instead of spinner
         (<>
@@ -2086,9 +2088,7 @@ export default function MyPostsPage() {
       ) : (
         <>
           {posts.length === 0 && (
-            <Box sx={{ textAlign: "center", py: 5, color: "text.secondary" }}>
-              You haven&apos;t posted anything yet.
-            </Box>
+            <EmptyState title="No posts yet" description="Create a post to start sharing with your community." />
           )}
 
           {visiblePosts.map((post) => (
@@ -2149,6 +2149,7 @@ export default function MyPostsPage() {
           <IconButton
             onClick={handleScrollTop}
             size="large"
+            aria-label="Scroll to top"
             sx={{
               bgcolor: "primary.main",
               color: "#fff",

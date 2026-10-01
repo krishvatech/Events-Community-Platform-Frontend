@@ -25,6 +25,8 @@ import VerifiedIcon from "@mui/icons-material/Verified";
 import EventRoundedIcon from "@mui/icons-material/EventRounded";
 import ReceiptLongRoundedIcon from "@mui/icons-material/ReceiptLongRounded";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import PageHeader from "../../components/page/PageHeader.jsx";
+import EmptyState from "../../components/page/EmptyState.jsx";
 
 const BORDER = "#e2e8f0";
 
@@ -998,9 +1000,11 @@ function NotificationRow({
         width: "100%",
         flexGrow: 1,
         boxSizing: "border-box",
-        border: `1px solid ${BORDER}`,
-        borderRadius: 2,
-        bgcolor: unread ? "#f6fffe" : "background.paper",
+        border: "1px solid var(--imaa-border)",
+        borderLeft: unread ? "4px solid var(--imaa-teal-hover)" : "1px solid var(--imaa-border)",
+        borderRadius: "var(--imaa-radius-card)",
+        bgcolor: unread ? "var(--imaa-bg-cool)" : "background.paper",
+        boxShadow: "var(--imaa-shadow-sm)",
         cursor: (
           isPaymentNotification(item) ||
           item.kind === "forum_enabled" ||
@@ -1027,7 +1031,7 @@ function NotificationRow({
           item.context?.groupSlug ||
           item.data?.group_slug
         ) ? {
-          bgcolor: unread ? "#e6f7f5" : "#f9fafb",
+          bgcolor: unread ? "var(--imaa-bg-cool)" : "background.paper",
         } : {},
       }}
     >
@@ -1063,6 +1067,11 @@ function NotificationRow({
         </ListItemAvatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
+          {unread && (
+            <Typography variant="caption" sx={{ display: "block", mb: 0.5, color: "var(--imaa-teal-hover)", fontWeight: 800 }}>
+              Unread
+            </Typography>
+          )}
           {renderContent()}
 
           {/* Show description only if it's not a generic auto-generated one */}
@@ -1102,6 +1111,8 @@ function NotificationRow({
             <IconButton
               size="small"
               title={unread ? "Mark as read" : "Mark as unread"}
+              aria-label={unread ? "Mark notification as read" : "Mark notification as unread"}
+              sx={{ minWidth: 40, minHeight: 40 }}
               onClick={(e) => {
                 e.stopPropagation();
                 onToggleRead?.(item.id, !unread);
@@ -1127,7 +1138,7 @@ function NotificationRow({
               item.context?.groupSlug ||
               item.data?.group_slug
             ) && (
-                <IconButton size="small" title="Open" onClick={(e) => {
+                <IconButton size="small" title="Open" aria-label="Open notification" sx={{ minWidth: 40, minHeight: 40 }} onClick={(e) => {
                   e.stopPropagation();
                   onOpen?.(item);
                 }}>
@@ -1583,14 +1594,15 @@ export default function NotificationsPage({
   };
 
   return (
-    <Grid container spacing={2}>
-      <Grid item xs={12} sm={12} md={9} sx={{ width: '100%' }}>
+    <Grid container spacing={2} sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
+      <Grid item xs={12} sm={12} md={9} sx={{ width: '100%', minWidth: 0 }}>
         {/* Header */}
-        <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, mb: 2 }}>
+        <PageHeader eyebrow="Community" title="Notifications" subtitle="Review account activity and connection updates." />
+        <Paper sx={{ p: { xs: 1.5, sm: 2 }, border: "1px solid var(--imaa-border)", borderRadius: "var(--imaa-radius-card)", boxShadow: "var(--imaa-shadow-sm)", mb: 2 }}>
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, alignItems: "center", gap: 1 }}>
             <Stack direction="row" spacing={1.25} alignItems="center">
               <Badge badgeContent={unreadCount} color="primary"><NotificationsNoneOutlinedIcon /></Badge>
-              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Notifications</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Notification filters</Typography>
               <Chip size="small" label={`${unreadCount} unread`} />
             </Stack>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent={{ xs: "flex-start", sm: "flex-end" }}>
@@ -1625,7 +1637,7 @@ export default function NotificationsPage({
         {loading && items.length === 0 ? (
           <><NotificationSkeleton /><NotificationSkeleton /><NotificationSkeleton /></>
         ) : filtered.length === 0 ? (
-          <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: 'center' }}><Typography variant="body2" color="text.secondary">No notifications found.</Typography></Paper>
+          <EmptyState title="No notifications found" description="New notifications will appear here." />
         ) : (
           <>
             {["Today", "Yesterday", "Earlier"].map((section) => groupedLimited[section]?.length ? (
@@ -1658,7 +1670,7 @@ export default function NotificationsPage({
       </Grid>
       {showScrollTop && (
         <Box sx={{ position: "fixed", bottom: { xs: 72, md: 32 }, right: { xs: 16, md: 32 }, zIndex: 1300 }}>
-          <IconButton onClick={handleScrollTop} size="large" sx={{ bgcolor: "primary.main", color: "#fff", boxShadow: 4, borderRadius: "999px", "&:hover": { bgcolor: "primary.dark" } }}><KeyboardArrowUpRoundedIcon /></IconButton>
+          <IconButton aria-label="Scroll to top" onClick={handleScrollTop} size="large" sx={{ bgcolor: "primary.main", color: "#fff", boxShadow: 4, borderRadius: "999px", "&:hover": { bgcolor: "primary.dark" } }}><KeyboardArrowUpRoundedIcon /></IconButton>
         </Box>
       )}
     </Grid>

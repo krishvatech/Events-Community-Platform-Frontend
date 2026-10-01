@@ -14,43 +14,29 @@ import {
     Stack,
     TextField,
     Typography,
-    Card,
-    CardContent,
-    CardActions,
     Alert,
-    Avatar,
     Pagination,
     Dialog,
     DialogTitle,
     DialogContent,
     DialogActions,
-    MenuItem,
     IconButton,
     Popper,
     Chip,
-    Tooltip,
 } from "@mui/material";
 import Autocomplete from "@mui/material/Autocomplete";
-import Skeleton from "@mui/material/Skeleton";
 import SearchIcon from "@mui/icons-material/Search";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
-import LockRounded from "@mui/icons-material/LockRounded";
-import { isAdminUser } from "../../utils/adminRole";
-import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
+import {
+    CommunityGroupCard,
+    CommunityGroupCardSkeleton,
+} from "../../components/CommunityGroupCard.jsx";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import { colors, layout, radii, shadows } from "../../styles/designTokens";
 
 const BORDER = "#e2e8f0";
-const JOIN_BTN_SX = {
-    textTransform: "none",
-    whiteSpace: "nowrap",
-    minWidth: 124,
-    px: 2.25,
-    fontWeight: 600,
-    borderRadius: 2,
-};
-
 const JOIN_POLICY_LABELS = {
     open: "Open",
     approval: "Request approval",
@@ -101,13 +87,6 @@ function authHeader() {
     return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-const slugify = (s) =>
-    (s || "")
-        .toLowerCase()
-        .trim()
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-
 const normalizeRole = (g) => {
     const raw =
         g?.current_user_role ??
@@ -122,33 +101,6 @@ const normalizeRole = (g) => {
             ? raw
             : raw?.name || raw?.role || raw?.title || "";
     return String(val || "").toLowerCase();
-};
-
-const roleLabel = (g) => {
-    const role = normalizeRole(g);
-    if (!role) return "";
-    if (role.includes("owner")) return "Owner";
-    if (role.includes("admin")) return "Admin";
-    if (role.includes("moderator") || role === "mod") return "Moderator";
-    return "";
-};
-
-const normalizeMembershipStatus = (g) => {
-    const raw =
-        g?.membership_status ??
-        g?.status ??
-        g?.membership?.status ??
-        g?.current_user_membership?.status ??
-        "";
-    return String(raw || "").toLowerCase();
-};
-
-const membershipLabel = (g) => {
-    if (g?.is_member) return "Member";
-    const s = normalizeMembershipStatus(g);
-    if (s === "pending" || s === "requested" || s === "request") return "Pending";
-    if (s === "joined" || s === "active" || s === "approved" || s === "member") return "Member";
-    return "";
 };
 
 /* ---------- Custom Select Component ---------- */
@@ -584,243 +536,6 @@ function EditGroupDialog({ open, group, onClose, onUpdated }) {
     );
 }
 
-/* ---------- Single group card ---------- */
-function GroupGridCard({ g, onJoin, onOpen, onEdit, hideJoin, canEdit }) {
-    const isPrivate = (g.visibility || "").toLowerCase() === "private";
-    const members = g.member_count ?? g.members_count ?? g.members?.length ?? 0;
-    const role = roleLabel(g);
-    const memberStatus = membershipLabel(g);
-    const accent = "#0A9396";
-    const headline = g.short_description || "";
-    const desc = g.description || g.topic || g.category || "";
-
-    const visibility = (g.visibility || "").toLowerCase();
-    const jp = (g.join_policy || "").toLowerCase();
-    const isApproval =
-        visibility === "public" && (jp === "public_approval" || jp === "approval");
-    const pending = (g.membership_status || "").toLowerCase() === "pending";
-    const joined =
-        (g.membership_status || "").toLowerCase() === "joined" || !!g.is_member;
-
-    const category = g.category || g.topic || "";
-    const ctaText = joined
-        ? "Joined"
-        : pending
-            ? "Request pending"
-            : isApproval
-                ? "Request to Join"
-                : "Join";
-
-    return (
-        <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, background: "#fff", overflow: "hidden", display: "flex", flexDirection: "column" }}>
-            {/* Top color stripe */}
-            <Box sx={{ width: "100%", height: 4, bgcolor: accent }} />
-
-            {/* Cover image */}
-            <Box
-                onClick={() => onOpen?.(g)}
-                sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}
-            >
-                {g.cover_image || g.cover ? (
-                    <img
-                        key={g._cache || g.updated_at}
-                        src={bust(g.cover_image || g.cover, g._cache || g.updated_at)}
-                        alt={g.name}
-                        loading="lazy"
-                        style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
-                    />
-                ) : (
-                    <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
-                )}
-
-                {/* Logo overlay */}
-                {g.logo && (
-                    <Box sx={{
-                        position: "absolute", bottom: -20, left: 14,
-                        width: 44, height: 44, borderRadius: "50%",
-                        overflow: "hidden", border: "3px solid white", bgcolor: "white",
-                        zIndex: 2, boxShadow: "0 2px 8px rgba(0,0,0,.15)"
-                    }}>
-                        <img src={bust(g.logo, g._cache || g.updated_at)} alt="logo"
-                            style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                    </Box>
-                )}
-            </Box>
-
-            {/* Body */}
-            <Box sx={{ p: "16px 18px 14px", flexGrow: 1, display: "flex", flexDirection: "column", gap: "6px", mt: g.logo ? 3 : 0 }}>
-                {/* Status badges row */}
-                <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "4px", mb: "2px" }}>
-                    <Typography sx={{ fontSize: 10, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                        {isPrivate ? "PRIVATE" : "GROUP"}
-                    </Typography>
-                    <Box sx={{ display: "flex", gap: "4px", alignItems: "center" }}>
-                        {joined && (
-                            <Box sx={{ fontSize: 10, fontWeight: 700, color: accent, bgcolor: "#E8F7F7", px: "7px", py: "2px", borderRadius: "100px" }}>
-                                ✓ Joined
-                            </Box>
-                        )}
-                        {pending && (
-                            <Box sx={{ fontSize: 10, fontWeight: 700, color: "#b45309", bgcolor: "#fffbeb", px: "7px", py: "2px", borderRadius: "100px" }}>
-                                Pending
-                            </Box>
-                        )}
-                        {isApproval && !joined && !pending && (
-                            <Box sx={{ display: "flex", alignItems: "center", gap: "3px" }}>
-                                <LockRounded sx={{ fontSize: 11, color: "#f97316" }} />
-                                <Typography sx={{ fontSize: 10, color: "#f97316" }}>Approval required</Typography>
-                            </Box>
-                        )}
-                        {memberStatus && (
-                            <Chip
-                                size="small"
-                                label={memberStatus}
-                                sx={{
-                                    height: 20,
-                                    fontSize: 10,
-                                    bgcolor: memberStatus === "Pending" ? "#fffbeb" : "#ecfdf3",
-                                    color: memberStatus === "Pending" ? "#b45309" : "#166534",
-                                }}
-                            />
-                        )}
-                        {role && (
-                            <Box sx={{ fontSize: 10, fontWeight: 700, color: "#4338ca", bgcolor: "#eef2ff", px: "7px", py: "2px", borderRadius: "100px" }}>
-                                {role}
-                            </Box>
-                        )}
-                        <Chip
-                            size="small"
-                            label={`${members} Member${members !== 1 ? "s" : ""}`}
-                            sx={{
-                                height: 20,
-                                fontSize: 10,
-                                bgcolor: "#f0f9ff",
-                                color: "#0369a1",
-                            }}
-                        />
-                    </Box>
-                </Box>
-
-                {/* Title */}
-                <Box onClick={() => onOpen?.(g)}>
-                    <Typography sx={{ fontSize: 11, fontWeight: 800, color: accent, textTransform: "uppercase", letterSpacing: "0.08em", mb: "2px" }}>
-                        GROUP
-                    </Typography>
-                    <Typography sx={{ fontSize: 15, fontWeight: 800, color: "#1B2A4A", lineHeight: 1.25, mb: "4px" }}>
-                        {g.name}
-                    </Typography>
-                    {g.owner_name || g.created_by_name ? (
-                        <Typography sx={{ fontSize: 11, color: "#888" }}>
-                            by {g.owner_name || g.created_by_name}
-                        </Typography>
-                    ) : null}
-                </Box>
-
-                {/* Short description / headline */}
-                {headline && (
-                    <Typography sx={{ fontSize: 12.5, color: "#334155", fontWeight: 600, lineHeight: 1.5,
-                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                        {headline}
-                    </Typography>
-                )}
-
-                {/* Description */}
-                {desc && (
-                    <Typography sx={{ fontSize: 12, color: "#666", lineHeight: 1.55,
-                        display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
-                        {desc}
-                    </Typography>
-                )}
-
-
-                {g.parent_group && (
-                    <Typography sx={{ fontSize: 11, color: "#888" }}>
-                        Subgroup of <b>{g.parent_group.name}</b>
-                    </Typography>
-                )}
-            </Box>
-
-            {/* Footer CTA */}
-            <Box sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "12px", display: "flex", gap: "8px", alignItems: "center" }}>
-                {canEdit && (
-                    <IconButton size="small" onClick={(e) => { e.stopPropagation(); onEdit?.(g); }}
-                        sx={{ color: "#aaa", "&:hover": { color: accent } }} title="Edit Group">
-                        <EditNoteRoundedIcon fontSize="small" />
-                    </IconButton>
-                )}
-                {!hideJoin && (
-                    <Box
-                        onClick={() => !pending && !joined && onJoin?.(g)}
-                        sx={{
-                            fontSize: 12, fontWeight: 700,
-                            color: joined ? "#888" : accent,
-                            cursor: (pending || joined) ? "default" : "pointer",
-                            display: "flex", alignItems: "center", gap: "4px",
-                            opacity: pending ? 0.6 : 1,
-                            "&:hover": { textDecoration: (pending || joined) ? "none" : "underline" }
-                        }}
-                    >
-                        {ctaText} {!joined && !pending && "→"}
-                    </Box>
-                )}
-                {(hideJoin || joined) && (
-                    <Box
-                        onClick={() => onOpen?.(g)}
-                        sx={{ fontSize: 12, fontWeight: 700, color: accent, cursor: "pointer",
-                            display: "flex", alignItems: "center", gap: "4px",
-                            ml: "auto",
-                            "&:hover": { textDecoration: "underline" } }}
-                    >
-                        {joined ? "Open Group →" : "View Details →"}
-                    </Box>
-                )}
-            </Box>
-        </Box>
-    );
-}
-
-function GroupGridCardSkeleton() {
-    return (
-        <Card
-            variant="outlined"
-            sx={{
-                width: "100%",
-                borderRadius: 3,
-                overflow: "hidden",
-                borderColor: BORDER,
-                height: 280,
-                display: "flex",
-                flexDirection: "column",
-            }}
-        >
-            {/* Cover skeleton */}
-            <Box
-                sx={{
-                    width: "100%",
-                    height: 130,
-                    bgcolor: "#f8fafc",
-                    borderBottom: `1px solid ${BORDER}`,
-                }}
-            >
-                <Skeleton variant="rectangular" width="100%" height="100%" />
-            </Box>
-
-            <CardContent sx={{ flexGrow: 1, pb: 1, pt: 2 }}>
-                <Stack direction="row" justifyContent="space-between" sx={{ mb: 1 }}>
-                    <Skeleton variant="text" width={60} height={20} />
-                    <Skeleton variant="text" width={50} height={20} />
-                </Stack>
-                <Skeleton variant="text" width="80%" height={28} sx={{ mb: 0.5 }} />
-                <Skeleton variant="text" width="60%" height={20} />
-            </CardContent>
-
-            <CardActions sx={{ pt: 0, pb: 2, px: 2 }}>
-                <Skeleton variant="rectangular" width="100%" height={36} sx={{ borderRadius: 1 }} />
-            </CardActions>
-        </Card>
-    );
-}
-
 function QuickViewDialog({ open, group, onClose, onJoin, onEdit, canEdit }) {
     if (!group) return null;
     const isPrivate = (group.visibility || "").toLowerCase() === "private";
@@ -938,7 +653,6 @@ function QuickViewDialog({ open, group, onClose, onJoin, onEdit, canEdit }) {
 export default function MyGroupsPage() {
     const navigate = useNavigate();
     const location = useLocation();
-
     // "My Groups" list
     const [data, setData] = React.useState([]);
     const [allData, setAllData] = React.useState([]);
@@ -1127,33 +841,33 @@ export default function MyGroupsPage() {
     };
 
     return (
-        <Box sx={{ width: "100%", py: { xs: 2, md: 3 }, bgcolor: "#FAF9F7", minHeight: "100vh" }}>
+        <Box sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: colors.bgMember, minHeight: "100vh" }}>
             <Box
                 sx={{
                     display: "flex",
                     gap: 3,
                     px: { xs: 2, sm: 2, md: 2.5, lg: 3 },
-                    maxWidth: { xs: "100%", lg: "1200px" },
+                    maxWidth: layout.contentMax,
                     mx: "auto",
                 }}
             >
                 {/* Main content */}
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                     {/* Header */}
-                    <Box sx={{ textAlign: "center", mb: 3, pt: 1 }}>
-                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#0A9396", textTransform: "uppercase", letterSpacing: "0.12em", mb: "6px" }}>
+                    <Box sx={{ mb: { xs: 3, md: 4 }, pt: 1 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: colors.tealDark, textTransform: "uppercase", letterSpacing: "0.12em", mb: 0.75 }}>
                             COMMUNITY
                         </Typography>
-                        <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: "8px", lineHeight: 1.2 }}>
+                        <Typography component="h1" variant="h4" sx={{ fontWeight: 800, color: colors.ink, mb: 1, lineHeight: 1.2 }}>
                             My Groups
                         </Typography>
-                        <Typography sx={{ fontSize: 14, color: "#888", mb: 2 }}>
+                        <Typography sx={{ fontSize: 14, color: colors.inkBody }}>
                             Groups you have joined or are managing
                         </Typography>
                     </Box>
 
                     {/* Filters */}
-                    <Box sx={{ mb: 2 }}>
+                    <Box sx={{ mb: 3, p: { xs: 1.5, sm: 2 }, bgcolor: colors.white, border: `1px solid ${colors.border}`, borderRadius: `${radii.card}px`, boxShadow: shadows.sm }}>
                         <Stack direction="column" spacing={2}>
                     <TextField
                         placeholder="Search my groups..."
@@ -1171,7 +885,7 @@ export default function MyGroupsPage() {
                                 </InputAdornment>
                             ),
                         }}
-                        sx={{ bgcolor: "white" }}
+                        sx={{ bgcolor: colors.white }}
                     />
 
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -1256,7 +970,7 @@ export default function MyGroupsPage() {
 
                     {/* Showing count */}
                     {!loading && (
-                        <Typography sx={{ fontSize: 11, fontWeight: 700, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
+                        <Typography sx={{ fontSize: 12, fontWeight: 700, color: colors.inkBody, textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
                             MY GROUPS {data.length}
                         </Typography>
                     )}
@@ -1264,44 +978,48 @@ export default function MyGroupsPage() {
                     {/* Content */}
                     <Box sx={{ minHeight: "400px" }}>
                         {loading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", md: "repeat(3, minmax(0, 1fr))" }, gap: 2 }}>
                         {[...Array(6)].map((_, i) => (
-                            <GroupGridCardSkeleton key={i} />
+                            <CommunityGroupCardSkeleton key={i} />
                         ))}
-                    </div>
+                    </Box>
                 ) : error ? (
                     <Alert severity="error">{error}</Alert>
                 ) : data.length === 0 ? (
-                    <Paper className="p-12 text-center rounded-2xl border-dashed border-2 border-slate-200 shadow-none bg-slate-50/50">
-                        <Typography variant="h6" className="text-slate-600 mb-2">
+                    <Paper variant="outlined" sx={{ py: { xs: 6, md: 8 }, px: 2, textAlign: "center", borderColor: colors.border, borderRadius: `${radii.card}px`, boxShadow: "none" }}>
+                        <Typography component="h2" variant="h6" sx={{ color: colors.ink, mb: 0.5 }}>
                             No groups found
                         </Typography>
-                        <Typography variant="body2" className="text-slate-500 mb-6">
-                            You haven't joined any groups yet.
+                        <Typography variant="body2" sx={{ color: colors.inkBody, mb: 3 }}>
+                            {search || selectedCompanies.length || selectedRegions.length || selectedTitles.length || selectedJoinPolicies.length || selectedVisibilities.length
+                                ? "Try a different search term or filter selection."
+                                : "You haven't joined any groups yet."}
                         </Typography>
-                        <Button variant="outlined" onClick={() => navigate("/community/groups")}>
+                        <Button variant="outlined" onClick={() => navigate("/community/groups")} sx={{ minHeight: 40, textTransform: "none", fontWeight: 700 }}>
                             Explore Groups
                         </Button>
                     </Paper>
                 ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", md: "repeat(3, minmax(0, 1fr))" }, gap: 2 }}>
                                 {data.map((g) => (
-                                    <GroupGridCard
+                                    <CommunityGroupCard
                                         key={g.id}
-                                        g={g}
+                                        group={g}
+                                        imageUrl={g.cover_image || g.cover ? bust(g.cover_image || g.cover, g._cache || g.updated_at) : ""}
+                                        logoUrl={g.logo ? bust(g.logo, g._cache || g.updated_at) : ""}
                                         hideJoin={true} // Usually "My Groups" are already joined, so we can hide generic join button or keep it as status
                                         onOpen={(grp) => navigate(`/community/mygroups/${grp.slug || grp.id}`, { state: { backTo: "/community/mygroups", backLabel: "Back to My Groups" } })}
                                         onEdit={(grp) => setEditGroup(grp)}
                                         canEdit={canEditGroup(g)}
                                     />
                                 ))}
-                            </div>
+                            </Box>
                         )}
 
                         {/* Pagination */}
                         {!loading && totalPages > 1 && (
                             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, mt: 4 }}>
-                                <Typography variant="caption" sx={{ color: "#888" }}>
+                                <Typography variant="caption" sx={{ color: colors.inkBody }}>
                                     {ITEMS_PER_PAGE} per page
                                 </Typography>
                                 <Pagination

@@ -11,6 +11,7 @@ import {
     Tooltip,
     Typography,
     Button,
+    ButtonBase,
     IconButton,
     Checkbox,
     MenuItem,
@@ -59,6 +60,8 @@ import {
 import L from "leaflet";
 import "leaflet.heat";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import PageHeader from "../../components/page/PageHeader.jsx";
+import EmptyState from "../../components/page/EmptyState.jsx";
 
 /* --------------------- constants & helpers --------------------- */
 const BORDER = "#e2e8f0";
@@ -269,13 +272,6 @@ function flagEmojiFromISO2(code) {
     try { return String.fromCodePoint(...pts); } catch { return ""; }
 }
 
-function memberAccentColor(name) {
-    const colors = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#3B5998"];
-    let h = 0;
-    for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-    return colors[h % colors.length];
-}
-
 /* -------------------------- Map Component -------------------------- */
 function MembersLeafletMap({ markers, countryAgg, showMap, minHeight = 580, onOpenProfile }) {
     const hasMarkers = markers && markers.length > 0;
@@ -408,7 +404,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
         ? rawSkills.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
 
-    const accent = memberAccentColor(name);
+    const accent = "#077B7E";
     const degree = status === "friends" ? 1 : status === "pending_outgoing" ? 2 : 3;
     const degreeColors = { 1: "#0A9396", 2: "#E8532F", 3: "#1B2A4A" };
     const degreeLabels = { 1: "1st", 2: "2nd", 3: "3rd" };
@@ -416,28 +412,27 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
     return (
         <Box
             sx={{
-                borderRadius: "14px",
-                border: `1px solid ${BORDER}`,
-                background: "#fff",
+                borderRadius: "var(--imaa-radius-card)",
+                border: "1px solid var(--imaa-border)",
+                bgcolor: "background.paper",
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
                 transition: "box-shadow .18s, border-color .18s",
-                boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+                boxShadow: "var(--imaa-shadow-sm)",
                 width: "100%",
                 "&:hover": {
-                    boxShadow: "0 8px 28px rgba(0,0,0,.09)",
-                    borderColor: accent + "55",
+                    boxShadow: "var(--imaa-shadow-md)",
+                    borderColor: "var(--imaa-border-hover)",
                 },
             }}
         >
-            {/* Top accent stripe */}
-            <Box sx={{ height: 4, bgcolor: accent, flexShrink: 0 }} />
-
             {/* Card body — click opens profile */}
-            <Box
+            <ButtonBase
+                component="div"
                 onClick={() => onOpenProfile?.(u)}
-                sx={{ p: "16px 18px 12px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", cursor: "pointer" }}
+                aria-label={`Open ${name}'s profile`}
+                sx={{ p: 2, flex: 1, width: "100%", display: "flex", alignItems: "stretch", textAlign: "left", flexDirection: "column", gap: 1 }}
             >
                 {/* Row 1: Avatar (left) + degree / industry (right) */}
                 <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
@@ -447,9 +442,9 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             src={u?.profile?.user_image_url || u?.user_image_url || u?.avatar_url || u?.avatar || u?.user_image || ""}
                             alt={name}
                             sx={{
-                                width: 50, height: 50, borderRadius: "13px",
-                                background: `linear-gradient(145deg, ${accent}20, ${accent}08)`,
-                                border: `2px solid ${accent}25`,
+                                width: 52, height: 52, borderRadius: "var(--imaa-radius-card)",
+                                bgcolor: "var(--imaa-bg-cool)",
+                                border: "1px solid var(--imaa-border)",
                                 color: accent, fontWeight: 800, fontSize: 18,
                             }}
                         >
@@ -501,11 +496,11 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
                 {/* Name + title + company */}
                 <Box>
-                    <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+                    <Typography component="h3" sx={{ fontSize: 16, fontWeight: 750, color: "var(--imaa-ink)", lineHeight: 1.3, mb: 0.25, overflowWrap: "anywhere" }}>
                         {name}
                     </Typography>
                     {(title || company) && (
-                        <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+                        <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", lineHeight: 1.45 }}>
                             {title}
                             {title && company
                                 ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {company}</Box>
@@ -518,7 +513,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
                 {/* Location + online indicator */}
                 {country && (
-                    <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                    <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                         {flag && <span>{flag}</span>}
                         {country}
                         {isOnline && (
@@ -543,12 +538,12 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                         ))}
                     </Box>
                 )}
-            </Box>
+            </ButtonBase>
 
             {/* Action footer */}
             {!isMe && (
                 <Box
-                    sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+                    sx={{ borderTop: "1px solid var(--imaa-border)", px: 2, py: 1, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}
                     onClick={(e) => e.stopPropagation()}
                 >
                     {status === "friends" ? (
@@ -556,7 +551,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             size="small"
                             variant="outlined"
                             onClick={() => onOpenProfile?.(u)}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                            sx={{ minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontSize: "0.75rem", fontWeight: 700, flex: 1 }}
                         >
                             Message
                         </Button>
@@ -566,7 +561,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             variant="outlined"
                             color="inherit"
                             onClick={() => {}}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                            sx={{ minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontSize: "0.75rem", fontWeight: 700, flex: 1 }}
                             disabled
                         >
                             Request Sent
@@ -577,7 +572,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             variant="contained"
                             onClick={() => onAddFriend(u.id)}
                             startIcon={<PersonAddAlt1RoundedIcon fontSize="small" />}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem", flex: 1 }}
+                            sx={{ minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontSize: "0.75rem", fontWeight: 700, flex: 1, bgcolor: "var(--imaa-teal-hover)", "&:hover": { bgcolor: "var(--imaa-navy)" } }}
                         >
                             Add Contact
                         </Button>
@@ -589,7 +584,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             variant="outlined"
                             color="error"
                             onClick={() => onRemoveFriend(u.id)}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontSize: "0.75rem", fontWeight: 700 }}
                         >
                             Remove
                         </Button>
@@ -617,33 +612,32 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
     const iso2 = resolveCountryCode(u);
     const flag = flagEmojiFromISO2(iso2);
 
-    const accent = memberAccentColor(name);
+    const accent = "#077B7E";
 
     return (
         <Box
             sx={{
-                borderRadius: "14px",
-                border: `1px solid ${BORDER}`,
-                background: "#fff",
+                borderRadius: "var(--imaa-radius-card)",
+                border: "1px solid var(--imaa-border)",
+                bgcolor: "background.paper",
                 overflow: "hidden",
                 display: "flex",
                 flexDirection: "column",
                 transition: "box-shadow .18s, border-color .18s",
-                boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+                boxShadow: "var(--imaa-shadow-sm)",
                 width: "100%",
                 "&:hover": {
-                    boxShadow: "0 8px 28px rgba(0,0,0,.09)",
-                    borderColor: accent + "55",
+                    boxShadow: "var(--imaa-shadow-md)",
+                    borderColor: "var(--imaa-border-hover)",
                 },
             }}
         >
-            {/* Top accent stripe */}
-            <Box sx={{ height: 4, bgcolor: type === "received" ? "#E8532F" : "#1B2A4A", flexShrink: 0 }} />
-
             {/* Card body — click opens profile */}
-            <Box
+            <ButtonBase
+                component="div"
                 onClick={() => onOpenProfile?.(u)}
-                sx={{ p: "16px 18px 12px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", cursor: "pointer" }}
+                aria-label={`Open ${name}'s profile`}
+                sx={{ p: 2, flex: 1, width: "100%", display: "flex", alignItems: "stretch", textAlign: "left", flexDirection: "column", gap: 1 }}
             >
                 {/* Row 1: Avatar (left) + status badge (right) */}
                 <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
@@ -653,9 +647,9 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             src={u?.profile?.user_image_url || u?.user_image_url || u?.avatar_url || u?.avatar || u?.user_image || ""}
                             alt={name}
                             sx={{
-                                width: 50, height: 50, borderRadius: "13px",
-                                background: `linear-gradient(145deg, ${accent}20, ${accent}08)`,
-                                border: `2px solid ${accent}25`,
+                                width: 52, height: 52, borderRadius: "var(--imaa-radius-card)",
+                                bgcolor: "var(--imaa-bg-cool)",
+                                border: "1px solid var(--imaa-border)",
                                 color: accent, fontWeight: 800, fontSize: 18,
                             }}
                         >
@@ -688,11 +682,11 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
 
                 {/* Name + title + company */}
                 <Box>
-                    <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+                    <Typography component="h3" sx={{ fontSize: 16, fontWeight: 750, color: "var(--imaa-ink)", lineHeight: 1.3, mb: 0.25, overflowWrap: "anywhere" }}>
                         {name}
                     </Typography>
                     {(title || company) && (
-                        <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+                        <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", lineHeight: 1.45 }}>
                             {title}
                             {title && company
                                 ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {company}</Box>
@@ -705,7 +699,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
 
                 {/* Location + industry */}
                 {(country || industry) && (
-                    <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+                    <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
                         {industry && <span>{industry}</span>}
                         {industry && country && <span>•</span>}
                         {flag && <span>{flag}</span>}
@@ -718,11 +712,11 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                         Wants to connect with you
                     </Typography>
                 )}
-            </Box>
+            </ButtonBase>
 
             {/* Action footer */}
             <Box
-                sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+                sx={{ borderTop: "1px solid var(--imaa-border)", px: 2, py: 1, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}
                 onClick={(e) => e.stopPropagation()}
             >
                 {type === "sent" ? (
@@ -731,7 +725,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             size="small"
                             variant="outlined"
                             color="inherit"
-                            sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ minHeight: 40, flex: 1, borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontSize: "0.75rem", fontWeight: 700 }}
                             disabled
                             startIcon={<HourglassBottomRoundedIcon />}
                         >
@@ -742,7 +736,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             variant="outlined"
                             color="error"
                             onClick={() => onCancel(req.id)}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontSize: "0.75rem", fontWeight: 700 }}
                             startIcon={<HighlightOffIcon />}
                         >
                             Cancel
@@ -754,7 +748,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             size="small"
                             variant="contained"
                             onClick={() => onAccept(req.id)}
-                            sx={{ flex: 1, borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ minHeight: 40, flex: 1, borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontSize: "0.75rem", fontWeight: 700, bgcolor: "var(--imaa-teal-hover)", "&:hover": { bgcolor: "var(--imaa-navy)" } }}
                             startIcon={<CheckCircleOutlineIcon />}
                         >
                             Accept
@@ -764,7 +758,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             variant="outlined"
                             color="error"
                             onClick={() => onDecline(req.id)}
-                            sx={{ borderRadius: 2, textTransform: "none", fontSize: "0.75rem" }}
+                            sx={{ minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontSize: "0.75rem", fontWeight: 700 }}
                             startIcon={<HighlightOffIcon />}
                         >
                             Decline
@@ -777,8 +771,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
 };
 
 const MemberCardSkeleton = () => (
-    <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <Box sx={{ height: 4, bgcolor: "#e2e8f0" }} />
+    <Box sx={{ borderRadius: "var(--imaa-radius-card)", border: "1px solid var(--imaa-border)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         <Stack sx={{ p: "16px 18px 12px", gap: "8px" }} spacing={0}>
             <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                 <Skeleton variant="rounded" width={50} height={50} sx={{ borderRadius: "13px" }} />
@@ -804,8 +797,7 @@ const MemberCardSkeleton = () => (
 );
 
 const RequestCardSkeleton = () => (
-    <Box sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-        <Box sx={{ height: 4, bgcolor: "#e2e8f0" }} />
+    <Box sx={{ borderRadius: "var(--imaa-radius-card)", border: "1px solid var(--imaa-border)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
         <Stack sx={{ p: "16px 18px 12px", gap: "8px" }} spacing={0}>
             <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                 <Skeleton variant="rounded" width={50} height={50} sx={{ borderRadius: "13px" }} />
@@ -1420,45 +1412,50 @@ export default function MyContacts() {
                             height: "100%",
                         }}
                     >
-                        <Paper sx={{ p: 1.5, mb: 1.5, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+                        <PageHeader
+                            eyebrow="Community"
+                            title="My Connections"
+                            subtitle="Manage your contacts, connection requests, and profile visitors."
+                            actions={isCompact ? (
+                                <Tooltip title="View map">
+                                    <IconButton aria-label="View contacts map" onClick={() => setMapOverlayOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
+                                        <MapRoundedIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                            ) : null}
+                        />
+                        <Paper sx={{ p: { xs: 1, sm: 1.5 }, mb: 1.5, border: "1px solid var(--imaa-border)", borderRadius: "var(--imaa-radius-card)", boxShadow: "var(--imaa-shadow-sm)", minWidth: 0 }}>
                             <Stack spacing={1.25}>
                                 {/* Title row */}
-                                <Stack
-                                    direction="row"
-                                    alignItems="center"
-                                    justifyContent="space-between"
-                                    sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}
-                                >
-                                    <Tabs value={tabIndex} onChange={(e, v) => setTabIndex(v)} variant="scrollable" scrollButtons="auto">
-                                        <Tab label={`My Contacts ${tabIndex === 0 ? `(Page ${page})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
-                                        <Tab label={`Requests Sent ${tabIndex === 1 && sentRequests.length ? `(${sentRequests.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
-                                        <Tab label={`Requests Received ${tabIndex === 2 && receivedRequests.length ? `(${receivedRequests.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
+                                <Box sx={{ width: "100%", minWidth: 0, overflow: "hidden", borderBottom: 1, borderColor: "divider", mb: 2 }}>
+                                    <Tabs
+                                        value={tabIndex}
+                                        onChange={(e, v) => setTabIndex(v)}
+                                        variant="scrollable"
+                                        scrollButtons="auto"
+                                        allowScrollButtonsMobile
+                                        aria-label="My Connections views"
+                                        sx={{ minWidth: 0, "& .MuiTab-root": { minHeight: 44, minWidth: "max-content", px: { xs: 1.5, sm: 2 }, fontWeight: 700, textTransform: "none" } }}
+                                    >
+                                        <Tab label={`My Contacts ${tabIndex === 0 ? `(Page ${page})` : ''}`} />
+                                        <Tab label={`Requests Sent ${tabIndex === 1 && sentRequests.length ? `(${sentRequests.length})` : ''}`} />
+                                        <Tab label={`Requests Received ${tabIndex === 2 && receivedRequests.length ? `(${receivedRequests.length})` : ''}`} />
                                         {viewerIsStaff && (
-                                            <Tab label={`Visitors ${tabIndex === 3 && visitors.length ? `(${visitors.length})` : ''}`} sx={{ fontWeight: 600, textTransform: 'none' }} />
+                                            <Tab label={`Visitors ${tabIndex === 3 && visitors.length ? `(${visitors.length})` : ''}`} />
                                         )}
                                     </Tabs>
-
-                                    {isCompact && (
-                                        <Tooltip title="View map">
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => setMapOverlayOpen(true)}
-                                                sx={{ flexShrink: 0 }}
-                                            >
-                                                <MapRoundedIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    )}
-                                </Stack>
+                                </Box>
 
                                 {tabIndex === 0 && (
                                     <>
                                         <TextField
                                             fullWidth
                                             size="small"
+                                            label="Search contacts"
                                             placeholder="Search contacts..."
                                             value={q}
                                             onChange={(e) => { setQ(e.target.value); setPage(1); }}
+                                            InputLabelProps={{ shrink: true }}
                                             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
                                         />
 
@@ -1619,7 +1616,7 @@ export default function MyContacts() {
                             </Stack>
                         )}
 
-                        {!loading && error && <Typography color="error">⚠️ {error}</Typography>}
+                        {!loading && error && <Alert severity="error" sx={{ borderRadius: "var(--imaa-radius-card)" }}>{error}</Alert>}
 
                         {!loading && !loadingRequests && !error && (
                             <Stack spacing={1.5}>
@@ -1638,9 +1635,7 @@ export default function MyContacts() {
                                             />
                                         ))}
                                         {displayedUsers.length === 0 && (
-                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                                                {page === 1 ? "No contacts found." : "No more contacts."}
-                                            </Typography>
+                                            <EmptyState title={page === 1 ? "No contacts found" : "No more contacts"} description={page === 1 ? "Try a different search term or filter selection." : "Return to an earlier page to view contacts."} sx={{ py: 4 }} />
                                         )}
                                         {totalContacts > 0 && (
                                             <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} sx={{ mt: 2 }}>
@@ -1670,9 +1665,7 @@ export default function MyContacts() {
                                             <RequestCard key={req.id} req={req} type="sent" onOpenProfile={handleOpenProfile} onCancel={cancelRequest} />
                                         ))}
                                         {sentRequests.length === 0 && (
-                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                                                {page === 1 ? "No sent requests pending." : "No more requests."}
-                                            </Typography>
+                                            <EmptyState title={page === 1 ? "No sent requests pending" : "No more requests"} sx={{ py: 4 }} />
                                         )}
                                         {sentRequestsTotal > 0 && (
                                             <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} sx={{ mt: 2 }}>
@@ -1702,9 +1695,7 @@ export default function MyContacts() {
                                             <RequestCard key={req.id} req={req} type="received" onOpenProfile={handleOpenProfile} onAccept={acceptRequest} onDecline={declineRequest} />
                                         ))}
                                         {receivedRequests.length === 0 && (
-                                            <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 4 }}>
-                                                {page === 1 ? "No pending requests received." : "No more requests."}
-                                            </Typography>
+                                            <EmptyState title={page === 1 ? "No pending requests received" : "No more requests"} sx={{ py: 4 }} />
                                         )}
                                         {receivedRequestsTotal > 0 && (
                                             <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} sx={{ mt: 2 }}>
@@ -1730,11 +1721,7 @@ export default function MyContacts() {
                                                 <CircularProgress size={32} />
                                             </Box>
                                         ) : visitors.length === 0 ? (
-                                            <Box sx={{ textAlign: "center", py: 4 }}>
-                                                <Typography variant="body2" color="text.secondary">
-                                                    No profile visitors yet.
-                                                </Typography>
-                                            </Box>
+                                            <EmptyState title="No profile visitors yet" sx={{ py: 4 }} />
                                         ) : (
                                             <List disablePadding>
                                                 {visitors.map((visitor, index) => (
@@ -1742,6 +1729,15 @@ export default function MyContacts() {
                                                         key={`${visitor.id}-${visitor.viewed_at}-${index}`}
                                                         disableGutters
                                                         onClick={() => !visitor.is_anonymous && navigate(`/community/rich-profile/${visitor.id}`)}
+                                                        onKeyDown={(event) => {
+                                                            if (!visitor.is_anonymous && (event.key === "Enter" || event.key === " ")) {
+                                                                event.preventDefault();
+                                                                navigate(`/community/rich-profile/${visitor.id}`);
+                                                            }
+                                                        }}
+                                                        role={visitor.is_anonymous ? undefined : "button"}
+                                                        tabIndex={visitor.is_anonymous ? undefined : 0}
+                                                        aria-label={visitor.is_anonymous ? undefined : `Open ${visitor.full_name || visitor.username || "visitor"}'s profile`}
                                                         sx={{
                                                             py: 1.5,
                                                             px: 0,
@@ -1757,6 +1753,7 @@ export default function MyContacts() {
                                                         <ListItemAvatar>
                                                             <Avatar
                                                                 src={visitor.avatar_url || ""}
+                                                                alt={visitor.is_anonymous ? "Anonymous visitor" : (visitor.full_name || visitor.username || "Profile visitor")}
                                                                 sx={{ width: 40, height: 40, bgcolor: "primary.main" }}
                                                             >
                                                                 {visitor.avatar_url ? null : (visitor.full_name || visitor.username || "?").slice(0, 1).toUpperCase()}

@@ -36,6 +36,8 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import localizedFormat from "dayjs/plugin/localizedFormat";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import PageHeader from "../../components/page/PageHeader.jsx";
+import EmptyState from "../../components/page/EmptyState.jsx";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -414,7 +416,7 @@ function SuggestedConnections({ list = [] }) {
         p: 1.5,
         mb: 2,
         borderColor: BORDER,
-        borderRadius: 3,
+        borderRadius: 2,
         bgcolor: "background.paper",
         // ✅ match PostCard width & centering
         maxWidth: { xs: "100%", md: "100%" },
@@ -2700,16 +2702,18 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
         p: 2,
         mb: 2,
         border: `1px solid ${BORDER}`,
-        borderRadius: 3,
+        borderRadius: 2,
         width: "100%",
         // 🔹 Make each post card itself fixed-width on desktop
         maxWidth: { xs: "100%", md: "100%" },
-        minWidth: { xs: "100%", md: "100%" },
+        minWidth: 0,
         mx: { xs: 0, md: "auto" },
+        boxSizing: "border-box",
+        overflow: "hidden",
       }}
     >
       {/* Header */}
-      <Stack direction="row" spacing={1.5} alignItems="center">
+      <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
         <Avatar
           src={toMediaUrl(
             post.type === "event"
@@ -2721,7 +2725,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
         />
         <Box sx={{ flex: 1, minWidth: 0 }}>
 
-          <Stack direction="row" spacing={0.5} alignItems="center">
+          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
             <Typography variant="body2" sx={{ fontWeight: 700 }}>
               {headingTitle}
             </Typography>
@@ -2730,14 +2734,14 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
             )}
           </Stack>
 
-          <Stack direction="row" spacing={0.5} alignItems="center">
-            <Typography variant="caption" color="text.secondary" noWrap>
+          <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap>
+            <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
               {post.type === "resource" ? (post.resource?.title || "Resource") : (post.author?.name)}
             </Typography>
 
 
 
-            <Typography variant="caption" color="text.secondary" noWrap>
+            <Typography variant="caption" color="text.secondary">
               · {formatWhen(post.created_at, userTimezone)}
             </Typography>
           </Stack>
@@ -2758,7 +2762,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
         {isRemoved && <Chip size="small" color="warning" label="Removed" variant="outlined" />}
         {canReport && (
           <>
-            <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+            <IconButton size="small" aria-label="Post actions" onClick={(e) => setMenuAnchor(e.currentTarget)} sx={{ minWidth: 40, minHeight: 40 }}>
               <MoreVertRoundedIcon fontSize="small" />
             </IconButton>
             <Menu
@@ -2888,7 +2892,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
       {/* Meta strip: likers avatars + sentence | shares on right */}
       {(local.metrics?.likes || 0) > 0 || (local.metrics?.shares || 0) > 0 ? (
         <Box sx={{ px: 0.5, pt: 0.5 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" useFlexGap>
             <Stack direction="row" spacing={1} alignItems="center">
               <AvatarGroup
                 max={3}
@@ -2924,7 +2928,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
       <Divider sx={{ my: 1 }} />
 
       {/* Action row: Like / Comment / Share */}
-      <Stack direction="row" justifyContent="space-around" alignItems="center" sx={{ px: 0.5, pb: 0.5 }}>
+      <Stack direction="row" justifyContent="space-around" alignItems="center" flexWrap="wrap" useFlexGap sx={{ px: 0.5, pb: 0.5, gap: 0.5, "& .MuiButton-root": { minHeight: 40 } }}>
         <Button
           size="small"
           onClick={canEngage ? handleOpenPicker : undefined}
@@ -4058,10 +4062,18 @@ export default function LiveFeedPage({
     <Grid
       container
       rowSpacing={2}
+      sx={{ width: "100%", maxWidth: "100%", minWidth: 0, m: 0 }}
       columnSpacing={{ xs: 2, md: 4 }}   // 🔹 more gap between feed and right rail on md+
     >
+      <Grid item xs={12} sx={{ minWidth: 0, pb: 0 }}>
+        <PageHeader
+          eyebrow="Community"
+          title="Live Feed"
+          subtitle="Follow the latest posts, events, resources, and conversations from your community."
+        />
+      </Grid>
       {/* Center: scope + search + feed */}
-      <Grid item xs={12} md={9}>
+      <Grid item xs={12} md={9} sx={{ minWidth: 0 }}>
         <Box
           sx={{
             width: "100%",
@@ -4097,6 +4109,7 @@ export default function LiveFeedPage({
               <TextField
                 fullWidth
                 size="small"
+                label="Search feed"
                 placeholder="Search posts, events, resources…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)} // debounced by dq
@@ -4154,7 +4167,11 @@ export default function LiveFeedPage({
           )}
 
           {/* Feed */}
-          {loading && posts.length === 0 ? (
+          {error && !loading && posts.length === 0 ? (
+            <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, borderColor: "error.light" }}>
+              <Typography role="alert" color="error.main">{error}</Typography>
+            </Paper>
+          ) : loading && posts.length === 0 ? (
             // [CHANGE 1] Show Skeletons on first load instead of "Loading..." text
             // Ensure <PostSkeleton /> is defined or imported as shown in the previous step
             (<>
@@ -4163,9 +4180,7 @@ export default function LiveFeedPage({
               <PostSkeleton />
             </>)
           ) : displayPosts.length === 0 ? (
-            <Paper sx={{ p: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
-              <Typography variant="body2" color="text.secondary">No posts match your filters.</Typography>
-            </Paper>
+            <EmptyState title="No posts match your filters" description="Try another scope, search term, or sort option." />
           ) : (
             <>
               {displayPosts.map((p, idx) => (

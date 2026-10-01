@@ -13,6 +13,7 @@ import {
   Tooltip,
   Typography,
   Button,
+  ButtonBase,
   IconButton,
   Chip,
   Card,
@@ -58,6 +59,9 @@ import {
 import L from "leaflet";
 import "leaflet.heat";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import PageHeader from "../../components/page/PageHeader.jsx";
+import FilterToolbar from "../../components/page/FilterToolbar.jsx";
+import EmptyState from "../../components/page/EmptyState.jsx";
 
 
 
@@ -549,14 +553,6 @@ const countryColor = (name) => {
   return PALETTE[h % PALETTE.length];
 };
 
-/* ── accent colour derived from member name (consistent palette) ── */
-function memberAccentColor(name) {
-  const colors = ["#0A9396", "#E8532F", "#1B2A4A", "#7B2D8E", "#D4920B", "#3B5998"];
-  let h = 0;
-  for (let i = 0; i < (name || "").length; i++) h = (h * 31 + name.charCodeAt(i)) & 0xffff;
-  return colors[h % colors.length];
-}
-
 /* -------------------------- Member card (left) -------------------------- */
 function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFriend, onCancelFriend, onAcceptFriend, onDeclineFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
   const isMobile = useMediaQuery("(max-width:600px)");
@@ -633,7 +629,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
   const country = displayCountry(u);
 
   // v3 style derived values
-  const accent = memberAccentColor(name);
+  const accent = "#077B7E";
   const degree = status === "friends" ? 1 : status === "pending_outgoing" ? 2 : 3;
   const degreeColors = { 1: "#0A9396", 2: "#E8532F", 3: "#1B2A4A" };
   const degreeLabels = { 1: "1st", 2: "2nd", 3: "3rd" };
@@ -649,28 +645,27 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
   return (
     <Box
       sx={{
-        borderRadius: "14px",
-        border: `1px solid ${BORDER}`,
-        background: "#fff",
+        borderRadius: "var(--imaa-radius-card)",
+        border: "1px solid var(--imaa-border)",
+        bgcolor: "background.paper",
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
         transition: "box-shadow .18s, border-color .18s",
-        boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+        boxShadow: "var(--imaa-shadow-sm)",
         width: "100%",
         "&:hover": {
-          boxShadow: "0 8px 28px rgba(0,0,0,.09)",
-          borderColor: accent + "55",
+          boxShadow: "var(--imaa-shadow-md)",
+          borderColor: "var(--imaa-border-hover)",
         },
       }}
     >
-      {/* Top accent stripe */}
-      <Box sx={{ height: 4, bgcolor: accent, flexShrink: 0 }} />
-
       {/* Card body — click opens profile */}
-      <Box
+      <ButtonBase
+        component="div"
         onClick={() => onOpenProfile?.(u)}
-        sx={{ p: "16px 18px 12px", flex: 1, display: "flex", flexDirection: "column", gap: "8px", cursor: "pointer" }}
+        aria-label={`Open ${name}'s profile`}
+        sx={{ p: 2, flex: 1, width: "100%", display: "flex", alignItems: "stretch", textAlign: "left", flexDirection: "column", gap: 1 }}
       >
         {/* Row 1: Avatar (left) + degree / industry (right) */}
         <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
@@ -680,9 +675,9 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
               src={u?.avatar_url || ""}
               alt={name}
               sx={{
-                width: 50, height: 50, borderRadius: "13px",
-                background: `linear-gradient(145deg, ${accent}20, ${accent}08)`,
-                border: `2px solid ${accent}25`,
+                width: 52, height: 52, borderRadius: "var(--imaa-radius-card)",
+                bgcolor: "var(--imaa-bg-cool)",
+                border: "1px solid var(--imaa-border)",
                 color: accent, fontWeight: 800, fontSize: 18,
               }}
             >
@@ -734,11 +729,11 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
         {/* Name + title + company */}
         <Box>
-          <Typography sx={{ fontSize: 14.5, fontWeight: 750, color: "#1B2A4A", lineHeight: 1.2, mb: "2px" }}>
+          <Typography component="h3" sx={{ fontSize: 16, fontWeight: 750, color: "var(--imaa-ink)", lineHeight: 1.3, mb: 0.25, overflowWrap: "anywhere" }}>
             {name}
           </Typography>
           {(rawTitle || rawCompany) && (
-            <Typography sx={{ fontSize: 11.5, color: "#999", lineHeight: 1.35 }}>
+            <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", lineHeight: 1.45 }}>
               {rawTitle}
               {rawTitle && rawCompany
                 ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {rawCompany}</Box>
@@ -751,7 +746,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
         {/* Location + online indicator */}
         {country && (
-          <Typography sx={{ fontSize: 11, color: "#aaa", display: "flex", alignItems: "center", gap: "4px", flexWrap: "wrap" }}>
+          <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
             {flag && <span>{flag}</span>}
             {country}
             {isOnline && (
@@ -779,16 +774,16 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
         {/* Email line (visibility-aware) */}
         {showEmailLine && (
-          <Typography sx={{ fontSize: 10.5, color: "#aaa" }} noWrap>
+          <Typography sx={{ fontSize: 11.5, color: "var(--imaa-ink-body)" }} noWrap>
             {emailDisplay}
           </Typography>
         )}
-      </Box>
+      </ButtonBase>
 
       {/* Action footer */}
       {!isSelf && (
         <Box
-          sx={{ borderTop: `1px solid ${BORDER}`, px: "18px", py: "10px", display: "flex", alignItems: "center", gap: "8px" }}
+          sx={{ borderTop: "1px solid var(--imaa-border)", px: 2, py: 1, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}
           onClick={(e) => e.stopPropagation()}
         >
           {status === "friends" ? (
@@ -798,9 +793,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                 variant="outlined"
                 onClick={() => onOpenProfile?.(u)}
                 sx={{
-                  textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px",
-                  px: 1.5, py: "5px", borderColor: "#0A939630", color: "#0A9396",
-                  bgcolor: "#0A939608", "&:hover": { bgcolor: "#0A939615", borderColor: "#0A939660" },
+                  minHeight: 40, textTransform: "none", fontSize: 12, fontWeight: 700, borderRadius: "var(--imaa-radius-field)",
                   flex: 1,
                 }}
               >
@@ -812,8 +805,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                 color="error"
                 onClick={() => onRemoveFriend?.(u)}
                 sx={{
-                  textTransform: "none", fontSize: 11, fontWeight: 600, borderRadius: "8px",
-                  px: 1.5, py: "5px",
+                  minHeight: 40, textTransform: "none", fontSize: 12, fontWeight: 600, borderRadius: "var(--imaa-radius-field)",
                 }}
               >
                 Remove
@@ -824,7 +816,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
               size="small"
               variant="outlined"
               disabled
-              sx={{ textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px", px: 1.5, py: "5px", flex: 1 }}
+              sx={{ minHeight: 40, textTransform: "none", fontSize: 12, fontWeight: 700, borderRadius: "var(--imaa-radius-field)", flex: 1 }}
             >
               ✓ Request Sent
             </Button>
@@ -837,10 +829,9 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                   disabled={blockByVerified}
                   onClick={() => onAddFriend?.(u)}
                   sx={{
-                    textTransform: "none", fontSize: 11, fontWeight: 700, borderRadius: "8px",
-                    px: 1.5, py: "5px", bgcolor: accent, boxShadow: "none",
-                    "&:hover": { bgcolor: accent, filter: "brightness(0.9)", boxShadow: "none" },
-                    "&:disabled": { bgcolor: "#ccc", color: "#fff" },
+                    minHeight: 40, textTransform: "none", fontSize: 12, fontWeight: 700, borderRadius: "var(--imaa-radius-field)",
+                    bgcolor: "var(--imaa-teal-hover)", boxShadow: "none",
+                    "&:hover": { bgcolor: "var(--imaa-navy)", boxShadow: "none" },
                     flex: 1,
                   }}
                 >
@@ -854,9 +845,7 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
             variant="outlined"
             onClick={() => onOpenProfile?.(u)}
             sx={{
-              textTransform: "none", fontSize: 11, fontWeight: 600, borderRadius: "8px",
-              px: 1.5, py: "5px", borderColor: "#1B2A4A12", color: "#1B2A4A88",
-              "&:hover": { borderColor: accent + "40", color: accent },
+              minHeight: 40, textTransform: "none", fontSize: 12, fontWeight: 600, borderRadius: "var(--imaa-radius-field)",
             }}
           >
             Profile
@@ -1861,6 +1850,7 @@ export default function MembersPage() {
 
   const handleTabChange = (event, newValue) => {
     setTabValue(newValue);
+    setPage(1);
   };
 
   // Calculate page count from total visible members
@@ -1939,28 +1929,20 @@ export default function MembersPage() {
           >
             {/* v3 Header */}
             <Box sx={{ mb: 2 }}>
-              {/* Page title */}
               <Box sx={{ mb: 1.5 }}>
-                <Typography sx={{ fontSize: 10, fontWeight: 800, color: "#0A9396", textTransform: "uppercase", letterSpacing: "0.12em", mb: "4px" }}>
-                  MEMBER DIRECTORY
-                </Typography>
-	                <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 1 }}>
-	                  <Box>
-	                    <Typography variant="h5" sx={{ fontWeight: 800, color: "#1B2A4A", lineHeight: 1.2, mb: "4px" }}>
-	                      Explore Members
-	                    </Typography>
-	                    <Typography sx={{ fontSize: 12.5, color: "#aaa" }}>
-	                      Connect with M&A professionals across the globe.
-	                    </Typography>
-	                  </Box>
-                  {isCompact && (
+                <PageHeader
+                  eyebrow="Member directory"
+                  title="Explore Members"
+                  subtitle="Connect with M&A professionals across the globe."
+                  actions={isCompact ? (
                     <Tooltip title="View map">
-                      <IconButton size="small" onClick={() => setMapOverlayOpen(true)} sx={{ flexShrink: 0, mt: "4px" }}>
+                      <IconButton aria-label="View members map" onClick={() => setMapOverlayOpen(true)} sx={{ minWidth: 44, minHeight: 44 }}>
                         <MapRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
-	                  )}
-	                </Box>
+                  ) : null}
+                  sx={{ mb: 1.5 }}
+                />
 	                <Box
 	                  sx={{
 	                    mt: 1.5,
@@ -2015,49 +1997,29 @@ export default function MembersPage() {
 	                </Box>
 	              </Box>
 
-	              {/* Tab pills */}
-	              <Box sx={{ display: "flex", gap: "4px", mb: 1.5, pb: 1.5, borderBottom: "1px solid #EEECEA" }}>
-                {[
-                  { label: "All Members", count: allMembersTotal || (tabValue === 0 ? rosterTotal : 0) },
-                  { label: "My Contacts", count: displayedContactsTotal },
-                ].map((tab, i) => (
-                  <Box
-                    key={i}
-                    onClick={() => { setTabValue(i); setPage(1); }}
-                    sx={{
-                      px: 2, py: "6px", borderRadius: "100px", cursor: "pointer",
-                      fontSize: 13, fontWeight: tabValue === i ? 700 : 500,
-                      color: tabValue === i ? "#1B2A4A" : "#888",
-                      bgcolor: tabValue === i ? "#fff" : "transparent",
-                      border: tabValue === i ? "1.5px solid #EEECEA" : "1.5px solid transparent",
-                      boxShadow: tabValue === i ? "0 1px 4px rgba(0,0,0,.06)" : "none",
-                      display: "flex", alignItems: "center", gap: "6px",
-                      transition: "all .15s",
-                    }}
-                  >
-                    {tab.label}
-                    {tab.count > 0 && (
-                      <Box component="span" sx={{
-                        fontSize: 11, fontWeight: 700,
-                        bgcolor: tabValue === i ? "#0A9396" : "#e5e7eb",
-                        color: tabValue === i ? "#fff" : "#666",
-                        px: "7px", py: "1px", borderRadius: "100px",
-                      }}>
-                        {tab.count}
-                      </Box>
-                    )}
-                  </Box>
-                ))}
-              </Box>
+              <Tabs
+                value={tabValue}
+                onChange={handleTabChange}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                aria-label="Member directory views"
+                sx={{ mb: 1.5, borderBottom: "1px solid var(--imaa-border)", minWidth: 0 }}
+              >
+                <Tab label={`All Members (${allMembersTotal || (tabValue === 0 ? rosterTotal : 0)})`} sx={{ minHeight: 44, textTransform: "none", fontWeight: 700 }} />
+                <Tab label={`My Contacts (${displayedContactsTotal})`} sx={{ minHeight: 44, textTransform: "none", fontWeight: 700 }} />
+              </Tabs>
 
-              <Stack spacing={1.25}>
+              <FilterToolbar surface aria-label="Member search and filters" sx={{ mb: 0, flexDirection: "column", alignItems: "stretch", gap: 1.25 }}>
                 {/* Search bar */}
                 <TextField
+                  label="Search members"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   size="small"
                   placeholder="Search by name, company, region..."
                   fullWidth
+                  InputLabelProps={{ shrink: true }}
                   InputProps={{
                     startAdornment: (
                       <InputAdornment position="start">
@@ -2213,31 +2175,7 @@ export default function MembersPage() {
                     </TextField>
                   </Stack>
                 </Box>
-
-
-
-                {/* Tabs row */}
-                <Tabs
-                  value={tabValue}
-                  onChange={handleTabChange}
-                  textColor="primary"
-                  indicatorColor="primary"
-                  variant="standard"
-                  sx={{
-                    minHeight: 40,
-                    borderBottom: `1px solid ${BORDER}`,
-                    "& .MuiTab-root": {
-                      textTransform: "none",
-                      fontWeight: 600,
-                      minHeight: 40,
-                      px: 2,
-                    },
-                  }}
-                >
-                  <Tab label="All Members" />
-                  <Tab label="My Contacts" />
-                </Tabs>
-              </Stack>
+              </FilterToolbar>
             </Box>
 
             {/* 🔄 Loading state with skeletons */}
@@ -2260,9 +2198,8 @@ export default function MembersPage() {
                   {Array.from({ length: ROWS_PER_PAGE }).map((_, idx) => (
                     <Box
                       key={idx}
-                      sx={{ borderRadius: "14px", border: `1px solid ${BORDER}`, bgcolor: "#fff", overflow: "hidden" }}
+                      sx={{ borderRadius: "var(--imaa-radius-card)", border: "1px solid var(--imaa-border)", bgcolor: "background.paper", overflow: "hidden" }}
                     >
-                      <Skeleton variant="rectangular" width="100%" height={4} sx={{ bgcolor: "#e8f7f7" }} />
                       <Box sx={{ p: "16px 18px 12px", display: "flex", flexDirection: "column", gap: "8px" }}>
                         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                           <Skeleton variant="rectangular" width={50} height={50} sx={{ borderRadius: "13px" }} />
@@ -2303,15 +2240,9 @@ export default function MembersPage() {
 
             {/* ❌ Error state */}
             {!loading && error && (
-              <Paper
-                sx={{
-                  p: 2,
-                  border: `1px solid ${BORDER}`,
-                  borderRadius: 3,
-                }}
-              >
-                <Typography color="error">⚠️ {error}</Typography>
-              </Paper>
+              <Alert severity="error" sx={{ borderRadius: "var(--imaa-radius-card)" }}>
+                {error}
+              </Alert>
             )}
 
             {/* ✅ Loaded state (existing logic unchanged) */}
@@ -2339,13 +2270,13 @@ export default function MembersPage() {
                   ))}
 
                   {filtered.length === 0 && (
-                    <Box sx={{ textAlign: "center", py: 5 }}>
-                      <Typography sx={{ fontSize: 14, color: "#aaa" }}>
-                        {tabValue === 1 && Object.keys(friendStatusByUser).length === 0
-                          ? "No contacts yet. Start connecting with members!"
-                          : "No members match your search."}
-                      </Typography>
-                    </Box>
+                    <EmptyState
+                      title={tabValue === 1 ? "No contacts found" : "No members found"}
+                      description={tabValue === 1 && Object.keys(friendStatusByUser).length === 0
+                        ? "Start connecting with members to build your contacts."
+                        : "Try a different search term or filter selection."}
+                      sx={{ py: 5 }}
+                    />
                   )}
                 </Stack>
 
