@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -418,7 +418,7 @@ function Dashboard({ campaigns, loading, error, onRefresh }) {
   );
 }
 
-function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, onOpen, onDuplicate, onCreate }) {
+function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, onOpen, onDuplicate, duplicatingUuid, onCreate }) {
   const filteredCampaigns = filter === "all"
     ? campaigns
     : campaigns.filter((row) => String(row?.status || "").toLowerCase() === filter);
@@ -487,9 +487,15 @@ function CampaignList({ campaigns, loading, error, filter, onFilter, onRefresh, 
                     <TableCell>No data available</TableCell>
                     <TableCell align="right">
                       <Tooltip title="Duplicate broadcast">
-                        <IconButton onClick={(event) => { event.stopPropagation(); onDuplicate(row.uuid); }}>
-                          <ContentCopyRoundedIcon fontSize="small" />
-                        </IconButton>
+                        <span>
+                          <IconButton
+                            aria-label="Duplicate broadcast"
+                            disabled={Boolean(duplicatingUuid)}
+                            onClick={(event) => { event.stopPropagation(); onDuplicate(row.uuid); }}
+                          >
+                            {duplicatingUuid === row.uuid ? <CircularProgress size={18} /> : <ContentCopyRoundedIcon fontSize="small" />}
+                          </IconButton>
+                        </span>
                       </Tooltip>
                       <Tooltip title="Open broadcast">
                         <IconButton onClick={(event) => { event.stopPropagation(); onOpen(row.uuid); }}>
@@ -911,6 +917,8 @@ export default function AdminNewsletterPage() {
   const [confirmState, setConfirmState] = useState({ type: "", loading: false });
   const [analyticsState, setAnalyticsState] = useState({ loading: false, data: null, error: "" });
   const [selectedAnalyticsCampaignId, setSelectedAnalyticsCampaignId] = useState("");
+  const [duplicatingUuid, setDuplicatingUuid] = useState("");
+  const duplicateInFlight = useRef(false);
 
   const loadCampaigns = async () => {
     setLoading(true);
@@ -1084,13 +1092,28 @@ export default function AdminNewsletterPage() {
   };
 
   const duplicateCampaign = async (uuid) => {
-    setError("");
+    // The ref blocks a second click before `duplicatingUuid` has re-rendered,
+    // so one click can never create two copies.
+    if (!uuid || duplicateInFlight.current) return;
+    duplicateInFlight.current = true;
+    setDuplicatingUuid(uuid);
     try {
       const data = await duplicateNewsletterCampaign(uuid);
       setSnack({ open: true, severity: "success", message: "Broadcast duplicated as a new draft." });
       navigate(`/admin/newsletter/${data.uuid}`);
     } catch (err) {
-      setError(getErrorMessage(err, "We could not duplicate this broadcast."));
+      // A snackbar, not the page error slot: on the list that slot replaces
+      // the whole table, and the source broadcast is untouched either way.
+      setSnack({
+        open: true,
+        severity: "error",
+        message: err?.response
+          ? getErrorMessage(err, "We could not duplicate this broadcast.")
+          : "We could not reach the server. Check your connection and try again.",
+      });
+    } finally {
+      duplicateInFlight.current = false;
+      setDuplicatingUuid("");
     }
   };
 
@@ -1163,6 +1186,14 @@ export default function AdminNewsletterPage() {
   });
   const canSendNow = detailLoaded && !isNew && status === "draft";
 
+  // Shared by the list and the editor: Duplicate reports success or failure
+  // from either one.
+  const snackbar = (
+    <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack((state) => ({ ...state, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
+      <Alert severity={snack.severity} onClose={() => setSnack((state) => ({ ...state, open: false }))}>{snack.message}</Alert>
+    </Snackbar>
+  );
+
   if (!isDetail) {
     return (
       <NewsletterShell>
@@ -1182,6 +1213,7 @@ export default function AdminNewsletterPage() {
                 onRefresh={loadCampaigns}
                 onOpen={(uuid) => navigate(`/admin/newsletter/${uuid}`)}
                 onDuplicate={duplicateCampaign}
+                duplicatingUuid={duplicatingUuid}
                 onCreate={() => navigate("/admin/newsletter/new")}
               />
             )}
@@ -1201,6 +1233,7 @@ export default function AdminNewsletterPage() {
             {activeTab === "settings" && <SettingsPage />}
           </>
         )}
+        {snackbar}
       </NewsletterShell>
     );
   }
@@ -1221,7 +1254,7 @@ export default function AdminNewsletterPage() {
         </Stack>
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           {!isNew && <Button startIcon={<PreviewRoundedIcon />} onClick={openPreview} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>Preview</Button>}
-          {!isNew && <Button startIcon={<ContentCopyRoundedIcon />} onClick={() => duplicateCampaign(campaignId)} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Duplicate</Button>}
+          {!isNew && <Button startIcon={duplicatingUuid ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />} onClick={() => duplicateCampaign(campaignId)} disabled={confirmState.loading || Boolean(duplicatingUuid)} sx={{ textTransform: "none" }}>{duplicatingUuid ? "Duplicating..." : "Duplicate"}</Button>}
           {!isNew && editable && <Button startIcon={<EmailRoundedIcon />} onClick={() => setTestState({ open: true, loading: false, error: "" })} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>Send Test Email</Button>}
           {canSchedule && <Button startIcon={<ScheduleRoundedIcon />} onClick={() => setScheduleState({ open: true, loading: false, error: "" })} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>{status === "scheduled" ? "Reschedule" : "Schedule"}</Button>}
           {canCancel && <Button color="warning" startIcon={<StopCircleRoundedIcon />} onClick={() => setConfirmState({ type: "cancel", loading: false })} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Cancel</Button>}
@@ -1335,9 +1368,7 @@ export default function AdminNewsletterPage() {
         <Typography>This only removes draft broadcasts. Sent or scheduled broadcast history is left untouched.</Typography>
       </ConfirmDialog>
 
-      <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack((state) => ({ ...state, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
-        <Alert severity={snack.severity} onClose={() => setSnack((state) => ({ ...state, open: false }))}>{snack.message}</Alert>
-      </Snackbar>
+      {snackbar}
       </Stack>
     </NewsletterShell>
   );
