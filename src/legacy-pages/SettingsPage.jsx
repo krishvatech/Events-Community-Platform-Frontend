@@ -1,50 +1,37 @@
 import React from "react";
 import { useNavigate } from "#navigation";
-import { Box, Button, Typography } from "@mui/material";
+import { Button, Container } from "@mui/material";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import { PageHeader, EmptyState } from "../components/page";
 
-const N = "#1B2A4A";
-const T = "#0A9396";
-
+// Settings is still a placeholder. Same shell as the other member pages (A3 PageHeader + EmptyState).
 export default function SettingsPage() {
   const navigate = useNavigate();
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        minHeight: "80vh",
-        gap: 2,
-        px: 2,
-        textAlign: "center",
-      }}
-    >
-      <SettingsRoundedIcon sx={{ fontSize: 72, color: T, opacity: 0.7 }} />
+    <Container maxWidth="xl" sx={{ py: 4 }}>
+      <PageHeader title="Settings" sx={{ mb: 3 }} />
 
-      <Typography variant="h4" sx={{ fontWeight: 700, color: N }}>
-        Coming Soon
-      </Typography>
-
-      <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 400 }}>
-        We're working on something great. Account settings will be available here soon.
-      </Typography>
-
-      <Button
-        variant="outlined"
-        onClick={() => navigate(-1)}
-        sx={{
-          mt: 1,
-          textTransform: "none",
-          borderColor: N,
-          color: N,
-          "&:hover": { borderColor: T, color: T },
-        }}
-      >
-        Go Back
-      </Button>
-    </Box>
+      <EmptyState
+        icon={<SettingsRoundedIcon />}
+        title="Coming Soon"
+        description="We're working on something great. Account settings will be available here soon."
+        action={
+          <Button
+            variant="outlined"
+            onClick={() => navigate(-1)}
+            sx={{
+              textTransform: "none",
+              borderColor: "var(--imaa-navy)",
+              color: "var(--imaa-navy)",
+              // Darker teal on hover keeps the label at AA contrast
+              "&:hover": { borderColor: "var(--imaa-teal)", color: "var(--imaa-teal-hover)" },
+            }}
+          >
+            Go Back
+          </Button>
+        }
+      />
+    </Container>
   );
 }
