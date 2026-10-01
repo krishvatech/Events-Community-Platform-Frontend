@@ -45,8 +45,16 @@ export default function BlogCard({
         flexDirection: "column",
         bgcolor: "#fff",
         border: `1px solid ${BLOG_BORDER}`,
-        borderRadius: "14px",
+        borderRadius: admin ? "14px" : "var(--imaa-radius-card)",
         overflow: "hidden",
+        minWidth: 0,
+        boxShadow: admin ? "none" : "0 1px 2px rgba(15, 23, 42, 0.04)",
+        transition: "border-color 160ms ease, box-shadow 160ms ease",
+        ...(!admin && {
+          "&:hover": { borderColor: "rgba(10, 147, 150, 0.45)", boxShadow: "0 4px 14px rgba(15, 23, 42, 0.07)" },
+          "&:focus-within": { borderColor: BLOG_TEAL, boxShadow: "0 0 0 2px rgba(10, 147, 150, 0.18)" },
+          "& h2 a:focus-visible": { outline: "2px solid", outlineColor: BLOG_TEAL, outlineOffset: 3, borderRadius: "2px" },
+        }),
       }}
     >
       <RouterLink to={href} tabIndex={-1} aria-hidden="true">
@@ -93,7 +101,7 @@ export default function BlogCard({
         </Typography>
 
         {(author || date) && (
-          <Typography sx={{ fontSize: 13, color: BLOG_MUTED }}>
+          <Typography sx={{ fontSize: 13, color: BLOG_MUTED, lineHeight: 1.5, overflowWrap: "anywhere" }}>
             {author && <span data-testid="blog-card-author">{author}</span>}
             {author && date && " · "}
             {date && <time dateTime={post.published_at}>{date}</time>}
@@ -114,6 +122,7 @@ export default function BlogCard({
               WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
+              lineHeight: 1.6,
             }}
           >
             {post.excerpt}
@@ -146,7 +155,7 @@ export default function BlogCard({
               to={href}
               size="small"
               aria-label={`Read more: ${post.title}`}
-              sx={{ textTransform: "none", fontWeight: 700, color: BLOG_TEAL, px: 0 }}
+              sx={{ textTransform: "none", fontWeight: 700, color: BLOG_TEAL, px: 0, minHeight: 40 }}
             >
               Read more →
             </Button>

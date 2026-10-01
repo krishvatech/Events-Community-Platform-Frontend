@@ -23,8 +23,9 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import EmptyState from "../components/page/EmptyState.jsx";
 
-const TEAL = "#0ea5a4";
+const TEAL = "var(--imaa-teal-hover)";
 const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000")
   .toString()
   .replace(/\/+$/, "");
@@ -67,7 +68,7 @@ const getFileName = (u) => {
 };
 
 const TypeIcon = ({ type }) => {
-  const common = { sx: { color: TEAL } };
+  const common = { sx: { color: TEAL }, "aria-hidden": true };
   switch (type) {
     case "file":
       return <PictureAsPdfRoundedIcon {...common} />;
@@ -88,7 +89,7 @@ function ResourceDetailsSkeleton() {
         <Skeleton variant="text" width={260} />
       </Breadcrumbs>
 
-      <Paper variant="outlined" sx={{ p: 4, borderRadius: 2 }}>
+      <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3, md: 4 }, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)" }}>
         {/* Header */}
         <Stack
           direction={{ xs: "column", sm: "row" }}
@@ -182,7 +183,7 @@ function ResourcePreview({ resource }) {
             src={iframeSrc}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
-            sx={{ width: "100%", height: 420, border: 0, borderRadius: 1 }}
+            sx={{ width: "100%", height: { xs: 240, sm: 360, md: 420 }, border: 0, borderRadius: "var(--imaa-radius-card)", display: "block" }}
             title={resource.title || "Video"}
           />
         ) : (
@@ -194,8 +195,8 @@ function ResourcePreview({ resource }) {
             sx={{
               width: "100%",
               maxHeight: 520,
-              borderRadius: 1,
-              border: "1px solid #e2e8f0",
+              borderRadius: "var(--imaa-radius-card)",
+              border: "1px solid var(--imaa-border)",
             }}
           />
         )}
@@ -210,9 +211,9 @@ function ResourcePreview({ resource }) {
         <Box
           sx={{
             mt: 1,
-            borderRadius: 1,
+            borderRadius: "var(--imaa-radius-card)",
             overflow: "hidden",
-            border: "1px solid #e2e8f0",
+            border: "1px solid var(--imaa-border)",
             bgcolor: "background.paper",
           }}
         >
@@ -220,7 +221,7 @@ function ResourcePreview({ resource }) {
             component="img"
             src={fileUrl}
             alt={resource.title || "resource image"}
-            sx={{ width: "100%", maxHeight: 560, objectFit: "cover", display: "block" }}
+            sx={{ width: "100%", maxHeight: 560, objectFit: "contain", display: "block" }}
           />
         </Box>
       );
@@ -231,9 +232,9 @@ function ResourcePreview({ resource }) {
         <Box
           sx={{
             mt: 1,
-            borderRadius: 1,
+            borderRadius: "var(--imaa-radius-card)",
             overflow: "hidden",
-            border: "1px solid #e2e8f0",
+            border: "1px solid var(--imaa-border)",
             bgcolor: "background.paper",
           }}
         >
@@ -241,7 +242,7 @@ function ResourcePreview({ resource }) {
             component="iframe"
             src={fileUrl}
             title={resource.title || "PDF"}
-            sx={{ width: "100%", height: 520, border: 0 }}
+            sx={{ width: "100%", height: { xs: 420, md: 560 }, border: 0, display: "block" }}
           />
         </Box>
       );
@@ -254,8 +255,8 @@ function ResourcePreview({ resource }) {
         sx={{
           mt: 1,
           p: 1.25,
-          borderRadius: 1,
-          borderColor: "#e2e8f0",
+          borderRadius: "var(--imaa-radius-card)",
+          borderColor: "var(--imaa-border)",
           bgcolor: "background.paper",
         }}
       >
@@ -270,6 +271,7 @@ function ResourcePreview({ resource }) {
               alignItems: "center",
               justifyContent: "center",
               fontSize: 22,
+              color: "var(--imaa-teal-hover)",
             }}
           >
             📎
@@ -298,17 +300,17 @@ function ResourcePreview({ resource }) {
         sx={{
           mt: 1,
           p: 1.5,
-          borderRadius: 1,
-          borderColor: "#e2e8f0",
+          borderRadius: "var(--imaa-radius-card)",
+          borderColor: "var(--imaa-border)",
           bgcolor: "background.paper",
         }}
       >
-        <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
+        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between" spacing={2}>
           <Box sx={{ minWidth: 0 }}>
             <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
               {resource.title || "Link"}
             </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
+            <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
               {linkUrl}
             </Typography>
           </Box>
@@ -318,7 +320,7 @@ function ResourcePreview({ resource }) {
             size="small"
             startIcon={<OpenInNewRoundedIcon />}
             onClick={() => window.open(linkUrl, "_blank")}
-            sx={{ flexShrink: 0 }}
+            sx={{ flexShrink: 0, alignSelf: { sm: "center" } }}
           >
             Open
           </Button>
@@ -459,32 +461,31 @@ export default function ResourceDetailsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Container maxWidth="xl" className="py-6 sm:py-8">
+    <Box sx={{ minHeight: "100vh", bgcolor: "#f7f8fa", width: "100%", minWidth: 0, overflow: "hidden" }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">
             {loading ? (
               <ResourceDetailsSkeleton />
             ) : error || !resource ? (
-              <Paper variant="outlined" sx={{ borderRadius: 2, p: 6 }}>
-                <Box sx={{ textAlign: "center" }}>
-                  <Typography variant="h5" color="error" gutterBottom>
-                    {error || "Resource not found"}
-                  </Typography>
+              <EmptyState
+                icon={<ArticleRoundedIcon />}
+                title={error || "Resource not found"}
+                titleComponent="h1"
+                action={
                   <Button
                     variant="contained"
                     startIcon={<ArrowBackRoundedIcon />}
                     onClick={() => navigate(backPath)}
-                    sx={{ mt: 2 }}
                   >
                     Back to resources
                   </Button>
-                </Box>
-              </Paper>
+                }
+              />
             ) : (
               <>
 
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} spacing={1} sx={{ mb: 2, minWidth: 0 }}>
                   <Button
                     startIcon={<ArrowBackRoundedIcon />}
                     component={Link}
@@ -495,22 +496,23 @@ export default function ResourceDetailsPage() {
                       fontWeight: 600,
                       minWidth: "auto",
                       px: 1,
-                      "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                      "&:hover": { bgcolor: "var(--imaa-teal-light)" },
+                      "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" },
                     }}
                   >
                     Back
                   </Button>
-                  <Breadcrumbs separator="›">
-                    <Link to={backPath} style={{ textDecoration: "none", color: "#666" }}>
+                  <Breadcrumbs separator="›" sx={{ minWidth: 0, maxWidth: "100%", '& .MuiBreadcrumbs-ol': { flexWrap: 'nowrap' } }}>
+                    <Link to={backPath} style={{ textDecoration: "none", color: "var(--imaa-ink-body)" }}>
                       {backLabel}
                     </Link>
-                    <Typography color="text.primary">
+                    <Typography color="text.primary" noWrap sx={{ maxWidth: { xs: 210, sm: 420, md: 640 } }}>
                       {resource?.title || "Resource"}
                     </Typography>
                   </Breadcrumbs>
                 </Stack>
 
-                <Paper variant="outlined" sx={{ p: 4, borderRadius: 2 }}>
+                <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3, md: 4 }, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", boxShadow: "var(--imaa-shadow-sm)", minWidth: 0, overflow: "hidden" }}>
                   {/* TOP HEADER */}
                   <Stack
                     direction={{ xs: "column", sm: "row" }}
@@ -525,25 +527,34 @@ export default function ResourceDetailsPage() {
                       alignItems="flex-start"
                       sx={{ flexGrow: 1, minWidth: 0 }}
                     >
-                      <Box sx={{ fontSize: 48 }}>
+                      <Box sx={{ width: 48, height: 48, borderRadius: "var(--imaa-radius-card)", bgcolor: "var(--imaa-teal-light)", display: "grid", placeItems: "center", flexShrink: 0, '& svg': { fontSize: 30 } }}>
                         <TypeIcon type={resource.type} />
                       </Box>
 
                       <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                        <Typography
-                          variant="h4"
-                          gutterBottom
-                          sx={{ wordBreak: "break-word" }}
+                        <Box
+                          component="h1"
+                          sx={{
+                            m: 0,
+                            mb: 1,
+                            fontFamily: "var(--imaa-font-serif)",
+                            fontWeight: 700,
+                            fontSize: { xs: "1.5rem", sm: "1.75rem", md: "2rem" },
+                            lineHeight: 1.2,
+                            color: "var(--imaa-ink)",
+                            overflowWrap: "anywhere",
+                          }}
                         >
                           {resource.title}
-                        </Typography>
+                        </Box>
 
                         <Stack
                           direction="row"
                           spacing={1}
-                          sx={{ mb: 2, flexWrap: "wrap" }}
+                          useFlexGap
+                          sx={{ mb: 1, flexWrap: "wrap" }}
                         >
-                          <Chip label={resource.type} size="small" color="primary" />
+                          <Chip label={resource.type} size="small" variant="outlined" sx={{ textTransform: "capitalize" }} />
                           {resource.is_published ? (
                             <Chip label="Published" size="small" color="success" />
                           ) : (
@@ -561,10 +572,14 @@ export default function ResourceDetailsPage() {
                   <Divider sx={{ my: 3 }} />
 
                   <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6" gutterBottom>
+                    <Typography component="h2" variant="h6" gutterBottom>
                       Description
                     </Typography>
-                    <Typography variant="body1" color="text.secondary">
+                    <Typography
+                      variant="body1"
+                      color="text.secondary"
+                      sx={{ maxWidth: "var(--imaa-prose-max)", whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.7 }}
+                    >
                       {resource.description || "No description provided"}
                     </Typography>
                   </Box>
@@ -574,7 +589,7 @@ export default function ResourceDetailsPage() {
                     <>
                       <Divider sx={{ my: 3 }} />
                       <Box sx={{ mb: 3 }}>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography component="h2" variant="h6" gutterBottom>
                           Preview
                         </Typography>
                         <ResourcePreview resource={resource} />
@@ -586,7 +601,7 @@ export default function ResourceDetailsPage() {
                     <>
                       <Divider sx={{ my: 3 }} />
                       <Box sx={{ mb: 3 }}>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography component="h2" variant="h6" gutterBottom>
                           Event
                         </Typography>
                         <Typography variant="body1" color="text.secondary">
@@ -600,10 +615,10 @@ export default function ResourceDetailsPage() {
                     <>
                       <Divider sx={{ my: 3 }} />
                       <Box sx={{ mb: 3 }}>
-                        <Typography variant="h6" gutterBottom>
+                        <Typography component="h2" variant="h6" gutterBottom>
                           Tags
                         </Typography>
-                        <Stack direction="row" spacing={1} flexWrap="wrap">
+                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
                           {resource.tags.map((tag, idx) => (
                             <Chip
                               key={`${tag}-${idx}`}
@@ -620,10 +635,10 @@ export default function ResourceDetailsPage() {
                   <Divider sx={{ my: 3 }} />
 
                   <Box sx={{ mb: 3 }}>
-                    <Typography variant="h6" gutterBottom>
+                    <Typography component="h2" variant="h6" gutterBottom>
                       Details
                     </Typography>
-                    <Stack spacing={1}>
+                    <Stack spacing={1} sx={{ overflowWrap: "anywhere" }}>
                       <Typography variant="body2" color="text.secondary">
                         <strong>Created:</strong>{" "}
                         {new Date(resource.created_at).toLocaleString("en-IN", {
@@ -655,7 +670,11 @@ export default function ResourceDetailsPage() {
                       onClick={handleView}
                       sx={{
                         bgcolor: TEAL,
-                        "&:hover": { bgcolor: "#0d9493" },
+                        minHeight: 44,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        "&:hover": { bgcolor: "var(--imaa-navy)" },
+                        "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" },
                         width: { xs: "100%", sm: "auto" },
                       }}
                     >
@@ -667,7 +686,7 @@ export default function ResourceDetailsPage() {
                         variant="outlined"
                         startIcon={<DownloadRoundedIcon />}
                         onClick={handleDownload}
-                        sx={{ width: { xs: "100%", sm: "auto" } }}
+                        sx={{ width: { xs: "100%", sm: "auto" }, minHeight: 44, textTransform: "none", fontWeight: 700 }}
                       >
                         Download
                       </Button>
@@ -679,6 +698,6 @@ export default function ResourceDetailsPage() {
           </main>
         </div>
       </Container>
-    </div>
+    </Box>
   );
 }

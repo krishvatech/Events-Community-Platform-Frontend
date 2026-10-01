@@ -1343,11 +1343,11 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, borderColor: BORDER }}>
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, borderColor: BORDER, minWidth: 0, overflow: "hidden" }}>
       {/* Header */}
-      <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
-        <Avatar src={local.author?.avatar} />
-        <Box sx={{ flex: 1 }}>
+      <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+        <Avatar src={local.author?.avatar} alt={local.author?.name || "Post author"} />
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="subtitle2" fontWeight={700}>
             {local.author?.name}
             {local.author?.kyc_status === "approved" && (
@@ -1359,7 +1359,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
         {local.type !== 'text' && <Chip size="small" label={local.type.toUpperCase()} variant="outlined" />}
         {(canReport || canEdit || canDelete) && (
           <>
-            <IconButton size="small" onClick={(e) => setMenuAnchor(e.currentTarget)}>
+            <IconButton size="small" aria-label="Post actions" onClick={(e) => setMenuAnchor(e.currentTarget)} sx={{ minWidth: 40, minHeight: 40 }}>
               <MoreVertRoundedIcon fontSize="small" />
             </IconButton>
             <Menu
@@ -1439,7 +1439,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
             {local.type === "link" && (
               <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#fafafa" }}>
                 <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 0.5 }} />
-                <Link href={local.url} target="_blank" fontWeight={600}>
+                <Link href={local.url} target="_blank" fontWeight={600} sx={{ overflowWrap: "anywhere" }}>
                   {local.url_title || local.url}
                 </Link>
                 <ExpandableText
@@ -1458,7 +1458,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
       {/* Metrics */}
       {(local.metrics.likes > 0 || local.metrics.shares > 0) && (
         <Box sx={{ px: 0.5, pt: 0.5, mb: 1 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap" useFlexGap>
             <Stack
               direction="row" spacing={1} alignItems="center"
               sx={{ cursor: "pointer" }}
@@ -1507,7 +1507,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
       <Divider sx={{ mb: 1 }} />
 
       {/* Actions */}
-      <Stack direction="row" justifyContent="space-around">
+      <Stack direction="row" justifyContent="space-around" flexWrap="wrap" useFlexGap sx={{ gap: 0.5, "& .MuiButton-root": { minHeight: 40 } }}>
         <Button
           startIcon={<span style={{ fontSize: 18 }}>{likeBtnEmoji}</span>}
           sx={{ color: hasReaction ? "primary.main" : "text.secondary", fontWeight: hasReaction ? 600 : 400 }}
@@ -2147,7 +2147,7 @@ function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
   return (
     <Box>
       {canCreatePost && (
-        <Paper sx={{ p: 2, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+        <Paper sx={{ p: 2, mb: 2, border: `1px solid ${BORDER}`, borderRadius: 2 }}>
           <Stack spacing={2}>
             <Stack direction="row" spacing={2} alignItems="center">
               <TextField
@@ -2264,7 +2264,7 @@ function PostsTab({ groupId, group, moderatorCanI, onNotify = () => {} }) {
       )}
 
       {!posts.length ? (
-        <Paper sx={{ p: 3, border: `1px solid ${BORDER}`, borderRadius: 3, textAlign: "center" }}>
+        <Paper sx={{ p: 3, border: `1px solid ${BORDER}`, borderRadius: 2, textAlign: "center" }}>
           <Typography color="text.secondary" sx={{ fontStyle: hasRemovedPosts ? "italic" : "normal" }}>
             {hasRemovedPosts
               ? "This content was removed by moderators."
@@ -3068,7 +3068,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
   return (
     <Box>
       {canManageMembers && (
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between" spacing={1.5} sx={{ mb: 2 }}>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>Members</Typography>
           <Stack direction="row" spacing={2} useFlexGap sx={{ flexWrap: "wrap", justifyContent: "flex-end" }}>
             {group?.join_policy !== "open" && group?.join_policy !== "invite" && (
@@ -3090,7 +3090,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
                 textTransform: "none",
                 borderColor: "#10b8a6",
                 color: "#10b8a6",
-                borderRadius: 3,
+                borderRadius: 2,
               }}
             >
               {exportingCSV ? "Exporting..." : "Export CSV"}
@@ -3103,7 +3103,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
                 backgroundColor: "#10b8a6",
                 "&:hover": { backgroundColor: "#0ea5a4" },
                 textTransform: "none",
-                borderRadius: 3,
+                borderRadius: 2,
               }}
             >
               Add members
@@ -3117,7 +3117,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
                 backgroundColor: "#10b8a6",
                 "&:hover": { backgroundColor: "#0ea5a4" },
                 textTransform: "none",
-                borderRadius: 3,
+                borderRadius: 2,
               }}
             >
               Invite
@@ -3131,7 +3131,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
                 backgroundColor: "#0ea5e9",
                 "&:hover": { backgroundColor: "#0284c7" },
                 textTransform: "none",
-                borderRadius: 3,
+                borderRadius: 2,
               }}
             >
               Invite by Email
@@ -3145,7 +3145,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
           p: 1.5,
           mb: 1.5,
           border: `1px solid ${BORDER}`,
-          borderRadius: 3,
+          borderRadius: 2,
         }}
       >
         <Stack spacing={1.25}>
@@ -3153,6 +3153,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
             value={q}
             onChange={(e) => setQ(e.target.value)}
             size="small"
+            label="Search members"
             placeholder="Search by name, email, company, title, industry, location..."
             fullWidth
             InputProps={{
@@ -3409,6 +3410,7 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
                     <IconButton
                       edge="end"
                       size="small"
+                      aria-label={`View ${u.name || u.full_name || u.username || "member"} profile`}
                       onClick={(e) => {
                         e.stopPropagation();
                         openMemberProfile(m);
@@ -3641,8 +3643,8 @@ function OverviewTab({ group }) {
   if (!group) return null;
   return (
     <Stack spacing={2}>
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 2 }}>
-        <Typography variant="h6" gutterBottom>About</Typography>
+      <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER, p: 2 }}>
+        <Typography component="h2" variant="h6" gutterBottom>About</Typography>
         {group.short_description && (
           <Typography variant="subtitle2" fontWeight={700} color="text.primary" gutterBottom>
             {group.short_description}
@@ -3650,8 +3652,8 @@ function OverviewTab({ group }) {
         )}
         <ClampedText text={group.description || "No description."} />
       </Card>
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 2 }}>
-        <Typography variant="h6" gutterBottom>Details</Typography>
+      <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER, p: 2 }}>
+        <Typography component="h2" variant="h6" gutterBottom>Details</Typography>
         <Typography variant="body2">Visibility: {group.visibility}</Typography>
         {group.parent_groups?.length > 0 ? (
           <Box>
@@ -3909,9 +3911,9 @@ function SettingsTab({ group, onUpdate }) {
   }, [visibility, joinPolicy, parentAllowsOpen]);
 
   return (
-    <Stack spacing={3} maxWidth="md">
+    <Stack spacing={3} maxWidth="md" sx={{ minWidth: 0 }}>
       {/* Group Details Section */}
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+      <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER, p: { xs: 2, sm: 3 } }}>
         <Typography variant="h6" gutterBottom fontWeight={700}>
           Group Details
         </Typography>
@@ -4023,7 +4025,7 @@ function SettingsTab({ group, onUpdate }) {
       </Card>
 
       {/* Public Landing Page Section */}
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+      <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER, p: { xs: 2, sm: 3 } }}>
         <Stack
           direction={{ xs: "column", sm: "row" }}
           spacing={2}
@@ -4096,7 +4098,7 @@ function SettingsTab({ group, onUpdate }) {
       </Card>
 
       {/* Communication / Forum Section */}
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+      <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER, p: { xs: 2, sm: 3 } }}>
         <Typography variant="h6" gutterBottom fontWeight={700}>
           Communication / Forum
         </Typography>
@@ -4137,7 +4139,7 @@ function SettingsTab({ group, onUpdate }) {
         </Stack>
       </Card>
 
-      <Card variant="outlined" sx={{ borderRadius: 3, borderColor: BORDER, p: 3 }}>
+      <Card variant="outlined" sx={{ borderRadius: 2, borderColor: BORDER, p: { xs: 2, sm: 3 } }}>
         <Typography variant="h6" gutterBottom fontWeight={700}>
           Group Visuals
         </Typography>
@@ -4278,7 +4280,7 @@ function SettingsTab({ group, onUpdate }) {
 
 function PostSkeleton() {
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 3, borderColor: "#e2e8f0" }}>
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, borderColor: "#e2e8f0" }}>
       {/* Header Skeleton */}
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
         <Skeleton variant="circular" width={40} height={40} />
@@ -4751,7 +4753,7 @@ export default function GroupDetailsPage() {
   });
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 2, md: 3 } }}>
+    <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 3 } }}>
       <Box
         sx={{
           display: "flex",
@@ -4759,6 +4761,7 @@ export default function GroupDetailsPage() {
           px: { xs: 0, sm: 2, md: 2.5, lg: 3 },
           maxWidth: { xs: "100%", lg: "1480px" },
           mx: "auto",
+          minWidth: 0,
         }}
       >
         {/* LEFT: Community sidebar (same as other community pages) */}
@@ -4783,44 +4786,58 @@ export default function GroupDetailsPage() {
           </Box>
           <Card
             variant="outlined"
-            sx={{ borderRadius: 3, borderColor: BORDER, mb: 3 }}
+            sx={{ borderRadius: 2, borderColor: BORDER, mb: 3, overflow: "hidden", minWidth: 0 }}
           >
+            {!groupLoading && group?.cover_image && (
+              <Box
+                component="img"
+                src={toMediaUrl(group.cover_image)}
+                alt={`${group.name || "Group"} cover`}
+                sx={{ width: "100%", height: { xs: 140, sm: 190, md: 220 }, objectFit: "cover", display: "block" }}
+              />
+            )}
             <CardContent
               sx={{
-                p: 3,
+                p: { xs: 2, sm: 3 },
                 display: "flex",
-                alignItems: "center",
+                flexDirection: { xs: "column", md: "row" },
+                alignItems: { xs: "stretch", md: "center" },
                 justifyContent: "space-between",
+                gap: 2,
               }}
             >
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack direction="row" spacing={2} alignItems="flex-start" sx={{ minWidth: 0 }}>
                 {groupLoading && !group ? (
                   <Skeleton variant="circular" width={80} height={80} />
                 ) : (
                   <Avatar
                     src={toMediaUrl(group?.logo || group?.avatar || group?.photo || group?.image)}
+                    alt={`${group?.name || "Group"} logo`}
                     sx={{
                       width: 80,
                       height: 80,
                       fontSize: 32,
                       bgcolor: "primary.light",
+                      border: "3px solid",
+                      borderColor: "background.paper",
+                      flexShrink: 0,
                     }}
                   >
                     {(group?.name || "G")[0]}
                   </Avatar>
                 )}
-                <Box>
-                  <Typography variant="h5" fontWeight={700} component="div">
+                <Box sx={{ minWidth: 0 }}>
+                  <Typography variant="h5" fontWeight={700} component="h1" sx={{ overflowWrap: "anywhere" }}>
                     {groupLoading && !group ? (
                       <Skeleton width={240} height={36} />
                     ) : (group?.name || "Group unavailable")}
                   </Typography>
                   {!groupLoading && group?.short_description && (
-                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600} component="div">
+                    <Typography variant="subtitle2" color="text.secondary" fontWeight={600} component="p" sx={{ overflowWrap: "anywhere" }}>
                       {group.short_description}
                     </Typography>
                   )}
-                  <Typography variant="body2" color="text.secondary" component="div">
+                  <Typography variant="body2" color="text.secondary" component="div" sx={{ overflowWrap: "anywhere" }}>
                     {groupLoading && !group ? (
                       <Skeleton width={90} />
                     ) : (
@@ -4855,9 +4872,22 @@ export default function GroupDetailsPage() {
                       </>
                     )}
                   </Typography>
+                  {!groupLoading && group && (
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mt: 1 }}>
+                      <Chip size="small" variant="outlined" label={String(group.visibility || "public").toLowerCase() === "private" ? "Private" : "Public"} />
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        label={String(group.join_policy || "open").toLowerCase() === "invite" ? "Invite only" : ["approval", "public_approval"].includes(String(group.join_policy || "").toLowerCase()) ? "Approval required" : "Open membership"}
+                      />
+                      {membershipStatus === "pending" && <Chip size="small" label="Membership pending" color="warning" variant="outlined" />}
+                      {(membershipStatus === "active" || isElevatedGroupUser) && <Chip size="small" label="Joined" color="success" variant="outlined" />}
+                      {currentRole && <RoleBadge role={currentRole} />}
+                    </Stack>
+                  )}
                 </Box>
               </Stack>
-              <Stack direction="row" spacing={1}>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ justifyContent: { xs: "flex-start", md: "flex-end" }, "& .MuiButton-root": { minHeight: 40 } }}>
                 {canAccessGroupContent && (
                   <Button
                     variant="outlined"
@@ -4929,16 +4959,24 @@ export default function GroupDetailsPage() {
           {/* Tabs + tab content */}
           <Card
             variant="outlined"
-            sx={{ borderRadius: 3, borderColor: BORDER }}
+            sx={{ borderRadius: 2, borderColor: BORDER, overflow: "hidden", minWidth: 0 }}
           >
-            <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>
+            <Box sx={{ borderBottom: 1, borderColor: "divider", maxWidth: "100%" }}>
+              <Tabs
+                value={tab}
+                onChange={(_, v) => setTab(v)}
+                variant="scrollable"
+                scrollButtons="auto"
+                allowScrollButtonsMobile
+                aria-label="Group sections"
+                sx={{ px: { xs: 0, sm: 2 } }}
+              >
                 {tabDefs.map((t) => (
                   <Tab key={t.label} icon={t.icon} iconPosition="start" label={t.label} />
                 ))}
               </Tabs>
             </Box>
-            <CardContent sx={{ p: 3 }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 }, minWidth: 0 }}>
               {groupError && !group ? (
                 <Alert
                   severity="error"

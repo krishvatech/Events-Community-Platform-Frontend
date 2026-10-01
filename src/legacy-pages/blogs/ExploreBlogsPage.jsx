@@ -11,7 +11,6 @@ import {
   Skeleton,
   Stack,
   TextField,
-  Typography,
 } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { useSearchParams } from "#navigation";
@@ -19,11 +18,13 @@ import BlogCard from "../../components/blogs/BlogCard.jsx";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
 import blogApi from "../../services/blogApi";
 import { BLOG_CARD_PAGE_SIZE, totalPagesFor } from "../../services/blogService";
-import { BLOG_BORDER, BLOG_NAVY, BLOG_PAGE_BG, BLOG_TEAL } from "../../components/blogs/blogTheme";
+import { BLOG_BORDER, BLOG_PAGE_BG, BLOG_TEAL } from "../../components/blogs/blogTheme";
+import PageHeader from "../../components/page/PageHeader.jsx";
+import EmptyState from "../../components/page/EmptyState.jsx";
 
 function BlogCardSkeleton() {
   return (
-    <Box sx={{ border: `1px solid ${BLOG_BORDER}`, borderRadius: "14px", overflow: "hidden", bgcolor: "#fff" }}>
+    <Box sx={{ border: `1px solid ${BLOG_BORDER}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
       <Skeleton variant="rectangular" sx={{ aspectRatio: "16 / 9", height: "auto" }} />
       <Box sx={{ p: 2 }}>
         <Skeleton variant="text" height={28} width="85%" />
@@ -130,19 +131,14 @@ export default function ExploreBlogsPage() {
   };
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 2, md: 3 }, bgcolor: BLOG_PAGE_BG, minHeight: "100vh" }}>
-      <Box sx={{ px: { xs: 2, md: 2.5, lg: 3 }, maxWidth: { xs: "100%", lg: "1200px" }, mx: "auto" }}>
-        <Box component="header" sx={{ textAlign: "center", mb: 3, pt: 1 }}>
-          <Typography sx={{ fontSize: 11, fontWeight: 800, color: BLOG_TEAL, textTransform: "uppercase", letterSpacing: "0.12em", mb: "6px" }}>
-            Explore
-          </Typography>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 800, color: BLOG_NAVY, mb: "8px", lineHeight: 1.2 }}>
-            Blogs
-          </Typography>
-          <Typography sx={{ fontSize: 14, color: "#888" }}>
-            Explore articles and insights from the community.
-          </Typography>
-        </Box>
+    <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 3 }, bgcolor: BLOG_PAGE_BG, minHeight: "100vh" }}>
+      <Box sx={{ px: { xs: 2, md: 2.5, lg: 3 }, maxWidth: { xs: "100%", lg: "1200px" }, mx: "auto", minWidth: 0 }}>
+        <PageHeader
+          eyebrow="Explore"
+          title="Blogs"
+          subtitle="Explore articles and insights from the community."
+          sx={{ mb: 3, pt: 1 }}
+        />
 
         <Stack
           direction={{ xs: "column", sm: "row" }}
@@ -154,6 +150,7 @@ export default function ExploreBlogsPage() {
             size="small"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
+            label="Search blogs"
             placeholder="Search blogs"
             inputProps={{ "aria-label": "Search blogs" }}
             sx={{ bgcolor: "#fff", minWidth: { sm: 320 } }}
@@ -199,16 +196,14 @@ export default function ExploreBlogsPage() {
             ))}
           </Grid>
         ) : posts.length === 0 ? (
-          <Box sx={{ textAlign: "center", py: 8, bgcolor: "#fff", borderRadius: "14px", border: `1px solid ${BLOG_BORDER}` }}>
-            <Typography sx={{ fontWeight: 700, color: BLOG_NAVY, mb: 1 }}>
-              {hasFilters ? "No blogs match your search." : "No blogs have been published yet."}
-            </Typography>
-            {hasFilters && (
+          <EmptyState
+            title={hasFilters ? "No blogs match your search." : "No blogs have been published yet."}
+            action={hasFilters ? (
               <Button onClick={clearAll} sx={{ textTransform: "none", color: BLOG_TEAL, fontWeight: 700 }}>
                 Clear search and filters
               </Button>
-            )}
-          </Box>
+            ) : null}
+          />
         ) : (
           <Grid container spacing={2.5} data-testid="blog-grid">
             {posts.map((post) => (

@@ -37,13 +37,13 @@ export function BlogArticleView({
   const chunks = contentChunks || [post.content_html];
 
   return (
-    <Box component="article" sx={{ maxWidth: 820, mx: "auto" }}>
+    <Box component="article" sx={{ maxWidth: 760, mx: "auto", minWidth: 0 }}>
       {backTo && (
         <Button
           component={RouterLink}
           to={backTo}
           startIcon={<ArrowBackRoundedIcon />}
-          sx={{ textTransform: "none", color: BLOG_MUTED, mb: 2, px: 0 }}
+          sx={{ textTransform: "none", color: BLOG_MUTED, mb: 2, px: 0, minHeight: 40 }}
         >
           {backLabel}
         </Button>
@@ -69,13 +69,13 @@ export function BlogArticleView({
       <Typography
         variant="h3"
         component="h1"
-        sx={{ fontWeight: 800, color: BLOG_NAVY, fontSize: { xs: 28, md: 38 }, lineHeight: 1.2, overflowWrap: "anywhere" }}
+        sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: BLOG_NAVY, fontSize: { xs: 28, sm: 34, md: 40 }, lineHeight: 1.18, overflowWrap: "anywhere" }}
       >
         {post.title}
       </Typography>
 
       {(author || date) && (
-        <Typography sx={{ color: BLOG_MUTED, mt: 1.5, fontSize: 14 }}>
+        <Typography sx={{ color: BLOG_MUTED, mt: 1.5, fontSize: 14, lineHeight: 1.5, overflowWrap: "anywhere" }}>
           {author && <span data-testid="blog-detail-author">By {author}</span>}
           {author && date && " · "}
           {date && <time dateTime={post.published_at}>{date}</time>}
@@ -93,11 +93,11 @@ export function BlogArticleView({
           src={post.featured_image}
           alt={post.title}
           loading="eager"
-          sx={{ mt: 3, borderRadius: "14px" }}
+          sx={{ mt: 3, borderRadius: "var(--imaa-radius-card)", border: `1px solid ${BLOG_BORDER}` }}
         />
       )}
 
-      <Box sx={{ mt: 3 }}>
+      <Box sx={{ mt: 3, bgcolor: "background.paper", border: `1px solid ${BLOG_BORDER}`, borderRadius: "var(--imaa-radius-card)", p: { xs: 2, sm: 3 }, minWidth: 0, overflow: "hidden" }}>
         {chunks.map((html, index) => (
           <BlogArticleContent key={index} html={html} continuation={index > 0} />
         ))}
@@ -288,13 +288,13 @@ export default function BlogDetailPage() {
   const seo = post ? getBlogSeoMeta(post, window.location.origin) : null;
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 2, md: 4 }, bgcolor: BLOG_PAGE_BG, minHeight: "100vh" }}>
-      <Box sx={{ px: { xs: 2, md: 3 } }}>
+    <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 4 }, bgcolor: BLOG_PAGE_BG, minHeight: "100vh" }}>
+      <Box sx={{ px: { xs: 2, md: 3 }, minWidth: 0 }}>
         {status === "loading" && (
-          <Box sx={{ maxWidth: 820, mx: "auto" }} aria-busy="true" aria-label="Loading blog">
+          <Box sx={{ maxWidth: 760, mx: "auto" }} aria-busy="true" aria-label="Loading blog">
             <Skeleton variant="text" height={56} width="90%" />
             <Skeleton variant="text" width="40%" />
-            <Skeleton variant="rectangular" sx={{ mt: 3, aspectRatio: "16 / 9", height: "auto", borderRadius: "14px" }} />
+            <Skeleton variant="rectangular" sx={{ mt: 3, aspectRatio: "16 / 9", height: "auto", borderRadius: 2 }} />
             <Skeleton variant="text" sx={{ mt: 3 }} />
             <Skeleton variant="text" />
             <Skeleton variant="text" width="80%" />
@@ -319,7 +319,7 @@ export default function BlogDetailPage() {
         )}
 
         {status === "error" && (
-          <Box sx={{ maxWidth: 820, mx: "auto" }}>
+          <Box sx={{ maxWidth: 760, mx: "auto" }}>
             <Alert
               severity="error"
               action={

@@ -5129,15 +5129,23 @@ export default function GroupManagePage() {
     const onUpdated = (updated) => setGroup(updated);
 
     return (
-        <div className="max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0">
+        <div className="max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0 overflow-hidden">
             <div className="grid grid-cols-12 gap-4">
 
                 {/* RIGHT: your original page content unchanged */}
-                <main className="col-span-12 lg:col-span-9">
+                <main className="col-span-12 min-w-0">
                     {/* ↓↓↓ PASTE everything that was inside your <Container> here ↓↓↓ */}
                     <Container maxWidth="lg" disableGutters className="py-0">
-                        {/* Cover banner */}
-                        {/* Header (no cover image) */}
+                        <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#e2e8f0", overflow: "hidden", mb: 2 }}>
+                        {group?.cover_image && (
+                            <Box
+                                component="img"
+                                src={bust(group.cover_image, group.updated_at || group._cache)}
+                                alt={`${group?.name || "Group"} cover`}
+                                sx={{ width: "100%", height: { xs: 140, sm: 190, md: 220 }, objectFit: "cover", display: "block" }}
+                            />
+                        )}
+                        {/* Header */}
                         <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
                             <Stack
                                 direction={{ xs: "column", sm: "row" }}
@@ -5166,10 +5174,11 @@ export default function GroupManagePage() {
                                         </Avatar>
                                         {canEditGroup && (
                                             <Tooltip title="Change group icon">
-                                                <IconButton
-                                                    size="small"
-                                                    onClick={handleOpenImageOnly}
-                                                    sx={{
+                                                 <IconButton
+                                                     size="small"
+                                                     aria-label="Change group icon"
+                                                     onClick={handleOpenImageOnly}
+                                                     sx={{
                                                         position: "absolute",
                                                         right: -6,
                                                         bottom: -6,
@@ -5187,7 +5196,8 @@ export default function GroupManagePage() {
 
                                     <Box sx={{ minWidth: 0 }}>
                                         <Typography
-                                            variant="h5"
+                                             variant="h5"
+                                             component="h1"
                                             className="font-extrabold"
                                             sx={{ wordBreak: "break-word" }}
                                         >
@@ -5202,12 +5212,20 @@ export default function GroupManagePage() {
                                                 {group.short_description}
                                             </Typography>
                                         )}
-                                        <Stack direction="row" spacing={1} alignItems="center">
-                                            <Chip
-                                                size="small"
-                                                label={group?.visibility === "private" ? "Private" : "Public"}
-                                                className={group?.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
-                                            />
+                                         <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
+                                             <Chip
+                                                 size="small"
+                                                 label={group?.visibility === "private" ? "Private" : "Public"}
+                                                 className={group?.visibility === "private" ? "bg-slate-200 text-slate-700" : "bg-teal-50 text-teal-700"}
+                                             />
+                                             {group?.join_policy && (
+                                                 <Chip
+                                                     size="small"
+                                                     variant="outlined"
+                                                     label={JOIN_POLICY_LABELS[String(group.join_policy).toLowerCase()] || group.join_policy}
+                                                 />
+                                             )}
+                                             {myRole && <RoleBadge role={myRole} />}
                                             {typeof memberCount === "number" && (
                                                 <Typography variant="body2">{memberCount} members</Typography>
                                             )}
@@ -5218,11 +5236,13 @@ export default function GroupManagePage() {
                                 <Stack
                                     direction="row"
                                     spacing={1}
-                                    sx={{
-                                        mt: { xs: 1, sm: 0 },
-                                        width: { xs: "100%", sm: "auto" },
-                                        justifyContent: { xs: "flex-start", sm: "flex-end" },
-                                    }}
+                                     sx={{
+                                         mt: { xs: 1, sm: 0 },
+                                         width: { xs: "100%", sm: "auto" },
+                                         justifyContent: { xs: "flex-start", sm: "flex-end" },
+                                         flexWrap: "wrap",
+                                         "& .MuiButton-root": { minHeight: 40 },
+                                     }}
                                 >
                                     <Button
                                         onClick={() => navigate(-1)}
@@ -5257,21 +5277,24 @@ export default function GroupManagePage() {
                                         Leave
                                     </Button>
                                 </Stack>
-                            </Stack>
-                        </Box>
+                             </Stack>
+                         </Box>
+                        </Paper>
 
 
                         {/* Tabs – desktop / tablet */}
                         <Paper
-                            elevation={0}
-                            className="rounded-none"
-                            sx={{ display: { xs: "none", sm: "block" } }}
-                        >
+                             elevation={0}
+                             variant="outlined"
+                             sx={{ display: { xs: "none", sm: "block" }, borderRadius: 2, borderColor: "#e2e8f0", overflow: "hidden" }}
+                         >
                             <Tabs
                                 value={tab}
                                 onChange={(_, v) => setTab(v)}
-                                variant="scrollable"
-                                allowScrollButtonsMobile
+                                 variant="scrollable"
+                                 scrollButtons="auto"
+                                 allowScrollButtonsMobile
+                                 aria-label="Group management sections"
                             >
                                 <Tab label="Overview" value={0} />
                                 <Tab label="Members" value={1} />
@@ -5347,11 +5370,11 @@ export default function GroupManagePage() {
                         ) : !group ? (
                             <Box className="p-8"><Alert severity="warning">Group not found.</Alert></Box>
                         ) : (
-                            <Box className="p-6">
+                            <Box sx={{ p: { xs: 2, sm: 3 }, minWidth: 0 }}>
                                 {tab === 0 && (
                                     <Grid container spacing={3}>
                                         <Grid item xs={12} md={8}>
-                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                            <Paper elevation={0} className="rounded-lg border border-slate-200 p-4">
                                                 <Typography variant="h6" className="font-semibold mb-1">About</Typography>
                                                 {group.short_description && (
                                                     <Typography className="text-slate-700 font-semibold mb-2">
@@ -5366,7 +5389,7 @@ export default function GroupManagePage() {
                                             </Paper>
                                         </Grid>
                                         <Grid item xs={12} md={4}>
-                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                            <Paper elevation={0} className="rounded-lg border border-slate-200 p-4">
                                                 <Typography variant="h6" className="font-semibold mb-2">Details</Typography>
                                                 <Stack spacing={1} className="text-slate-600">
                                                     <div><b>Visibility:</b> {group.visibility}</div>
@@ -5391,11 +5414,11 @@ export default function GroupManagePage() {
                                     </Grid>
                                 )}
                                 {tab === 1 && (
-                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-4">
+                                    <Paper elevation={0} className="rounded-lg border border-slate-200 p-4">
+                                        <Stack direction={{ xs: "column", md: "row" }} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between" spacing={1.5} className="mb-4">
                                             <Typography variant="h6" className="font-semibold">Members</Typography>
 
-                                            <Stack direction="row" spacing={1}>
+                                            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ "& .MuiButton-root": { minHeight: 40 } }}>
                                                 {canAddMembersDirectly && (
                                                     // Owner + Admin → Export CSV
                                                     (<Button
@@ -5666,7 +5689,7 @@ export default function GroupManagePage() {
                                     <Stack spacing={3}>
                                         {/* Parent Groups (Both Primary & Linked) */}
                                         {(isChildGroup || hasParents) && (
-                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                            <Paper elevation={0} className="rounded-lg border border-slate-200 p-4">
                                                 <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                                     <Typography variant="h6" className="font-semibold">Parent Groups</Typography>
                                                     <Stack direction="row" spacing={1}>
@@ -5788,7 +5811,7 @@ export default function GroupManagePage() {
                                         {/* 2. Subgroups */}
                                         {/* 2. Subgroups - ONLY for Independent/Parent Groups (No parents) */}
                                         {!hasParents && (
-                                            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                            <Paper elevation={0} className="rounded-lg border border-slate-200 p-4">
                                                 <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
                                                     <Typography variant="h6" className="font-semibold">Sub-groups</Typography>
                                                     {canCreateSubgroups && (
@@ -5921,7 +5944,7 @@ export default function GroupManagePage() {
                                 )}
 
                                 {tab === 3 && (
-                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                    <Paper elevation={0} className="rounded-lg border border-slate-200 p-4">
                                         <Typography variant="h6" className="font-semibold mb-1">Settings</Typography>
                                         <Typography className="text-slate-500 mb-4">
                                             Manage group visibility and permissions.
@@ -6069,7 +6092,7 @@ export default function GroupManagePage() {
                                         {/* Forum settings */}
                                         <Stack spacing={1.5} className="mb-4">
                                             <Typography variant="subtitle1" className="font-semibold">Communication / Forum</Typography>
-                                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                            <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1}>
                                                 <Typography variant="body2" className="text-slate-600">
                                                     Enable forum posts for members.
                                                 </Typography>
@@ -6084,7 +6107,7 @@ export default function GroupManagePage() {
                                                     label={forumEnabled ? "On" : "Off"}
                                                 />
                                             </Stack>
-                                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                            <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1}>
                                                 <Typography variant="body2" className="text-slate-600">
                                                     Restrict posting to admins only.
                                                 </Typography>
@@ -6099,7 +6122,7 @@ export default function GroupManagePage() {
                                                     label={postsCreationRestricted ? "On" : "Off"}
                                                 />
                                             </Stack>
-                                            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                                            <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1}>
                                                 <Typography variant="body2" className="text-slate-600">
                                                     Enable comments on posts.
                                                 </Typography>
@@ -6129,7 +6152,7 @@ export default function GroupManagePage() {
 
                                         <Divider className="mb-4" />
                                         {/* Chat toggle */}
-                                        <Stack direction="row" alignItems="center" justifyContent="space-between" className="mb-2">
+                                        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={1} className="mb-2">
                                             <div>
                                                 <Typography variant="subtitle1" className="font-semibold">Group Chat</Typography>
                                                 <Typography variant="body2" className="text-slate-600">
@@ -6161,7 +6184,7 @@ export default function GroupManagePage() {
                                             </Alert>
                                         )}
 
-                                        <Stack direction="row" spacing={1}>
+                                        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ "& .MuiButton-root": { minHeight: 40 } }}>
                                             {canEditGroup && (
                                                 <Button
                                                     variant="contained"
@@ -6211,7 +6234,7 @@ export default function GroupManagePage() {
                                 )}
 
                                 {tab === 4 && (
-                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                    <Paper elevation={0} className="rounded-lg border border-slate-200 p-4">
                                         <Stack spacing={2}>
                                             <Typography variant="h6" className="font-semibold">Posts</Typography>
 
@@ -6492,7 +6515,7 @@ export default function GroupManagePage() {
                                 {tab === CHAT_TAB_INDEX && (
                                     <Paper
                                         elevation={0}
-                                        className="rounded-2xl border border-slate-200 p-4"
+                                        className="rounded-lg border border-slate-200 p-4"
                                     >
                                         <GroupChatTab
                                             group={group}
@@ -6506,7 +6529,7 @@ export default function GroupManagePage() {
                                 )}
 
                                 {canSeeNotificationsTab && tab === NOTIF_TAB_INDEX && (
-                                    <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
+                                    <Paper elevation={0} className="rounded-lg border border-slate-200 p-4">
                                         <Stack spacing={2}>
                                             <Typography variant="h6" className="font-semibold">Notifications</Typography>
 

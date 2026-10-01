@@ -2,12 +2,12 @@
 
 import React, { useEffect, useState } from "react";
 import {
-  Box, Container, Divider, TextField,
+  Alert, Box, Container, TextField,
   List, ListItem, ListItemIcon, ListItemText, Chip, Paper,
   Typography, InputAdornment, Stack, Pagination, Skeleton,
   IconButton, FormControl, Select, MenuItem, Button, useTheme, useMediaQuery, Menu,
 } from "@mui/material";
-import { useNavigate } from "#navigation";
+import { Link, useNavigate } from "#navigation";
 
 // Icons
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -21,35 +21,29 @@ import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import BlockRoundedIcon from "@mui/icons-material/BlockRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
+import FolderOpenRoundedIcon from "@mui/icons-material/FolderOpenRounded";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import PageHeader from "../components/page/PageHeader.jsx";
+import FilterToolbar from "../components/page/FilterToolbar.jsx";
+import EmptyState from "../components/page/EmptyState.jsx";
 
 const API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
 const API_URL = API.endsWith("/api") ? API : `${API}/api`;
 
 function ResourcesListSkeleton({ rows = 10, isMobile }) {
   return (
-    <List>
+    <List disablePadding aria-label="Loading resources" aria-busy="true" sx={{ display: "grid", gap: 1.5 }}>
       {Array.from({ length: rows }).map((_, idx) => (
-        <React.Fragment key={idx}>
-          {idx > 0 && <Divider />}
-          <ListItem
-            secondaryAction={
-              isMobile ? (
-                <Skeleton variant="circular" width={32} height={32} />
-              ) : (
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Skeleton variant="rounded" width={56} height={22} />
-                  <Skeleton variant="circular" width={32} height={32} />
-                  <Skeleton variant="circular" width={32} height={32} />
-                  <Skeleton variant="circular" width={32} height={32} />
-                </Stack>
-              )
-            }
-          >
-            <ListItemIcon>
+        <Paper
+          component="li"
+          variant="outlined"
+          key={idx}
+          sx={{ listStyle: "none", p: { xs: 1.5, sm: 2 }, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)" }}
+        >
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <ListItemIcon sx={{ minWidth: 44 }}>
               <Skeleton variant="circular" width={28} height={28} />
             </ListItemIcon>
-
             <ListItemText
               primary={<Skeleton variant="text" width="40%" height={28} />}
               secondary={
@@ -59,8 +53,17 @@ function ResourcesListSkeleton({ rows = 10, isMobile }) {
                 </>
               }
             />
-          </ListItem>
-        </React.Fragment>
+            {isMobile ? (
+              <Skeleton variant="circular" width={36} height={36} />
+            ) : (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Skeleton variant="circular" width={36} height={36} />
+                <Skeleton variant="circular" width={36} height={36} />
+                <Skeleton variant="circular" width={36} height={36} />
+              </Stack>
+            )}
+          </Stack>
+        </Paper>
       ))}
     </List>
   );
@@ -91,6 +94,7 @@ export default function MyResourcesPage() {
   const [resources, setResources] = useState([]);
   const [resourcesTotal, setResourcesTotal] = useState(0);
   const [resourcesLoading, setResourcesLoading] = useState(true);
+  const [resourcesError, setResourcesError] = useState("");
 
   const [menuAnchor, setMenuAnchor] = useState(null);
   const [menuResource, setMenuResource] = useState(null);
@@ -182,12 +186,14 @@ export default function MyResourcesPage() {
       if (!currentUser || !registrationsLoaded) return;
       if (registeredEvents.length === 0) {
         setResourcesLoading(false);
+        setResourcesError("");
         setResources([]);
         setResourcesTotal(0);
         return;
       }
 
       setResourcesLoading(true);
+      setResourcesError("");
       try {
         const token = getStoredAccessToken();
         const offset = (page - 1) * itemsPerPage;
@@ -240,6 +246,7 @@ export default function MyResourcesPage() {
         console.error("Error fetching resources:", error);
         setResources([]);
         setResourcesTotal(0);
+        setResourcesError("Resources could not be loaded. Please try again.");
       } finally {
         if (!controller.signal.aborted) {
           setResourcesLoading(false);
@@ -308,25 +315,20 @@ export default function MyResourcesPage() {
 
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Container maxWidth="xl" className="py-6 sm:py-8">
+    <Box sx={{ minHeight: "100vh", bgcolor: "#f7f8fa", width: "100%", minWidth: 0, overflow: "hidden" }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">
-            <Typography variant="h4" sx={{ mb: 1 }}>My Resources</Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Access resources from your registered events
-            </Typography>
+            <PageHeader
+              eyebrow="E-Library"
+              title="My Resources"
+              subtitle="Access resources from your registered events"
+              sx={{ mb: 3 }}
+            />
 
-
-            <Stack
-              direction={{ xs: "column", sm: "column", md: "row" }}
-              spacing={2}
-              sx={{
-                mb: 3,
-                flexWrap: { xs: "nowrap", md: "wrap" }, // row wrap only on desktop
-              }}
-            >
+            <FilterToolbar surface aria-label="Resource filters" sx={{ mb: 3 }}>
               <TextField
+                label="Search resources"
                 placeholder="Search resources..."
                 value={searchQuery}
                 onChange={(e) => {
@@ -342,7 +344,8 @@ export default function MyResourcesPage() {
                 }}
                 sx={{
                   flexGrow: 1,
-                  minWidth: { xs: "100%", sm: "100%", md: 250 },
+                  minWidth: { xs: "100%", sm: 260 },
+                  bgcolor: "background.paper",
                 }}
                 size="small"
               />
@@ -350,7 +353,7 @@ export default function MyResourcesPage() {
               <FormControl
                 size="small"
                 sx={{
-                  minWidth: { xs: "100%", sm: 220, md: 120 }, // full width below search
+                  minWidth: { xs: "100%", sm: 150 },
                 }}
               >
                 <Select value={filterType} onChange={(e) => {
@@ -358,6 +361,7 @@ export default function MyResourcesPage() {
                   setPage(1);
                 }}
                   displayEmpty
+                  inputProps={{ "aria-label": "Filter by resource type" }}
                   renderValue={(value) => {
                     if (value === "") return "All Types";
                     if (value === "file") return "File";
@@ -377,43 +381,32 @@ export default function MyResourcesPage() {
                   display: "flex",
                   alignItems: "center",
                   gap: 1,
-                  width: { xs: "100%", sm: "100%", md: "auto" }, // full width on mobile/tablet
-                  justifyContent: { xs: "flex-start", sm: "flex-start" },
+                  width: { xs: "100%", sm: "auto" },
                 }}
               >
-                {/* Show "Sort" label only on laptop/desktop */}
-                <Typography
-                  variant="body2"
-                  sx={{
-                    display: { xs: "none", sm: "none", md: "inline" },
-                  }}
-                >
-                  Sort
-                </Typography>
-
                 <FormControl
                   size="small"
                   sx={{
                     // 👉 Same style as Type box on mobile & tablet
-                    minWidth: { xs: "100%", sm: 220, md: 140 },
-                    flexGrow: { xs: 1, sm: 0, md: 0 }, // stretches on small screens
+                    minWidth: { xs: "100%", sm: 160 },
+                    flexGrow: { xs: 1, sm: 0 },
                   }}
                 >
                   <Select value={sortBy} onChange={(e) => {
                     setSortBy(e.target.value);
                     setPage(1);
                   }}
+                    inputProps={{ "aria-label": "Sort resources" }}
                   >
                     <MenuItem value="newest">Newest first</MenuItem>
                     <MenuItem value="oldest">Oldest first</MenuItem>
                   </Select>
                 </FormControl>
               </Box>
-            </Stack>
+            </FilterToolbar>
 
             <>
-              {/* RESOURCES LIST (unchanged content) */}
-              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+              <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2, mb: 1.5 }}>
                 <Typography variant="body2" color="text.secondary">
                   {renderRangeText(resourcesTotal, page, itemsPerPage)}
                 </Typography>
@@ -422,11 +415,15 @@ export default function MyResourcesPage() {
                   disabled={resourcesLoading}
                   size="small"
                   title="Refresh resources"
+                  aria-label="Refresh resources"
                   sx={{
-                    color: '#0ea5a4',
+                    color: 'var(--imaa-teal-hover)',
+                    minWidth: 40,
+                    minHeight: 40,
                     '&:hover': {
-                      bgcolor: '#f0fdfa',
-                    }
+                      bgcolor: 'var(--imaa-teal-light)',
+                    },
+                    '&:focus-visible': { outline: 'var(--imaa-focus-width) solid var(--imaa-focus-color)', outlineOffset: 'var(--imaa-focus-offset)' },
                   }}
                 >
                   <RefreshRoundedIcon
@@ -441,31 +438,47 @@ export default function MyResourcesPage() {
                   />
                 </IconButton>
               </Box>
-              <Paper variant="outlined" sx={{ borderRadius: 2 }}>
-                {resourcesLoading ? (
+              {resourcesError ? (
+                <Alert
+                  severity="error"
+                  action={
+                    <Button color="inherit" size="small" onClick={() => setRefreshTrigger((prev) => prev + 1)}>
+                      Retry
+                    </Button>
+                  }
+                  sx={{ borderRadius: "var(--imaa-radius-card)" }}
+                >
+                  {resourcesError}
+                </Alert>
+              ) : resourcesLoading ? (
                   <ResourcesListSkeleton rows={itemsPerPage} isMobile={isMobile} />
                 ) : resources.length === 0 ? (
-                  <Box sx={{ p: 8, textAlign: "center" }}>
-                    <Typography variant="h6" color="text.secondary" gutterBottom>No resources found</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {registeredEvents.length === 0 ? "Register for events to access resources" : "Resources uploaded by publishers will appear here"}
-                    </Typography>
-                  </Box>
+                  <EmptyState
+                    icon={<FolderOpenRoundedIcon />}
+                    title="No resources found"
+                    description={registeredEvents.length === 0 ? "Register for events to access resources" : "Resources uploaded by publishers will appear here"}
+                  />
                 ) : (
                   <>
-                    <List>
-                      {resources.map((resource, index) => (
+                    <List disablePadding aria-label="Resources" sx={{ display: "grid", gap: 1.5 }}>
+                      {resources.map((resource) => (
                         <React.Fragment key={resource.id}>
-                          {index > 0 && <Divider />}
                           <ListItem
-                            button
-                            onClick={() => navigate(`/resource/${resource.id}`)}
                             sx={{
-                              cursor: 'pointer',
+                              bgcolor: "background.paper",
+                              border: "1px solid var(--imaa-border)",
+                              borderRadius: "var(--imaa-radius-card)",
+                              borderColor: "var(--imaa-border)",
+                              boxShadow: "var(--imaa-shadow-sm)",
+                              overflow: "hidden",
                               pr: isMobile ? 6 : 20,
+                              py: { xs: 0.75, sm: 1 },
+                              transition: "border-color 160ms ease, box-shadow 160ms ease",
                               '&:hover': {
-                                bgcolor: '#f0fdfa'
-                              }
+                                borderColor: "var(--imaa-border-hover)",
+                                boxShadow: "var(--imaa-shadow-md)",
+                              },
+                              '&:focus-within': { borderColor: "var(--imaa-teal)" },
                             }}
                             secondaryAction={
                               isMobile ? (
@@ -474,24 +487,25 @@ export default function MyResourcesPage() {
                                   size="small"
                                   onClick={(e) => handleMenuOpen(e, resource)}
                                   title="More actions"
+                                  aria-label={`More actions for ${resource.title}`}
+                                  sx={{ minWidth: 40, minHeight: 40 }}
                                 >
                                   <MoreVertRoundedIcon />
                                 </IconButton>)
                               ) : (
                                 <Stack direction="row" spacing={1} alignItems="center">
-                                  <Chip label={resource.type} size="small" />
-                                  <IconButton size="small" onClick={(e) => handleDetails(resource, e)} title="Details">
+                                  <IconButton size="small" onClick={(e) => handleDetails(resource, e)} title="Details" aria-label={`Details for ${resource.title}`} sx={{ minWidth: 40, minHeight: 40 }}>
                                     <InfoRoundedIcon />
                                   </IconButton>
-                                  <IconButton size="small" onClick={(e) => handleView(resource, e)} title="View">
+                                  <IconButton size="small" onClick={(e) => handleView(resource, e)} title="View" aria-label={`View ${resource.title}`} sx={{ minWidth: 40, minHeight: 40 }}>
                                     <VisibilityRoundedIcon />
                                   </IconButton>
                                   {resource.type === 'file' ? (
-                                    <IconButton size="small" onClick={(e) => handleDownload(resource, e)} title="Download">
+                                    <IconButton size="small" onClick={(e) => handleDownload(resource, e)} title="Download" aria-label={`Download ${resource.title}`} sx={{ minWidth: 40, minHeight: 40 }}>
                                       <DownloadRoundedIcon />
                                     </IconButton>
                                   ) : (
-                                    <IconButton size="small" disabled title="Download not available" sx={{ cursor: 'not-allowed', opacity: 0.4 }}>
+                                    <IconButton size="small" disabled title="Download not available" aria-label={`Download not available for ${resource.title}`} sx={{ minWidth: 40, minHeight: 40, cursor: 'not-allowed', opacity: 0.4 }}>
                                       <BlockRoundedIcon />
                                     </IconButton>
                                   )
@@ -500,16 +514,45 @@ export default function MyResourcesPage() {
                               )
                             }
                           >
-                            <ListItemIcon>{getResourceIcon(resource.type)}</ListItemIcon>
+                            <ListItemIcon
+                              aria-hidden="true"
+                              sx={{
+                                minWidth: 48,
+                                width: 40,
+                                height: 40,
+                                mr: 1.5,
+                                borderRadius: "var(--imaa-radius-card)",
+                                bgcolor: "var(--imaa-teal-light)",
+                                color: "var(--imaa-teal-hover)",
+                                display: "grid",
+                                placeItems: "center",
+                              }}
+                            >
+                              {getResourceIcon(resource.type)}
+                            </ListItemIcon>
                             <ListItemText
                               sx={{ pr: isMobile ? 0 : 10 }}
+                              secondaryTypographyProps={{ component: "div" }}
                               primary={
-                                <Typography variant="body1" sx={{ fontWeight: 500, color: '#0ea5a4', '&:hover': { textDecoration: 'underline' } }}>
+                                <Typography
+                                  component={Link}
+                                  to={`/resource/${resource.id}`}
+                                  variant="body1"
+                                  sx={{
+                                    display: "inline-block",
+                                    fontWeight: 700,
+                                    color: 'var(--imaa-ink)',
+                                    textDecoration: "none",
+                                    overflowWrap: "anywhere",
+                                    '&:hover': { color: "var(--imaa-teal-hover)", textDecoration: 'underline' },
+                                    '&:focus-visible': { outline: 'var(--imaa-focus-width) solid var(--imaa-focus-color)', outlineOffset: 'var(--imaa-focus-offset)' },
+                                  }}
+                                >
                                   {resource.title}
                                 </Typography>
                               }
                               secondary={
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, minWidth: 0, width: '100%' }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, minWidth: 0, width: '100%', mt: 0.5 }}>
                                   <Typography
                                     component="span"
                                     variant="body2"
@@ -517,14 +560,17 @@ export default function MyResourcesPage() {
                                     sx={{
                                       flex: 1,
                                       minWidth: 0,
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: 'vertical',
                                       overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap',
+                                      overflowWrap: 'anywhere',
                                     }}
                                   >
                                     {resource.description || "No description"}
                                   </Typography>
-                                  <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>Added {new Date(resource.created_at).toLocaleDateString()}</Typography>
+                                  <Chip label={resource.type} size="small" variant="outlined" sx={{ textTransform: "capitalize", height: 22 }} />
+                                  <Typography variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>Added {new Date(resource.created_at).toLocaleDateString()}</Typography>
                                 </Box>
                               }
                             />
@@ -533,7 +579,7 @@ export default function MyResourcesPage() {
                       ))}
                     </List>
                     {totalPages > 1 && (
-                      <Box sx={{ display: "flex", justifyContent: "center", p: 3 }}>
+                      <Box sx={{ display: "flex", justifyContent: "center", py: 3, overflowX: "auto" }}>
                         <Pagination count={totalPages} page={page} onChange={(e, value) => setPage(value)} color="primary" shape="rounded" />
                       </Box>
                     )}
@@ -590,11 +636,10 @@ export default function MyResourcesPage() {
                     </Menu>
                   </>
                 )}
-              </Paper>
             </>
           </main>
         </div>
       </Container>
-    </div>
+    </Box>
   );
 }

@@ -12,8 +12,9 @@ const articleSx = {
   overflowWrap: "anywhere",
   "& p": { my: 2 },
   "& h1, & h2, & h3, & h4, & h5, & h6": {
+    fontFamily: "var(--imaa-font-serif)",
     color: BLOG_NAVY,
-    fontWeight: 800,
+    fontWeight: 700,
     lineHeight: 1.3,
     mt: 4,
     mb: 1.5,
@@ -23,12 +24,16 @@ const articleSx = {
   "& h3": { fontSize: { xs: 19, md: 21 } },
   "& h4, & h5, & h6": { fontSize: 17 },
   "& a": { color: BLOG_TEAL, textDecoration: "underline", textUnderlineOffset: "2px" },
+  "& a:focus-visible": { outline: `2px solid ${BLOG_TEAL}`, outlineOffset: "3px", borderRadius: "2px" },
   // The app's global CSS reset removes list markers; restore them here only.
   "& ul, & ol": { pl: 3, my: 2 },
   "& ul": { listStyleType: "disc" },
   "& ol": { listStyleType: "decimal" },
   "& li": { mb: 0.75 },
   "& img": { maxWidth: "100%", height: "auto", borderRadius: "8px", display: "block", my: 2 },
+  "& video": { display: "block", width: "100%", maxWidth: "100%", height: "auto", my: 2 },
+  "& iframe, & embed": { display: "block", width: "100%", maxWidth: "100%", border: 0 },
+  "& .wp-block-embed, & .wp-block-embed__wrapper": { maxWidth: "100%", overflowX: "auto" },
   "& figure": { mx: 0, my: 3 },
   "& figcaption": { fontSize: 13, color: "#6b7280", textAlign: "center", mt: 1 },
   "& blockquote": {
