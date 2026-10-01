@@ -164,7 +164,7 @@ export default function RecognitionDirectoryPage() {
         </nav>
         <div className="right">
           <div className="search-btn">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
             </svg>
           </div>
@@ -174,6 +174,7 @@ export default function RecognitionDirectoryPage() {
             className="mobile-menu-btn"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
           >
             <span></span>
             <span></span>
@@ -227,6 +228,7 @@ export default function RecognitionDirectoryPage() {
             <input
               type="text"
               placeholder="Search institution or program…"
+              aria-label="Search institution or program"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -235,24 +237,32 @@ export default function RecognitionDirectoryPage() {
           <div className="filter-group">
             <span className="filter-label">Status</span>
             <button
+              type="button"
+              aria-pressed={statusFilter === 'all'}
               className={`chip filter ${statusFilter === 'all' ? 'active' : ''}`}
               onClick={() => setStatusFilter('all')}
             >
               All
             </button>
             <button
+              type="button"
+              aria-pressed={statusFilter === 'recognized'}
               className={`chip filter ${statusFilter === 'recognized' ? 'active' : ''}`}
               onClick={() => setStatusFilter('recognized')}
             >
               Recognized
             </button>
             <button
+              type="button"
+              aria-pressed={statusFilter === 'partner'}
               className={`chip filter ${statusFilter === 'partner' ? 'active' : ''}`}
               onClick={() => setStatusFilter('partner')}
             >
               Partner
             </button>
             <button
+              type="button"
+              aria-pressed={statusFilter === 'review'}
               className={`chip filter ${statusFilter === 'review' ? 'active' : ''}`}
               onClick={() => setStatusFilter('review')}
             >
@@ -265,6 +275,8 @@ export default function RecognitionDirectoryPage() {
             {[1, 2, 3, 4].map((comp) => (
               <button
                 key={comp}
+                type="button"
+                aria-pressed={activeCompetencies.has(comp)}
                 className={`chip filter chip-comp ${activeCompetencies.has(comp) ? 'active' : ''}`}
                 onClick={() => handleCompetencyToggle(comp)}
               >
@@ -275,12 +287,16 @@ export default function RecognitionDirectoryPage() {
 
           <div className="view-toggle">
             <button
+              type="button"
+              aria-pressed={viewMode === 'institution'}
               className={viewMode === 'institution' ? 'active' : ''}
               onClick={() => setViewMode('institution')}
             >
               By institution
             </button>
             <button
+              type="button"
+              aria-pressed={viewMode === 'program'}
               className={viewMode === 'program' ? 'active' : ''}
               onClick={() => setViewMode('program')}
             >
@@ -320,6 +336,9 @@ export default function RecognitionDirectoryPage() {
               </div>
             </article>
           ))}
+          {filteredInstitutions.length === 0 && (
+            <p className="directory-empty" role="status">No institutions match your search or filters.</p>
+          )}
         </div>
       </main>
 

@@ -2,24 +2,26 @@
 
 /* Fonts (Inter + Source Serif 4) are loaded globally in index.html / src/app/layout.jsx. */
 
+/* Local names for the shared design tokens (src/styles/brand.css, --imaa-*); same values as before. */
 .imaa-public-page {
-  --navy: #1B2A4A;
-  --coral: #E84C38;
-  --teal: #0A9396;
-  --link: #4A7DB5;
-  --cool: #F0F4F5;
-  --connect: #F7F8FA;
+  --navy: var(--imaa-navy);
+  --coral: var(--imaa-coral);
+  --teal: var(--imaa-teal);
+  --teal-text: var(--imaa-teal-hover); /* darker teal for small text: meets AA contrast on white */
+  --link: var(--imaa-link);
+  --cool: var(--imaa-bg-cool);
+  --connect: var(--imaa-bg-member);
   --white: #FFFFFF;
-  --ink: #1B2A4A;
-  --ink-body: #5A6070;
-  --meta: #747A88;
-  --hint: #B0B4BC;
-  --hairline: #E2E4E8;
-  --hairline-hover: #D1CFC9;
-  --r-tag: 4px;
-  --r-input: 6px;
-  --r-card: 8px;
-  --r-modal: 12px;
+  --ink: var(--imaa-ink);
+  --ink-body: var(--imaa-ink-body);
+  --meta: var(--imaa-ink-meta);
+  --hint: var(--imaa-ink-hint);
+  --hairline: var(--imaa-border);
+  --hairline-hover: var(--imaa-border-hover);
+  --r-tag: var(--imaa-radius-tag);
+  --r-input: var(--imaa-radius-field);
+  --r-card: var(--imaa-radius-card);
+  --r-modal: var(--imaa-radius-popup);
   --r-pill: 50px;
   --fs-micro: 9px;
   --fs-eyebrow: 10px;
@@ -41,24 +43,24 @@
   --lh-snug: 1.4;
   --lh-body: 1.55;
   --lh-relaxed: 1.7;
-  --sp-1: 4px;
-  --sp-2: 8px;
-  --sp-3: 12px;
-  --sp-4: 16px;
-  --sp-5: 24px;
-  --sp-6: 32px;
-  --sp-7: 48px;
-  --sp-section: 60px;
+  --sp-1: var(--imaa-space-1);
+  --sp-2: var(--imaa-space-2);
+  --sp-3: var(--imaa-space-3);
+  --sp-4: var(--imaa-space-4);
+  --sp-5: var(--imaa-space-5);
+  --sp-6: var(--imaa-space-6);
+  --sp-7: var(--imaa-space-7);
+  --sp-section: var(--imaa-space-section);
   --ico-xs: 10px;
   --ico-sm: 12px;
   --ico-md: 14px;
   --ico-lg: 18px;
   --pad-section: 60px;
-  --content-max: 1200px;
-  --prose-max: 700px;
-  --shadow-sm: 0 1px 2px rgba(27, 42, 74, 0.08);
-  --shadow-md: 0 4px 12px rgba(27, 42, 74, 0.12);
-  --shadow-lg: 0 12px 32px rgba(27, 42, 74, 0.2);
+  --content-max: var(--imaa-content-max);
+  --prose-max: var(--imaa-prose-max);
+  --shadow-sm: var(--imaa-shadow-sm);
+  --shadow-md: var(--imaa-shadow-md);
+  --shadow-lg: var(--imaa-shadow-lg);
 }
 
 .imaa-public-page * {
@@ -68,7 +70,7 @@
 }
 
 .imaa-public-page {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-body-lg);
   line-height: var(--lh-body);
   color: var(--ink-body);
@@ -88,7 +90,7 @@
 
 .imaa-public-page h1,
 .imaa-public-page .h1 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: var(--fs-h1);
   font-weight: 700;
   line-height: 1.2;
@@ -98,7 +100,7 @@
 
 .imaa-public-page h2,
 .imaa-public-page .h2 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: var(--fs-h2);
   font-weight: 700;
   line-height: var(--lh-heading);
@@ -108,7 +110,7 @@
 
 .imaa-public-page h3,
 .imaa-public-page .h3 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: var(--fs-h3);
   font-weight: 700;
   line-height: 1.3;
@@ -116,7 +118,7 @@
 }
 
 .imaa-public-page .section-label {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -130,7 +132,7 @@
   justify-content: center;
   padding: 10px 22px;
   border-radius: var(--r-pill);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-sm);
   font-weight: 600;
   text-transform: uppercase;
@@ -264,7 +266,7 @@
 }
 
 .imaa-public-page .header-white .logo .mark {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: 20px;
   font-weight: 700;
   color: var(--navy);
@@ -398,7 +400,7 @@
 }
 
 .imaa-public-page .hero-eyebrow {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: 0.18em;
@@ -408,7 +410,7 @@
 }
 
 .imaa-public-page .hero-title {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: var(--fs-h1);
   font-weight: 700;
   line-height: var(--lh-display);
@@ -424,7 +426,7 @@
 }
 
 .imaa-public-page .hero-lede {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-body-lg);
   line-height: var(--lh-relaxed);
   color: rgba(255, 255, 255, 0.78);
@@ -448,7 +450,7 @@
 }
 
 .imaa-public-page .section-title {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: var(--fs-h2);
   font-weight: 700;
   color: var(--navy);
@@ -487,17 +489,17 @@
 }
 
 .imaa-public-page .program-abbr {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--teal);
+  color: var(--teal-text);
   margin-bottom: var(--sp-2);
 }
 
 .imaa-public-page .program-name {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: 20px;
   font-weight: 700;
   color: var(--navy);
@@ -525,7 +527,7 @@
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--meta);
+  color: var(--ink-body);
   background: var(--cool);
   padding: 4px 10px;
   border-radius: 999px;
@@ -535,7 +537,7 @@
 .imaa-public-page .program-link {
   font-size: var(--fs-sm);
   font-weight: 600;
-  color: var(--teal);
+  color: var(--teal-text);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -572,7 +574,7 @@
 }
 
 .imaa-public-page .inhouse-text h3 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: 20px;
   font-weight: 700;
   color: var(--navy);
@@ -632,7 +634,7 @@
 }
 
 .imaa-public-page .format-card h3 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: var(--fs-lg);
   font-weight: 700;
   color: var(--navy);
@@ -654,7 +656,7 @@
 }
 
 .imaa-public-page .cta-section h2 {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: var(--fs-h2);
   font-weight: 700;
   color: var(--navy);
@@ -701,7 +703,7 @@
 }
 
 .imaa-public-page .footer-brand .mark {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: 22px;
   font-weight: 700;
   color: #fff;
@@ -789,7 +791,7 @@
 }
 
 .imaa-public-page .context-eyebrow {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-eyebrow);
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -799,7 +801,7 @@
 }
 
 .imaa-public-page .context-title {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: 26px;
   font-weight: 700;
   line-height: 1.25;
@@ -810,7 +812,7 @@
 }
 
 .imaa-public-page .top-notice {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-style: italic;
   font-size: var(--fs-body-lg);
   line-height: 1.6;
@@ -821,7 +823,7 @@
 
 .imaa-public-page .top-notice strong {
   font-style: normal;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -836,7 +838,7 @@
   align-items: baseline;
   padding-top: 20px;
   border-top: 1px solid var(--hairline);
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -895,7 +897,7 @@
   background: none;
   border: none;
   outline: none;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-body);
   color: var(--ink);
 }
@@ -912,7 +914,7 @@
 }
 
 .imaa-public-page .filter-label {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -924,7 +926,7 @@
 .imaa-public-page .chip {
   display: inline-flex;
   align-items: center;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   border-radius: 999px;
   white-space: nowrap;
   text-decoration: none;
@@ -965,7 +967,7 @@
 .imaa-public-page .view-toggle {
   margin-left: auto;
   display: flex;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -1001,6 +1003,13 @@
   margin: 0 auto;
 }
 
+.imaa-public-page .directory-empty {
+  padding: var(--sp-6) 0;
+  text-align: center;
+  font-size: var(--fs-body);
+  color: var(--ink-body);
+}
+
 .imaa-public-page .institution {
   border-bottom: 1px solid var(--hairline);
   transition: background 0.18s;
@@ -1020,7 +1029,7 @@
 }
 
 .imaa-public-page .inst-name {
-  font-family: 'Source Serif 4', Georgia, serif;
+  font-family: var(--imaa-font-serif);
   font-size: 20px;
   font-weight: 500;
   color: var(--navy);
@@ -1029,7 +1038,7 @@
 }
 
 .imaa-public-page .inst-location {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-xs);
   font-weight: 500;
   letter-spacing: 0.08em;
@@ -1042,7 +1051,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-xs);
   font-weight: 600;
   letter-spacing: 0.12em;
@@ -1085,7 +1094,7 @@
   border: 1px solid var(--hairline);
   display: grid;
   place-items: center;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--meta);
@@ -1100,7 +1109,7 @@
 }
 
 .imaa-public-page .prog-count {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-xs);
   font-weight: 500;
   letter-spacing: 0.06em;
@@ -1132,7 +1141,7 @@
 }
 
 .imaa-public-page .legend-block h4 {
-  font-family: 'Inter', sans-serif;
+  font-family: var(--imaa-font-sans);
   font-size: var(--fs-xs);
   font-weight: 700;
   letter-spacing: 0.14em;
@@ -1523,7 +1532,7 @@
     content: attr(data-mobile-meta);
     grid-column: 1;
     grid-row: 2;
-    font-family: 'Inter', sans-serif;
+    font-family: var(--imaa-font-sans);
     font-size: 9px;
     font-weight: 600;
     letter-spacing: 0.08em;

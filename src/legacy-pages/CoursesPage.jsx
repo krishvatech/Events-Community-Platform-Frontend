@@ -98,12 +98,12 @@ function CourseCard({ course, enrollment = null }) {
   return (
     <Card
       elevation={0}
-      className="flex flex-col rounded-2xl border border-slate-200 overflow-hidden"
+      className="flex flex-col rounded-lg border border-imaa-border overflow-hidden"
       sx={{
-        borderRadius: 2,
+        borderRadius: "var(--imaa-radius-card)",
         height: "100%",
         transition: "box-shadow 0.2s, border-color 0.2s",
-        "&:hover": { boxShadow: 2, borderColor: "primary.light" },
+        "&:hover": { boxShadow: "var(--imaa-shadow-md)", borderColor: "var(--imaa-border-hover)" },
       }}
     >
       {/* Image: 16:9 aspect ratio with consistent sizing */}
@@ -113,7 +113,7 @@ function CourseCard({ course, enrollment = null }) {
           width: "100%",
           aspectRatio: "16 / 9",
           "@supports not (aspect-ratio: 1 / 1)": { height: 180 },
-          bgcolor: "#E5E7EB",
+          bgcolor: "var(--imaa-bg-cool)",
           overflow: "hidden",
         }}
       >
@@ -139,10 +139,10 @@ function CourseCard({ course, enrollment = null }) {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              bgcolor: "#E5E7EB",
+              bgcolor: "var(--imaa-bg-cool)",
             }}
           >
-            <SchoolRoundedIcon sx={{ fontSize: 52, color: "#9CA3AF" }} />
+            <SchoolRoundedIcon aria-hidden="true" sx={{ fontSize: 52, color: "var(--imaa-ink-hint)" }} />
           </Box>
         )}
       </Box>
@@ -170,22 +170,24 @@ function CourseCard({ course, enrollment = null }) {
         </Box>
 
         {/* Course name: 2-line clamp */}
-        <Typography
-          variant="subtitle1"
+        <Box
+          component="h2"
           sx={{
-            fontWeight: 700,
+            m: 0,
+            fontFamily: "var(--imaa-font-serif)",
+            fontWeight: 600,
             lineHeight: 1.3,
             display: "-webkit-box",
             WebkitLineClamp: 2,
             WebkitBoxOrient: "vertical",
             overflow: "hidden",
-            color: "#111827",
-            fontSize: { xs: 15, sm: 16 },
+            color: "var(--imaa-ink)",
+            fontSize: { xs: 16, sm: 17 },
             minHeight: "3em",
           }}
         >
           {name}
-        </Typography>
+        </Box>
 
         {/* Progress bar (enrolled courses only) */}
         {progress !== null && !completed && (
@@ -194,7 +196,7 @@ function CourseCard({ course, enrollment = null }) {
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12 }}>
                 Progress
               </Typography>
-              <Typography variant="caption" fontWeight={600} color="primary.main" sx={{ fontSize: 12 }}>
+              <Typography variant="caption" fontWeight={600} sx={{ fontSize: 12, color: "var(--imaa-teal-hover)" }}>
                 {Math.round(progress)}%
               </Typography>
             </Box>
@@ -253,7 +255,7 @@ function CourseCard({ course, enrollment = null }) {
 
 function CourseCardSkeleton() {
   return (
-    <Card elevation={0} sx={{ border: "1px solid", borderColor: "divider", borderRadius: 2 }}>
+    <Card elevation={0} sx={{ border: "1px solid", borderColor: "var(--imaa-border)", borderRadius: "var(--imaa-radius-card)" }}>
       <Skeleton variant="rectangular" height={160} />
       <CardContent sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <Skeleton width="40%" height={24} />
@@ -475,6 +477,7 @@ function CourseCatalogueTab() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           slotProps={{
+            htmlInput: { "aria-label": "Search courses" },
             input: {
               startAdornment: (
                 <InputAdornment position="start">
@@ -490,7 +493,8 @@ function CourseCatalogueTab() {
           value={selectedCategory}
           onChange={(e) => setSelectedCategory(e.target.value)}
           displayEmpty
-          startAdornment={<FilterListRoundedIcon fontSize="small" sx={{ mr: 1, color: "text.secondary" }} />}
+          inputProps={{ "aria-label": "Filter by category" }}
+          startAdornment={<FilterListRoundedIcon fontSize="small" aria-hidden="true" sx={{ mr: 1, color: "text.secondary" }} />}
           sx={{ minWidth: 200 }}
         >
           <MenuItem value="">All Categories</MenuItem>
@@ -567,7 +571,14 @@ export default function CoursesPage() {
       <Tabs
         value={tab}
         onChange={(_, v) => setTab(v)}
-        sx={{ mb: 3, borderBottom: 1, borderColor: "divider" }}
+        sx={{
+          mb: 3,
+          borderBottom: 1,
+          borderColor: "var(--imaa-border)",
+          // Selected label in ink (theme teal text is below AA contrast); teal indicator bar
+          "& .Mui-selected": { color: "var(--imaa-ink) !important" },
+          "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal)" },
+        }}
       >
         <Tab label="My Courses" sx={{ textTransform: "none", fontWeight: 600 }} />
         <Tab label="Course Catalogue" sx={{ textTransform: "none", fontWeight: 600 }} />

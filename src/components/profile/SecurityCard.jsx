@@ -17,6 +17,9 @@ import LockOutlinedIcon from "@mui/icons-material/LockOutlined";
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useNavigate } from "#navigation";
 import { cognitoChangePassword } from "../../utils/cognitoAuth";
+import { SectionHeader } from "../page";
+
+const securityCardSx = { borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)" };
 
 // Providers whose password lives in Cognito and is owned by the user.
 // "cognito" = native email/password signup, so the current password is known
@@ -140,19 +143,23 @@ export default function SecurityCard({ provider = "", email = "" }) {
 
   const providerLabel = normalizedProvider === "google" ? "Google" : "an external provider";
 
+  // Same shell and heading as the other profile section cards (A3 SectionHeader, design tokens)
   const header = (
-    <>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <LockOutlinedIcon fontSize="small" />
-        <Typography variant="h6">Security</Typography>
-      </Box>
-    </>
+    <SectionHeader
+      title={
+        <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: 1 }}>
+          <LockOutlinedIcon fontSize="small" aria-hidden="true" />
+          Security
+        </Box>
+      }
+      sx={{ mb: 0 }}
+    />
   );
 
   // Password is owned by WordPress — neither change nor reset works here.
   if (isExternallyManaged) {
     return (
-      <Card>
+      <Card variant="outlined" sx={securityCardSx}>
         <CardContent>
           {header}
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -169,7 +176,7 @@ export default function SecurityCard({ provider = "", email = "" }) {
   // flow instead of asking for a current password they cannot know.
   if (isFederated) {
     return (
-      <Card>
+      <Card variant="outlined" sx={securityCardSx}>
         <CardContent>
           {header}
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -194,7 +201,7 @@ export default function SecurityCard({ provider = "", email = "" }) {
 
   return (
     <>
-      <Card>
+      <Card variant="outlined" sx={securityCardSx}>
         <CardContent>
           {header}
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

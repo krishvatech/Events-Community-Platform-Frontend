@@ -64,21 +64,21 @@ const PROGRAMS = [
 const STUDY_FORMATS = [
   {
     icon: (
-      <svg viewBox="0 0 24 24"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg>
     ),
     title: "Onsite",
     desc: "In-person training at select locations worldwide, combining intensive classroom learning with networking opportunities."
   },
   {
     icon: (
-      <svg viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/><line x1="12" x2="12" y1="17" y2="21"/></svg>
     ),
     title: "Interactive Online Live",
     desc: "Real-time virtual sessions led by faculty, with live Q&A, group exercises, and collaborative case studies."
   },
   {
     icon: (
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
     ),
     title: "Online Self-Paced",
     desc: "Pre-recorded lectures, readings, and assessments accessible on your own schedule."
@@ -111,13 +111,14 @@ export default function TrainingProgramsPage() {
         <div className="right">
           <a className="login" href="#">Log in</a>
           <div className="search-btn">
-            <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           </div>
           <a className="pill btn-coral" href="https://imaa-institute.org/membership/">Join IMAA</a>
           <button
             className="mobile-menu-btn"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
+            aria-expanded={mobileMenuOpen}
           >
             <span></span>
             <span></span>
@@ -162,7 +163,7 @@ export default function TrainingProgramsPage() {
               </div>
               <a className="program-link" href={program.link}>
                 Learn more
-                <svg viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               </a>
             </div>
           ))}

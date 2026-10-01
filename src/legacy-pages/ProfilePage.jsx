@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Link } from "#navigation";
 import {
   Avatar, Box, Button, Container, Divider, Grid, LinearProgress, Paper,
-  Snackbar, Alert, TextField, Typography, Card, CardHeader, CardContent,
+  Snackbar, Alert, TextField, Typography, Card, CardContent,
   List, ListItem, ListItemIcon, ListItemText,
   Dialog, DialogTitle, DialogContent, DialogActions, DialogContentText, Chip,
   FormControlLabel, Checkbox, InputAdornment, Collapse, IconButton, Tooltip, Radio,
@@ -57,6 +57,7 @@ import dayjs from 'dayjs';
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 import ExperienceList from "../components/profile/ExperienceList";
 import ProfileEditButton, { topActionSx } from "../components/profile/ProfileEditButton";
+import { SectionHeader } from "../components/page";
 
 // -------------------- Constants for Dropdowns --------------------
 const CEFR_OPTIONS = [
@@ -840,17 +841,32 @@ function UniversityAutocomplete({ value, onChange, label = "University", error, 
 
 
 // -------------------- Small UI helpers --------------------
+// Profile card shell (design tokens: border, 8px corners). The heading is the shared A3 SectionHeader (<h2>).
+const profileCardSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: "var(--imaa-border)",
+};
+
+// Member's name in the profile header card: serif page title in ink
+const profileNameSx = {
+  m: 0,
+  fontFamily: "var(--imaa-font-serif)",
+  fontWeight: 700,
+  fontSize: { xs: "1.25rem", sm: "1.5rem" },
+  lineHeight: 1.25,
+  color: "var(--imaa-ink)",
+  overflowWrap: "anywhere",
+};
+
 function SectionCard({ title, action, children, sx }) {
   return (
     <Card
       variant="outlined"
-      sx={{ borderRadius: 2, width: '100%', mx: { xs: 'auto', md: 0 }, ...sx }}
+      sx={{ ...profileCardSx, width: '100%', mx: { xs: 'auto', md: 0 }, ...sx }}
     >
-      <CardHeader
-        title={<Typography variant="h6" sx={{ fontWeight: 600 }}>{title}</Typography>}
-        action={action}
-        sx={{ pb: 0.5, '& .MuiCardHeader-action': { alignSelf: 'center' } }}
-      />
+      <Box sx={{ px: 2, pt: 2, pb: 0.5 }}>
+        <SectionHeader title={title} action={action} sx={{ mb: 0, alignItems: "center" }} />
+      </Box>
       <CardContent sx={{ pt: 1.5 }}>{children}</CardContent>
     </Card>
   );
@@ -866,7 +882,7 @@ function VerificationCard({ status, pendingRequest, onVerify, onRenew }) {
       title="Verification"
       sx={{
         mb: 2,
-        borderColor: isVerified ? "primary.light" : isPending ? "#14b8a6" : "divider",
+        borderColor: isVerified ? "primary.light" : isPending ? "#14b8a6" : "var(--imaa-border)",
         bgcolor: isVerified ? "primary.50" : isPending ? "#f0fdfa" : "background.paper"
       }}
     >
@@ -877,7 +893,7 @@ function VerificationCard({ status, pendingRequest, onVerify, onRenew }) {
               <VerifiedRoundedIcon sx={{ fontSize: 40 }} />
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+              <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mb: 0.5 }}>
                 Verified Profile
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -916,7 +932,7 @@ function VerificationCard({ status, pendingRequest, onVerify, onRenew }) {
               </Box>
             </Box>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 600, mb: 0.5 }}>
+              <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mb: 0.5 }}>
                 Verification {status === "review" ? "Under Review" : "Pending"}
               </Typography>
               <Typography variant="body2" color="text.secondary">
@@ -944,7 +960,7 @@ function SectionSkeleton({ minHeight = 140, lines = 3 }) {
     <Card
       variant="outlined"
       sx={{
-        borderRadius: 2,
+        ...profileCardSx,
         width: "100%",
         minHeight,
         display: "flex",
@@ -3501,7 +3517,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-imaa-member">
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">
@@ -3513,7 +3529,7 @@ export default function ProfilePage() {
                   <Card
                     variant="outlined"
                     sx={{
-                      borderRadius: 3,
+                      ...profileCardSx,
                       p: 2,
                       mb: 2,
                     }}
@@ -3616,7 +3632,7 @@ export default function ProfilePage() {
                 // ================= NORMAL VIEW (YOUR EXISTING PREVIEW UI) ============
                 (<Box>
                   {/* --- HEADER CARD (Matching HomePage) --- */}
-                  <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
+                  <Card variant="outlined" sx={{ ...profileCardSx, width: "100%", p: 2, mb: 2 }}>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
                       <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
                         <Avatar src={form.avatar || ""} sx={{ width: 72, height: 72 }}>
@@ -3635,9 +3651,10 @@ export default function ProfilePage() {
 
                       <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
                         <Stack direction="row" alignItems="center" spacing={1}>
-                          <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                          {/* Member's name is the page title (plain heading: index.css forces the sans font on Typography) */}
+                          <Box component="h1" sx={profileNameSx}>
                             {fullName}
-                          </Typography>
+                          </Box>
 
                           {/* Verified Badge */}
                           {form.kyc_status === 'approved' && (
@@ -3656,7 +3673,7 @@ export default function ProfilePage() {
                       </Box>
 
                       {/* --- EDIT BUTTONS --- */}
-                      <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box sx={{ ml: "auto", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
                         <Button
                           variant="outlined"
                           size="small"
