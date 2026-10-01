@@ -26,7 +26,6 @@ import {
   TextField,
   Tooltip,
   Typography,
-  Stack,
 } from "@mui/material";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
@@ -35,6 +34,7 @@ import SchoolRoundedIcon from "@mui/icons-material/SchoolRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import FilterListRoundedIcon from "@mui/icons-material/FilterListRounded";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import { PageHeader, FilterToolbar, EmptyState } from "../components/page";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -351,15 +351,12 @@ function MyCoursesTab() {
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
       {enrollments.length === 0 && !error ? (
-        <Box sx={{ textAlign: "center", py: 8 }}>
-          <SchoolRoundedIcon sx={{ fontSize: 64, color: "text.disabled", mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            No courses enrolled yet
-          </Typography>
-          <Typography variant="body2" color="text.disabled">
-            Your IMAA courses will appear here once enrolled.
-          </Typography>
-        </Box>
+        <EmptyState
+          surface={false}
+          icon={<SchoolRoundedIcon />}
+          title="No courses enrolled yet"
+          description="Your IMAA courses will appear here once enrolled."
+        />
       ) : (
         <>
           <Box
@@ -471,7 +468,7 @@ function CourseCatalogueTab() {
   return (
     <>
       {/* Filters */}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 3 }}>
+      <FilterToolbar sx={{ mb: 3 }}>
         <TextField
           size="small"
           placeholder="Search courses…"
@@ -503,7 +500,7 @@ function CourseCatalogueTab() {
             </MenuItem>
           ))}
         </Select>
-      </Stack>
+      </FilterToolbar>
 
       {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
 
@@ -513,10 +510,7 @@ function CourseCatalogueTab() {
       </Typography>
 
       {filtered.length === 0 && !error ? (
-        <Box sx={{ textAlign: "center", py: 8 }}>
-          <SchoolRoundedIcon sx={{ fontSize: 64, color: "text.disabled", mb: 2 }} />
-          <Typography variant="h6" color="text.secondary">No courses found</Typography>
-        </Box>
+        <EmptyState surface={false} icon={<SchoolRoundedIcon />} title="No courses found" />
       ) : (
         <>
           <Box
@@ -561,15 +555,11 @@ export default function CoursesPage() {
 
   return (
     <Container maxWidth="xl" sx={{ py: 4 }}>
-      {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h5" fontWeight={700} gutterBottom>
-          My Courses & Trainings
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Your IMAA courses synced via Edwiser Bridge. Click "Continue" to open a course in the platform.
-        </Typography>
-      </Box>
+      <PageHeader
+        title="My Courses & Trainings"
+        subtitle={'Your IMAA courses synced via Edwiser Bridge. Click "Continue" to open a course in the platform.'}
+        sx={{ mb: 3 }}
+      />
 
       <Divider sx={{ mb: 0 }} />
 

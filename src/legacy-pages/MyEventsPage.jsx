@@ -13,7 +13,6 @@ import {
   TextField,
   IconButton,
   Typography,
-  Stack,
   Snackbar,
   Alert,
   CircularProgress, // MOD: spinner for joining state
@@ -24,6 +23,7 @@ import { Tooltip } from "@mui/material";
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
+import { PageHeader, FilterToolbar, EmptyState } from "../components/page";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useJoinLiveState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
@@ -884,16 +884,10 @@ export default function MyEventsPage() {
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <div>
-                <Typography variant="h4">
-                  My Events
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  View, join, and manage events you’ve registered for.
-                </Typography>
-              </div>
-            </div>
+            <PageHeader
+              title="My Events"
+              subtitle="View, join, and manage events you’ve registered for."
+            />
             <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
               <Tabs
                 value={tab}
@@ -915,11 +909,19 @@ export default function MyEventsPage() {
               </Tabs>
             </Paper>
 
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              alignItems={{ xs: "stretch", sm: "center" }}
-              className="mb-5"
+            <FilterToolbar
+              sx={{ mb: 2.5 }}
+              actions={
+                <Button
+                  component={Link}
+                  to="/events"
+                  variant="contained"
+                  sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+                  className="rounded-xl"
+                >
+                  Explore more
+                </Button>
+              }
             >
               <TextField
                 size="small"
@@ -933,17 +935,7 @@ export default function MyEventsPage() {
                   <RefreshRoundedIcon />
                 </IconButton>
               </Tooltip>
-              <Box sx={{ flex: 1, display: { xs: "none", sm: "block" } }} />
-              <Button
-                component={Link}
-                to="/events"
-                variant="contained"
-                sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
-                className="rounded-xl"
-              >
-                Explore more
-              </Button>
-            </Stack>
+            </FilterToolbar>
 
             {loading ? (
               <>
@@ -964,25 +956,21 @@ export default function MyEventsPage() {
                 </Box>
               </>
             ) : events.length === 0 ? (
-              <Paper elevation={0} className="rounded-2xl border border-slate-200">
-                <Box className="p-8 text-center">
-                  <Typography variant="h6" className="font-semibold text-slate-700">
-                    No events yet
-                  </Typography>
-                  <p className="text-slate-500 mt-1">
-                    You haven’t registered or purchased any events on this account.
-                  </p>
+              <EmptyState
+                title="No events yet"
+                description="You haven’t registered or purchased any events on this account."
+                action={
                   <Button
                     component={Link}
                     to="/events"
-                    className="mt-4 rounded-xl"
+                    className="rounded-xl"
                     sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
                     variant="contained"
                   >
                     Browse events
                   </Button>
-                </Box>
-              </Paper>
+                }
+              />
             ) : (
               <>
                 {/* Events grid */}
