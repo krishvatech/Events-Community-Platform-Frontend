@@ -31,6 +31,8 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import BlockIcon from "@mui/icons-material/Block";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import AdminStatusChip from "../components/admin/AdminStatusChip.jsx";
+import AdminEmptyState from "../components/admin/AdminEmptyState.jsx";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 
@@ -70,9 +72,10 @@ const REASON_LABELS = {
   profile_illegal: "Illegal Content",
 };
 
-export default function AdminProfileModerationPage() {
+export default function AdminProfileModerationPage({ embedded = false }) {
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState("");
   const [status, setStatus] = React.useState("under_review");
   const [query, setQuery] = React.useState("");
   const [actionBusy, setActionBusy] = React.useState(false);
@@ -90,6 +93,7 @@ export default function AdminProfileModerationPage() {
 
   const fetchQueue = React.useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const url = new URL(toApiUrl("moderation/profiles/queue/"));
       if (status && status !== "all") {
@@ -106,6 +110,7 @@ export default function AdminProfileModerationPage() {
     } catch (error) {
       console.error("Failed to fetch profile moderation queue:", error);
       setItems([]);
+      setLoadError(error?.message || "Failed to load profile reports.");
     } finally {
       setLoading(false);
     }
@@ -189,32 +194,43 @@ export default function AdminProfileModerationPage() {
   }
 
   return (
-    <Box sx={{ px: { xs: 1, md: 2 }, py: 2 }}>
+    <Box
+      sx={{
+        px: embedded ? 0 : { xs: 2, md: 3 },
+        py: embedded ? 0 : { xs: 2, md: 3 },
+        minWidth: 0,
+        maxWidth: "100%",
+        overflow: "hidden",
+      }}
+    >
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
         alignItems={{ xs: "stretch", md: "center" }}
         sx={{ mb: 2 }}
       >
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>
+        <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)" }}>
           Profile Moderation Queue
         </Typography>
         <Box sx={{ flex: 1 }} />
         <TextField
           size="small"
+          label="Search profile reports"
           placeholder="Search name, email, bio..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          sx={{ minWidth: 240 }}
+          sx={{ minWidth: { xs: "100%", sm: 280 }, bgcolor: "background.paper" }}
         />
       </Stack>
 
-      <Paper variant="outlined" sx={{ mb: 2 }}>
+      <Paper variant="outlined" sx={{ mb: 2, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", overflow: "hidden" }}>
         <Tabs
           value={status}
           onChange={(_, v) => setStatus(v)}
           variant="scrollable"
+          scrollButtons="auto"
           allowScrollButtonsMobile
+          aria-label="Profile moderation status filters"
         >
           <Tab value="under_review" label="Under Review" />
           <Tab value="all" label="All Reports" />
@@ -225,23 +241,22 @@ export default function AdminProfileModerationPage() {
         </Tabs>
       </Paper>
 
-      {loading ? (
-        <LinearProgress />
+      {loadError ? (
+        <Alert severity="error" role="alert" sx={{ borderRadius: "var(--imaa-radius-card)" }}>{loadError}</Alert>
+      ) : loading ? (
+        <LinearProgress aria-label="Loading profile reports" />
       ) : filtered.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography color="text.secondary">
-            No profile reports in this view.
-          </Typography>
-        </Paper>
+        <AdminEmptyState compact title="No profile reports in this view." />
       ) : (
         <Stack spacing={2}>
           {filtered.map((item) => (
-            <Paper key={item.user_id} variant="outlined" sx={{ p: 2 }}>
+            <Paper key={item.user_id} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", boxShadow: "var(--imaa-shadow-sm)", minWidth: 0 }}>
               <Stack spacing={2}>
                 {/* Header with avatar and basic info */}
-                <Stack direction="row" spacing={2} alignItems="flex-start">
+                <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems="flex-start">
                   <Avatar
                     src={item.user?.avatar}
+                    alt={item.user?.full_name || item.user?.username || "Reported profile"}
                     sx={{ width: 64, height: 64 }}
                   >
                     {item.user?.full_name?.[0] || item.user?.username?.[0]}
@@ -257,8 +272,8 @@ export default function AdminProfileModerationPage() {
                         icon={<FlagOutlinedIcon />}
                         label={`${item.report_count} report${item.report_count !== 1 ? 's' : ''}`}
                       />
-                      <Chip
-                        size="small"
+                      <AdminStatusChip
+                        status={item.user?.profile_status || "active"}
                         label={item.user?.profile_status || "active"}
                         color={
                           item.user?.profile_status === "suspended" ||
@@ -271,11 +286,11 @@ export default function AdminProfileModerationPage() {
                       />
                     </Stack>
 
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
                       @{item.user?.username} · {item.user?.email}
                     </Typography>
 
-                    <Typography variant="body2">
+                    <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
                       {item.user?.bio || "(no bio)"}
                     </Typography>
 
@@ -285,13 +300,14 @@ export default function AdminProfileModerationPage() {
                   </Stack>
 
                   {/* Action buttons */}
-                  <Stack spacing={1}>
+                  <Stack direction={{ xs: "column", sm: "row", md: "column" }} spacing={1} useFlexGap flexWrap="wrap" sx={{ width: { xs: "100%", md: "auto" } }}>
                     <Button
                       size="small"
                       startIcon={<CheckCircleOutlineIcon />}
                       onClick={() => openAction(item, "clear")}
                       disabled={actionBusy}
                       variant={item.user?.profile_status === "active" ? "outlined" : "contained"}
+                      sx={{ minHeight: 40, fontWeight: 700, flexGrow: { xs: 1, md: 0 } }}
                     >
                       Clear Profile
                     </Button>
@@ -302,6 +318,7 @@ export default function AdminProfileModerationPage() {
                       startIcon={<BlockIcon />}
                       onClick={() => openAction(item, "suspend")}
                       disabled={actionBusy}
+                      sx={{ minHeight: 40, fontWeight: 700, flexGrow: { xs: 1, md: 0 } }}
                     >
                       Suspend
                     </Button>
@@ -312,6 +329,7 @@ export default function AdminProfileModerationPage() {
                       startIcon={<PersonOffOutlinedIcon />}
                       onClick={() => openAction(item, "mark_deceased")}
                       disabled={actionBusy}
+                      sx={{ minHeight: 40, fontWeight: 700, flexGrow: { xs: 1, md: 0 } }}
                     >
                       Mark Deceased
                     </Button>
@@ -322,6 +340,7 @@ export default function AdminProfileModerationPage() {
                       startIcon={<DeleteForeverIcon />}
                       onClick={() => openAction(item, "mark_fake")}
                       disabled={actionBusy}
+                      sx={{ minHeight: 40, fontWeight: 700, flexGrow: { xs: 1, md: 0 } }}
                     >
                       Mark Fake
                     </Button>
@@ -372,6 +391,7 @@ export default function AdminProfileModerationPage() {
                           href={item.sample_metadata.obituary_url}
                           target="_blank"
                           rel="noopener noreferrer"
+                          style={{ overflowWrap: "anywhere" }}
                         >
                           {item.sample_metadata.obituary_url}
                         </a>
@@ -436,8 +456,9 @@ export default function AdminProfileModerationPage() {
         onClose={() => setActionOpen(false)}
         maxWidth="sm"
         fullWidth
+        aria-labelledby="profile-moderation-action-title"
       >
-        <DialogTitle>
+        <DialogTitle id="profile-moderation-action-title">
           {actionType === "clear" && "Clear Profile"}
           {actionType === "suspend" && "Suspend Profile"}
           {actionType === "mark_deceased" && "Mark Profile as Deceased"}

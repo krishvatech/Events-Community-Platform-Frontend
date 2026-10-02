@@ -7,7 +7,6 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   Chip,
@@ -16,6 +15,7 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  Divider,
   TextField,
   IconButton,
   Tooltip,
@@ -53,6 +53,8 @@ import {
   decideVerificationRequest,
   getVerificationHistory // New API
 } from "../utils/api";
+import AdminTableShell from "../components/admin/AdminTableShell.jsx";
+import AdminStatusChip from "../components/admin/AdminStatusChip.jsx";
 
 // Helper to color-code statuses
 const getStatusColor = (status) => {
@@ -94,7 +96,12 @@ const getUserDisplayName = (u) => {
 
 function TabPanel({ children, value, index }) {
   return (
-    <div role="tabpanel" hidden={value !== index}>
+    <div
+      role="tabpanel"
+      id={`identity-tabpanel-${index}`}
+      aria-labelledby={`identity-tab-${index}`}
+      hidden={value !== index}
+    >
       {value === index && <Box sx={{ pt: 3 }}>{children}</Box>}
     </div>
   );
@@ -408,7 +415,7 @@ export default function AdminNameRequestsPage() {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: { xs: 0, sm: 1, md: 2 }, width: "100%", minWidth: 0, overflowX: "hidden" }}>
       {/* Header */}
       <Box
         className="mb-4"
@@ -419,12 +426,12 @@ export default function AdminNameRequestsPage() {
           gap: 2,
         }}
       >
-        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
+        <Avatar sx={{ bgcolor: "var(--imaa-teal)" }}>
           {("I")[0].toUpperCase()}
         </Avatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h5" className="font-extrabold">
+          <Typography component="h1" variant="h5" className="font-extrabold" sx={{ fontFamily: "var(--imaa-font-serif)", color: "var(--imaa-ink)" }}>
             Identity Verification
           </Typography>
           <Typography className="text-slate-500">
@@ -440,7 +447,7 @@ export default function AdminNameRequestsPage() {
             variant="outlined"
             size="small"
             className="rounded-xl"
-            sx={{ textTransform: "none" }}
+            sx={{ textTransform: "none", minHeight: 40, borderRadius: "var(--imaa-radius-field)" }}
           >
             Refresh
           </Button>
@@ -449,10 +456,17 @@ export default function AdminNameRequestsPage() {
 
       {/* Tabs */}
       <Box sx={{ borderBottom: 1, borderColor: "divider", mb: 2 }}>
-        <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
-          <Tab label="Name Change Requests" />
-          <Tab label="KYC Verifications" />
-          <Tab label="Renewal Requests" />
+        <Tabs
+          value={tabValue}
+          onChange={(e, newValue) => setTabValue(newValue)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          aria-label="Identity verification sections"
+        >
+          <Tab id="identity-tab-0" aria-controls="identity-tabpanel-0" label="Name Change Requests" />
+          <Tab id="identity-tab-1" aria-controls="identity-tabpanel-1" label="KYC Verifications" />
+          <Tab id="identity-tab-2" aria-controls="identity-tabpanel-2" label="Renewal Requests" />
         </Tabs>
       </Box>
 
@@ -462,6 +476,7 @@ export default function AdminNameRequestsPage() {
           <TextField
             size="small"
             placeholder="Search requests..."
+            label="Search requests"
             variant="outlined"
             value={requestsSearch}
             onChange={(e) => setRequestsSearch(e.target.value)}
@@ -472,13 +487,29 @@ export default function AdminNameRequestsPage() {
                 </InputAdornment>
               ),
             }}
-            sx={{ width: 250 }}
+            sx={{ width: { xs: "100%", sm: 250 } }}
           />
         </Stack>
 
-        <Paper variant="outlined" sx={{ overflow: "hidden" }}>
-          <TableContainer>
-            <Table sx={{ minWidth: 800 }}>
+        <AdminTableShell
+          minWidth={900}
+          pagination={(
+            <TablePagination
+              component="div"
+              count={requestsTotal}
+              page={requestsPage}
+              onPageChange={(e, newPage) => setRequestsPage(newPage)}
+              rowsPerPage={requestsRowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRequestsRowsPerPage(parseInt(e.target.value, 10));
+                setRequestsPage(0);
+              }}
+              rowsPerPageOptions={[8, 16, 24, 40]}
+              sx={{ overflowX: "auto" }}
+            />
+          )}
+        >
+            <Table sx={{ minWidth: 800 }} aria-label="Name change requests" aria-busy={loadingRequests || undefined}>
               <TableHead sx={{ bgcolor: "grey.50" }}>
                 <TableRow>
                   <TableCell>User</TableCell>
@@ -516,14 +547,14 @@ export default function AdminNameRequestsPage() {
                       <TableRow key={req.id} hover>
                         <TableCell>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <Avatar sx={{ width: 40, height: 40 }}>
+                            <Avatar alt={`${req.first_name || ""} ${req.last_name || ""}`.trim() || req.username || "User"} sx={{ width: 40, height: 40 }}>
                               {(req.first_name || req.username || "U")[0].toUpperCase()}
                             </Avatar>
-                            <Box>
+                            <Box sx={{ minWidth: 0 }}>
                               <Typography variant="body2" fontWeight={500}>
                                 {`${req.first_name || ""} ${req.last_name || ""}`.trim() || req.username || `User #${req.user}`}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
                                 {req.email}
                               </Typography>
                             </Box>
@@ -547,9 +578,9 @@ export default function AdminNameRequestsPage() {
                         </TableCell>
                         <TableCell>
                           <Stack spacing={0.6}>
-                            <Chip
+                            <AdminStatusChip
+                              status={req.didit_status || "not_started"}
                               label={(req.didit_status || "not_started").replace("_", " ").toUpperCase()}
-                              size="small"
                               variant="outlined"
                               color={getDiditColor(req.didit_status)}
                             />
@@ -573,9 +604,9 @@ export default function AdminNameRequestsPage() {
                           </Stack>
                         </TableCell>
                         <TableCell>
-                          <Chip
+                          <AdminStatusChip
+                            status={req.status}
                             label={req.status.toUpperCase()}
-                            size="small"
                             color={getStatusColor(req.status)}
                           />
                         </TableCell>
@@ -583,17 +614,17 @@ export default function AdminNameRequestsPage() {
                           {req.status === "pending" ? (
                             <Stack direction="row" justifyContent="flex-end" spacing={1}>
                               <Tooltip title="Approve">
-                                <IconButton color="success" size="small" onClick={() => handleOpenAction(req, "approved")}>
+                                <IconButton color="success" size="small" aria-label={`Approve name change for ${req.email || req.username || `user ${req.user}`}`} onClick={() => handleOpenAction(req, "approved")} sx={{ minWidth: 40, minHeight: 40 }}>
                                   <CheckCircleIcon />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="Reject">
-                                <IconButton color="error" size="small" onClick={() => handleOpenAction(req, "rejected")}>
+                                <IconButton color="error" size="small" aria-label={`Reject name change for ${req.email || req.username || `user ${req.user}`}`} onClick={() => handleOpenAction(req, "rejected")} sx={{ minWidth: 40, minHeight: 40 }}>
                                   <CancelIcon />
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title="View details">
-                                <IconButton size="small" onClick={() => openDetails(req)}>
+                                <IconButton size="small" aria-label={`View name change details for ${req.email || req.username || `user ${req.user}`}`} onClick={() => openDetails(req)} sx={{ minWidth: 40, minHeight: 40 }}>
                                   <InfoIcon />
                                 </IconButton>
                               </Tooltip>
@@ -610,62 +641,55 @@ export default function AdminNameRequestsPage() {
                 )}
               </TableBody>
             </Table>
-          </TableContainer>
-          <TablePagination
-            component="div"
-            count={requestsTotal}
-            page={requestsPage}
-            onPageChange={(e, newPage) => setRequestsPage(newPage)}
-            rowsPerPage={requestsRowsPerPage}
-            onRowsPerPageChange={(e) => {
-              setRequestsRowsPerPage(parseInt(e.target.value, 10));
-              setRequestsPage(0);
-            }}
-            rowsPerPageOptions={[8, 16, 24, 40]}
-          />
-        </Paper>
+        </AdminTableShell>
       </TabPanel>
 
       {/* Tab 2: KYC Verifications */}
       <TabPanel value={tabValue} index={1}>
         {/* Filters & Search */}
         <Box sx={{ mb: 2 }}>
-          <Stack direction="row" spacing={2} justifyContent="space-between" alignItems="center">
+          <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ xs: "stretch", md: "center" }}>
             {/* Filter Chips */}
             <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
               <Chip
                 label="All"
                 onClick={() => setKycStatusFilter("all")}
+                aria-pressed={kycStatusFilter === "all"}
                 color={kycStatusFilter === "all" ? "primary" : "default"}
                 variant={kycStatusFilter === "all" ? "filled" : "outlined"}
               />
               <Chip
                 label="Not Started"
                 onClick={() => setKycStatusFilter("not_started")}
+                aria-pressed={kycStatusFilter === "not_started"}
                 color={kycStatusFilter === "not_started" ? "default" : "default"}
                 variant={kycStatusFilter === "not_started" ? "filled" : "outlined"}
               />
               <Chip
                 label="Pending"
                 onClick={() => setKycStatusFilter("pending")}
+                aria-pressed={kycStatusFilter === "pending"}
                 color={kycStatusFilter === "pending" ? "info" : "default"}
                 variant={kycStatusFilter === "pending" ? "filled" : "outlined"}
               />
               <Chip
                 label="Review"
                 onClick={() => setKycStatusFilter("review")}
+                aria-pressed={kycStatusFilter === "review"}
                 color={kycStatusFilter === "review" ? "warning" : "default"}
                 variant={kycStatusFilter === "review" ? "filled" : "outlined"}
               />
               <Chip
                 label="Approved"
                 onClick={() => setKycStatusFilter("approved")}
+                aria-pressed={kycStatusFilter === "approved"}
                 color={kycStatusFilter === "approved" ? "success" : "default"}
                 variant={kycStatusFilter === "approved" ? "filled" : "outlined"}
               />
               <Chip
                 label="Declined"
                 onClick={() => setKycStatusFilter("declined")}
+                aria-pressed={kycStatusFilter === "declined"}
                 color={kycStatusFilter === "declined" ? "error" : "default"}
                 variant={kycStatusFilter === "declined" ? "filled" : "outlined"}
               />
@@ -675,6 +699,7 @@ export default function AdminNameRequestsPage() {
             <TextField
               size="small"
               placeholder="Search users..."
+              label="Search users"
               variant="outlined"
               value={kycSearch}
               onChange={(e) => setKycSearch(e.target.value)}
@@ -685,14 +710,30 @@ export default function AdminNameRequestsPage() {
                   </InputAdornment>
                 ),
               }}
-              sx={{ width: 250 }}
+              sx={{ width: { xs: "100%", md: 250 } }}
             />
           </Stack>
         </Box>
 
-        <Paper variant="outlined" sx={{ overflow: "hidden" }}>
-          <TableContainer>
-            <Table sx={{ minWidth: 800 }}>
+        <AdminTableShell
+          minWidth={860}
+          pagination={(
+            <TablePagination
+              component="div"
+              count={kycTotal}
+              page={kycPage}
+              onPageChange={(e, newPage) => setKycPage(newPage)}
+              rowsPerPage={kycRowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setKycRowsPerPage(parseInt(e.target.value, 10));
+                setKycPage(0);
+              }}
+              rowsPerPageOptions={[8, 16, 24, 40]}
+              sx={{ overflowX: "auto" }}
+            />
+          )}
+        >
+            <Table sx={{ minWidth: 800 }} aria-label="KYC verifications" aria-busy={loadingKyc || undefined}>
               <TableHead sx={{ bgcolor: "grey.50" }}>
                 <TableRow>
                   <TableCell>User</TableCell>
@@ -729,21 +770,32 @@ export default function AdminNameRequestsPage() {
                         <TableCell>
                           <Box
                             onClick={() => openKycDetails(verification)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                openKycDetails(verification);
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`View KYC details for ${verification.email || verification.username || `user ${verification.user_id}`}`}
                             sx={{
                               display: "flex",
                               alignItems: "center",
                               gap: 1.5,
                               cursor: "pointer",
-                              "&:hover": { opacity: 0.8 }
+                              "&:hover": { opacity: 0.8 },
+                              "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" },
                             }}
                           >
                             <Avatar
                               src={verification.user_image_url}
+                              alt={`${verification.first_name || ""} ${verification.last_name || ""}`.trim() || verification.username || "User"}
                               sx={{ width: 40, height: 40 }}
                             >
                               {(verification.first_name || verification.username || "U")[0].toUpperCase()}
                             </Avatar>
-                            <Box>
+                            <Box sx={{ minWidth: 0 }}>
                               <Stack direction="row" spacing={0.5} alignItems="center">
                                 <Typography variant="body2" fontWeight={500}>
                                   {`${verification.first_name || ""} ${verification.last_name || ""}`.trim() || verification.username || `User #${verification.user_id}`}
@@ -764,9 +816,9 @@ export default function AdminNameRequestsPage() {
                           {verification.full_name || `${verification.first_name} ${verification.last_name}`.trim()}
                         </TableCell>
                         <TableCell>
-                          <Chip
+                          <AdminStatusChip
+                            status={verification.kyc_status || "not_started"}
                             label={(verification.kyc_status || "not_started").replace("_", " ").toUpperCase()}
-                            size="small"
                             color={getKYCStatusColor(verification.kyc_status)}
                           />
                         </TableCell>
@@ -789,7 +841,9 @@ export default function AdminNameRequestsPage() {
                                 <IconButton
                                   color="primary"
                                   size="small"
+                                  aria-label={`Manually approve KYC for ${verification.email || verification.username || `user ${verification.user_id}`}`}
                                   onClick={() => handleOpenManualApprove(verification)}
+                                  sx={{ minWidth: 40, minHeight: 40 }}
                                 >
                                   <CloudUploadIcon />
                                 </IconButton>
@@ -798,7 +852,9 @@ export default function AdminNameRequestsPage() {
                                 <IconButton
                                   color="success"
                                   size="small"
+                                  aria-label={`Approve KYC for ${verification.email || verification.username || `user ${verification.user_id}`}`}
                                   onClick={() => handleOpenKycAction(verification, "approved")}
+                                  sx={{ minWidth: 40, minHeight: 40 }}
                                 >
                                   <CheckCircleIcon />
                                 </IconButton>
@@ -807,7 +863,9 @@ export default function AdminNameRequestsPage() {
                                 <IconButton
                                   color="error"
                                   size="small"
+                                  aria-label={`Decline KYC for ${verification.email || verification.username || `user ${verification.user_id}`}`}
                                   onClick={() => handleOpenKycAction(verification, "declined")}
+                                  sx={{ minWidth: 40, minHeight: 40 }}
                                 >
                                   <CancelIcon />
                                 </IconButton>
@@ -816,7 +874,9 @@ export default function AdminNameRequestsPage() {
                                 <IconButton
                                   color="warning"
                                   size="small"
+                                  aria-label={`Reset KYC for ${verification.email || verification.username || `user ${verification.user_id}`}`}
                                   onClick={() => handleOpenKycAction(verification, "reset")}
+                                  sx={{ minWidth: 40, minHeight: 40 }}
                                 >
                                   <RestartAltIcon />
                                 </IconButton>
@@ -824,7 +884,9 @@ export default function AdminNameRequestsPage() {
                               <Tooltip title="View Details">
                                 <IconButton
                                   size="small"
+                                  aria-label={`View KYC details for ${verification.email || verification.username || `user ${verification.user_id}`}`}
                                   onClick={() => openKycDetails(verification)}
+                                  sx={{ minWidth: 40, minHeight: 40 }}
                                 >
                                   <VisibilityIcon />
                                 </IconButton>
@@ -837,7 +899,9 @@ export default function AdminNameRequestsPage() {
                                   <IconButton
                                     color="primary"
                                     size="small"
+                                    aria-label={`Manually approve KYC for ${verification.email || verification.username || `user ${verification.user_id}`}`}
                                     onClick={() => handleOpenManualApprove(verification)}
+                                    sx={{ minWidth: 40, minHeight: 40 }}
                                   >
                                     <CloudUploadIcon />
                                   </IconButton>
@@ -851,7 +915,9 @@ export default function AdminNameRequestsPage() {
                               <Tooltip title="View Details">
                                 <IconButton
                                   size="small"
+                                  aria-label={`View KYC details for ${verification.email || verification.username || `user ${verification.user_id}`}`}
                                   onClick={() => openKycDetails(verification)}
+                                  sx={{ minWidth: 40, minHeight: 40 }}
                                 >
                                   <VisibilityIcon />
                                 </IconButton>
@@ -865,20 +931,7 @@ export default function AdminNameRequestsPage() {
                 )}
               </TableBody>
             </Table>
-          </TableContainer>
-          <TablePagination
-            component="div"
-            count={kycTotal}
-            page={kycPage}
-            onPageChange={(e, newPage) => setKycPage(newPage)}
-            rowsPerPage={kycRowsPerPage}
-            onRowsPerPageChange={(e) => {
-              setKycRowsPerPage(parseInt(e.target.value, 10));
-              setKycPage(0);
-            }}
-            rowsPerPageOptions={[8, 16, 24, 40]}
-          />
-        </Paper>
+        </AdminTableShell>
       </TabPanel>
 
       {/* Tab 3: Renewal Requests */}
@@ -887,16 +940,30 @@ export default function AdminNameRequestsPage() {
           <TextField
             size="small"
             placeholder="Search renewals..."
+            label="Search renewals"
             variant="outlined"
             value={renewalSearch}
             onChange={(e) => setRenewalSearch(e.target.value)}
             InputProps={{ startAdornment: (<InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment>) }}
-            sx={{ width: 250 }}
+            sx={{ width: { xs: "100%", sm: 250 } }}
           />
         </Stack>
-        <Paper variant="outlined">
-          <TableContainer>
-            <Table>
+        <AdminTableShell
+          minWidth={720}
+          pagination={(
+            <TablePagination
+              component="div"
+              count={renewalTotal}
+              page={renewalPage}
+              onPageChange={(e, p) => setRenewalPage(p)}
+              rowsPerPage={renewalRowsPerPage}
+              onRowsPerPageChange={(e) => { setRenewalRowsPerPage(parseInt(e.target.value, 10)); setRenewalPage(0); }}
+              rowsPerPageOptions={[8, 16, 24]}
+              sx={{ overflowX: "auto" }}
+            />
+          )}
+        >
+            <Table aria-label="Verification renewal requests" aria-busy={loadingRenewals || undefined}>
               <TableHead sx={{ bgcolor: "grey.50" }}>
                 <TableRow>
                   <TableCell>User</TableCell>
@@ -916,14 +983,14 @@ export default function AdminNameRequestsPage() {
                       <TableRow key={req.id} hover>
                         <TableCell>
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-                            <Avatar src={req.user_details?.avatar_url || req.user_details?.avatar || ""} alt={req.user_details?.first_name}>
+                            <Avatar src={req.user_details?.avatar_url || req.user_details?.avatar || ""} alt={getUserDisplayName(req.user_details)}>
                               {getUserDisplayName(req.user_details)[0]?.toUpperCase() || "U"}
                             </Avatar>
-                            <Box>
+                            <Box sx={{ minWidth: 0 }}>
                               <Typography variant="body2" fontWeight={500}>
                                 {getUserDisplayName(req.user_details)}
                               </Typography>
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
                                 {req.user_details?.username ? `@${req.user_details.username}` : req.user_details?.email}
                               </Typography>
                             </Box>
@@ -933,7 +1000,7 @@ export default function AdminNameRequestsPage() {
                           <Typography variant="body2" noWrap title={req.reason}>{req.reason}</Typography>
                         </TableCell>
                         <TableCell>
-                          <Chip label={req.status.toUpperCase()} size="small" color={getStatusColor(req.status)} />
+                          <AdminStatusChip status={req.status} label={req.status.toUpperCase()} color={getStatusColor(req.status)} />
                         </TableCell>
                         <TableCell>
                           <Typography variant="caption" color="text.secondary">
@@ -942,15 +1009,15 @@ export default function AdminNameRequestsPage() {
                         </TableCell>
                         <TableCell align="right">
                           <Stack direction="row" justifyContent="flex-end" spacing={1}>
-                            <IconButton size="small" onClick={() => fetchHistory(req.user)}>
+                            <IconButton size="small" aria-label={`View verification history for ${getUserDisplayName(req.user_details)}`} onClick={() => fetchHistory(req.user)} sx={{ minWidth: 40, minHeight: 40 }}>
                               <HistoryIcon />
                             </IconButton>
                             {req.status === 'pending' && (
                               <>
-                                <IconButton color="success" size="small" onClick={() => { setRenewalNote(""); setRenewalActionDialog({ open: true, request: req, type: "approved" }); }}>
+                                <IconButton color="success" size="small" aria-label={`Approve renewal for ${getUserDisplayName(req.user_details)}`} onClick={() => { setRenewalNote(""); setRenewalActionDialog({ open: true, request: req, type: "approved" }); }} sx={{ minWidth: 40, minHeight: 40 }}>
                                   <CheckCircleIcon />
                                 </IconButton>
-                                <IconButton color="error" size="small" onClick={() => { setRenewalNote(""); setRenewalActionDialog({ open: true, request: req, type: "rejected" }); }}>
+                                <IconButton color="error" size="small" aria-label={`Reject renewal for ${getUserDisplayName(req.user_details)}`} onClick={() => { setRenewalNote(""); setRenewalActionDialog({ open: true, request: req, type: "rejected" }); }} sx={{ minWidth: 40, minHeight: 40 }}>
                                   <CancelIcon />
                                 </IconButton>
                               </>
@@ -963,22 +1030,12 @@ export default function AdminNameRequestsPage() {
                 )}
               </TableBody>
             </Table>
-          </TableContainer>
-          <TablePagination
-            component="div"
-            count={renewalTotal}
-            page={renewalPage}
-            onPageChange={(e, p) => setRenewalPage(p)}
-            rowsPerPage={renewalRowsPerPage}
-            onRowsPerPageChange={(e) => { setRenewalRowsPerPage(parseInt(e.target.value, 10)); setRenewalPage(0); }}
-            rowsPerPageOptions={[8, 16, 24]}
-          />
-        </Paper>
+        </AdminTableShell>
       </TabPanel>
 
       {/* Name Change Decision Dialog */}
-      <Dialog open={actionDialog.open} onClose={handleCloseAction} fullWidth maxWidth="xs">
-        <DialogTitle>
+      <Dialog open={actionDialog.open} onClose={handleCloseAction} fullWidth maxWidth="xs" aria-labelledby="name-request-action-title" PaperProps={{ sx: { borderRadius: "var(--imaa-radius-card)", m: { xs: 2 } } }}>
+        <DialogTitle id="name-request-action-title">
           {actionDialog.type === "approved" ? "Approve Request" : "Reject Request"}
         </DialogTitle>
         <DialogContent dividers>
@@ -1019,8 +1076,8 @@ export default function AdminNameRequestsPage() {
       </Dialog>
 
       {/* KYC Action Dialog */}
-      <Dialog open={kycActionDialog.open} onClose={handleCloseKycAction} fullWidth maxWidth="xs">
-        <DialogTitle>
+      <Dialog open={kycActionDialog.open} onClose={handleCloseKycAction} fullWidth maxWidth="xs" aria-labelledby="kyc-action-title" PaperProps={{ sx: { borderRadius: "var(--imaa-radius-card)", m: { xs: 2 } } }}>
+        <DialogTitle id="kyc-action-title">
           {kycActionDialog.action === "reset"
             ? "Reset KYC Process"
             : kycActionDialog.action === "approved"
@@ -1073,8 +1130,8 @@ export default function AdminNameRequestsPage() {
       </Dialog>
 
       {/* Details Dialog (Name Change) */}
-      <Dialog open={detailsDialog.open} onClose={closeDetails} fullWidth maxWidth="sm">
-        <DialogTitle>Name Change Review</DialogTitle>
+      <Dialog open={detailsDialog.open} onClose={closeDetails} fullWidth maxWidth="sm" aria-labelledby="name-review-title" PaperProps={{ sx: { borderRadius: "var(--imaa-radius-card)", m: { xs: 2 } } }}>
+        <DialogTitle id="name-review-title">Name Change Review</DialogTitle>
         <DialogContent dividers>
           {detailsDialog.request && (
             <Stack spacing={2}>
@@ -1102,14 +1159,14 @@ export default function AdminNameRequestsPage() {
                 </Typography>
               </Box>
               <Stack direction="row" spacing={1} flexWrap="wrap">
-                <Chip
-                  size="small"
+                <AdminStatusChip
+                  status={detailsDialog.request.didit_status || "not_started"}
                   label={`DIDIT: ${(detailsDialog.request.didit_status || "not_started").toUpperCase()}`}
                   variant="outlined"
                   color={getDiditColor(detailsDialog.request.didit_status)}
                 />
-                <Chip
-                  size="small"
+                <AdminStatusChip
+                  status={detailsDialog.request.status}
                   label={`REQUEST: ${detailsDialog.request.status?.toUpperCase()}`}
                   color={getStatusColor(detailsDialog.request.status)}
                 />
@@ -1148,24 +1205,26 @@ export default function AdminNameRequestsPage() {
       </Dialog>
 
       {/* KYC Details Dialog */}
-      <Dialog open={kycDetailsDialog.open} onClose={closeKycDetails} fullWidth maxWidth="md">
-        <DialogTitle>KYC Verification Details</DialogTitle>
+      <Dialog open={kycDetailsDialog.open} onClose={closeKycDetails} fullWidth maxWidth="md" aria-labelledby="kyc-details-title" PaperProps={{ sx: { borderRadius: "var(--imaa-radius-card)", m: { xs: 2 } } }}>
+        <DialogTitle id="kyc-details-title">KYC Verification Details</DialogTitle>
         <DialogContent dividers>
           {kycDetailsDialog.verification && (
             <Stack spacing={3}>
               {/* Header Info */}
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap', minWidth: 0 }}>
                 <Avatar
                   src={kycDetailsDialog.verification.user_image_url}
+                  alt={kycDetailsDialog.verification.full_name || kycDetailsDialog.verification.username || "User"}
                   sx={{ width: 64, height: 64 }}
                 >
                   {(kycDetailsDialog.verification.first_name || "U")[0].toUpperCase()}
                 </Avatar>
-                <Box>
+                <Box sx={{ minWidth: 0 }}>
                   <Typography variant="h6">
                     {kycDetailsDialog.verification.full_name || kycDetailsDialog.verification.username}
                   </Typography>
-                  <Chip
+                  <AdminStatusChip
+                    status={kycDetailsDialog.verification.kyc_status}
                     label={(kycDetailsDialog.verification.kyc_status || "").replace("_", " ").toUpperCase()}
                     color={getKYCStatusColor(kycDetailsDialog.verification.kyc_status)}
                     size="small"
@@ -1235,7 +1294,11 @@ export default function AdminNameRequestsPage() {
                 return (
                   <Paper variant="outlined" sx={{ p: 2 }}>
                     <Typography variant="subtitle2" sx={{ mb: 2 }}>Verification Checks</Typography>
-                    <Stack direction="row" spacing={4} divider={<Box sx={{ borderRight: 1, borderColor: 'divider' }} />}>
+                    <Stack
+                      direction={{ xs: "column", sm: "row" }}
+                      spacing={{ xs: 2, sm: 4 }}
+                      divider={<Divider flexItem sx={{ display: { xs: "none", sm: "block" } }} />}
+                    >
                       <Box>
                         <Typography variant="caption" color="text.secondary">Liveness</Typography>
                         <Typography variant="body1" fontWeight="bold" sx={{ color: liveness.status === 'Approved' ? 'success.main' : 'error.main' }}>
@@ -1318,8 +1381,8 @@ export default function AdminNameRequestsPage() {
       </Dialog >
 
       {/* Manual Approve Dialog */}
-      <Dialog open={manualApproveDialog.open} onClose={handleCloseManualApprove} fullWidth maxWidth="xs">
-        <DialogTitle>Manual Identification Approval</DialogTitle>
+      <Dialog open={manualApproveDialog.open} onClose={handleCloseManualApprove} fullWidth maxWidth="xs" aria-labelledby="manual-approval-title" PaperProps={{ sx: { borderRadius: "var(--imaa-radius-card)", m: { xs: 2 } } }}>
+        <DialogTitle id="manual-approval-title">Manual Identification Approval</DialogTitle>
         <DialogContent dividers>
           {manualError && <Alert severity="error" sx={{ mb: 2 }}>{manualError}</Alert>}
 
@@ -1367,8 +1430,8 @@ export default function AdminNameRequestsPage() {
       </Dialog>
 
       {/* Renewal Decision Dialog */}
-      <Dialog open={renewalActionDialog.open} onClose={() => setRenewalActionDialog({ ...renewalActionDialog, open: false })} fullWidth maxWidth="xs">
-        <DialogTitle>{renewalActionDialog.type === "approved" ? "Approve Renewal" : "Reject Renewal"}</DialogTitle>
+      <Dialog open={renewalActionDialog.open} onClose={() => setRenewalActionDialog({ ...renewalActionDialog, open: false })} fullWidth maxWidth="xs" aria-labelledby="renewal-action-title" PaperProps={{ sx: { borderRadius: "var(--imaa-radius-card)", m: { xs: 2 } } }}>
+        <DialogTitle id="renewal-action-title">{renewalActionDialog.type === "approved" ? "Approve Renewal" : "Reject Renewal"}</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" paragraph>
             {renewalActionDialog.type === "approved"
@@ -1391,19 +1454,19 @@ export default function AdminNameRequestsPage() {
       </Dialog>
 
       {/* Verification History Dialog */}
-      <Dialog open={historyDialog.open} onClose={() => setHistoryDialog({ ...historyDialog, open: false })} fullWidth maxWidth="sm">
-        <DialogTitle>Verification History</DialogTitle>
+      <Dialog open={historyDialog.open} onClose={() => setHistoryDialog({ ...historyDialog, open: false })} fullWidth maxWidth="sm" aria-labelledby="verification-history-title" PaperProps={{ sx: { borderRadius: "var(--imaa-radius-card)", m: { xs: 2 } } }}>
+        <DialogTitle id="verification-history-title">Verification History</DialogTitle>
         <DialogContent dividers>
           {historyDialog.loading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>
+            <Box role="status" aria-label="Loading verification history" sx={{ display: 'flex', justifyContent: 'center', p: 3 }}><CircularProgress /></Box>
           ) : historyDialog.history.length === 0 ? (
             <Typography align="center" color="text.secondary">No history found.</Typography>
           ) : (
             <Stack spacing={2}>
               {historyDialog.history.map((item) => (
                 <Paper key={item.id} variant="outlined" sx={{ p: 2 }}>
-                  <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
-                    <Chip label={item.kyc_status.toUpperCase()} size="small" color={getStatusColor(item.kyc_status)} />
+                  <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} gap={1} mb={1}>
+                    <AdminStatusChip status={item.kyc_status} label={item.kyc_status.toUpperCase()} color={getStatusColor(item.kyc_status)} />
                     <Typography variant="caption" color="text.secondary">
                       Archived: {new Date(item.archived_at).toLocaleDateString()}
                     </Typography>

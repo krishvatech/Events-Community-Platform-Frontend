@@ -18,6 +18,7 @@ import {
   CircularProgress,
   Tabs,
   Tab,
+  Alert,
 } from "@mui/material";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
@@ -26,6 +27,8 @@ import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlin
 import { isAdminUser } from "../utils/adminRole";
 import AdminProfileModerationPage from "./AdminProfileModerationPage";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import AdminStatusChip from "../components/admin/AdminStatusChip.jsx";
+import AdminEmptyState from "../components/admin/AdminEmptyState.jsx";
 
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 function getToken() {
@@ -83,6 +86,7 @@ export default function AdminModerationPage() {
   // Content Moderation State
   const [items, setItems] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState("");
   const [status, setStatus] = React.useState("under_review");
   const [query, setQuery] = React.useState("");
   const [actionBusy, setActionBusy] = React.useState(false);
@@ -98,6 +102,7 @@ export default function AdminModerationPage() {
     if (viewMode !== 0) return;
 
     setLoading(true);
+    setLoadError("");
     try {
       const url = new URL(`${API_ROOT}/moderation/queue/`);
       if (status && status !== "all") url.searchParams.set("status", status);
@@ -105,8 +110,9 @@ export default function AdminModerationPage() {
       const j = res.ok ? await res.json() : {};
       const rows = Array.isArray(j?.results) ? j.results : (Array.isArray(j) ? j : []);
       setItems(rows);
-    } catch {
+    } catch (error) {
       setItems([]);
+      setLoadError(error?.message || "Failed to load moderation reports.");
     } finally {
       setLoading(false);
     }
@@ -174,41 +180,44 @@ export default function AdminModerationPage() {
   // If viewing profiles, render that component directly
   if (viewMode === 1) {
     return (
-      <Box sx={{ px: { xs: 1, md: 2 } }}>
-        <Tabs value={viewMode} onChange={(_, v) => setViewMode(v)} sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}>
+      <Box sx={{ px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 }, minWidth: 0 }}>
+        <Tabs value={viewMode} onChange={(_, v) => setViewMode(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile aria-label="Moderation areas" sx={{ mb: 2, borderBottom: "1px solid var(--imaa-border)" }}>
           <Tab label="Content Reports" />
           <Tab label="Profile Reports" />
         </Tabs>
-        <AdminProfileModerationPage />
+        <AdminProfileModerationPage embedded />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ px: { xs: 1, md: 2 } }}>
-      <Tabs value={viewMode} onChange={(_, v) => setViewMode(v)} sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}>
+    <Box sx={{ px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 }, minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
+      <Tabs value={viewMode} onChange={(_, v) => setViewMode(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile aria-label="Moderation areas" sx={{ mb: 2, borderBottom: "1px solid var(--imaa-border)" }}>
         <Tab label="Content Reports" />
         <Tab label="Profile Reports" />
       </Tabs>
 
       <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "stretch", md: "center" }} sx={{ mb: 2 }}>
-        <Typography variant="h5" sx={{ fontWeight: 700 }}>Content Moderation Queue</Typography>
+        <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)" }}>Content Moderation Queue</Typography>
         <Box sx={{ flex: 1 }} />
         <TextField
           size="small"
+          label="Search content reports"
           placeholder="Search text, author..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          sx={{ minWidth: 240 }}
+          sx={{ minWidth: { xs: "100%", sm: 280 }, bgcolor: "background.paper" }}
         />
       </Stack>
 
-      <Paper variant="outlined" sx={{ mb: 2 }}>
+      <Paper variant="outlined" sx={{ mb: 2, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", overflow: "hidden" }}>
         <Tabs
           value={status}
           onChange={(_, v) => setStatus(v)}
           variant="scrollable"
+          scrollButtons="auto"
           allowScrollButtonsMobile
+          aria-label="Content moderation status filters"
         >
           <Tab value="under_review" label="Under Review" />
           <Tab value="all" label="All Reports" />
@@ -216,22 +225,22 @@ export default function AdminModerationPage() {
         </Tabs>
       </Paper>
 
-      {loading ? (
-        <LinearProgress />
+      {loadError ? (
+        <Alert severity="error" role="alert" sx={{ borderRadius: "var(--imaa-radius-card)" }}>{loadError}</Alert>
+      ) : loading ? (
+        <LinearProgress aria-label="Loading content reports" />
       ) : filtered.length === 0 ? (
-        <Paper variant="outlined" sx={{ p: 2 }}>
-          <Typography color="text.secondary">No reports in this view.</Typography>
-        </Paper>
+        <AdminEmptyState compact title="No reports in this view." />
       ) : (
         <Stack spacing={2}>
           {filtered.map((item) => (
-            <Paper key={`${item.target_type}:${item.target_id}`} variant="outlined" sx={{ p: 2 }}>
+            <Paper key={`${item.target_type}:${item.target_id}`} variant="outlined" sx={{ p: { xs: 1.5, sm: 2 }, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", boxShadow: "var(--imaa-shadow-sm)", minWidth: 0 }}>
               <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ xs: "flex-start", md: "center" }}>
                 <Stack spacing={0.5} sx={{ flex: 1 }}>
-                  <Stack direction="row" spacing={1} alignItems="center">
+                  <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
                     <Chip size="small" icon={<FlagOutlinedIcon />} label={`${item.report_count} reports`} />
                     <Chip size="small" label={item.content_kind} variant="outlined" />
-                    <Chip size="small" label={item.status} color={item.status === "removed" ? "warning" : "default"} />
+                    <AdminStatusChip status={item.status} label={item.status} color={item.status === "removed" ? "warning" : "default"} />
                   </Stack>
                   <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                     {item.content?.title || item.content?.text || "(no text)"}
@@ -244,18 +253,19 @@ export default function AdminModerationPage() {
                     {item.last_reported_at ? ` · Last report ${formatWhen(item.last_reported_at)}` : ""}
                   </Typography>
                   {item.content?.text && (
-                    <Typography variant="body2" sx={{ mt: 0.5 }}>
+                    <Typography variant="body2" sx={{ mt: 0.5, overflowWrap: "anywhere" }}>
                       {item.content.text}
                     </Typography>
                   )}
                 </Stack>
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }} sx={{ width: { xs: "100%", md: "auto" } }}>
                   {/* ✅ Edit button removed - Use "Remove Content" option in dialog instead */}
                   <Button
                     size="small"
                     startIcon={<CheckCircleOutlineRoundedIcon />}
                     onClick={() => runAction(item, "approve")}
                     disabled={actionBusy}
+                    sx={{ minHeight: 40, fontWeight: 700 }}
                   >
                     {item.status === "removed" ? "Restore Content" : "Keep Content"}
                   </Button>
@@ -265,6 +275,7 @@ export default function AdminModerationPage() {
                     startIcon={<DeleteOutlineRoundedIcon />}
                     onClick={() => setConfirmTarget(item)}
                     disabled={actionBusy}
+                    sx={{ minHeight: 40, fontWeight: 700 }}
                   >
                     Remove Content
                   </Button>
@@ -296,8 +307,8 @@ export default function AdminModerationPage() {
         </Stack>
       )}
 
-      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Edit content</DialogTitle>
+      <Dialog open={editOpen} onClose={() => setEditOpen(false)} maxWidth="sm" fullWidth aria-labelledby="moderation-edit-title">
+        <DialogTitle id="moderation-edit-title">Edit content</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
             <TextField
@@ -332,8 +343,8 @@ export default function AdminModerationPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!confirmTarget} onClose={() => setConfirmTarget(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 700 }}>Confirm Removal?</DialogTitle>
+      <Dialog open={!!confirmTarget} onClose={() => setConfirmTarget(null)} maxWidth="xs" fullWidth aria-labelledby="moderation-remove-title">
+        <DialogTitle id="moderation-remove-title" sx={{ fontWeight: 700 }}>Confirm Removal?</DialogTitle>
         <DialogContent dividers>
           <Typography variant="body2" color="text.secondary">
             You are about to remove this content from public view. It will be hidden from users but retained in the database for audit purposes.

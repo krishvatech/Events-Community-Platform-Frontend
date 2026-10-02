@@ -34,12 +34,12 @@ import VerifiedUserRoundedIcon from "@mui/icons-material/VerifiedUserRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 
-const ORANGE = "#E8532F";
-const TEAL = "#0A9396";
-const NAVY = "#1B2A4A";
-const TEXT = "#2C3E5A";
-const BORDER = "#F0EEEB";
-const SOFT_BG = "#F8FAFC";
+const ORANGE = "var(--imaa-teal-hover)";
+const TEAL = "var(--imaa-teal-hover)";
+const NAVY = "var(--imaa-ink)";
+const TEXT = "var(--imaa-ink-body)";
+const BORDER = "var(--imaa-border)";
+const SOFT_BG = "var(--imaa-bg-cool)";
 
 const quickGuideCards = [
   {
@@ -183,7 +183,7 @@ function SectionHeader({ eyebrow, title, description }) {
           {eyebrow}
         </Typography>
       )}
-      <Typography variant="h5" sx={{ color: NAVY, fontWeight: 900, mb: 0.75, letterSpacing: "-0.02em" }}>
+      <Typography component="h2" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", color: NAVY, fontWeight: 900, mb: 0.75, letterSpacing: "-0.02em" }}>
         {title}
       </Typography>
       {description && (
@@ -203,7 +203,7 @@ function GuideAccordion({ id, title, children, defaultExpanded = false }) {
       disableGutters
       sx={{
         border: `1px solid ${BORDER}`,
-        borderRadius: "16px !important",
+        borderRadius: "var(--imaa-radius-card) !important",
         mb: 1.5,
         boxShadow: "none",
         overflow: "hidden",
@@ -212,7 +212,7 @@ function GuideAccordion({ id, title, children, defaultExpanded = false }) {
       }}
     >
       <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />} sx={{ px: 2.5, py: 1.1 }}>
-        <Typography sx={{ fontWeight: 900, color: NAVY }}>{title}</Typography>
+        <Typography component="h3" sx={{ fontWeight: 900, color: NAVY }}>{title}</Typography>
       </AccordionSummary>
       <AccordionDetails sx={{ px: 2.5, pt: 0, pb: 2.5 }}>{children}</AccordionDetails>
     </Accordion>
@@ -263,7 +263,7 @@ export default function AdminGuidePage() {
         maxWidth: "1180px",
         mx: "auto",
         pb: 6,
-        px: { xs: 1.5, md: 0 },
+        px: { xs: 0, md: 0 },
         overflowX: "hidden",
         scrollMarginTop: 24,
       }}
@@ -273,16 +273,17 @@ export default function AdminGuidePage() {
         sx={{
           p: { xs: 2.5, md: 4 },
           mb: 2.5,
-          borderRadius: 4,
+          borderRadius: "var(--imaa-radius-card)",
           border: `1px solid ${BORDER}`,
           overflow: "hidden",
-          background: "linear-gradient(135deg, rgba(10,147,150,0.10), rgba(232,83,47,0.08))",
+          bgcolor: "background.paper",
+          boxShadow: "var(--imaa-shadow-sm)",
         }}
       >
         <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between">
           <Box sx={{ minWidth: 0 }}>
             <Chip label="Admin Help Center" size="small" sx={{ mb: 1.5, bgcolor: "#fff", color: ORANGE, fontWeight: 900 }} />
-            <Typography variant="h3" sx={{ color: NAVY, fontWeight: 950, letterSpacing: "-0.04em", mb: 1, lineHeight: 1.05 }}>
+            <Typography component="h1" variant="h3" sx={{ fontFamily: "var(--imaa-font-serif)", color: NAVY, fontWeight: 950, letterSpacing: "-0.04em", mb: 1, lineHeight: 1.05 }}>
               Admin Guide
             </Typography>
             <Typography variant="body1" sx={{ color: TEXT, maxWidth: 760, lineHeight: 1.65 }}>
@@ -294,13 +295,14 @@ export default function AdminGuidePage() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search guide..."
+            inputProps={{ "aria-label": "Search guide" }}
             size="small"
             sx={{
               width: { xs: "100%", md: 340 },
               flexShrink: 0,
               bgcolor: "#fff",
-              borderRadius: 2,
-              "& .MuiOutlinedInput-root": { borderRadius: 2 },
+              borderRadius: "var(--imaa-radius-field)",
+              "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" },
             }}
             InputProps={{
               startAdornment: (
@@ -319,7 +321,7 @@ export default function AdminGuidePage() {
           p: 1.25,
           mb: 2.5,
           border: `1px solid ${BORDER}`,
-          borderRadius: 3,
+          borderRadius: "var(--imaa-radius-card)",
           bgcolor: "#fff",
         }}
       >
@@ -331,11 +333,12 @@ export default function AdminGuidePage() {
               onClick={() => scrollToSection(id)}
               sx={{
                 px: 1.5,
-                borderRadius: 2,
+                borderRadius: "var(--imaa-radius-field)",
                 color: TEXT,
                 textTransform: "none",
                 fontWeight: 800,
-                "&:hover": { bgcolor: "rgba(232,83,47,0.08)", color: ORANGE },
+                minHeight: 40,
+                "&:hover": { bgcolor: "var(--imaa-teal-light)", color: ORANGE },
               }}
             >
               {label}
@@ -345,7 +348,7 @@ export default function AdminGuidePage() {
       </Paper>
 
       <Stack spacing={2.5} sx={{ minWidth: 0 }}>
-        <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+        <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", boxShadow: "var(--imaa-shadow-sm)" }}>
           <SectionHeader
             eyebrow="Quick Guide"
             title="Choose what you want to understand"
@@ -359,12 +362,22 @@ export default function AdminGuidePage() {
                   key={card.id}
                   variant="outlined"
                   onClick={() => scrollToSection(card.id)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      scrollToSection(card.id);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Go to ${card.title}`}
                   sx={{
                     borderColor: BORDER,
-                    borderRadius: 3,
+                    borderRadius: "var(--imaa-radius-card)",
                     cursor: "pointer",
                     height: "100%",
                     transition: "all 0.18s ease",
+                    "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" },
                     "&:hover": {
                       borderColor: ORANGE,
                       transform: "translateY(-2px)",
@@ -373,7 +386,7 @@ export default function AdminGuidePage() {
                   }}
                 >
                   <CardContent sx={{ p: 2.25 }}>
-                    <Box sx={{ width: 42, height: 42, borderRadius: 2, bgcolor: "rgba(232,83,47,0.10)", display: "flex", alignItems: "center", justifyContent: "center", mb: 2 }}>
+                    <Box sx={{ width: 42, height: 42, borderRadius: "var(--imaa-radius-card)", bgcolor: "var(--imaa-teal-light)", display: "flex", alignItems: "center", justifyContent: "center", mb: 2 }}>
                       <Icon sx={{ color: ORANGE }} />
                     </Box>
                     <Typography sx={{ color: NAVY, fontWeight: 900, mb: 0.75 }}>{card.title}</Typography>
@@ -385,7 +398,7 @@ export default function AdminGuidePage() {
           </Box>
         </Paper>
 
-        <Paper id="start-here" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: 3, scrollMarginTop: 24 }}>
+        <Paper id="start-here" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24, boxShadow: "var(--imaa-shadow-sm)" }}>
           <SectionHeader
             eyebrow="Start Here"
             title="Full workflow in one simple flow"
@@ -400,25 +413,25 @@ export default function AdminGuidePage() {
                   flex: "1 1 135px",
                   minWidth: 135,
                   p: 1.75,
-                  borderRadius: 3,
+                  borderRadius: "var(--imaa-radius-card)",
                   border: `1px solid ${BORDER}`,
                   bgcolor: index === 6 ? "rgba(10,147,150,0.08)" : SOFT_BG,
                 }}
               >
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
-                  <Chip size="small" label={`Step ${index + 1}`} sx={{ height: 22, color: ORANGE, bgcolor: "rgba(232,83,47,0.10)", fontWeight: 900 }} />
+                  <Chip size="small" label={`Step ${index + 1}`} sx={{ height: 22, color: ORANGE, bgcolor: "var(--imaa-teal-light)", fontWeight: 900 }} />
                   {index < 6 && <RouteRoundedIcon sx={{ color: "#CBD5E1", fontSize: 18 }} />}
                 </Stack>
                 <Typography sx={{ color: NAVY, fontWeight: 900, lineHeight: 1.35 }}>{step}</Typography>
               </Paper>
             ))}
           </Box>
-          <Alert severity="info" sx={{ mt: 2.5, borderRadius: 2 }}>
+          <Alert severity="info" sx={{ mt: 2.5, borderRadius: "var(--imaa-radius-card)" }}>
             Post-acceptance forms are created only after the correct attendee origin becomes <strong>Confirmed</strong>.
           </Alert>
         </Paper>
 
-        <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: 3 }}>
+        <Paper elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", boxShadow: "var(--imaa-shadow-sm)" }}>
           <GuideAccordion id="application-tracks" title="Application Tracks" defaultExpanded>
             <Typography variant="body2" sx={{ color: TEXT, mb: 2, lineHeight: 1.65 }}>
               A track is the category a user applies for. Example: Participant, Speaker, Sponsor Staff, Start-up, Investor, or Researcher.
@@ -430,7 +443,7 @@ export default function AdminGuidePage() {
                 ["Tier", "Price/payment outcome"],
                 ["Role", "What user becomes after acceptance"],
               ].map(([title, body]) => (
-                <Paper key={title} elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: 2 }}>
+                <Paper key={title} elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: "var(--imaa-radius-card)" }}>
                   <Typography sx={{ color: NAVY, fontWeight: 900 }}>{title}</Typography>
                   <Typography variant="body2" sx={{ color: "#64748B" }}>{body}</Typography>
                 </Paper>
@@ -451,10 +464,10 @@ export default function AdminGuidePage() {
 
           <GuideAccordion id="pricing-tiers" title="Pricing Tiers" defaultExpanded>
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
-              <Alert icon={<PaymentsRoundedIcon />} severity="success" sx={{ borderRadius: 2 }}>
+              <Alert icon={<PaymentsRoundedIcon />} severity="success" sx={{ borderRadius: "var(--imaa-radius-card)" }}>
                 <strong>Tier price = 0</strong><br />User becomes Confirmed immediately after admin accepts.
               </Alert>
-              <Alert icon={<WarningAmberRoundedIcon />} severity="warning" sx={{ borderRadius: 2 }}>
+              <Alert icon={<WarningAmberRoundedIcon />} severity="warning" sx={{ borderRadius: "var(--imaa-radius-card)" }}>
                 <strong>Tier price &gt; 0</strong><br />User becomes Payment Pending. Admin must mark paid to confirm.
               </Alert>
             </Box>
@@ -467,20 +480,20 @@ export default function AdminGuidePage() {
             <Typography variant="body2" sx={{ color: TEXT, mb: 1.5, lineHeight: 1.65 }}>
               Pre-approval is useful for invite-only or already confirmed users. Codes and allowlist records are scoped to a specific event, track, and submission mode.
             </Typography>
-            <Alert severity="info" sx={{ borderRadius: 2 }}>
+            <Alert severity="info" sx={{ borderRadius: "var(--imaa-radius-card)" }}>
               Example: a Speaker + Confirmed code should not work for Participant or Speaker Self Nomination unless you create another code for that exact scope.
             </Alert>
           </GuideAccordion>
 
           <GuideAccordion id="forms" title="Post-Acceptance Forms" defaultExpanded>
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
-              <Paper id="participant-information" elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: 2, scrollMarginTop: 24 }}>
+              <Paper id="participant-information" elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24 }}>
                 <Typography sx={{ color: NAVY, fontWeight: 900, mb: 0.75 }}>Participant Information</Typography>
                 <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.65 }}>
                   Used for logistics such as accessibility, dietary needs, emergency contact, travel information, and consent. It is for confirmed in-person or hybrid attendees.
                 </Typography>
               </Paper>
-              <Paper id="promotional-profiles" elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: 2, scrollMarginTop: 24 }}>
+              <Paper id="promotional-profiles" elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24 }}>
                 <Typography sx={{ color: NAVY, fontWeight: 900, mb: 0.75 }}>Promotional Profile</Typography>
                 <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.65 }}>
                   Used for public-facing profile content such as speaker bio, headshot, talk title, sponsor logo, start-up pitch, or investor display details.
@@ -490,14 +503,14 @@ export default function AdminGuidePage() {
           </GuideAccordion>
         </Paper>
 
-        <Paper id="trigger-matrix" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: 3, scrollMarginTop: 24 }}>
+        <Paper id="trigger-matrix" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24, boxShadow: "var(--imaa-shadow-sm)" }}>
           <SectionHeader
             eyebrow="Rules"
             title="Expected Form Trigger Matrix"
             description="Use this table when an admin asks why a form was or was not created."
           />
-          <TableContainer component={Paper} elevation={0} sx={{ border: `1px solid ${BORDER}`, borderRadius: 3, overflowX: "auto" }}>
-            <Table size="small" sx={{ minWidth: 760 }}>
+          <TableContainer component={Paper} elevation={0} sx={{ width: "100%", maxWidth: "100%", border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", overflowX: "auto" }}>
+            <Table size="small" sx={{ minWidth: 760 }} aria-label="Expected form trigger matrix">
               <TableHead sx={{ bgcolor: SOFT_BG }}>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 900, color: NAVY }}>Event Format</TableCell>
@@ -520,7 +533,7 @@ export default function AdminGuidePage() {
           </TableContainer>
         </Paper>
 
-        <Paper id="common-scenarios" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: 3, scrollMarginTop: 24 }}>
+        <Paper id="common-scenarios" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24, boxShadow: "var(--imaa-shadow-sm)" }}>
           <SectionHeader
             eyebrow="Examples"
             title="Common Scenarios"
@@ -528,7 +541,7 @@ export default function AdminGuidePage() {
           />
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
             {commonScenarios.map((item) => (
-              <Paper key={item.title} elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: 3, border: `1px solid ${BORDER}` }}>
+              <Paper key={item.title} elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: "var(--imaa-radius-card)", border: `1px solid ${BORDER}` }}>
                 <Typography sx={{ color: NAVY, fontWeight: 900, mb: 1 }}>{item.title}</Typography>
                 <Typography variant="caption" sx={{ display: "block", color: ORANGE, fontWeight: 900, mb: 0.75 }}>Setup</Typography>
                 <Typography variant="body2" sx={{ color: TEXT, mb: 1.25, lineHeight: 1.6 }}>{item.setup}</Typography>
@@ -540,14 +553,14 @@ export default function AdminGuidePage() {
           </Box>
         </Paper>
 
-        <Paper id="troubleshooting" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: 3, scrollMarginTop: 24 }}>
+        <Paper id="troubleshooting" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24, boxShadow: "var(--imaa-shadow-sm)" }}>
           <SectionHeader
             eyebrow="Troubleshooting"
             title="Common admin questions"
             description="Use this section when something looks missing or incorrect."
           />
           {troubleshootingItems.map((item, index) => (
-            <Accordion key={item.question} disableGutters defaultExpanded={index === 0} sx={{ boxShadow: "none", border: `1px solid ${BORDER}`, mb: 1, borderRadius: "12px !important", overflow: "hidden", "&:before": { display: "none" } }}>
+            <Accordion key={item.question} disableGutters defaultExpanded={index === 0} sx={{ boxShadow: "none", border: `1px solid ${BORDER}`, mb: 1, borderRadius: "var(--imaa-radius-card) !important", overflow: "hidden", "&:before": { display: "none" } }}>
               <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <HelpOutlineRoundedIcon sx={{ color: ORANGE }} fontSize="small" />
@@ -561,7 +574,7 @@ export default function AdminGuidePage() {
           ))}
         </Paper>
 
-        <Paper id="testing-checklist" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: 3, scrollMarginTop: 24 }}>
+        <Paper id="testing-checklist" elevation={0} sx={{ p: { xs: 2, md: 3 }, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24, boxShadow: "var(--imaa-shadow-sm)" }}>
           <SectionHeader
             eyebrow="Checklist"
             title="Setup checklist before testing"
@@ -569,7 +582,7 @@ export default function AdminGuidePage() {
           />
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 1.25 }}>
             {setupChecklist.map((item, index) => (
-              <Stack key={item} direction="row" spacing={1.25} alignItems="flex-start" sx={{ p: 1.5, bgcolor: SOFT_BG, borderRadius: 2 }}>
+              <Stack key={item} direction="row" spacing={1.25} alignItems="flex-start" sx={{ p: 1.5, bgcolor: SOFT_BG, borderRadius: "var(--imaa-radius-card)" }}>
                 <Chip label={index + 1} size="small" sx={{ bgcolor: "rgba(10,147,150,0.12)", color: TEAL, fontWeight: 900 }} />
                 <Typography variant="body2" sx={{ color: TEXT, lineHeight: 1.55 }}>{item}</Typography>
               </Stack>

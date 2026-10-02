@@ -16,6 +16,7 @@ import {
 import InsertPhotoRoundedIcon from '@mui/icons-material/InsertPhotoRounded';
 import { toast } from 'react-toastify';
 import { createVirtualSpeaker, updateVirtualSpeaker } from '../services/virtualSpeakerService';
+import { colors, radii } from '../styles/designTokens';
 
 const VirtualSpeakerForm = ({
   open,
@@ -159,15 +160,25 @@ const VirtualSpeakerForm = ({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
+      aria-labelledby="virtual-speaker-form-title"
+      PaperProps={{ sx: { borderRadius: `${radii.popup}px`, m: 2 } }}
     >
-      <DialogTitle>
+      <DialogTitle id="virtual-speaker-form-title" sx={{ color: colors.navy, fontWeight: 700 }}>
         {initialData ? 'Edit Virtual Speaker' : 'Create Virtual Speaker'}
       </DialogTitle>
 
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+      <DialogContent sx={{ bgcolor: colors.white }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 3,
+            mt: 2,
+            '& .MuiOutlinedInput-root': { borderRadius: `${radii.field}px` },
+          }}
+        >
           {/* Profile Image */}
-          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', mb: 1 }}>
             <Box
               sx={{
                 position: 'relative',
@@ -181,10 +192,11 @@ const VirtualSpeakerForm = ({
                 sx={{
                   width: 100,
                   height: 100,
-                  bgcolor: imagePreview ? 'transparent' : '#e0e0e0',
+                  bgcolor: imagePreview ? 'transparent' : colors.bgCool,
+                  border: `1px solid ${colors.border}`,
                 }}
                 src={imagePreview}
-                alt="Profile preview"
+                alt={`${formData.name || 'Virtual speaker'} profile preview`}
               >
                 {!imagePreview && <InsertPhotoRoundedIcon sx={{ fontSize: 40 }} />}
               </Avatar>
@@ -200,6 +212,7 @@ const VirtualSpeakerForm = ({
                   variant="outlined"
                   size="small"
                   component="span"
+                  sx={{ minHeight: 40, borderRadius: `${radii.field}px` }}
                 >
                   Upload Image
                 </Button>
@@ -260,16 +273,30 @@ const VirtualSpeakerForm = ({
         </Box>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose} disabled={submitting}>
+      <DialogActions
+        sx={{
+          p: 2,
+          pt: 1,
+          gap: 1,
+          flexDirection: { xs: 'column-reverse', sm: 'row' },
+          '& .MuiButton-root': { minHeight: 44, width: { xs: '100%', sm: 'auto' } },
+        }}
+      >
+        <Button onClick={onClose} disabled={submitting} sx={{ borderRadius: `${radii.field}px` }}>
           Cancel
         </Button>
         <Button
           onClick={handleSubmit}
           variant="contained"
           disabled={submitting}
+          sx={{ borderRadius: `${radii.field}px` }}
         >
-          {submitting ? <CircularProgress size={24} /> : 'Save'}
+          {submitting ? (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <CircularProgress size={18} color="inherit" />
+              <span>Saving...</span>
+            </Stack>
+          ) : 'Save'}
         </Button>
       </DialogActions>
     </Dialog>

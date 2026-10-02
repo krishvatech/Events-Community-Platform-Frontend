@@ -887,14 +887,16 @@ function SectionCard({ title, action, children, sx }) {
     <Card
       variant="outlined"
       sx={{
-        borderRadius: 2,
+        borderRadius: "var(--imaa-radius-card)",
+        borderColor: "var(--imaa-border)",
         width: "100%",
+        minWidth: 0,
         mx: { xs: "auto", md: 0 },
         ...sx,
       }}
     >
       <CardHeader
-        title={<Typography variant="h6" sx={{ fontWeight: 600 }}>{title}</Typography>}
+        title={<Typography component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)" }}>{title}</Typography>}
         action={action}
         sx={{ pb: 0.5, "& .MuiCardHeader-action": { alignSelf: "center" } }}
       />
@@ -980,7 +982,8 @@ function SectionSkeleton({ minHeight = 140, lines = 3 }) {
     <Card
       variant="outlined"
       sx={{
-        borderRadius: 2,
+        borderRadius: "var(--imaa-radius-card)",
+        borderColor: "var(--imaa-border)",
         width: "100%",
         minHeight,
         display: "flex",
@@ -1345,6 +1348,7 @@ function NameChangeDialog({ open, onClose, currentNames, showToast }) {
 
 export default function AdminSettings() {
   const [loading, setLoading] = React.useState(true);
+  const [loadError, setLoadError] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [toast, setToast] = React.useState({
     open: false,
@@ -2658,6 +2662,7 @@ export default function AdminSettings() {
   // ---------- LOADERS ----------
   const load = React.useCallback(async () => {
     setLoading(true);
+    setLoadError("");
     try {
       const data = await fetchAdminProfile();
       const prof = data?.profile || {};
@@ -2681,7 +2686,11 @@ export default function AdminSettings() {
         kyc_status: prof.kyc_status || "not_started",
         legal_name_locked: !!prof.legal_name_locked,
       });
-    } catch (e) { showNotification("error", e?.message || "Load failed"); } finally { setLoading(false); }
+    } catch (e) {
+      const message = e?.message || "Load failed";
+      setLoadError(message);
+      showNotification("error", message);
+    } finally { setLoading(false); }
   }, []);
 
   const loadExtras = React.useCallback(async () => {
@@ -2912,12 +2921,16 @@ export default function AdminSettings() {
 
   // ---------- RENDER ----------
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
-      {isOwner ? (
-        <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 } }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", width: "100%", minWidth: 0, overflow: "hidden" }}>
+      {loadError ? (
+        <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, sm: 3 } }}>
+          <Alert severity="error" role="alert" sx={{ borderRadius: "var(--imaa-radius-card)" }}>{loadError}</Alert>
+        </Container>
+      ) : isOwner ? (
+        <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, sm: 3 } }}>
           {loading ? (
             // 🔹 OWNER SKELETON
-            (<Stack spacing={3}>
+            (<Stack spacing={3} role="status" aria-live="polite" aria-label="Loading admin settings">
               {/* Title skeleton */}
               <Skeleton variant="text" width="55%" height={32} />
               {/* Main profile card skeleton */}
@@ -2934,17 +2947,17 @@ export default function AdminSettings() {
             </Stack>)
           ) : (
             <Stack spacing={3}>
-              <Box><Typography variant="h5" sx={{ fontWeight: 800, mb: 0.5, letterSpacing: 0.2 }}>Admin Settings</Typography><Typography variant="body2" sx={{ color: "text.secondary" }}>Update how you appear as an admin across the community.</Typography></Box>
-              <Card variant="outlined" sx={{ borderRadius: 3, borderColor: "divider", boxShadow: { xs: "none", md: "0 18px 45px rgba(15,23,42,0.08)" } }}>
+              <Box><Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)", mb: 0.5, letterSpacing: 0.2 }}>Admin Settings</Typography><Typography variant="body2" sx={{ color: "text.secondary" }}>Update how you appear as an admin across the community.</Typography></Box>
+              <Card variant="outlined" sx={{ borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", boxShadow: "var(--imaa-shadow-sm)" }}>
                 <CardContent sx={{ p: { xs: 2.5, sm: 3 } }}>
                   <Grid container spacing={{ xs: 3, md: 4 }} alignItems="flex-start">
                     <Grid item xs={12} md={4}>
                       <Stack spacing={2} alignItems="center" sx={{ width: "100%" }}>
                         <Box sx={{ position: "relative", width: 112, height: 112, borderRadius: "50%", border: "3px solid", borderColor: "primary.light", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "grey.50" }}>
-                          <Avatar src={avatarUrl || undefined} sx={{ width: 104, height: 104, fontSize: 34, bgcolor: "primary.main" }}>{(profile.full_name || "A").charAt(0).toUpperCase()}</Avatar>
+                          <Avatar src={avatarUrl || undefined} alt={profile.full_name || "Admin profile"} sx={{ width: 104, height: 104, fontSize: 34, bgcolor: "primary.main" }}>{(profile.full_name || "A").charAt(0).toUpperCase()}</Avatar>
                         </Box>
                         <input ref={fileRef} hidden type="file" accept="image/*" onChange={onFileChange} />
-                        <Button size="small" variant="outlined" fullWidth startIcon={<UploadRoundedIcon />} onClick={onPickFile} disabled={loading || saving} sx={{ borderRadius: 999, textTransform: "none" }}>Change photo</Button>
+                        <Button size="small" variant="outlined" fullWidth startIcon={<UploadRoundedIcon />} onClick={onPickFile} disabled={loading || saving} sx={{ borderRadius: "var(--imaa-radius-field)", minHeight: 40, textTransform: "none", fontWeight: 700 }}>Change photo</Button>
                         <Typography variant="caption" sx={{ color: "text.secondary", textAlign: "center" }}>Recommended: square image, at least 400×400px.</Typography>
                       </Stack>
                     </Grid>
@@ -2959,8 +2972,8 @@ export default function AdminSettings() {
                   </Grid>
                   <Divider sx={{ my: 3 }} />
                   <Stack direction={{ xs: "column", sm: "row" }} justifyContent="flex-end" spacing={1.5}>
-                    <Button variant="text" startIcon={<RefreshRoundedIcon />} onClick={load} disabled={loading || saving} sx={{ textTransform: "none" }}>Reset</Button>
-                    <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={onSave} disabled={saving || loading} sx={{ textTransform: "none", minWidth: 140 }}>Save changes</Button>
+                    <Button variant="text" startIcon={<RefreshRoundedIcon />} onClick={load} disabled={loading || saving} sx={{ textTransform: "none", minHeight: 44, fontWeight: 700 }}>Reset</Button>
+                    <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={onSave} disabled={saving || loading} sx={{ textTransform: "none", minWidth: 140, minHeight: 44, fontWeight: 700 }}>Save changes</Button>
                   </Stack>
                 </CardContent>
               </Card>
@@ -2969,13 +2982,13 @@ export default function AdminSettings() {
         </Container>
       ) : (
         // STAFF VIEW
-        (<Container maxWidth="lg" sx={{ py: 4 }}>
-          <Typography variant="h5" sx={{ fontWeight: 700, mb: 2 }}>Profile</Typography>
+        (<Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
+          <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)", mb: 2 }}>Profile</Typography>
           {loading ? (
             // 🔹 STAFF SKELETON
-            (<Stack spacing={2.5}>
+            (<Stack spacing={2.5} role="status" aria-live="polite" aria-label="Loading profile settings">
               {/* Top strip skeleton */}
-              <Card variant="outlined" sx={{ mb: 1.5, borderRadius: 3 }}>
+              <Card variant="outlined" sx={{ mb: 1.5, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)" }}>
                 <Box
                   sx={{
                     display: "flex",
@@ -3012,11 +3025,11 @@ export default function AdminSettings() {
             </Stack>)
           ) : (
             <>
-              <Card variant="outlined" sx={{ mb: 2.5, borderRadius: 3 }}>
-                <Box sx={{ display: "flex", alignItems: "center", px: { xs: 2, md: 3 }, py: { xs: 1.5, md: 2 } }}>
+              <Card variant="outlined" sx={{ mb: 2.5, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", boxShadow: "var(--imaa-shadow-sm)" }}>
+                <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, gap: { xs: 1.5, sm: 0 }, px: { xs: 2, md: 3 }, py: { xs: 1.5, md: 2 } }}>
                   <Box sx={{ position: "relative", display: "inline-flex", mr: 2 }}>
-                    <Avatar src={avatarUrl || undefined} sx={{ width: 56, height: 56, bgcolor: "grey.300", fontSize: 24 }}>{displayName.charAt(0).toUpperCase()}</Avatar>
-                    <IconButton size="small" onClick={openAvatarDialog} sx={{ position: "absolute", bottom: -4, right: -4, width: 26, height: 26, bgcolor: "background.paper", borderRadius: "50%", border: "1px solid", borderColor: "divider", boxShadow: 1, "&:hover": { bgcolor: "grey.100" } }}>
+                    <Avatar src={avatarUrl || undefined} alt={displayName || "Profile"} sx={{ width: 56, height: 56, bgcolor: "grey.300", fontSize: 24 }}>{displayName.charAt(0).toUpperCase()}</Avatar>
+                    <IconButton size="small" onClick={openAvatarDialog} aria-label={`Change photo for ${displayName}`} sx={{ position: "absolute", bottom: -4, right: -4, width: 40, height: 40, bgcolor: "background.paper", borderRadius: "50%", border: "1px solid", borderColor: "divider", boxShadow: 1, "&:hover": { bgcolor: "grey.100" } }}>
                       {avatarUrl ? <EditOutlinedIcon sx={{ fontSize: 16 }} /> : <PhotoCameraRoundedIcon sx={{ fontSize: 16 }} />}
                     </IconButton>
                   </Box>
@@ -3043,9 +3056,9 @@ export default function AdminSettings() {
                     )}
                   </Box>
                   {/* Edit Identity Trigger */}
-                  <Box sx={{ ml: "auto" }}>
+                  <Box sx={{ ml: { sm: "auto" } }}>
                     <Tooltip title="Identity Details">
-                      <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
+                      <IconButton size="small" onClick={() => setBasicInfoOpen(true)} aria-label="Open identity details" sx={{ minWidth: 40, minHeight: 40 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3059,7 +3072,7 @@ export default function AdminSettings() {
                   <VerificationCard status={profile.kyc_status} onVerify={handleStartKYC} />
                   <SectionCard title="About" action={
                     <Tooltip title="Edit About">
-                      <IconButton size="small" onClick={() => openAbout("description")}>
+                      <IconButton size="small" onClick={() => openAbout("description")} aria-label="Edit About section" sx={{ minWidth: 40, minHeight: 40 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3100,7 +3113,7 @@ export default function AdminSettings() {
 
                   <SectionCard sx={{ mt: 2 }} title="Skills" action={
                     <Tooltip title="Edit Skills">
-                      <IconButton size="small" onClick={() => openAbout("skills")}>
+                      <IconButton size="small" onClick={() => openAbout("skills")} aria-label="Edit Skills section" sx={{ minWidth: 40, minHeight: 40 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3158,7 +3171,7 @@ export default function AdminSettings() {
 
                   <SectionCard sx={{ mt: 2 }} title="Experience" action={
                     <Tooltip title="Add Experience">
-                      <IconButton size="small" onClick={openAddExperience}>
+                      <IconButton size="small" onClick={openAddExperience} aria-label="Add experience" sx={{ minWidth: 40, minHeight: 40 }}>
                         <AddRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3182,7 +3195,7 @@ export default function AdminSettings() {
 
                   <SectionCard sx={{ mt: 2 }} title="Education" action={
                     <Tooltip title="Add Education">
-                      <IconButton size="small" onClick={() => setEduOpen(true)}>
+                      <IconButton size="small" onClick={() => setEduOpen(true)} aria-label="Add education" sx={{ minWidth: 40, minHeight: 40 }}>
                         <AddRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3237,7 +3250,7 @@ export default function AdminSettings() {
                     title="Certifications & Licenses"
                     action={
                       <Tooltip title="Add">
-                        <IconButton size="small" onClick={openAddCert}>
+                        <IconButton size="small" onClick={openAddCert} aria-label="Add certification" sx={{ minWidth: 40, minHeight: 40 }}>
                           <AddRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -3340,7 +3353,7 @@ export default function AdminSettings() {
                     title="Memberships"
                     action={
                       <Tooltip title="Add">
-                        <IconButton size="small" onClick={openAddMember}>
+                        <IconButton size="small" onClick={openAddMember} aria-label="Add membership" sx={{ minWidth: 40, minHeight: 40 }}>
                           <AddRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -3441,7 +3454,7 @@ export default function AdminSettings() {
                 <Grid item xs={12} lg={6}>
                   <SectionCard title="E-Mail" action={
                     <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => openContactEditor("emails")}>
+                      <IconButton size="small" onClick={() => openContactEditor("emails")} aria-label="Edit email addresses" sx={{ minWidth: 40, minHeight: 40 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3492,7 +3505,7 @@ export default function AdminSettings() {
 
                   <SectionCard sx={{ mt: 2 }} title="Phone Numbers" action={
                     <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => openContactEditor("phones")}>
+                      <IconButton size="small" onClick={() => openContactEditor("phones")} aria-label="Edit phone numbers" sx={{ minWidth: 40, minHeight: 40 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3527,7 +3540,7 @@ export default function AdminSettings() {
 
                   <SectionCard sx={{ mt: 2 }} title={socialTitle} action={
                     <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => openContactEditor("socials")}>
+                      <IconButton size="small" onClick={() => openContactEditor("socials")} aria-label="Edit social profiles" sx={{ minWidth: 40, minHeight: 40 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3558,7 +3571,7 @@ export default function AdminSettings() {
 
                   <SectionCard sx={{ mt: 2 }} title="Websites" action={
                     <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => openContactEditor("websites")}>
+                      <IconButton size="small" onClick={() => openContactEditor("websites")} aria-label="Edit websites" sx={{ minWidth: 40, minHeight: 40 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3600,7 +3613,7 @@ export default function AdminSettings() {
 
                   <SectionCard sx={{ mt: 2 }} title="Scheduling Link" action={
                     <Tooltip title="Edit">
-                      <IconButton size="small" onClick={() => openContactEditor("scheduler")}>
+                      <IconButton size="small" onClick={() => openContactEditor("scheduler")} aria-label="Edit scheduling link" sx={{ minWidth: 40, minHeight: 40 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -3642,7 +3655,7 @@ export default function AdminSettings() {
                     title="Location"
                     action={
                       <Tooltip title="Edit Location">
-                        <IconButton size="small" onClick={openLocation}>
+                        <IconButton size="small" onClick={openLocation} aria-label="Edit location" sx={{ minWidth: 40, minHeight: 40 }}>
                           <EditRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -3667,7 +3680,7 @@ export default function AdminSettings() {
                     title="Trainings & Executive Education"
                     action={
                       <Tooltip title="Add">
-                        <IconButton size="small" onClick={openAddTraining}>
+                        <IconButton size="small" onClick={openAddTraining} aria-label="Add training" sx={{ minWidth: 40, minHeight: 40 }}>
                           <AddRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -3786,7 +3799,7 @@ export default function AdminSettings() {
                     title="Languages"
                     action={
                       <Tooltip title="Add Language">
-                        <IconButton size="small" onClick={openAddLanguage}>
+                        <IconButton size="small" onClick={openAddLanguage} aria-label="Add language" sx={{ minWidth: 40, minHeight: 40 }}>
                           <AddRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -4241,7 +4254,11 @@ export default function AdminSettings() {
                         </TextField>
                       </Grid>
                       <Grid item xs={1} sm={1}>
-                        <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
+                        <IconButton
+                          onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}
+                          aria-label={`Remove email ${item.email || idx + 1}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
+                        >
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
                       </Grid>
@@ -4342,7 +4359,11 @@ export default function AdminSettings() {
                         />
                       </Grid>
                       <Grid item xs={4} sm={1}>
-                        <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
+                        <IconButton
+                          onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}
+                          aria-label={`Remove phone ${item.number || idx + 1}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
+                        >
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
                       </Grid>
@@ -4490,7 +4511,11 @@ export default function AdminSettings() {
                         </TextField>
                       </Grid>
                       <Grid item xs={5} sm={1}>
-                        <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
+                        <IconButton
+                          onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}
+                          aria-label={`Remove website ${item.label || idx + 1}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
+                        >
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
                       </Grid>
@@ -4656,6 +4681,8 @@ export default function AdminSettings() {
                         edge="end"
                         size="small"
                         onClick={() => handleAskDeleteDoc(doc)}
+                        aria-label={`Delete document ${doc.filename || doc.id}`}
+                        sx={{ minWidth: 40, minHeight: 40 }}
                       >
                         <DeleteOutlineIcon fontSize="small" color="error" />
                       </IconButton>

@@ -26,6 +26,7 @@ import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import { apiClient, listAdminUsers, patchAdminUser, patchStaff, bulkSetStaff, createAdminUser, createAdminUserWithPassword, updateAdminUser, deactivateAdminUser, restoreAdminUser, mergeAdminUsers, getSaleorStaffList, addUserToSaleorStaff, removeUserFromSaleorStaff, getMarketingAccessUsers, addUserToMarketing, removeUserFromMarketing } from "../utils/api";
 import { useLocation, useNavigate, useParams } from "#navigation";
 import { resetMarketingStatusCache } from "../hooks/useMarketingAccess";
+import AdminTableShell from "../components/admin/AdminTableShell.jsx";
 
 
 // Simple Dialog for Creating/Editing Users/staff (Invitation only)
@@ -93,8 +94,8 @@ function UserDialog({ open, onClose, mode, initialData, onSave, loading }) {
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth aria-labelledby="admin-user-dialog-title">
+            <DialogTitle id="admin-user-dialog-title">
                 {mode === "create" ? "Invite New User" : "Edit User"}
             </DialogTitle>
             <DialogContent dividers>
@@ -160,7 +161,7 @@ function UserDialog({ open, onClose, mode, initialData, onSave, loading }) {
             <DialogActions>
                 <Button onClick={onClose} disabled={loading}>Cancel</Button>
                 <Button onClick={handleSubmit} variant="contained" disabled={loading}>
-                    {loading ? <CircularProgress size={24} /> : (mode === "create" ? "Send Invitation" : "Save Changes")}
+                    {loading ? <CircularProgress size={24} aria-label={mode === "create" ? "Sending invitation" : "Saving changes"} /> : (mode === "create" ? "Send Invitation" : "Save Changes")}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -241,8 +242,8 @@ function ManualUserDialog({ open, onClose, onSave, loading }) {
     };
 
     return (
-        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>Create User with Password</DialogTitle>
+        <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth aria-labelledby="manual-user-dialog-title">
+            <DialogTitle id="manual-user-dialog-title">Create User with Password</DialogTitle>
             <DialogContent dividers>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                 <Stack spacing={2}>
@@ -319,7 +320,7 @@ function ManualUserDialog({ open, onClose, onSave, loading }) {
             <DialogActions>
                 <Button onClick={onClose} disabled={loading}>Cancel</Button>
                 <Button onClick={handleSubmit} variant="contained" disabled={loading}>
-                    {loading ? <CircularProgress size={24} /> : "Create User"}
+                    {loading ? <CircularProgress size={24} aria-label="Creating user" /> : "Create User"}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -459,7 +460,7 @@ function SaleorStaffTab({ currentUserId }) {
             </Box>
 
             <TableContainer component={Paper} variant="outlined">
-                <Table>
+                <Table aria-label="Saleor staff members" aria-busy={loading || undefined}>
                     <TableHead>
                         <TableRow sx={{ backgroundColor: "#f3f4f6" }}>
                             <TableCell>Superuser</TableCell>
@@ -830,7 +831,7 @@ function MarketingAccessTab({ currentUserId, navigate }) {
             </Box>
 
             <TableContainer component={Paper} variant="outlined">
-                <Table>
+                <Table aria-label="Users with marketing access" aria-busy={loading || undefined}>
                     <TableHead>
                         <TableRow sx={{ backgroundColor: "#f3f4f6" }}>
                             <TableCell>Superuser</TableCell>
@@ -1007,7 +1008,7 @@ export default function AdminStaffPage() {
     if (!canAccessPage) {
         return (
             <Container maxWidth="md" sx={{ py: 6 }}>
-                <Typography variant="h6" align="center">
+                <Typography component="h1" variant="h6" align="center" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)" }}>
                     You do not have access to this page.
                 </Typography>
             </Container>
@@ -1021,6 +1022,7 @@ export default function AdminStaffPage() {
 
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
+    const [loadError, setLoadError] = React.useState("");
     const [q, setQ] = React.useState("");
     const [currentUser, setCurrentUser] = React.useState(null);
 
@@ -1078,6 +1080,7 @@ export default function AdminStaffPage() {
         ) return;
 
         setLoading(true);
+        setLoadError("");
         try {
             const params = {
                 search: q,
@@ -1090,6 +1093,10 @@ export default function AdminStaffPage() {
             const data = await listAdminUsers(params);
             setRows(data.results ?? data);
             setTotalCount(data.count ?? 0);
+        } catch (err) {
+            setRows([]);
+            setTotalCount(0);
+            setLoadError(err.response?.data?.detail || err.message || "Failed to load users.");
         } finally {
             setLoading(false);
         }
@@ -1422,7 +1429,7 @@ export default function AdminStaffPage() {
     const paginatedRows = rows;
 
     return (
-        <Container maxWidth="lg" disableGutters sx={{ py: 3 }}>
+        <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
             <Box className="grid grid-cols-12 gap-6">
                 <Box
                     className="col-span-12"
@@ -1441,13 +1448,13 @@ export default function AdminStaffPage() {
                             gap: 2,
                         }}
                     >
-                        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
+                        <Avatar aria-hidden="true" sx={{ bgcolor: "var(--imaa-teal)" }}>
                             <AdminPanelSettingsRoundedIcon />
                         </Avatar>
 
                         <Box sx={{ flex: 1, minWidth: 0 }}>
-                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5 }}>
-                                <Typography variant="h5" className="font-extrabold">
+                            <Box sx={{ display: "flex", alignItems: "center", gap: 1, mb: 0.5, flexWrap: "wrap" }}>
+                                <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)", overflowWrap: "anywhere" }}>
                                     {owner ? "Users Management" : "User Profile Access"}
                                 </Typography>
                                 {!loading && (
@@ -1455,7 +1462,7 @@ export default function AdminStaffPage() {
                                         label={`${totalCount} Registered users`}
                                         size="small"
                                         variant="outlined"
-                                        sx={{ borderColor: "#0ea5a4", color: "#0ea5a4" }}
+                                        sx={{ borderColor: "var(--imaa-teal)", color: "var(--imaa-teal-hover)", fontWeight: 700 }}
                                     />
                                 )}
                             </Box>
@@ -1484,7 +1491,7 @@ export default function AdminStaffPage() {
                                             color="primary"
                                             startIcon={<AddIcon />}
                                             onClick={handleOpenManualCreate}
-                                            sx={{ borderRadius: 8, textTransform: "none" }}
+                                            sx={{ borderRadius: "var(--imaa-radius-field)", textTransform: "none", minHeight: 44, fontWeight: 700 }}
                                         >
                                             Create User
                                         </Button>
@@ -1493,7 +1500,7 @@ export default function AdminStaffPage() {
                                             color="primary"
                                             startIcon={<AddIcon />}
                                             onClick={handleOpenCreate}
-                                            sx={{ borderRadius: 8, textTransform: "none" }}
+                                            sx={{ borderRadius: "var(--imaa-radius-field)", textTransform: "none", minHeight: 44, fontWeight: 700 }}
                                         >
                                             Invite User
                                         </Button>
@@ -1506,6 +1513,7 @@ export default function AdminStaffPage() {
                     {userTypeFilter !== "saleor-staff" && userTypeFilter !== "marketing-access" && (
                         <TextField
                             size="small"
+                            label="Search users"
                             placeholder="Search users..."
                             value={q}
                             onChange={(e) => setQ(e.target.value)}
@@ -1516,14 +1524,18 @@ export default function AdminStaffPage() {
                                     </InputAdornment>
                                 ),
                             }}
-                            sx={{ mb: 2, width: { xs: "100%", md: 360 } }}
+                            sx={{ mb: 2, width: { xs: "100%", md: 360 }, bgcolor: "background.paper" }}
                         />
                     )}
 
                     <Tabs
                         value={userTypeFilter}
                         onChange={(_, newValue) => setUserTypeFilter(newValue)}
-                        sx={{ mb: 2, borderBottom: `1px solid #e5e7eb` }}
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        allowScrollButtonsMobile
+                        aria-label="User type filters"
+                        sx={{ mb: 2, borderBottom: "1px solid var(--imaa-border)", minWidth: 0 }}
                     >
                         <Tab label="All Users" value="all" />
                         <Tab label="Superuser" value="superuser" />
@@ -1541,8 +1553,13 @@ export default function AdminStaffPage() {
                         <MarketingAccessTab currentUserId={currentUser?.id} navigate={navigate} />
                     ) : userTypeFilter !== "duplicates" ? (
                         <Box>
+                            {loadError && (
+                                <Alert severity="error" role="alert" sx={{ mb: 2, borderRadius: "var(--imaa-radius-card)" }}>
+                                    {loadError}
+                                </Alert>
+                            )}
                             {/* Bulk Delete Action Bar */}
-                            {userTypeFilter !== "deleted" && selected.size >= 2 && (
+                            {!loadError && userTypeFilter !== "deleted" && selected.size >= 2 && (
                                 <Box sx={{
                                     display: "flex",
                                     alignItems: "center",
@@ -1581,8 +1598,8 @@ export default function AdminStaffPage() {
                                 </Box>
                             )}
 
-                            <TableContainer component={Paper} variant="outlined">
-                            <Table>
+                            {!loadError && <AdminTableShell minWidth={900}>
+                            <Table aria-label="Users" aria-busy={loading || undefined}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell padding="checkbox">
@@ -1591,6 +1608,7 @@ export default function AdminStaffPage() {
                                             indeterminate={selected.size > 0 && selected.size < paginatedRows.length}
                                             onChange={handleSelectAll}
                                             disabled={paginatedRows.length === 0}
+                                            inputProps={{ "aria-label": "Select all users on this page" }}
                                         />
                                     </TableCell>
                                     <TableCell>User</TableCell>
@@ -1627,6 +1645,7 @@ export default function AdminStaffPage() {
                                                     checked={selected.has(u.id)}
                                                     onChange={() => handleSelectRow(u.id)}
                                                     disabled={isCurrentUserRow(u) || u.profile?.profile_status === "deleted"}
+                                                    inputProps={{ "aria-label": `Select ${u.email || u.username || "user"}` }}
                                                 />
                                             </TableCell>
 
@@ -1637,7 +1656,16 @@ export default function AdminStaffPage() {
                                                     spacing={2}
                                                     alignItems="center"
                                                     onClick={() => window.open(`/community/rich-profile/${u.id}`, "_blank", "noopener,noreferrer")}
-                                                    sx={{ cursor: "pointer" }}
+                                                    onKeyDown={(event) => {
+                                                        if (event.key === "Enter" || event.key === " ") {
+                                                            event.preventDefault();
+                                                            window.open(`/community/rich-profile/${u.id}`, "_blank", "noopener,noreferrer");
+                                                        }
+                                                    }}
+                                                    role="link"
+                                                    tabIndex={0}
+                                                    aria-label={`View profile for ${u.first_name || u.username || u.email || "user"}`}
+                                                    sx={{ cursor: "pointer", borderRadius: "var(--imaa-radius-field)", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
                                                 >
                                                     <Avatar
                                                         src={u.avatar_url}
@@ -1697,6 +1725,7 @@ export default function AdminStaffPage() {
                                                             checked={Boolean(u.can_edit_profiles ?? u.profile?.can_edit_profiles)}
                                                             onChange={(e) => handleToggleEditProfiles(u, e.target.checked)}
                                                             disabled={toggleBusyId === u.id}
+                                                            inputProps={{ "aria-label": `Allow ${u.email || u.username || "user"} to edit profiles` }}
                                                         />
                                                     )}
                                                 </TableCell>
@@ -1728,6 +1757,8 @@ export default function AdminStaffPage() {
                                                                         color="success"
                                                                         onClick={() => handleRestoreUser(u)}
                                                                         disabled={!owner || restoreBusyId === u.id}
+                                                                        aria-label={`Restore user access for ${u.email || u.username || "user"}`}
+                                                                        sx={{ minWidth: 40, minHeight: 40 }}
                                                                     >
                                                                         {restoreBusyId === u.id
                                                                             ? <CircularProgress size={18} />
@@ -1743,6 +1774,8 @@ export default function AdminStaffPage() {
                                                                     size="small" 
                                                                     onClick={() => handleOpenEdit(u)}
                                                                     disabled={!owner || isCurrentUserRow(u)}
+                                                                    aria-label={`Edit details for ${u.email || u.username || "user"}`}
+                                                                    sx={{ minWidth: 40, minHeight: 40 }}
                                                                 >
                                                                     <EditIcon fontSize="small" />
                                                                 </IconButton>
@@ -1754,6 +1787,8 @@ export default function AdminStaffPage() {
                                                                     size="small"
                                                                     color="primary"
                                                                     onClick={() => navigate(`/admin/users/${u.id}/edit-profile`)}
+                                                                    aria-label={`Edit profile for ${u.email || u.username || "user"}`}
+                                                                    sx={{ minWidth: 40, minHeight: 40 }}
                                                                 >
                                                                     <ManageAccountsIcon fontSize="small" />
                                                                 </IconButton>
@@ -1764,6 +1799,8 @@ export default function AdminStaffPage() {
                                                                 <IconButton
                                                                     size="small"
                                                                     onClick={() => window.open(`/community/rich-profile/${u.id}`, "_blank", "noopener,noreferrer")}
+                                                                    aria-label={`View profile for ${u.email || u.username || "user"}`}
+                                                                    sx={{ minWidth: 40, minHeight: 40 }}
                                                                 >
                                                                     <OpenInNewIcon fontSize="small" />
                                                                 </IconButton>
@@ -1776,6 +1813,8 @@ export default function AdminStaffPage() {
                                                                     color="success"
                                                                     onClick={() => handleConnectWithUser(u)}
                                                                     disabled={connectingUserId === u.id || isCurrentUserRow(u)}
+                                                                    aria-label={`Connect with ${u.email || u.username || "user"}`}
+                                                                    sx={{ minWidth: 40, minHeight: 40 }}
                                                                 >
                                                                     <PersonAddIcon fontSize="small" />
                                                                 </IconButton>
@@ -1788,6 +1827,8 @@ export default function AdminStaffPage() {
                                                                     color="error"
                                                                     onClick={() => confirmDeleteUser(u)}
                                                                     disabled={!owner || isCurrentUserRow(u)}
+                                                                    aria-label={`Deactivate ${u.email || u.username || "user"} across platforms`}
+                                                                    sx={{ minWidth: 40, minHeight: 40 }}
                                                                 >
                                                                     <DeleteIcon fontSize="small" />
                                                                 </IconButton>
@@ -1809,10 +1850,10 @@ export default function AdminStaffPage() {
                                 )}
                             </TableBody>
                         </Table>
-                            </TableContainer>
+                            </AdminTableShell>}
 
                             {/* Pagination control */}
-                            {totalCount > PAGE_SIZE && (
+                            {!loadError && totalCount > PAGE_SIZE && (
                                 <Box mt={2} display="flex" justifyContent="flex-end">
                                     <Pagination
                                         count={totalPages}
@@ -1820,6 +1861,7 @@ export default function AdminStaffPage() {
                                         onChange={(_, value) => setPage(value)}
                                         color="primary"
                                         size="small"
+                                        aria-label="User pages"
                                     />
                                 </Box>
                             )}
@@ -1828,7 +1870,7 @@ export default function AdminStaffPage() {
                         <Box>
                             {/* Duplicates Tab View */}
                             {dupLoading ? (
-                                <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
+                                <Box role="status" aria-label="Loading duplicate accounts" sx={{ display: "flex", justifyContent: "center", py: 4 }}>
                                     <CircularProgress />
                                 </Box>
                             ) : dupGroups.length === 0 ? (
@@ -1837,7 +1879,7 @@ export default function AdminStaffPage() {
                                 </Alert>
                             ) : (
                                 <TableContainer component={Paper} variant="outlined">
-                                    <Table>
+                                    <Table aria-label="Duplicate accounts">
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell>Email</TableCell>

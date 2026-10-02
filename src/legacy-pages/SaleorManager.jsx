@@ -13,7 +13,6 @@ import {
   TableRow,
   TableCell,
   Chip,
-  Skeleton,
   Alert,
   IconButton,
   Dialog,
@@ -47,10 +46,11 @@ import {
 } from "../utils/api";
 import { isOwnerUser } from "../utils/adminRole";
 import InvoiceSettingsTab from "../components/saleor/InvoiceSettingsTab";
+import AdminTableShell from "../components/admin/AdminTableShell.jsx";
+import AdminStatusChip from "../components/admin/AdminStatusChip.jsx";
 
-const ORANGE = "#E8532F";
-const TEXT = "#2C3E5A";
-const BG_GRADIENT = "linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)";
+const ORANGE = "var(--imaa-teal-hover)";
+const TEXT = "var(--imaa-ink)";
 const INVOICE_SETTINGS_TAB = 6;
 const SALEOR_PERMISSION_OPTIONS = [
   "MANAGE_USERS",
@@ -1465,8 +1465,9 @@ export default function SaleorManager() {
 
   if (!isOwnerUser()) {
     return (
-      <Container maxWidth="lg" sx={{ py: 4 }}>
-        <Paper sx={{ p: 3, textAlign: "center" }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 } }}>
+        <Paper sx={{ p: 3, textAlign: "center", borderRadius: "var(--imaa-radius-card)", border: "1px solid var(--imaa-border)" }}>
+          <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: TEXT, mb: 2 }}>Saleor Manager</Typography>
           <Alert severity="error">Permission Denied: Only platform_admin can access this page.</Alert>
         </Paper>
       </Container>
@@ -1475,11 +1476,11 @@ export default function SaleorManager() {
 
   if (checkingSaleorStatus) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
+      <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 } }}>
         <Container maxWidth="sm">
-          <Paper sx={{ p: 4, textAlign: "center", borderRadius: 3 }}>
+          <Paper role="status" aria-live="polite" sx={{ p: 4, textAlign: "center", borderRadius: "var(--imaa-radius-card)", border: "1px solid var(--imaa-border)" }}>
             <CircularProgress sx={{ color: ORANGE, mb: 2 }} />
-            <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
+            <Typography component="h1" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: TEXT }}>
               Checking Saleor SSO status
             </Typography>
           </Paper>
@@ -1490,11 +1491,11 @@ export default function SaleorManager() {
 
   if (!saleorStatus?.connected) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
+      <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 } }}>
         <Container maxWidth="sm">
-          <Paper sx={{ p: 4, textAlign: "center", borderRadius: 3, border: "1px solid #e5e7eb" }}>
+          <Paper sx={{ p: { xs: 3, sm: 4 }, textAlign: "center", borderRadius: "var(--imaa-radius-card)", border: "1px solid var(--imaa-border)" }}>
             <ShoppingCartIcon sx={{ fontSize: 42, color: ORANGE, mb: 2 }} />
-            <Typography variant="h5" sx={{ fontWeight: 800, color: TEXT, mb: 1 }}>
+            <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: TEXT, mb: 1 }}>
               Saleor SSO connection required
             </Typography>
             <Typography sx={{ color: "#6b7280", mb: 3 }}>
@@ -1513,11 +1514,12 @@ export default function SaleorManager() {
               sx={{
                 bgcolor: ORANGE,
                 color: "white",
-                borderRadius: "12px",
+                borderRadius: "var(--imaa-radius-field)",
+                minHeight: 44,
                 px: 3,
                 textTransform: "none",
                 fontWeight: 700,
-                "&:hover": { bgcolor: "#c94324" },
+                "&:hover": { bgcolor: "var(--imaa-ink)" },
               }}
             >
               Connect Saleor SSO
@@ -1530,9 +1532,10 @@ export default function SaleorManager() {
 
   if (saleorStatus?.enabled === false) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
+      <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 } }}>
         <Container maxWidth="sm">
-          <Alert severity="warning" sx={{ borderRadius: 3 }}>
+          <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: TEXT, mb: 2 }}>Saleor Manager</Typography>
+          <Alert severity="warning" sx={{ borderRadius: "var(--imaa-radius-card)" }}>
             Saleor integration is currently disabled. Contact your administrator to enable it.
           </Alert>
         </Container>
@@ -1542,9 +1545,10 @@ export default function SaleorManager() {
 
   if (!saleorStatus?.can_manage_staff) {
     return (
-      <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
+      <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 } }}>
         <Container maxWidth="sm">
-          <Alert severity="error" sx={{ borderRadius: 3 }}>
+          <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: TEXT, mb: 2 }}>Saleor Manager</Typography>
+          <Alert severity="error" sx={{ borderRadius: "var(--imaa-radius-card)" }}>
             Connected Saleor account does not have MANAGE_STAFF permission.
           </Alert>
         </Container>
@@ -1553,17 +1557,17 @@ export default function SaleorManager() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f3f4f6", py: 4 }}>
-      <Container maxWidth="lg">
+    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 }, width: "100%", minWidth: 0, overflowX: "hidden" }}>
+      <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3 }, minWidth: 0 }}>
         {/* Header Section */}
         <Paper
           elevation={0}
           sx={{
-            p: 2,
+            p: { xs: 2, sm: 2.5 },
             mb: 3,
-            borderRadius: 3,
+            borderRadius: "var(--imaa-radius-card)",
             background: "white",
-            border: "1px solid #e5e7eb",
+            border: "1px solid var(--imaa-border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -1571,13 +1575,13 @@ export default function SaleorManager() {
             gap: 1.5,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0 }}>
             <Box
               sx={{
                 width: 40,
                 height: 40,
-                borderRadius: "12px",
-                bgcolor: "rgba(232, 83, 47, 0.1)",
+                borderRadius: "var(--imaa-radius-card)",
+                bgcolor: "var(--imaa-teal-light)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -1585,8 +1589,8 @@ export default function SaleorManager() {
             >
               <ShoppingCartIcon sx={{ fontSize: 24, color: ORANGE }} />
             </Box>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: TEXT, letterSpacing: "-0.5px" }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: TEXT, letterSpacing: "-0.5px" }}>
                 Saleor Manager
               </Typography>
               <Typography variant="caption" sx={{ color: "#6b7280", display: "block" }}>
@@ -1594,7 +1598,7 @@ export default function SaleorManager() {
               </Typography>
             </Box>
           </Box>
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2, flexWrap: "wrap" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", width: { xs: "100%", md: "auto" } }}>
             <Typography variant="caption" sx={{ color: "#6b7280" }}>
               Connected as: {saleorStatus.saleor_email}
             </Typography>
@@ -1607,7 +1611,8 @@ export default function SaleorManager() {
                 sx={{
                   bgcolor: TEXT,
                   color: "white",
-                  borderRadius: "12px",
+                  borderRadius: "var(--imaa-radius-field)",
+                  minHeight: 40,
                   px: 3,
                   textTransform: "none",
                   fontWeight: 600,
@@ -1623,7 +1628,8 @@ export default function SaleorManager() {
               onClick={handleOpenSaleorDashboard}
               disabled={!saleorDashboardUrl}
               sx={{
-                borderRadius: "12px",
+                borderRadius: "var(--imaa-radius-field)",
+                minHeight: 40,
                 textTransform: "none",
                 borderColor: "#e5e7eb",
                 color: TEXT,
@@ -1636,7 +1642,8 @@ export default function SaleorManager() {
               variant="text"
               onClick={handleDisconnectSaleor}
               sx={{
-                borderRadius: "12px",
+                borderRadius: "var(--imaa-radius-field)",
+                minHeight: 40,
                 textTransform: "none",
                 color: "#b91c1c",
                 fontWeight: 600,
@@ -1648,19 +1655,20 @@ export default function SaleorManager() {
         </Paper>
 
         {error && (
-          <Alert severity="error" sx={{ mb: 3, borderRadius: "12px" }} onClose={() => setError(null)}>
+          <Alert severity="error" sx={{ mb: 3, borderRadius: "var(--imaa-radius-card)" }} onClose={() => setError(null)}>
             {error}
           </Alert>
         )}
 
         {/* Content Area */}
-        <Paper elevation={0} sx={{ borderRadius: 4, overflow: "hidden", border: "1px solid #e5e7eb", bgcolor: "white" }}>
+        <Paper elevation={0} sx={{ borderRadius: "var(--imaa-radius-card)", overflow: "visible", border: "1px solid var(--imaa-border)", bgcolor: "white", minWidth: 0, boxShadow: "var(--imaa-shadow-sm)" }}>
           <Tabs
             value={tab}
             onChange={handleTabChange}
             variant="scrollable"
             scrollButtons="auto"
             allowScrollButtonsMobile
+            aria-label="Saleor management sections"
             sx={{
               px: 2,
               pt: 2,
@@ -1690,12 +1698,12 @@ export default function SaleorManager() {
             <Tab label="Invoice Settings" />
           </Tabs>
 
-          <Box sx={{ p: 4 }}>
+          <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, minWidth: 0 }}>
             {tab === INVOICE_SETTINGS_TAB ? (
               <InvoiceSettingsTab />
             ) : (
               <>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3 }}>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, flexDirection: { xs: "column", sm: "row" }, gap: 1.5, mb: 3 }}>
               <Typography variant="h6" sx={{ fontWeight: 700, color: TEXT }}>
                 {tab === 0 ? "Active Channels" : tab === 1 ? "Warehouse Nodes" : tab === 2 ? "Shipping Policy Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
               </Typography>
@@ -1724,14 +1732,14 @@ export default function SaleorManager() {
               */}
             </Box>
 
-            {loading ? (
-              <Box sx={{ py: 2 }}>
-                {[1, 2, 3, 4].map(i => (
-                  <Skeleton key={i} variant="rectangular" height={70} sx={{ mb: 2, borderRadius: 2 }} />
-                ))}
-              </Box>
-            ) : (
-              <Table>
+            <AdminTableShell
+              loading={loading}
+              loadingLabel="Loading Saleor records"
+              loadingRows={4}
+              minWidth={860}
+              sx={{ border: 0, borderRadius: 0, boxShadow: "none", minWidth: 0 }}
+            >
+              <Table aria-label={`${tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : tab === 2 ? "Shipping zones" : tab === 3 ? "Product types" : tab === 4 ? "Staff users" : "Permission groups"} table`}>
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#f9fafb" }}>
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
@@ -1812,28 +1820,12 @@ export default function SaleorManager() {
                             sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }}
                           />
                         ) : tab !== 3 ? (
-                          <Chip
-                            label={item.is_active ? "Active" : "Inactive"}
-                            size="small"
-                            sx={{
-                              fontWeight: 600,
-                              bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                              color: item.is_active ? "#059669" : "#4b5563",
-                            }}
-                          />
+                          <AdminStatusChip status={item.is_active ? "active" : "inactive"} />
                         ) : null}
                       </TableCell>
                       {tab !== 3 && tab !== 4 && tab !== 5 && (
                         <TableCell>
-                          <Chip
-                            label={item.is_active ? "Active" : "Inactive"}
-                            size="small"
-                            sx={{
-                              fontWeight: 600,
-                              bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                              color: item.is_active ? "#059669" : "#4b5563",
-                            }}
-                          />
+                          <AdminStatusChip status={item.is_active ? "active" : "inactive"} />
                           {item.is_default && (
                             <Chip label="Default" size="small" color="primary" sx={{ ml: 1, height: 20, fontSize: "0.65rem" }} />
                           )}
@@ -1842,14 +1834,9 @@ export default function SaleorManager() {
                       {tab !== 5 && (
                         <TableCell>
                           {tab === 3 ? (
-                          <Chip
+                          <AdminStatusChip
+                            status={item.is_shipping_required ? "active" : "inactive"}
                             label={item.is_shipping_required ? "Shippable" : "Not shippable"}
-                            size="small"
-                            sx={{
-                              fontWeight: 600,
-                              bgcolor: item.is_shipping_required ? "rgba(34, 197, 94, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                              color: item.is_shipping_required ? "#22c55e" : "#4b5563",
-                            }}
                           />
                         ) : tab === 4 ? (
                           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
@@ -1862,15 +1849,7 @@ export default function SaleorManager() {
                               inputProps={{ "aria-label": `Set ${item.email} active status` }}
                             />
                             */}
-                            <Chip
-                              label={item.is_active ? "Active" : "Inactive"}
-                              size="small"
-                              sx={{
-                                fontWeight: 600,
-                                bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                                color: item.is_active ? "#059669" : "#4b5563",
-                              }}
-                            />
+                            <AdminStatusChip status={item.is_active ? "active" : "inactive"} />
                           </Box>
                         ) : (
                           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
@@ -1991,7 +1970,7 @@ export default function SaleorManager() {
                   )}
                 </TableBody>
               </Table>
-            )}
+            </AdminTableShell>
               </>
             )}
           </Box>
@@ -2254,7 +2233,7 @@ export default function SaleorManager() {
               px: 3,
               pt: 3,
               pb: 2.5,
-              background: "linear-gradient(180deg, #fff7ed 0%, #ffffff 72%)",
+              bgcolor: "var(--imaa-bg-cool)",
             }}
           >
             <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>

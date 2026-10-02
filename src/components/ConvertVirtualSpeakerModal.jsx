@@ -15,6 +15,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { convertVirtualSpeaker } from '../services/virtualSpeakerService';
+import { colors, radii } from '../styles/designTokens';
 
 const ConvertVirtualSpeakerModal = ({
   open,
@@ -88,13 +89,25 @@ const ConvertVirtualSpeakerModal = ({
       onClose={onClose}
       maxWidth="sm"
       fullWidth
+      aria-labelledby="convert-virtual-speaker-title"
+      PaperProps={{ sx: { borderRadius: `${radii.popup}px`, m: 2 } }}
     >
-      <DialogTitle>Convert Virtual Speaker to User Account</DialogTitle>
+      <DialogTitle id="convert-virtual-speaker-title" sx={{ color: colors.navy, fontWeight: 700 }}>
+        Convert Virtual Speaker to User Account
+      </DialogTitle>
 
-      <DialogContent>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 2 }}>
+      <DialogContent sx={{ bgcolor: colors.white }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 2,
+            mt: 2,
+            '& .MuiOutlinedInput-root': { borderRadius: `${radii.field}px` },
+          }}
+        >
           {/* Speaker Info */}
-          <Box>
+          <Box sx={{ p: 2, border: `1px solid ${colors.border}`, borderRadius: `${radii.card}px`, bgcolor: colors.bgCool }}>
             <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
               Speaker Name:
             </Typography>
@@ -138,8 +151,16 @@ const ConvertVirtualSpeakerModal = ({
         </Box>
       </DialogContent>
 
-      <DialogActions>
-        <Button onClick={onClose} disabled={submitting}>
+      <DialogActions
+        sx={{
+          p: 2,
+          pt: 1,
+          gap: 1,
+          flexDirection: { xs: 'column-reverse', sm: 'row' },
+          '& .MuiButton-root': { minHeight: 44, width: { xs: '100%', sm: 'auto' } },
+        }}
+      >
+        <Button onClick={onClose} disabled={submitting} sx={{ borderRadius: `${radii.field}px` }}>
           Cancel
         </Button>
         <Button
@@ -147,8 +168,14 @@ const ConvertVirtualSpeakerModal = ({
           variant="contained"
           color="primary"
           disabled={submitting}
+          sx={{ borderRadius: `${radii.field}px` }}
         >
-          {submitting ? <CircularProgress size={24} /> : 'Convert'}
+          {submitting ? (
+            <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+              <CircularProgress size={18} color="inherit" />
+              <span>Converting...</span>
+            </Box>
+          ) : 'Convert'}
         </Button>
       </DialogActions>
     </Dialog>

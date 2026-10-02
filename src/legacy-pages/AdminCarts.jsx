@@ -30,12 +30,15 @@ import {
   Skeleton,
   Avatar,
   ListItemAvatar,
+  Alert,
 } from "@mui/material";
 import CloseOutlinedIcon from "@mui/icons-material/CloseOutlined";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 
 import { API_BASE, getToken } from "../utils/api.js";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js";
+import AdminStatusChip from "../components/admin/AdminStatusChip.jsx";
+import AdminEmptyState from "../components/admin/AdminEmptyState.jsx";
 
 // --- shared helpers (copied from MyCartPage) ---
 const authHeaders = () => {
@@ -155,7 +158,7 @@ export default function AdminCarts() {
             p: 3,
           }}
         >
-          <Typography variant="h6" color="error" sx={{ fontWeight: 700 }}>
+          <Typography component="h1" variant="h6" color="error" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700 }}>
             You don&apos;t have permission to view this page.
           </Typography>
           <Typography sx={{ mt: 1, color: "text.secondary" }}>
@@ -172,6 +175,8 @@ export default function AdminCarts() {
   const [couponCode, setCouponCode] = useState("");
   const [discount, setDiscount] = useState(0);
   const [showPaid, setShowPaid] = useState(false);
+  const [cartLoading, setCartLoading] = useState(true);
+  const [cartError, setCartError] = useState("");
 
   const [orders, setOrders] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -185,6 +190,7 @@ export default function AdminCarts() {
   useEffect(() => {
     (async () => {
       try {
+        setCartError("");
         const res = await fetch(`${API_BASE}/cart/`, {
           headers: authHeaders(),
         });
@@ -205,6 +211,9 @@ export default function AdminCarts() {
         setCart([]);
         setSubtotal(0);
         setTotal(0);
+        setCartError("Failed to load cart.");
+      } finally {
+        setCartLoading(false);
       }
     })();
   }, []);
@@ -350,18 +359,19 @@ export default function AdminCarts() {
 
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
       <Box
         sx={{
           mb: 3,
           display: "flex",
-          alignItems: "center",
+          alignItems: { xs: "flex-start", sm: "center" },
           gap: 2,
+          minWidth: 0,
         }}
       >
         <Avatar
           sx={{
-            bgcolor: "#14b8a6",      // teal circle like your screenshot
+            bgcolor: "var(--imaa-teal)",
             width: 40,
             height: 40,
             fontWeight: 700,
@@ -369,8 +379,8 @@ export default function AdminCarts() {
         >
           C
         </Avatar>
-        <Box>
-          <Typography variant="h6" sx={{ fontWeight: 800 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: "var(--imaa-ink)" }}>
             Staff Cart
           </Typography>
           <Typography sx={{ color: "text.secondary", mt: 0.25 }}>
@@ -384,6 +394,10 @@ export default function AdminCarts() {
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
+          aria-label="Staff cart sections"
           sx={{
             ".MuiTab-root": { textTransform: "none", fontWeight: 600 },
           }}
@@ -400,27 +414,30 @@ export default function AdminCarts() {
             <Paper
               elevation={0}
               sx={{
-                borderRadius: 3,
-                border: "1px solid #e5e7eb",
+                borderRadius: "var(--imaa-radius-card)",
+                border: "1px solid var(--imaa-border)",
                 overflow: "hidden",
+                minWidth: 0,
+                boxShadow: "var(--imaa-shadow-sm)",
               }}
             >
-              {viewItems.length === 0 ? (
-                <Box sx={{ p: 6, textAlign: "center" }}>
-                  <Typography
-                    variant="h6"
-                    sx={{ fontWeight: 600, color: "text.primary" }}
-                  >
-                    Your cart is empty
-                  </Typography>
-                  <Typography sx={{ mt: 1, color: "text.secondary" }}>
-                    Add items from the events section to see them here.
-                  </Typography>
+              {cartLoading ? (
+                <Box role="status" aria-label="Loading cart" sx={{ p: 2.5 }}>
+                  {[1, 2, 3].map((row) => <Skeleton key={row} variant="rounded" height={44} sx={{ mb: row === 3 ? 0 : 1 }} />)}
                 </Box>
+              ) : cartError ? (
+                <Alert severity="error" role="alert" sx={{ m: 2 }}>{cartError}</Alert>
+              ) : viewItems.length === 0 ? (
+                <AdminEmptyState
+                  compact
+                  title="Your cart is empty"
+                  description="Add items from the events section to see them here."
+                  sx={{ border: 0, borderRadius: 0 }}
+                />
               ) : (
                 <>
-                  <Box sx={{ width: "100%", overflowX: "auto" }}>
-                    <Table sx={{ minWidth: 600 }} size="small">
+                  <Box sx={{ width: "100%", maxWidth: "100%", overflowX: "auto" }}>
+                    <Table sx={{ minWidth: 600 }} size="small" aria-label="Cart items">
                       <TableHead>
                         <TableRow>
                           <TableCell />
@@ -445,7 +462,8 @@ export default function AdminCarts() {
                               <IconButton
                                 size="small"
                                 onClick={() => removeItem(it.id)}
-                                aria-label="remove"
+                                aria-label={`Remove ${it.title} from cart`}
+                                sx={{ minWidth: 40, minHeight: 40 }}
                               >
                                 <CloseOutlinedIcon />
                               </IconButton>
@@ -460,7 +478,7 @@ export default function AdminCarts() {
                                 onChange={(e) =>
                                   updateQty(it.id, e.target.value)
                                 }
-                                inputProps={{ min: 1 }}
+                                inputProps={{ min: 1, "aria-label": `Quantity for ${it.title}` }}
                               />
                             </TableCell>
                             <TableCell sx={{ fontWeight: 600 }}>
@@ -486,12 +504,12 @@ export default function AdminCarts() {
                       size="small"
                       value={couponCode}
                       onChange={(e) => setCouponCode(e.target.value)}
-                      sx={{ maxWidth: 260 }}
+                      sx={{ width: { xs: "100%", sm: "auto" }, maxWidth: { sm: 260 } }}
                     />
                     <Button
                       onClick={applyCoupon}
                       variant="outlined"
-                      sx={{ textTransform: "none" }}
+                      sx={{ textTransform: "none", minHeight: 40 }}
                     >
                       Apply
                     </Button>
@@ -499,7 +517,7 @@ export default function AdminCarts() {
                     <Button
                       onClick={refreshCart}
                       variant="outlined"
-                      sx={{ textTransform: "none" }}
+                      sx={{ textTransform: "none", minHeight: 40 }}
                     >
                       Refresh cart
                     </Button>
@@ -515,9 +533,10 @@ export default function AdminCarts() {
               <Paper
                 elevation={0}
                 sx={{
-                  borderRadius: 3,
-                  border: "1px solid #e5e7eb",
-                  p: 3,
+                  borderRadius: "var(--imaa-radius-card)",
+                  border: "1px solid var(--imaa-border)",
+                  p: { xs: 2, sm: 3 },
+                  boxShadow: "var(--imaa-shadow-sm)",
                 }}
               >
                 <Typography
@@ -528,8 +547,8 @@ export default function AdminCarts() {
                 </Typography>
                 <Box
                   sx={{
-                    borderRadius: 2,
-                    border: "1px solid #e5e7eb",
+                    borderRadius: "var(--imaa-radius-card)",
+                    border: "1px solid var(--imaa-border)",
                     overflow: "hidden",
                   }}
                 >
@@ -539,7 +558,7 @@ export default function AdminCarts() {
                       py: 1.5,
                       display: "flex",
                       justifyContent: "space-between",
-                      borderBottom: "1px solid #e5e7eb",
+                      borderBottom: "1px solid var(--imaa-border)",
                     }}
                   >
                     <span>Subtotal</span>
@@ -553,7 +572,7 @@ export default function AdminCarts() {
                         py: 1.5,
                         display: "flex",
                         justifyContent: "space-between",
-                        borderBottom: "1px solid #e5e7eb",
+                        borderBottom: "1px solid var(--imaa-border)",
                       }}
                     >
                       <span className="flex items-center gap-2">
@@ -563,7 +582,7 @@ export default function AdminCarts() {
                       <span
                         style={{
                           fontWeight: 600,
-                          color: "#0f766e",
+                          color: "var(--imaa-teal-hover)",
                         }}
                       >
                         −{fmt(discount)}
@@ -592,6 +611,7 @@ export default function AdminCarts() {
                     mt: 2.5,
                     textTransform: "none",
                     py: 1.1,
+                    minHeight: 44,
                   }}
                   variant="contained"
                 >
@@ -608,17 +628,21 @@ export default function AdminCarts() {
           <Paper
             elevation={0}
             sx={{
-              borderRadius: 3,
-              border: "1px solid #e5e7eb",
-              p: 3,
+              borderRadius: "var(--imaa-radius-card)",
+              border: "1px solid var(--imaa-border)",
+              p: { xs: 2, sm: 3 },
+              minWidth: 0,
+              boxShadow: "var(--imaa-shadow-sm)",
             }}
           >
             <Box
               sx={{
                 display: "flex",
-                alignItems: "center",
+                alignItems: { xs: "flex-start", sm: "center" },
                 justifyContent: "space-between",
                 mb: 2,
+                gap: 1,
+                flexDirection: { xs: "column", sm: "row" },
               }}
             >
               <Typography variant="h6" sx={{ fontWeight: 800 }}>
@@ -628,8 +652,8 @@ export default function AdminCarts() {
             </Box>
 
             {ordersLoading && (
-              <Box sx={{ width: "100%", overflowX: "auto" }}>
-                <Table size="small" sx={{ minWidth: 600 }}>
+              <Box role="status" aria-label="Loading previous orders" sx={{ width: "100%", maxWidth: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 600 }} aria-label="Loading previous orders">
                   <TableHead>
                     <TableRow>
                       <TableCell>Order</TableCell>
@@ -665,20 +689,16 @@ export default function AdminCarts() {
             )}
 
             {!ordersLoading && ordersError && (
-              <Typography variant="body2" color="error">
-                {ordersError}
-              </Typography>
+              <Alert severity="error" role="alert">{ordersError}</Alert>
             )}
 
             {!ordersLoading && !ordersError && viewOrders.length === 0 && (
-              <Typography variant="body2" color="text.secondary">
-                No paid orders yet.
-              </Typography>
+              <AdminEmptyState compact title="No paid orders yet." sx={{ border: 0, p: 0 }} />
             )}
 
             {!ordersLoading && !ordersError && viewOrders.length > 0 && (
-              <Box sx={{ width: "100%", overflowX: "auto" }}>
-                <Table size="small" sx={{ minWidth: 600 }}>
+              <Box sx={{ width: "100%", maxWidth: "100%", overflowX: "auto" }}>
+                <Table size="small" sx={{ minWidth: 600 }} aria-label="Previous orders">
                   <TableHead>
                     <TableRow>
                       <TableCell>Order</TableCell>
@@ -693,8 +713,16 @@ export default function AdminCarts() {
                       <TableRow
                         key={o.id}
                         hover
-                        sx={{ cursor: "pointer" }}
+                        tabIndex={0}
+                        aria-label={`Open order ${o.number}`}
+                        sx={{ cursor: "pointer", "&:focus-visible": { outline: "2px solid var(--imaa-teal)", outlineOffset: -2 } }}
                         onClick={() => handleOrderClick(o)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            handleOrderClick(o);
+                          }
+                        }}
                       >
                         <TableCell>#{o.number}</TableCell>
                         <TableCell>
@@ -709,10 +737,9 @@ export default function AdminCarts() {
                           {fmt(o.total)}
                         </TableCell>
                         <TableCell align="right">
-                          <Chip
+                          <AdminStatusChip
+                            status={o.status || "paid"}
                             label={String(o.status || "paid").toUpperCase()}
-                            size="small"
-                            variant="outlined"
                             color={
                               o.status === "cancelled"
                                 ? "default"
@@ -736,8 +763,9 @@ export default function AdminCarts() {
         onClose={closeOrderDialog}
         fullWidth
         maxWidth="sm"
+        aria-labelledby="admin-order-details-title"
       >
-        <DialogTitle>
+        <DialogTitle id="admin-order-details-title">
           {selectedOrder ? `Order #${selectedOrder.number}` : "Order details"}
         </DialogTitle>
         <DialogContent dividers>

@@ -13,8 +13,8 @@ import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import { apiClient } from "../../utils/api";
 
-const ORANGE = "#E8532F";
-const TEXT = "#2C3E5A";
+const ORANGE = "var(--imaa-teal-hover)";
+const TEXT = "var(--imaa-ink)";
 const ENDPOINT = "/invoicing/admin/legal-entity/";
 
 const EMPTY_SETTINGS = {
@@ -86,8 +86,8 @@ function SectionTitle({ icon, title, subtitle }) {
         sx={{
           width: 38,
           height: 38,
-          borderRadius: "11px",
-          bgcolor: "rgba(232, 83, 47, 0.1)",
+          borderRadius: "var(--imaa-radius-card)",
+          bgcolor: "var(--imaa-teal-light)",
           color: ORANGE,
           display: "grid",
           placeItems: "center",
@@ -191,7 +191,7 @@ export default function InvoiceSettingsTab() {
 
   if (loading) {
     return (
-      <Box sx={{ minHeight: 360, display: "grid", placeItems: "center" }}>
+      <Box role="status" aria-live="polite" aria-label="Loading invoice settings" sx={{ minHeight: 360, display: "grid", placeItems: "center" }}>
         <Box sx={{ textAlign: "center" }}>
           <CircularProgress sx={{ color: ORANGE }} />
           <Typography sx={{ mt: 2, color: "#64748b" }}>Loading invoice settings…</Typography>
@@ -203,7 +203,7 @@ export default function InvoiceSettingsTab() {
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h6" sx={{ color: TEXT, fontWeight: 800 }}>
+        <Typography component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", color: TEXT, fontWeight: 800 }}>
           Invoice Settings
         </Typography>
         <Typography variant="body2" sx={{ color: "#64748b", mt: 0.5 }}>
@@ -212,16 +212,16 @@ export default function InvoiceSettingsTab() {
       </Box>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3, borderRadius: "12px" }} onClose={() => setError("")}>
+        <Alert severity="error" sx={{ mb: 3, borderRadius: "var(--imaa-radius-card)" }} onClose={() => setError("")}>
           {error}
         </Alert>
       )}
       {success && (
-        <Alert severity="success" sx={{ mb: 3, borderRadius: "12px" }} onClose={() => setSuccess("")}>
+        <Alert severity="success" sx={{ mb: 3, borderRadius: "var(--imaa-radius-card)" }} onClose={() => setSuccess("")}>
           {success}
         </Alert>
       )}
-      <Alert severity="info" sx={{ mb: 3, borderRadius: "12px" }}>
+      <Alert severity="info" sx={{ mb: 3, borderRadius: "var(--imaa-radius-card)" }}>
         Existing PDF files are not changed automatically. These details are used when a new invoice PDF is generated or an invoice PDF is explicitly regenerated.
       </Alert>
 
@@ -234,7 +234,7 @@ export default function InvoiceSettingsTab() {
         }}
       >
         <Box sx={{ display: "grid", gap: 3 }}>
-          <Paper variant="outlined" sx={{ p: { xs: 2.5, md: 3 }, borderRadius: 3, borderColor: "#e2e8f0" }}>
+          <Paper variant="outlined" sx={{ p: { xs: 2, sm: 2.5, md: 3 }, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", minWidth: 0 }}>
             <SectionTitle
               icon={<ReceiptLongOutlinedIcon fontSize="small" />}
               title="Invoice From"
@@ -297,13 +297,13 @@ export default function InvoiceSettingsTab() {
             </Box>
           </Paper>
 
-          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, flexWrap: "wrap" }}>
+          <Box sx={{ display: "flex", justifyContent: "flex-end", gap: 1.5, flexWrap: "wrap", flexDirection: { xs: "column-reverse", sm: "row" } }}>
             <Button
               variant="outlined"
               startIcon={<RestartAltOutlinedIcon />}
               onClick={handleReset}
               disabled={!dirty || saving}
-              sx={{ borderRadius: "10px", textTransform: "none", fontWeight: 700, color: TEXT, borderColor: "#cbd5e1" }}
+              sx={{ borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontWeight: 700, color: TEXT, borderColor: "var(--imaa-border)", minHeight: 44 }}
             >
               Reset Unsaved Changes
             </Button>
@@ -314,10 +314,11 @@ export default function InvoiceSettingsTab() {
               disabled={saving || !dirty || !settings.name.trim() || !settings.legal_form.trim() || !settings.address.trim() || settings.country.length !== 2 || settings.currency.length !== 3}
               sx={{
                 bgcolor: TEXT,
-                borderRadius: "10px",
+                borderRadius: "var(--imaa-radius-field)",
                 textTransform: "none",
                 fontWeight: 700,
                 px: 3,
+                minHeight: 44,
                 "&:hover": { bgcolor: "#1a253a" },
               }}
             >
@@ -330,11 +331,12 @@ export default function InvoiceSettingsTab() {
           variant="outlined"
           sx={{
             p: { xs: 2.5, md: 3 },
-            borderRadius: 3,
-            borderColor: "#dbe3ef",
+            borderRadius: "var(--imaa-radius-card)",
+            borderColor: "var(--imaa-border)",
             position: { lg: "sticky" },
             top: { lg: 24 },
             overflow: "hidden",
+            minWidth: 0,
           }}
         >
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>

@@ -15,18 +15,19 @@ import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
   TextField,
-  Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import AdminEmptyState from "../admin/AdminEmptyState.jsx";
+import AdminTableShell from "../admin/AdminTableShell.jsx";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
 import { totalPagesFor } from "../../services/blogService";
 import { blogPrimaryButtonSx } from "./blogTheme";
+import { colors, focus, radii, shadows } from "../../styles/designTokens";
 
 /**
  * Lightweight list/create/edit manager for a flat Blog taxonomy (categories or
@@ -126,22 +127,39 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
   const totalPages = totalPagesFor(count);
 
   return (
-    <Box>
-      <Paper sx={{ p: 2, mb: 2, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+    <Box sx={{ minWidth: 0 }}>
+      <Paper
+        component="section"
+        aria-label={`${plural} search and actions`}
+        variant="outlined"
+        sx={{
+          p: { xs: 1.5, sm: 2 },
+          mb: 2,
+          display: "grid",
+          gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(240px, 1fr) auto" },
+          gap: 1.5,
+          alignItems: "center",
+          borderColor: colors.border,
+          borderRadius: `${radii.card}px`,
+          boxShadow: shadows.sm,
+        }}
+      >
         <TextField
           size="small"
+          label={`Search ${plural.toLowerCase()}`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder={`Search ${plural.toLowerCase()}`}
           inputProps={{ "aria-label": `Search ${plural.toLowerCase()}` }}
           InputProps={{ startAdornment: <SearchRoundedIcon sx={{ mr: 1, color: "grey.500" }} /> }}
-          sx={{ minWidth: { xs: "100%", sm: 240 } }}
+          fullWidth
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } }}
         />
         <Button
           variant="contained"
           startIcon={<AddRoundedIcon />}
           onClick={openCreate}
-          sx={{ ml: { sm: "auto" }, ...blogPrimaryButtonSx }}
+          sx={{ width: { xs: "100%", sm: "auto" }, minHeight: 40, ...blogPrimaryButtonSx, borderRadius: `${radii.field}px` }}
         >
           New {singular}
         </Button>
@@ -163,16 +181,18 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
           <CircularProgress aria-label={`Loading ${plural.toLowerCase()}`} />
         </Box>
       ) : rows.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: "center" }}>
-          <Typography color="text.secondary">
-            {debouncedSearch ? `No ${plural.toLowerCase()} match your search.` : `No ${plural.toLowerCase()} yet.`}
-          </Typography>
-        </Paper>
+        <AdminEmptyState
+          title={debouncedSearch ? `No ${plural.toLowerCase()} match your search.` : `No ${plural.toLowerCase()} yet.`}
+          titleComponent="h2"
+          compact
+          icon={<SearchRoundedIcon />}
+          sx={{ boxShadow: shadows.sm }}
+        />
       ) : (
-        <TableContainer component={Paper} sx={{ borderRadius: 2, overflowX: "auto" }}>
+        <AdminTableShell minWidth={560} sx={{ boxShadow: shadows.sm }}>
           <Table size="small" aria-label={plural}>
             <TableHead>
-              <TableRow sx={{ bgcolor: "grey.50" }}>
+              <TableRow>
                 <TableCell sx={{ fontWeight: 800 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 800 }}>Slug</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
@@ -184,7 +204,12 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
                   <TableCell sx={{ overflowWrap: "anywhere" }}>{row.name}</TableCell>
                   <TableCell sx={{ color: "text.secondary", overflowWrap: "anywhere" }}>{row.slug}</TableCell>
                   <TableCell align="right">
-                    <IconButton size="small" onClick={() => openEdit(row)} aria-label={`Edit ${singular.toLowerCase()} ${row.name}`}>
+                    <IconButton
+                      size="small"
+                      onClick={() => openEdit(row)}
+                      aria-label={`Edit ${singular.toLowerCase()} ${row.name}`}
+                      sx={{ minWidth: 40, minHeight: 40, borderRadius: `${radii.field}px`, "&:focus-visible": { outline: `${focus.width}px solid ${focus.color}`, outlineOffset: focus.offset } }}
+                    >
                       <EditRoundedIcon fontSize="small" />
                     </IconButton>
                   </TableCell>
@@ -192,17 +217,17 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
               ))}
             </TableBody>
           </Table>
-        </TableContainer>
+        </AdminTableShell>
       )}
 
       {totalPages > 1 && (
-        <Stack sx={{ mt: 2, alignItems: "center" }}>
-          <Pagination count={totalPages} page={page} onChange={(_e, value) => setPage(value)} color="primary" />
+        <Stack sx={{ mt: 2, alignItems: "center", overflowX: "auto", pb: 0.5 }}>
+          <Pagination count={totalPages} page={page} onChange={(_e, value) => setPage(value)} color="primary" sx={{ minWidth: "max-content" }} />
         </Stack>
       )}
 
-      <Dialog open={Boolean(dialog)} onClose={closeDialog} maxWidth="xs" fullWidth>
-        <DialogTitle>{dialog?.id ? `Edit ${singular}` : `New ${singular}`}</DialogTitle>
+      <Dialog open={Boolean(dialog)} onClose={closeDialog} maxWidth="xs" fullWidth aria-labelledby="taxonomy-dialog-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
+        <DialogTitle id="taxonomy-dialog-title" sx={{ color: colors.navy, fontWeight: 750 }}>{dialog?.id ? `Edit ${singular}` : `New ${singular}`}</DialogTitle>
         <DialogContent>
           {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
           <TextField
@@ -216,6 +241,7 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
             error={Boolean(fieldErrors.name)}
             helperText={fieldErrors.name}
             inputProps={{ maxLength: 120 }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } }}
           />
           <TextField
             fullWidth
@@ -226,6 +252,7 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
             error={Boolean(fieldErrors.slug)}
             helperText={fieldErrors.slug || (dialog?.id ? "" : "Leave blank to generate from the name.")}
             inputProps={{ maxLength: 140 }}
+            sx={{ "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } }}
           />
         </DialogContent>
         <DialogActions>

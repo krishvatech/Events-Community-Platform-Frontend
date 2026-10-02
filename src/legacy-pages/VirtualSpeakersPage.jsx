@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   TextField,
-  CircularProgress,
   Alert,
   Avatar,
   Typography,
@@ -14,14 +13,11 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Chip,
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
   TableRow,
-  Paper,
 } from '@mui/material';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
@@ -36,6 +32,9 @@ import {
 } from '../services/virtualSpeakerService';
 import VirtualSpeakerForm from '../components/VirtualSpeakerForm';
 import ConvertVirtualSpeakerModal from '../components/ConvertVirtualSpeakerModal';
+import AdminTableShell from '../components/admin/AdminTableShell';
+import AdminStatusChip from '../components/admin/AdminStatusChip';
+import { colors, radii } from '../styles/designTokens';
 
 const VirtualSpeakersPage = () => {
   const navigate = useNavigate();
@@ -53,6 +52,7 @@ const VirtualSpeakersPage = () => {
 
   const [speakers, setSpeakers] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [formOpen, setFormOpen] = useState(false);
   const [editingSpeaker, setEditingSpeaker] = useState(null);
@@ -71,6 +71,7 @@ const VirtualSpeakersPage = () => {
   // Load speakers
   const loadSpeakers = useCallback(async () => {
     setLoading(true);
+    setLoadError('');
     try {
       console.log('Loading virtual speakers for community:', communityId);
       const response = await listVirtualSpeakers(communityId, {
@@ -91,6 +92,7 @@ const VirtualSpeakersPage = () => {
       setSpeakers(speakerList);
     } catch (error) {
       console.error('Load error:', error);
+      setLoadError('Failed to load virtual speakers. Please try again later.');
       toast.error('Failed to load virtual speakers: ' + error.message);
     } finally {
       setLoading(false);
@@ -166,7 +168,7 @@ const VirtualSpeakersPage = () => {
 
   return (
     <>
-    <Box sx={{ p: { xs: 2, md: 3 } }}>
+    <Box sx={{ width: '100%', minWidth: 0, p: { xs: 2, md: 3 } }}>
         {/* Header */}
         <Box
           sx={{
@@ -177,14 +179,14 @@ const VirtualSpeakersPage = () => {
             mb: 3,
           }}
         >
-          <Avatar sx={{ bgcolor: '#0ea5a4' }}>
+          <Avatar sx={{ bgcolor: colors.tealDark }}>
             {(user?.first_name || 'A')[0].toUpperCase()}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700 }}>
+            <Typography component="h1" variant="h5" sx={{ color: colors.navy, fontWeight: 700 }}>
               Virtual Speakers
             </Typography>
-            <Typography sx={{ color: '#64748b' }}>
+            <Typography color="text.secondary">
               Create and manage reusable speaker profiles
             </Typography>
           </Box>
@@ -194,9 +196,11 @@ const VirtualSpeakersPage = () => {
             onClick={handleCreateNew}
             sx={{
               width: { xs: '100%', sm: 'auto' },
+              minHeight: 44,
               textTransform: 'none',
-              backgroundColor: '#10b8a6',
-              '&:hover': { backgroundColor: '#0ea5a4' },
+              borderRadius: `${radii.field}px`,
+              backgroundColor: colors.tealDark,
+              '&:hover': { backgroundColor: colors.navy },
             }}
           >
             Create Speaker
@@ -205,29 +209,37 @@ const VirtualSpeakersPage = () => {
 
         {/* Search */}
         <TextField
+          label="Search speakers by name"
           placeholder="Search speakers by name..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           fullWidth
-          sx={{ mb: 3 }}
+          sx={{
+            mb: 3,
+            maxWidth: 560,
+            '& .MuiOutlinedInput-root': { borderRadius: `${radii.field}px` },
+          }}
           size="small"
         />
 
-        {/* Loading */}
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
-          </Box>
-        ) : filteredSpeakers.length === 0 ? (
-          <Alert severity="info">
-            {searchQuery
-              ? 'No speakers found matching your search'
-              : 'No virtual speakers created yet. Create one to get started!'}
+        {loadError ? (
+          <Alert severity="error" sx={{ borderRadius: `${radii.card}px` }}>
+            {loadError}
           </Alert>
         ) : (
-          <TableContainer component={Paper}>
-            <Table>
-              <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+          <AdminTableShell
+            loading={loading}
+            loadingLabel="Loading virtual speakers"
+            empty={!loading && filteredSpeakers.length === 0}
+            emptyTitle={
+              searchQuery
+                ? 'No speakers found matching your search'
+                : 'No virtual speakers created yet. Create one to get started!'
+            }
+            minWidth={760}
+          >
+            <Table aria-label="Virtual speakers">
+              <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Job Title</TableCell>
@@ -248,12 +260,12 @@ const VirtualSpeakersPage = () => {
                         >
                           {speaker.name.charAt(0)}
                         </Avatar>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        <Box sx={{ minWidth: 0, maxWidth: 300 }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
                             {speaker.name}
                           </Typography>
                           {speaker.bio && (
-                            <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mt: 0.5 }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, overflowWrap: 'anywhere' }}>
                               {speaker.bio.substring(0, 50)}...
                             </Typography>
                           )}
@@ -271,7 +283,8 @@ const VirtualSpeakersPage = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip
+                      <AdminStatusChip
+                        status={speaker.status || 'virtual'}
                         label={
                           speaker.status === 'converted'
                             ? '✓ User Account'
@@ -288,11 +301,13 @@ const VirtualSpeakersPage = () => {
                       )}
                     </TableCell>
                     <TableCell align="right">
-                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                      <Stack direction="row" spacing={0.5} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
                         <IconButton
                           size="small"
                           onClick={() => handleEdit(speaker)}
                           title="Edit"
+                          aria-label={`Edit ${speaker.name}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
                         >
                           <EditRoundedIcon fontSize="small" />
                         </IconButton>
@@ -301,6 +316,8 @@ const VirtualSpeakersPage = () => {
                           color="error"
                           onClick={() => handleDeleteClick(speaker)}
                           title="Delete"
+                          aria-label={`Delete ${speaker.name}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
                         >
                           <DeleteRoundedIcon fontSize="small" />
                         </IconButton>
@@ -311,6 +328,7 @@ const VirtualSpeakersPage = () => {
                             startIcon={<PersonAddRoundedIcon />}
                             onClick={() => handleConvert(speaker)}
                             variant="text"
+                            sx={{ minHeight: 40 }}
                           >
                             Convert
                           </Button>
@@ -319,6 +337,7 @@ const VirtualSpeakersPage = () => {
                             size="small"
                             onClick={() => handleResendInvite(speaker)}
                             variant="text"
+                            sx={{ minHeight: 40 }}
                           >
                             Resend Invite
                           </Button>
@@ -329,7 +348,7 @@ const VirtualSpeakersPage = () => {
                 ))}
               </TableBody>
             </Table>
-          </TableContainer>
+          </AdminTableShell>
         )}
       </Box>
 
@@ -356,14 +375,27 @@ const VirtualSpeakersPage = () => {
       )}
 
       {/* Delete Confirmation */}
-      <Dialog open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
-        <DialogTitle>Delete Virtual Speaker</DialogTitle>
+      <Dialog
+        open={deleteConfirmOpen}
+        onClose={() => setDeleteConfirmOpen(false)}
+        aria-labelledby="delete-virtual-speaker-title"
+        PaperProps={{ sx: { borderRadius: `${radii.popup}px`, m: 2 } }}
+      >
+        <DialogTitle id="delete-virtual-speaker-title">Delete Virtual Speaker</DialogTitle>
         <DialogContent>
           <Typography>
             Are you sure you want to delete "{speakerToDelete?.name}"? This action cannot be undone.
           </Typography>
         </DialogContent>
-        <DialogActions>
+        <DialogActions
+          sx={{
+            p: 2,
+            pt: 1,
+            gap: 1,
+            flexDirection: { xs: 'column-reverse', sm: 'row' },
+            '& .MuiButton-root': { minHeight: 44, width: { xs: '100%', sm: 'auto' } },
+          }}
+        >
           <Button onClick={() => setDeleteConfirmOpen(false)}>Cancel</Button>
           <Button onClick={handleConfirmDelete} color="error" variant="contained">
             Delete

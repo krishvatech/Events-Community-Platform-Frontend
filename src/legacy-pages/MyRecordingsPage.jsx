@@ -2,8 +2,8 @@
 // Attendee view: shows recordings for events the logged-in user registered for.
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Box, Button, Chip, Container, Divider, Grid,
-  Card as MUICard, CardContent, LinearProgress, Paper,
+  Alert, Box, Button, Chip, Container, Divider, Grid,
+  Card as MUICard, CardContent,
   Typography, TextField, InputAdornment, Pagination,
   Select, MenuItem, FormControl, InputLabel, Skeleton
 } from "@mui/material";
@@ -12,8 +12,12 @@ import PlayCircleOutlineRoundedIcon from "@mui/icons-material/PlayCircleOutlineR
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import PlaceIcon from "@mui/icons-material/Place";
+import OndemandVideoRoundedIcon from "@mui/icons-material/OndemandVideoRounded";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import PageHeader from "../components/page/PageHeader.jsx";
+import FilterToolbar from "../components/page/FilterToolbar.jsx";
+import EmptyState from "../components/page/EmptyState.jsx";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
 const API = RAW_API.endsWith("/api") ? RAW_API : `${RAW_API}/api`;
@@ -121,8 +125,15 @@ function RecordingCardSkeleton() {
   return (
     <MUICard
       elevation={0}
-      className="rounded-2xl border border-slate-200 overflow-hidden"
-      sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+      aria-hidden="true"
+      sx={{
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+        border: "1px solid var(--imaa-border)",
+        borderRadius: "var(--imaa-radius-card)",
+      }}
     >
       <Box
         sx={{
@@ -164,7 +175,7 @@ function RecordingCardSkeleton() {
 
 function RecordingsGridSkeleton({ count = 6 }) {
   return (
-    <>
+    <Box role="status" aria-live="polite" aria-label="Loading recordings">
       <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
         {Array.from({ length: count }).map((_, idx) => (
           <Grid key={idx} size={{ xs: 4, sm: 4, md: 4 }}>
@@ -173,10 +184,10 @@ function RecordingsGridSkeleton({ count = 6 }) {
         ))}
       </Grid>
 
-      <Box className="mt-4 flex justify-center">
+      <Box sx={{ mt: 3, display: "flex", justifyContent: "center" }}>
         <Skeleton variant="rounded" width={240} height={40} sx={{ borderRadius: 2 }} />
       </Box>
-    </>
+    </Box>
   );
 }
 
@@ -260,22 +271,18 @@ export default function MyRecordingsPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Container maxWidth="xl" className="py-6 sm:py-8">
+    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", width: "100%", minWidth: 0, overflow: "hidden" }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">
-            <div className="flex items-center justify-between mb-3 sm:mb-4">
-              <div>
-                <Typography variant="h4">My Recordings</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Watch or download recordings from your past events.
-                </Typography>
-              </div>
-            </div>
+            <PageHeader
+              title="My Recordings"
+              subtitle="Watch or download recordings from your past events."
+              sx={{ mb: 3 }}
+            />
 
-            <Paper elevation={0} className="rounded-2xl border border-slate-200 p-3 sm:p-4 mb-3 sm:mb-4">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <FormControl size="small">
+            <FilterToolbar surface aria-label="Recording filters" sx={{ mb: 3 }}>
+                <FormControl size="small" sx={{ minWidth: { xs: "100%", sm: 180 } }}>
                   <InputLabel id="event-type-label">Event Type</InputLabel>
                   <Select labelId="event-type-label" value={eventType} label="Event Type" onChange={(e) => setEventType(e.target.value)}>
                     <MenuItem value="all">All</MenuItem>
@@ -285,21 +292,21 @@ export default function MyRecordingsPage() {
 
                 <TextField
                   size="small"
+                  label="Search recordings"
                   placeholder="Search title, location, date…"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   InputProps={{ startAdornment: <InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment> }}
+                  sx={{ flexGrow: 1, minWidth: { xs: "100%", sm: 280 }, bgcolor: "background.paper" }}
                 />
-                <div />
-              </div>
-            </Paper>
+            </FilterToolbar>
 
             {loading && <RecordingsGridSkeleton count={PER_PAGE} />}
 
             {!loading && error && (
-              <Paper elevation={0} className="rounded-2xl border border-slate-200 p-4">
-                <Typography color="error">⚠️ {error}</Typography>
-              </Paper>
+              <Alert severity="error" role="alert" sx={{ borderRadius: "var(--imaa-radius-card)" }}>
+                {error}
+              </Alert>
             )}
 
             {!loading && !error && filtered.length > 0 && (
@@ -324,19 +331,35 @@ export default function MyRecordingsPage() {
                       >
                         <MUICard
                           elevation={0}
-                          className="rounded-2xl border border-slate-200 overflow-hidden"
                           sx={{
                             height: "100%",
                             display: "flex",
                             flexDirection: "column",
+                            minWidth: 0,
+                            overflow: "hidden",
+                            border: "1px solid var(--imaa-border)",
+                            borderRadius: "var(--imaa-radius-card)",
+                            boxShadow: "var(--imaa-shadow-sm)",
+                            transition: "border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease",
+                            "&:hover": {
+                              borderColor: "var(--imaa-border-hover)",
+                              boxShadow: "var(--imaa-shadow-md)",
+                              transform: "translateY(-2px)",
+                            },
+                            "&:focus-within": {
+                              borderColor: "var(--imaa-teal)",
+                              boxShadow: "var(--imaa-shadow-md)",
+                            },
                           }}
                         >
-                          <div
-                            style={{
+                          <Box
+                            sx={{
                               position: "relative",
                               width: "100%",
-                              aspectRatio: "16/9",
-                              background: canWatch ? "#0b1220" : "#E5E7EB",
+                              aspectRatio: "16 / 9",
+                              overflow: "hidden",
+                              bgcolor: canWatch ? "var(--imaa-navy)" : "var(--imaa-bg-cool)",
+                              borderBottom: "1px solid var(--imaa-border)",
                             }}
                           >
                             {canWatch ? (
@@ -344,12 +367,14 @@ export default function MyRecordingsPage() {
                                 src={resolveRecordingUrl(ev.recording_url)}
                                 controls
                                 onPlay={() => handleTrackReplay(ev.id)}
+                                aria-label={`Recording player: ${ev.title || "Untitled Event"}`}
                                 style={{
                                   position: "absolute",
                                   inset: 0,
                                   width: "100%",
                                   height: "100%",
-                                  objectFit: "cover",
+                                  objectFit: "contain",
+                                  backgroundColor: "var(--imaa-navy)",
                                 }}
                               />
                             ) : (
@@ -368,37 +393,58 @@ export default function MyRecordingsPage() {
                                   gap: 1
                                 }}
                               >
-                                <span>
+                                <OndemandVideoRoundedIcon aria-hidden="true" sx={{ fontSize: 32, color: "var(--imaa-ink-meta)" }} />
+                                <Typography component="span" variant="body2" sx={{ color: "var(--imaa-ink-body)" }}>
                                   {replayState === "available" && "Replay available"}
                                   {replayState === "expired" && "Replay has expired"}
                                   {replayState === "pending_review" && "Replay will be made available soon"}
                                   {replayState === "processing" && "Replay will be made available soon"}
-                                </span>
+                                </Typography>
                               </Box>
                             )}
-                          </div>
+                          </Box>
 
                           <CardContent
                             sx={{
                               display: "flex",
                               flexDirection: "column",
                               flexGrow: 1,
+                              minWidth: 0,
+                              p: { xs: 2, sm: 2.5 },
                             }}
                           >
                             <Typography
                               variant="subtitle1"
-                              className="font-semibold line-clamp-2"
+                              component="h2"
+                              sx={{
+                                fontFamily: "var(--imaa-font-serif)",
+                                fontWeight: 700,
+                                fontSize: "1.125rem",
+                                lineHeight: 1.35,
+                                color: "var(--imaa-ink)",
+                                overflowWrap: "anywhere",
+                                display: "-webkit-box",
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: "vertical",
+                                overflow: "hidden",
+                              }}
                             >
                               {ev.title || "Untitled Event"}
                             </Typography>
 
-                            <Box className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                              <span>{fmtDateRange(ev.start_time, ev.end_time)}</span>
+                            <Box sx={{ mt: 1, display: "flex", alignItems: "flex-start", gap: 1, color: "var(--imaa-ink-body)", minWidth: 0 }}>
+                              <CalendarMonthIcon aria-hidden="true" sx={{ mt: "2px", fontSize: 17, flex: "0 0 auto" }} />
+                              <Typography component="span" variant="body2" sx={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                                {fmtDateRange(ev.start_time, ev.end_time)}
+                              </Typography>
                             </Box>
 
                             {ev.location && (
-                              <Box className="mt-1 flex items-center gap-2 text-sm text-slate-500">
-                                <span className="truncate">{ev.location}</span>
+                              <Box sx={{ mt: 0.75, display: "flex", alignItems: "flex-start", gap: 1, color: "var(--imaa-ink-body)", minWidth: 0 }}>
+                                <PlaceIcon aria-hidden="true" sx={{ mt: "2px", fontSize: 17, flex: "0 0 auto" }} />
+                                <Typography component="span" variant="body2" sx={{ lineHeight: 1.5, overflowWrap: "anywhere" }}>
+                                  {ev.location}
+                                </Typography>
                               </Box>
                             )}
 
@@ -435,7 +481,7 @@ export default function MyRecordingsPage() {
                               </Box>
                             )}
 
-                            <Divider className="my-3" />
+                            <Divider sx={{ mt: "auto", mb: 0, pt: 2, borderColor: "var(--imaa-border)" }} />
 
                             <Box
                               className="flex flex-wrap"
@@ -460,8 +506,13 @@ export default function MyRecordingsPage() {
                                     onClick={() => handleTrackReplay(ev.id)}
                                     sx={{
                                       textTransform: "none",
-                                      borderRadius: 2,
+                                      borderRadius: "var(--imaa-radius-field)",
+                                      minHeight: 44,
+                                      fontWeight: 700,
+                                      bgcolor: "var(--imaa-teal-hover)",
                                       width: { xs: "100%", sm: "auto" },
+                                      "&:hover": { bgcolor: "var(--imaa-navy)" },
+                                      "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" },
                                     }}
                                   >
                                     Watch
@@ -473,8 +524,11 @@ export default function MyRecordingsPage() {
                                     onClick={() => handleDownload(ev.recording_url)}
                                     sx={{
                                       textTransform: "none",
-                                      borderRadius: 2,
+                                      borderRadius: "var(--imaa-radius-field)",
+                                      minHeight: 44,
+                                      fontWeight: 700,
                                       width: { xs: "100%", sm: "auto" },
+                                      "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" },
                                     }}
                                   >
                                     Download
@@ -495,29 +549,31 @@ export default function MyRecordingsPage() {
                   })}
                 </Grid>
 
-                <Box className="mt-4 flex justify-center">
+                <Box sx={{ mt: 3, display: "flex", justifyContent: "center", overflowX: "auto", pb: 0.5 }}>
                   <Pagination
                     count={totalPages}
                     page={page}
                     onChange={(_, v) => setPage(v)}
                     color="primary"
                     shape="rounded"
+                    aria-label="Recording pages"
                   />
                 </Box>
               </>
             )}
 
             {!loading && !error && filtered.length === 0 && (
-              <Paper elevation={0} className="rounded-2xl border border-slate-200 p-8 text-center">
-                <Typography variant="h6" className="font-semibold mb-1">No past events yet</Typography>
-                <Typography variant="body2" color="text.secondary">
-                  You’ll see your past events and their recordings here once you attend them.
-                </Typography>
-              </Paper>
+              <EmptyState
+                icon={<OndemandVideoRoundedIcon />}
+                title={items.length > 0 ? "No recordings found" : "No past events yet"}
+                description={items.length > 0
+                  ? "Try changing your search or event type filter."
+                  : "You’ll see your past events and their recordings here once you attend them."}
+              />
             )}
           </main>
         </div>
       </Container>
-    </div>
+    </Box>
   );
 }

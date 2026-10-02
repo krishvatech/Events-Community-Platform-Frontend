@@ -812,10 +812,10 @@ function SectionCard({ title, action, children, sx }) {
   return (
     <Card
       variant="outlined"
-      sx={{ borderRadius: 2, width: '100%', mx: { xs: 'auto', md: 0 }, ...sx }}
+      sx={{ borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", width: '100%', minWidth: 0, mx: { xs: 'auto', md: 0 }, ...sx }}
     >
       <CardHeader
-        title={<Typography variant="h6" sx={{ fontWeight: 600 }}>{title}</Typography>}
+        title={<Typography component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)" }}>{title}</Typography>}
         action={action}
         sx={{ pb: 0.5, '& .MuiCardHeader-action': { alignSelf: 'center' } }}
       />
@@ -912,7 +912,8 @@ function SectionSkeleton({ minHeight = 140, lines = 3 }) {
     <Card
       variant="outlined"
       sx={{
-        borderRadius: 2,
+        borderRadius: "var(--imaa-radius-card)",
+        borderColor: "var(--imaa-border)",
         width: "100%",
         minHeight,
         display: "flex",
@@ -1301,6 +1302,7 @@ export default function AdminUserProfileEditPage() {
   const [isPublicView, setIsPublicView] = useState(false);
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [snack, setSnack] = useState({ open: false, msg: "", sev: "success" });
@@ -1867,6 +1869,7 @@ export default function AdminUserProfileEditPage() {
     (async () => {
       try {
         setLoading(true);
+        setLoadError("");
         const url = `${API_BASE}/auth/admin/users/${userId}/profile/`;
         const r = await fetch(url, { headers: tokenHeader(), signal: ctrl.signal });
         if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -1913,6 +1916,7 @@ export default function AdminUserProfileEditPage() {
         setFriendCount(Number(data?.contacts_count) || 0);
       } catch (e) {
         if (e?.name === "AbortError") return;
+        setLoadError(e?.message || "Failed to load profile");
         showNotification("error", e?.message || "Failed to load profile");
       } finally {
         if (!alive) return;
@@ -3199,15 +3203,15 @@ export default function AdminUserProfileEditPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", width: "100%", minWidth: 0, overflow: "hidden" }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
         {/* Back Button */}
         <Box sx={{ mb: 2 }}>
           <Button
             variant="outlined"
             color="inherit"
             onClick={() => navigate("/admin/users")}
-            sx={{ textTransform: "none", borderRadius: 1 }}
+            sx={{ textTransform: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 44, "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
           >
             ← Back to Staff Users
           </Button>
@@ -3216,9 +3220,13 @@ export default function AdminUserProfileEditPage() {
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">
             {mode === "preview" && (
-              loading ? (
+              loadError ? (
+                <Alert severity="error" role="alert" sx={{ borderRadius: "var(--imaa-radius-card)" }}>
+                  {loadError}
+                </Alert>
+              ) : loading ? (
                 // ================= SKELETON VIEW (LIKE HOME PAGE) ================
-                (<Box>
+                (<Box role="status" aria-live="polite" aria-label="Loading user profile">
                   {/* Header Skeleton */}
                   <Card
                     variant="outlined"
@@ -3340,7 +3348,7 @@ export default function AdminUserProfileEditPage() {
                       useFlexGap
                       flexWrap="wrap"
                     >
-                      <Typography variant="h5" sx={{ fontWeight: 700 }}>
+                      <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)", overflowWrap: "anywhere" }}>
                         Editing: {fullName}
                       </Typography>
                       {form.kyc_status === "approved" && (
@@ -3359,17 +3367,18 @@ export default function AdminUserProfileEditPage() {
                     </Stack>
                   </Box>
                   {/* --- HEADER CARD (Matching HomePage) --- */}
-                  <Card variant="outlined" sx={{ width: "100%", borderRadius: 3, p: 2, mb: 2 }}>
+                  <Card variant="outlined" sx={{ width: "100%", minWidth: 0, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", p: 2, mb: 2, boxShadow: "var(--imaa-shadow-sm)" }}>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
                       <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
-                        <Avatar src={form.avatar || ""} sx={{ width: 72, height: 72 }}>
+                        <Avatar src={form.avatar || ""} alt={fullName || "User profile"} sx={{ width: 72, height: 72 }}>
                           {(fullName[0] || "").toUpperCase()}
                         </Avatar>
                         <Tooltip title="Change photo">
                           <IconButton
                             size="small"
                             onClick={() => { setAvatarPreview(form.avatar || ""); setAvatarDialogOpen(true); }}
-                            sx={{ position: "absolute", right: -6, bottom: -6, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: 1 }}
+                            aria-label={`Change photo for ${fullName}`}
+                            sx={{ position: "absolute", right: -6, bottom: -6, minWidth: 40, minHeight: 40, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", boxShadow: 1 }}
                           >
                             <PhotoCameraRoundedIcon fontSize="small" />
                           </IconButton>
@@ -3392,13 +3401,13 @@ export default function AdminUserProfileEditPage() {
                       </Box>
 
                       {/* --- EDIT BUTTONS --- */}
-                      <Box sx={{ ml: "auto", display: "flex", alignItems: "center", gap: 1 }}>
+                      <Box sx={{ ml: { sm: "auto" }, width: { xs: "100%", sm: "auto" }, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
                         <Button
                           variant="outlined"
                           size="small"
                           startIcon={<PublicOutlinedIcon />}
                           onClick={() => setIsPublicView(true)}
-                          sx={{ textTransform: "none", borderRadius: 2, mr: 1 }}
+                          sx={{ textTransform: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 40, flexGrow: { xs: 1, sm: 0 } }}
                         >
                           View as Public
                         </Button>
@@ -3407,7 +3416,7 @@ export default function AdminUserProfileEditPage() {
                           size="small"
                           onClick={handleSyncProfile}
                           disabled={syncing}
-                          sx={{ textTransform: "none", borderRadius: 2 }}
+                          sx={{ textTransform: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 40, flexGrow: { xs: 1, sm: 0 } }}
                         >
                           {syncing ? (
                             <>
@@ -3419,7 +3428,7 @@ export default function AdminUserProfileEditPage() {
                           )}
                         </Button>
                         <Tooltip title="Identity Details">
-                          <IconButton size="small" onClick={() => setBasicInfoOpen(true)}>
+                          <IconButton size="small" onClick={() => setBasicInfoOpen(true)} aria-label={`Open identity details for ${fullName}`} sx={{ minWidth: 40, minHeight: 40 }}>
                             <EditRoundedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -3443,7 +3452,7 @@ export default function AdminUserProfileEditPage() {
                         title="About"
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => openEditAbout("description")}>
+                            <IconButton size="small" onClick={() => openEditAbout("description")} aria-label="Edit About section" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3492,7 +3501,7 @@ export default function AdminUserProfileEditPage() {
                         title="Skills"
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => openEditAbout("skills")}>
+                            <IconButton size="small" onClick={() => openEditAbout("skills")} aria-label="Edit Skills section" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3568,7 +3577,7 @@ export default function AdminUserProfileEditPage() {
                         title="Experience"
                         action={
                           <Tooltip title="Add">
-                            <IconButton size="small" onClick={openAddExperience}>
+                            <IconButton size="small" onClick={openAddExperience} aria-label="Add experience" sx={{ minWidth: 40, minHeight: 40 }}>
                               <AddRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3611,7 +3620,7 @@ export default function AdminUserProfileEditPage() {
                         title="Education"
                         action={
                           <Tooltip title="Add">
-                            <IconButton size="small" onClick={() => setEduOpen(true)}>
+                            <IconButton size="small" onClick={() => setEduOpen(true)} aria-label="Add education" sx={{ minWidth: 40, minHeight: 40 }}>
                               <AddRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3660,7 +3669,7 @@ export default function AdminUserProfileEditPage() {
                         title="Certifications & Licenses"
                         action={
                           <Tooltip title="Add">
-                            <IconButton size="small" onClick={openAddCert}>
+                            <IconButton size="small" onClick={openAddCert} aria-label="Add certification" sx={{ minWidth: 40, minHeight: 40 }}>
                               <AddRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3679,6 +3688,8 @@ export default function AdminUserProfileEditPage() {
                                         <IconButton
                                           size="small"
                                           onClick={() => window.open(cert.credential_url, "_blank")}
+                                          aria-label={`View credential for ${cert.certification_name || "certification"}`}
+                                          sx={{ minWidth: 40, minHeight: 40 }}
                                         >
                                           <LinkIcon fontSize="small" />
                                         </IconButton>
@@ -3764,7 +3775,7 @@ export default function AdminUserProfileEditPage() {
                         title="Memberships"
                         action={
                           <Tooltip title="Add">
-                            <IconButton size="small" onClick={openAddMember}>
+                            <IconButton size="small" onClick={openAddMember} aria-label="Add membership" sx={{ minWidth: 40, minHeight: 40 }}>
                               <AddRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3784,6 +3795,8 @@ export default function AdminUserProfileEditPage() {
                                         <IconButton
                                           size="small"
                                           onClick={() => window.open(m.membership_url, "_blank")}
+                                          aria-label={`Open membership link for ${m.organization_name || "membership"}`}
+                                          sx={{ minWidth: 40, minHeight: 40 }}
                                         >
                                           <LinkIcon fontSize="small" />
                                         </IconButton>
@@ -3869,7 +3882,7 @@ export default function AdminUserProfileEditPage() {
                         title="E-Mail"
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => openContactEditor("emails")}>
+                            <IconButton size="small" onClick={() => openContactEditor("emails")} aria-label="Edit email addresses" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3924,7 +3937,7 @@ export default function AdminUserProfileEditPage() {
                         title="Phone Numbers"
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => openContactEditor("phones")}>
+                            <IconButton size="small" onClick={() => openContactEditor("phones")} aria-label="Edit phone numbers" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3963,7 +3976,7 @@ export default function AdminUserProfileEditPage() {
                         title={socialTitle}
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => openContactEditor("socials")}>
+                            <IconButton size="small" onClick={() => openContactEditor("socials")} aria-label="Edit social profiles" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -3998,7 +4011,7 @@ export default function AdminUserProfileEditPage() {
                         title="Websites"
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => openContactEditor("websites")}>
+                            <IconButton size="small" onClick={() => openContactEditor("websites")} aria-label="Edit websites" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -4044,7 +4057,7 @@ export default function AdminUserProfileEditPage() {
                         title="Scheduling Link"
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={() => openContactEditor("scheduler")}>
+                            <IconButton size="small" onClick={() => openContactEditor("scheduler")} aria-label="Edit scheduling link" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -4089,7 +4102,7 @@ export default function AdminUserProfileEditPage() {
                         title="Location"
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={openEditLocation}>
+                            <IconButton size="small" onClick={openEditLocation} aria-label="Edit location" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -4120,7 +4133,7 @@ export default function AdminUserProfileEditPage() {
                         title="Privacy Settings"
                         action={
                           <Tooltip title="Edit">
-                            <IconButton size="small" onClick={openPrivacy}>
+                            <IconButton size="small" onClick={openPrivacy} aria-label="Edit privacy settings" sx={{ minWidth: 40, minHeight: 40 }}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -4260,7 +4273,7 @@ export default function AdminUserProfileEditPage() {
                         title="Trainings & Executive Education"
                         action={
                           <Tooltip title="Add">
-                            <IconButton size="small" onClick={openAddTraining}>
+                            <IconButton size="small" onClick={openAddTraining} aria-label="Add training" sx={{ minWidth: 40, minHeight: 40 }}>
                               <AddRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -4280,6 +4293,8 @@ export default function AdminUserProfileEditPage() {
                                         <IconButton
                                           size="small"
                                           onClick={() => window.open(t.credential_url, "_blank")}
+                                          aria-label={`View credential for ${t.program_title || "training"}`}
+                                          sx={{ minWidth: 40, minHeight: 40 }}
                                         >
                                           <LinkIcon fontSize="small" />
                                         </IconButton>
@@ -4380,7 +4395,7 @@ export default function AdminUserProfileEditPage() {
                         title="Languages"
                         action={
                           <Tooltip title="Add Language">
-                            <IconButton size="small" onClick={openAddLanguage}>
+                            <IconButton size="small" onClick={openAddLanguage} aria-label="Add language" sx={{ minWidth: 40, minHeight: 40 }}>
                               <AddRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -4741,7 +4756,11 @@ export default function AdminUserProfileEditPage() {
                               <VerifiedRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
-                          <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
+                          <IconButton
+                            onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}
+                            aria-label={`Remove email ${item.email || idx + 1}`}
+                            sx={{ minWidth: 40, minHeight: 40 }}
+                          >
                             <DeleteOutlineIcon fontSize="small" />
                           </IconButton>
                         </Box>
@@ -4772,7 +4791,13 @@ export default function AdminUserProfileEditPage() {
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>Phones</Typography>
                 <Stack spacing={1.5} sx={{ mt: 1 }}>
                   {contactForm.phones.map((item, idx) => (
-                    <Stack direction="row" spacing={1} alignItems="center" key={`phone-row-${idx}`} sx={{ width: '100%' }}>
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1}
+                      alignItems={{ xs: 'stretch', sm: 'center' }}
+                      key={`phone-row-${idx}`}
+                      sx={{ width: '100%', minWidth: 0 }}
+                    >
                       <Tooltip title="Set as primary">
                         <Radio
                           size="small"
@@ -4790,7 +4815,7 @@ export default function AdminUserProfileEditPage() {
                         />
                       </Tooltip>
 
-                      <Box sx={{ flex: 1.5, minWidth: '140px' }}>
+                      <Box sx={{ flex: 1.5, minWidth: { xs: 0, sm: '140px' } }}>
                         <PhoneInputWithCountry
                           size="small"
                           label="Number"
@@ -4809,7 +4834,7 @@ export default function AdminUserProfileEditPage() {
                         />
                       </Box>
 
-                      <Box sx={{ flex: 1, minWidth: '100px' }}>
+                      <Box sx={{ flex: 1, minWidth: { xs: 0, sm: '100px' } }}>
                         <TextField
                           select
                           size="small"
@@ -4831,7 +4856,7 @@ export default function AdminUserProfileEditPage() {
                         </TextField>
                       </Box>
 
-                      <Box sx={{ flex: 1, minWidth: '100px' }}>
+                      <Box sx={{ flex: 1, minWidth: { xs: 0, sm: '100px' } }}>
                         <TextField
                           select
                           size="small"
@@ -4853,7 +4878,12 @@ export default function AdminUserProfileEditPage() {
                         </TextField>
                       </Box>
 
-                      <IconButton size="small" onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
+                      <IconButton
+                        size="small"
+                        onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}
+                        aria-label={`Remove phone ${item.number || idx + 1}`}
+                        sx={{ minWidth: 40, minHeight: 40, alignSelf: { xs: 'flex-end', sm: 'center' } }}
+                      >
                         <DeleteOutlineIcon fontSize="small" />
                       </IconButton>
                     </Stack>
@@ -5000,7 +5030,11 @@ export default function AdminUserProfileEditPage() {
                         </TextField>
                       </Grid>
                       <Grid item xs={5} sm={1}>
-                        <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
+                        <IconButton
+                          onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}
+                          aria-label={`Remove website ${item.label || idx + 1}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
+                        >
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
                       </Grid>
@@ -5317,6 +5351,8 @@ export default function AdminUserProfileEditPage() {
                         edge="end"
                         size="small"
                         onClick={() => handleAskDeleteDoc("edu", doc)}
+                        aria-label={`Delete education document ${doc.filename || doc.id}`}
+                        sx={{ minWidth: 40, minHeight: 40 }}
                       >
                         <DeleteOutlineIcon fontSize="small" color="error" />
                       </IconButton>
@@ -5618,6 +5654,8 @@ export default function AdminUserProfileEditPage() {
                           edge="end"
                           size="small"
                           onClick={() => handleAskDeleteDoc("training", doc)}
+                          aria-label={`Delete training document ${doc.filename || doc.id}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
                         >
                           <DeleteOutlineIcon fontSize="small" color="error" />
                         </IconButton>
@@ -5927,6 +5965,8 @@ export default function AdminUserProfileEditPage() {
                         <IconButton
                           edge="end"
                           size="small"
+                          aria-label={`Delete membership document ${doc.filename || doc.id}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
                           onClick={() => {
                             // Note: We use a simplified implementation: immediately delete
                             deleteMembershipDocApi(userId, doc.id)
@@ -6335,7 +6375,7 @@ export default function AdminUserProfileEditPage() {
         }}
         showToast={showNotification}
       />
-    </div >
+    </Box>
   );
 }
 

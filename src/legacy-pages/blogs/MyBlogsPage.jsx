@@ -34,6 +34,8 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { Link as RouterLink, useNavigate, useSearchParams } from "#navigation";
+import AdminEmptyState from "../../components/admin/AdminEmptyState.jsx";
+import AdminStatusChip from "../../components/admin/AdminStatusChip.jsx";
 import BlogCard from "../../components/blogs/BlogCard.jsx";
 import BlogTaxonomyManager from "../../components/blogs/BlogTaxonomyManager.jsx";
 import WordPressImportPanel from "../../components/blogs/WordPressImportPanel.jsx";
@@ -48,6 +50,7 @@ import {
 } from "../../config/blogNavigation";
 import { getBlogStatusMeta } from "../../utils/blogContent";
 import { blogPrimaryButtonSx } from "../../components/blogs/blogTheme";
+import { colors, focus, radii, shadows } from "../../styles/designTokens";
 
 const TABS = ["blogs", "categories", "tags"];
 
@@ -66,10 +69,10 @@ const tagApi = {
 export function BlogStatusChip({ status }) {
   const meta = getBlogStatusMeta(status);
   return (
-    <Chip
+    <AdminStatusChip
+      status={status}
       label={meta.label}
       color={meta.color}
-      size="small"
       variant={status === "published" ? "filled" : "outlined"}
       data-testid="blog-status"
     />
@@ -94,30 +97,36 @@ function AdminBadges({ blog }) {
 
 function AdminActions({ blog, busy, onConfirm }) {
   const isPublished = blog.status === "published";
+  const actionSx = {
+    minWidth: 40,
+    minHeight: 40,
+    borderRadius: `${radii.field}px`,
+    "&:focus-visible": { outline: `${focus.width}px solid ${focus.color}`, outlineOffset: focus.offset },
+  };
   return (
     <>
       {isPublished ? (
         <Tooltip title="View published blog">
-          <IconButton size="small" component={RouterLink} to={blogDetailPath(blog.slug)} aria-label={`View ${blog.title}`}>
+          <IconButton size="small" component={RouterLink} to={blogDetailPath(blog.slug)} aria-label={`View ${blog.title}`} sx={actionSx}>
             <VisibilityRoundedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       ) : (
         <Tooltip title="Preview draft">
-          <IconButton size="small" component={RouterLink} to={previewBlogPath(blog.id)} aria-label={`Preview ${blog.title}`}>
+          <IconButton size="small" component={RouterLink} to={previewBlogPath(blog.id)} aria-label={`Preview ${blog.title}`} sx={actionSx}>
             <VisibilityRoundedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
       )}
       <Tooltip title="Edit">
-        <IconButton size="small" component={RouterLink} to={editBlogPath(blog.id)} aria-label={`Edit ${blog.title}`}>
+        <IconButton size="small" component={RouterLink} to={editBlogPath(blog.id)} aria-label={`Edit ${blog.title}`} sx={actionSx}>
           <EditRoundedIcon fontSize="small" />
         </IconButton>
       </Tooltip>
       {isPublished ? (
         <Tooltip title="Unpublish">
           <span>
-            <IconButton size="small" disabled={busy} onClick={() => onConfirm({ action: "unpublish", blog })} aria-label={`Unpublish ${blog.title}`}>
+            <IconButton size="small" disabled={busy} onClick={() => onConfirm({ action: "unpublish", blog })} aria-label={`Unpublish ${blog.title}`} sx={actionSx}>
               <UnpublishedRoundedIcon fontSize="small" />
             </IconButton>
           </span>
@@ -125,7 +134,7 @@ function AdminActions({ blog, busy, onConfirm }) {
       ) : (
         <Tooltip title="Publish">
           <span>
-            <IconButton size="small" color="success" disabled={busy} onClick={() => onConfirm({ action: "publish", blog })} aria-label={`Publish ${blog.title}`}>
+            <IconButton size="small" color="success" disabled={busy} onClick={() => onConfirm({ action: "publish", blog })} aria-label={`Publish ${blog.title}`} sx={actionSx}>
               <PublishRoundedIcon fontSize="small" />
             </IconButton>
           </span>
@@ -207,19 +216,37 @@ function BlogsTab({ onNotify }) {
   }
 
   return (
-    <Box>
+    <Box sx={{ minWidth: 0 }}>
       <WordPressImportPanel onFinished={() => setReloadKey((k) => k + 1)} />
-      <Paper sx={{ p: 2, mb: 2, display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
+      <Paper
+        component="section"
+        aria-label="Blog filters and actions"
+        variant="outlined"
+        sx={{
+          p: { xs: 1.5, sm: 2 },
+          mb: 2,
+          display: "grid",
+          gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(240px, 1fr) 180px auto" },
+          gap: 1.5,
+          alignItems: "center",
+          borderColor: colors.border,
+          borderRadius: `${radii.card}px`,
+          bgcolor: colors.white,
+          boxShadow: shadows.sm,
+        }}
+      >
         <TextField
           size="small"
+          label="Search blogs"
           placeholder="Search blogs"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           inputProps={{ "aria-label": "Search blogs" }}
           InputProps={{ startAdornment: <SearchRoundedIcon sx={{ mr: 1, color: "grey.500" }} /> }}
-          sx={{ minWidth: { xs: "100%", sm: 240 } }}
+          fullWidth
+          sx={{ "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } }}
         />
-        <FormControl size="small" sx={{ minWidth: 160 }}>
+        <FormControl size="small" sx={{ minWidth: 0, "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } }}>
           <InputLabel id="blog-status-filter-label">Status</InputLabel>
           <Select
             labelId="blog-status-filter-label"
@@ -236,7 +263,7 @@ function BlogsTab({ onNotify }) {
           variant="contained"
           startIcon={<AddRoundedIcon />}
           onClick={() => navigate(NEW_BLOG_PATH)}
-          sx={{ ml: { sm: "auto" }, ...blogPrimaryButtonSx }}
+          sx={{ width: { xs: "100%", sm: "auto" }, minHeight: 40, ...blogPrimaryButtonSx, borderRadius: `${radii.field}px` }}
         >
           Create Blog
         </Button>
@@ -260,18 +287,19 @@ function BlogsTab({ onNotify }) {
           <CircularProgress aria-label="Loading blogs" />
         </Box>
       ) : blogs.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: "center" }}>
-          <Typography color="text.secondary" sx={{ mb: filtered ? 0 : 2 }}>
-            {filtered ? "No blogs match these filters." : "No blogs yet. Create the first one."}
-          </Typography>
-          {!filtered && (
-            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate(NEW_BLOG_PATH)} sx={blogPrimaryButtonSx}>
+        <AdminEmptyState
+          title={filtered ? "No blogs match these filters." : "No blogs yet. Create the first one."}
+          titleComponent="h2"
+          icon={<AddRoundedIcon />}
+          action={!filtered ? (
+            <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate(NEW_BLOG_PATH)} sx={{ ...blogPrimaryButtonSx, borderRadius: `${radii.field}px` }}>
               Create Blog
             </Button>
-          )}
-        </Paper>
+          ) : null}
+          sx={{ boxShadow: shadows.sm }}
+        />
       ) : (
-        <Grid container spacing={2.5} data-testid="admin-blog-grid" aria-label="Blogs">
+        <Grid container spacing={{ xs: 2, md: 2.5 }} data-testid="admin-blog-grid" aria-label="Blogs" sx={{ minWidth: 0 }}>
           {blogs.map((blog) => (
             <Grid size={{ xs: 12, sm: 6, md: 4 }} key={blog.id}>
               <BlogCard
@@ -287,13 +315,13 @@ function BlogsTab({ onNotify }) {
       )}
 
       {!error && totalPages > 1 && (
-        <Stack sx={{ mt: 3, alignItems: "center" }}>
-          <Pagination count={totalPages} page={page} onChange={(_e, value) => setPage(value)} color="primary" disabled={loading} />
+        <Stack sx={{ mt: 3, alignItems: "center", overflowX: "auto", pb: 0.5 }}>
+          <Pagination count={totalPages} page={page} onChange={(_e, value) => setPage(value)} color="primary" disabled={loading} sx={{ minWidth: "max-content" }} />
         </Stack>
       )}
 
-      <Dialog open={Boolean(confirm)} onClose={() => setConfirm(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{confirm?.action === "publish" ? "Publish blog?" : "Unpublish blog?"}</DialogTitle>
+      <Dialog open={Boolean(confirm)} onClose={() => setConfirm(null)} maxWidth="xs" fullWidth aria-labelledby="blog-action-dialog-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
+        <DialogTitle id="blog-action-dialog-title" sx={{ color: colors.navy, fontWeight: 750 }}>{confirm?.action === "publish" ? "Publish blog?" : "Unpublish blog?"}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             {confirm?.action === "publish"
@@ -324,15 +352,16 @@ export default function MyBlogsPage() {
   const notify = useCallback((msg, type = "success") => setToast({ open: true, type, msg }), []);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: "auto" }}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 800, mb: 2 }}>
+    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: "auto", width: "100%", minWidth: 0 }}>
+      <Typography variant="h4" component="h1" sx={{ fontWeight: 800, mb: 2, color: colors.navy }}>
         My Blogs
       </Typography>
 
       <Tabs
         value={tab}
         onChange={(_e, value) => setSearchParams(value === "blogs" ? {} : { tab: value })}
-        sx={{ mb: 2, borderBottom: 1, borderColor: "divider" }}
+        aria-label="Blog management sections"
+        sx={{ mb: 2, borderBottom: 1, borderColor: colors.border, minHeight: 44 }}
         variant="scrollable"
         allowScrollButtonsMobile
       >

@@ -41,8 +41,16 @@ import {
 } from "../../utils/blogEditor";
 import { formatBlogDate } from "../../utils/blogContent";
 import { blogPrimaryButtonSx } from "../../components/blogs/blogTheme";
+import { colors, radii, shadows } from "../../styles/designTokens";
 
-const actionSx = { textTransform: "none", fontWeight: 700, borderRadius: "10px" };
+const actionSx = { textTransform: "none", fontWeight: 700, borderRadius: `${radii.field}px`, minHeight: 40 };
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } };
+const surfaceSx = {
+  border: `1px solid ${colors.border}`,
+  borderRadius: `${radii.card}px`,
+  bgcolor: colors.white,
+  boxShadow: shadows.sm,
+};
 
 const FIELD_ORDER = [
   "title", "slug", "excerpt", "content_html", "featured_image", "author_id",
@@ -105,6 +113,7 @@ function AuthorPicker({ value, onChange, disabled, error }) {
           label="Author"
           error={Boolean(error)}
           helperText={error || "Optional. Search ECP members by name or email."}
+          sx={fieldSx}
         />
       )}
     />
@@ -128,6 +137,7 @@ function TermPicker({ label, options, selectedIds, onChange, disabled, error, ma
           {...params}
           label={label}
           error={Boolean(error)}
+          sx={fieldSx}
           helperText={
             error || (
               <>
@@ -175,19 +185,19 @@ function FeaturedImageField({ currentUrl, form, setForm, disabled, error, onErro
   };
 
   return (
-    <Box>
-      <Typography component="p" sx={{ fontWeight: 700, mb: 1 }}>Featured image</Typography>
+    <Box component="section" aria-labelledby="featured-image-heading" sx={{ minWidth: 0 }}>
+      <Typography id="featured-image-heading" component="h2" variant="subtitle1" sx={{ fontWeight: 750, mb: 1, color: colors.navy }}>Featured image</Typography>
       {shownUrl ? (
         <Box
           component="img"
           src={shownUrl}
           alt="Featured image preview"
-          sx={{ width: "100%", maxWidth: 480, aspectRatio: "16 / 9", objectFit: "cover", borderRadius: 1, border: "1px solid", borderColor: "divider", display: "block" }}
+          sx={{ width: "100%", maxWidth: 480, aspectRatio: "16 / 9", objectFit: "cover", borderRadius: `${radii.card}px`, border: `1px solid ${colors.border}`, display: "block" }}
         />
       ) : (
         <Typography variant="body2" color="text.secondary">No featured image.</Typography>
       )}
-      <Stack direction="row" spacing={1} sx={{ mt: 1 }} useFlexGap flexWrap="wrap">
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mt: 1, alignItems: { xs: "stretch", sm: "center" } }} useFlexGap flexWrap="wrap">
         <Button variant="outlined" size="small" onClick={() => inputRef.current?.click()} disabled={disabled} sx={{ textTransform: "none" }}>
           {shownUrl ? "Replace image" : "Choose image"}
         </Button>
@@ -418,8 +428,8 @@ export default function BlogEditorPage() {
 
   if (loadState === "loading") {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
-        <CircularProgress aria-label="Loading blog" />
+      <Box role="status" aria-label="Loading blog" sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+        <CircularProgress />
       </Box>
     );
   }
@@ -432,7 +442,7 @@ export default function BlogEditorPage() {
         ? "You do not have permission to manage blogs."
         : loadError || "Unable to load this blog.";
     return (
-      <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: "auto" }}>
+      <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 900, mx: "auto", width: "100%", minWidth: 0 }}>
         <Alert severity="error" sx={{ mb: 2 }}>{message}</Alert>
         <Button component={RouterLink} to={MY_BLOGS_PATH} startIcon={<ArrowBackRoundedIcon />}>
           Back to My Blogs
@@ -442,14 +452,14 @@ export default function BlogEditorPage() {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto" }}>
+    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto", width: "100%", minWidth: 0 }}>
       <Button component={RouterLink} to={MY_BLOGS_PATH} startIcon={<ArrowBackRoundedIcon />} sx={{ textTransform: "none", mb: 1, px: 0 }}>
         My Blogs
       </Button>
 
-      <Stack direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "center" }} justifyContent="space-between" sx={{ mb: 2 }}>
-        <Box>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 800 }}>
+      <Stack component="header" direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "flex-start" }} justifyContent="space-between" sx={{ mb: 2.5 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 800, color: colors.navy }}>
             {isEdit ? "Edit Blog" : "Create Blog"}
           </Typography>
           {isEdit && blog && (
@@ -465,7 +475,15 @@ export default function BlogEditorPage() {
           )}
         </Box>
 
-        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, auto)" },
+            gap: 1,
+            alignSelf: { md: "flex-start" },
+            "& .MuiButton-root": { width: { xs: "100%", lg: "auto" }, whiteSpace: "nowrap" },
+          }}
+        >
           {isEdit && (
             <Button variant="outlined" onClick={() => setPreview(true)} disabled={disabled} sx={actionSx}>
               Preview
@@ -476,7 +494,7 @@ export default function BlogEditorPage() {
               View Published
             </Button>
           )}
-          <Button variant="contained" onClick={handleSave} disabled={disabled} sx={blogPrimaryButtonSx}>
+          <Button variant="contained" onClick={handleSave} disabled={disabled} sx={{ ...blogPrimaryButtonSx, borderRadius: `${radii.field}px`, minHeight: 40 }}>
             {busy === "save" ? "Saving…" : isEdit ? "Save Changes" : "Save Draft"}
           </Button>
           {isEdit && !isPublished && (
@@ -489,7 +507,7 @@ export default function BlogEditorPage() {
               {busy === "unpublish" ? "Unpublishing…" : "Unpublish"}
             </Button>
           )}
-        </Stack>
+        </Box>
       </Stack>
 
       {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
@@ -503,7 +521,7 @@ export default function BlogEditorPage() {
         }}
       >
         <Stack spacing={3}>
-          <Paper sx={{ p: { xs: 2, md: 3 } }}>
+          <Paper component="section" aria-label="Blog content" variant="outlined" sx={{ ...surfaceSx, p: { xs: 1.5, sm: 2, md: 3 }, minWidth: 0, overflow: "hidden" }}>
             <Stack spacing={2.5}>
               <TextField
                 label="Title"
@@ -515,6 +533,7 @@ export default function BlogEditorPage() {
                 helperText={fieldErrors.title}
                 disabled={disabled}
                 inputProps={{ maxLength: 255 }}
+                sx={fieldSx}
               />
               <TextField
                 label="Slug"
@@ -530,6 +549,7 @@ export default function BlogEditorPage() {
                 }
                 disabled={disabled}
                 inputProps={{ maxLength: 255 }}
+                sx={fieldSx}
               />
               <TextField
                 label="Excerpt"
@@ -541,17 +561,20 @@ export default function BlogEditorPage() {
                 error={Boolean(fieldErrors.excerpt)}
                 helperText={fieldErrors.excerpt || "Optional. Shown on blog cards."}
                 disabled={disabled}
+                sx={fieldSx}
               />
-              <BlogContentEditor
-                value={form.content_html}
-                onChange={setField("content_html")}
-                disabled={disabled}
-                error={fieldErrors.content_html}
-              />
+              <Box role="region" aria-label="Blog content editor" sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflowX: "auto" }}>
+                <BlogContentEditor
+                  value={form.content_html}
+                  onChange={setField("content_html")}
+                  disabled={disabled}
+                  error={fieldErrors.content_html}
+                />
+              </Box>
             </Stack>
           </Paper>
 
-          <Paper sx={{ p: { xs: 2, md: 3 } }}>
+          <Paper component="section" aria-label="Blog metadata" variant="outlined" sx={{ ...surfaceSx, p: { xs: 1.5, sm: 2, md: 3 }, minWidth: 0 }}>
             <Stack spacing={2.5}>
               <FeaturedImageField
                 currentUrl={blog?.featured_image || ""}
@@ -596,6 +619,12 @@ export default function BlogEditorPage() {
           <Accordion
             disableGutters
             defaultExpanded={Boolean(form.seo_title || form.seo_description || form.canonical_url)}
+            sx={{
+              ...surfaceSx,
+              overflow: "hidden",
+              "&:before": { display: "none" },
+              "&.Mui-expanded": { m: 0 },
+            }}
           >
             <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
               <Typography sx={{ fontWeight: 700 }}>SEO (optional)</Typography>
@@ -611,6 +640,7 @@ export default function BlogEditorPage() {
                   helperText={fieldErrors.seo_title || "Defaults to the title."}
                   disabled={disabled}
                   inputProps={{ maxLength: 255 }}
+                  sx={fieldSx}
                 />
                 <TextField
                   label="SEO description"
@@ -622,6 +652,7 @@ export default function BlogEditorPage() {
                   error={Boolean(fieldErrors.seo_description)}
                   helperText={fieldErrors.seo_description || "Defaults to the excerpt."}
                   disabled={disabled}
+                  sx={fieldSx}
                 />
                 <TextField
                   label="Canonical URL"
@@ -632,6 +663,7 @@ export default function BlogEditorPage() {
                   helperText={fieldErrors.canonical_url || "Optional. Only used when it points to this site."}
                   disabled={disabled}
                   inputProps={{ maxLength: 500 }}
+                  sx={fieldSx}
                 />
               </Stack>
             </AccordionDetails>
@@ -639,11 +671,19 @@ export default function BlogEditorPage() {
         </Stack>
       </Box>
 
-      <Dialog open={showPreview && isEdit} onClose={() => setPreview(false)} fullWidth maxWidth="md" scroll="paper">
-        <DialogTitle>
+      <Dialog
+        open={showPreview && isEdit}
+        onClose={() => setPreview(false)}
+        fullWidth
+        maxWidth="md"
+        scroll="paper"
+        aria-labelledby="blog-preview-title"
+        PaperProps={{ sx: { width: { xs: "calc(100% - 24px)", sm: "calc(100% - 64px)" }, maxHeight: "calc(100dvh - 32px)", borderRadius: `${radii.popup}px` } }}
+      >
+        <DialogTitle id="blog-preview-title" sx={{ color: colors.navy, fontWeight: 750 }}>
           Preview{!isPublished && " — draft, not visible to members"}
         </DialogTitle>
-        <DialogContent dividers>
+        <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2.5 }, overflowX: "hidden" }}>
           <BlogArticleView post={previewPost} backTo={null} />
         </DialogContent>
         <DialogActions>
@@ -651,8 +691,8 @@ export default function BlogEditorPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={confirmUnpublish} onClose={() => setConfirmUnpublish(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Unpublish blog?</DialogTitle>
+      <Dialog open={confirmUnpublish} onClose={() => setConfirmUnpublish(false)} maxWidth="xs" fullWidth aria-labelledby="unpublish-blog-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
+        <DialogTitle id="unpublish-blog-title" sx={{ color: colors.navy, fontWeight: 750 }}>Unpublish blog?</DialogTitle>
         <DialogContent>
           <DialogContentText>
             It will be removed from Explore Blogs and moved back to drafts. Its original publication date is kept.
