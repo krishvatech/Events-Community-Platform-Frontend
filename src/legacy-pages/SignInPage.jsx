@@ -240,7 +240,7 @@ export default function SignInPage() {
     <Box
       sx={{
         minHeight: "100vh",
-        background: "linear-gradient(135deg, #e0f2fe 0%, #f0fdf4 50%, #f8fafc 100%)",
+        background: "var(--imaa-bg-cool)", // flat surface behind the auth modal (gradients retired)
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

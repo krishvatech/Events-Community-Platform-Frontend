@@ -39,6 +39,7 @@ import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import DoneRoundedIcon from "@mui/icons-material/DoneRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import { EmptyState } from "../components/page";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -69,6 +70,22 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
+// ── Presentation tokens (IMAA design system, src/styles/brand.css) ─────────────
+const INK = "var(--imaa-ink)";
+const INK_BODY = "var(--imaa-ink-body)";
+const BORDER = "var(--imaa-border)";
+const SURFACE_MUTED = "var(--imaa-bg-member)";
+const SURFACE_HOVER = "var(--imaa-bg-cool)";
+const TEAL = "var(--imaa-teal)";
+const TEAL_TEXT = "var(--imaa-teal-hover)"; // darker teal: AA contrast for text
+const TEAL_TINT = "var(--imaa-teal-light)";
+const CARD_RADIUS = "var(--imaa-radius-card)";
+// Completion stays green (its meaning); this shade meets contrast as text and icon.
+const DONE_GREEN = "#047857";
+const DONE_CHIP_SX = { bgcolor: "#04785714", color: DONE_GREEN, border: "1px solid #04785744", height: 26, fontSize: 11 };
+// Reset for clickable rows rendered as real <button>s (keyboard reachable)
+const ROW_BUTTON_RESET = { border: "none", width: "100%", font: "inherit", textAlign: "left", m: 0, color: "inherit" };
+
 // ── Module icon ───────────────────────────────────────────────────────────────
 function ModuleIcon({ modtype, mimetype, sx = {} }) {
   const base = { fontSize: 20, ...sx };
@@ -89,7 +106,7 @@ function moduleColor(modtype, mimetype) {
   if (modtype === "assign") return "#ec4899";
   if (modtype === "quiz") return "#8b5cf6";
   if (modtype === "forum") return "#f59e0b";
-  if (modtype === "resource" && mimetype?.startsWith("video/")) return "#1bbbb3";
+  if (modtype === "resource" && mimetype?.startsWith("video/")) return "#0A9396";
   if (modtype === "resource" && mimetype === "application/pdf") return "#ef4444";
   return "#6b7280";
 }
@@ -105,9 +122,9 @@ function PlayerTopBar({ course, progress, completed, refreshing, onRefresh }) {
         px: 2,
         py: 1.25,
         bgcolor: "#ffffff",
-        color: "#111827",
-        borderBottom: "1px solid #e5e7eb",
-        boxShadow: "0 1px 3px 0 rgb(0 0 0 / 0.08)",
+        color: INK,
+        borderBottom: `1px solid ${BORDER}`,
+        boxShadow: "var(--imaa-shadow-sm)",
         flexShrink: 0,
         flexWrap: "wrap",
       }}
@@ -117,28 +134,35 @@ function PlayerTopBar({ course, progress, completed, refreshing, onRefresh }) {
           component="a"
           href="/account/courses"
           size="small"
-          sx={{ color: "#9ca3af", "&:hover": { color: "#111827" } }}
+          sx={{ color: INK_BODY, "&:hover": { color: INK } }}
         >
           <ArrowBackRoundedIcon fontSize="small" />
         </IconButton>
       </Tooltip>
 
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography variant="subtitle1" fontWeight={600} noWrap sx={{ color: "#111827", lineHeight: 1.3 }}>
+        {/* Course title is the page's h1 (plain element: index.css forces the sans font on Typography) */}
+        <Box
+          component="h1"
+          sx={{
+            m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: { xs: 17, sm: 18 }, lineHeight: 1.3,
+            color: INK, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+          }}
+        >
           {decodeEntities(course?.full_name) || "Loading…"}
-        </Typography>
+        </Box>
         {course?.category_name && (
           <Chip
             label={decodeEntities(course.category_name)}
             size="small"
-            sx={{ mt: 0.25, bgcolor: "#1bbbb322", color: "#1bbbb3", height: 18, fontSize: 11 }}
+            sx={{ mt: 0.25, bgcolor: TEAL_TINT, color: TEAL_TEXT, height: 18, fontSize: 11 }}
           />
         )}
       </Box>
 
       <Box sx={{ display: "flex", alignItems: "center", gap: 1, minWidth: 160 }}>
         {completed ? (
-          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: "#34d399" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, color: DONE_GREEN }}>
             <CheckCircleRoundedIcon fontSize="small" />
             <Typography variant="caption" fontWeight={600}>Completed</Typography>
           </Box>
@@ -148,13 +172,14 @@ function PlayerTopBar({ course, progress, completed, refreshing, onRefresh }) {
               <LinearProgress
                 variant="determinate"
                 value={progress || 0}
+                aria-label="Course progress"
                 sx={{
-                  height: 6, borderRadius: 3, bgcolor: "#e5e7eb",
-                  "& .MuiLinearProgress-bar": { bgcolor: "#1bbbb3", borderRadius: 3 },
+                  height: 6, borderRadius: 3, bgcolor: BORDER,
+                  "& .MuiLinearProgress-bar": { bgcolor: TEAL, borderRadius: 3 },
                 }}
               />
             </Box>
-            <Typography variant="caption" sx={{ color: "#9ca3af", whiteSpace: "nowrap" }}>
+            <Typography variant="caption" sx={{ color: INK_BODY, whiteSpace: "nowrap" }}>
               {Math.round(progress || 0)}%
             </Typography>
           </>
@@ -166,10 +191,10 @@ function PlayerTopBar({ course, progress, completed, refreshing, onRefresh }) {
           size="small"
           onClick={onRefresh}
           disabled={refreshing}
-          sx={{ color: "#9ca3af", "&:hover": { color: "#111827" } }}
+          sx={{ color: INK_BODY, "&:hover": { color: INK } }}
         >
           {refreshing
-            ? <CircularProgress size={16} sx={{ color: "#1bbbb3" }} />
+            ? <CircularProgress size={16} sx={{ color: TEAL }} />
             : <RefreshRoundedIcon fontSize="small" />}
         </IconButton>
       </Tooltip>
@@ -194,7 +219,7 @@ function CourseSidebar({ sections, activeSectionId, activeModule, onSelectSectio
     return (
       <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1.5 }}>
         {[1, 2, 3].map((i) => (
-          <Skeleton key={i} height={40} sx={{ bgcolor: "#e5e7eb", borderRadius: 1 }} />
+          <Skeleton key={i} height={40} sx={{ bgcolor: SURFACE_HOVER, borderRadius: 1 }} />
         ))}
       </Box>
     );
@@ -211,31 +236,36 @@ function CourseSidebar({ sections, activeSectionId, activeModule, onSelectSectio
 
         return (
           <Box key={section.id}>
-            {/* Section header - click to scroll to section */}
+            {/* Section header - click to scroll to section (a real button: keyboard reachable) */}
             <Box
+              component="button"
+              type="button"
+              aria-expanded={isOpen}
               onClick={() => { onSelectSection(section); toggle(section.id); }}
               sx={{
+                ...ROW_BUTTON_RESET,
                 display: "flex",
                 alignItems: "center",
                 gap: 1,
                 px: 2,
                 py: 1,
                 cursor: "pointer",
-                bgcolor: isActive ? "#1bbbb318" : "transparent",
-                borderLeft: isActive ? "3px solid #1bbbb3" : "3px solid transparent",
-                "&:hover": { bgcolor: isActive ? "#1bbbb318" : "#f3f4f6" },
+                bgcolor: isActive ? TEAL_TINT : "transparent",
+                borderLeft: isActive ? `3px solid ${TEAL}` : "3px solid transparent",
+                "&:hover": { bgcolor: isActive ? TEAL_TINT : SURFACE_HOVER },
+                "&:focus-visible": { outlineOffset: "-2px" },
                 transition: "all 0.2s ease",
               }}
             >
               {isOpen
-                ? <ExpandMoreRoundedIcon sx={{ fontSize: 16, color: "#6b7280", flexShrink: 0 }} />
-                : <ChevronRightRoundedIcon sx={{ fontSize: 16, color: "#6b7280", flexShrink: 0 }} />}
-              <Box sx={{ flex: 1, minWidth: 0 }}>
+                ? <ExpandMoreRoundedIcon sx={{ fontSize: 16, color: INK_BODY, flexShrink: 0 }} />
+                : <ChevronRightRoundedIcon sx={{ fontSize: 16, color: INK_BODY, flexShrink: 0 }} />}
+              <Box component="span" sx={{ flex: 1, minWidth: 0, display: "block" }}>
                 <Typography
                   variant="caption"
                   fontWeight={700}
                   sx={{
-                    color: isActive ? "#1bbbb3" : "#374151",
+                    color: isActive ? TEAL_TEXT : INK,
                     textTransform: "uppercase",
                     letterSpacing: "0.05em",
                     display: "block",
@@ -247,7 +277,7 @@ function CourseSidebar({ sections, activeSectionId, activeModule, onSelectSectio
                   {decodeEntities(section.name) || `Section ${section.position + 1}`}
                 </Typography>
                 {total > 0 && (
-                  <Typography variant="caption" sx={{ color: "#6b7280", fontSize: 10 }}>
+                  <Typography variant="caption" sx={{ color: INK_BODY, fontSize: 11, display: "block" }}>
                     {completed}/{total} completed
                   </Typography>
                 )}
@@ -261,8 +291,12 @@ function CourseSidebar({ sections, activeSectionId, activeModule, onSelectSectio
                 return (
                   <Box
                     key={mod.id}
+                    component="button"
+                    type="button"
+                    aria-current={isModuleActive ? "true" : undefined}
                     onClick={() => onSelectModule(section, mod)}
                     sx={{
+                      ...ROW_BUTTON_RESET,
                       display: "flex",
                       alignItems: "center",
                       gap: 1.5,
@@ -270,22 +304,24 @@ function CourseSidebar({ sections, activeSectionId, activeModule, onSelectSectio
                       pr: 2,
                       py: 0.75,
                       cursor: "pointer",
-                      bgcolor: isModuleActive ? "#1bbbb318" : "transparent",
-                      borderLeft: isModuleActive ? "3px solid #1bbbb3" : "3px solid transparent",
-                      "&:hover": { bgcolor: "#f3f4f6" },
+                      bgcolor: isModuleActive ? TEAL_TINT : "transparent",
+                      borderLeft: isModuleActive ? `3px solid ${TEAL}` : "3px solid transparent",
+                      "&:hover": { bgcolor: SURFACE_HOVER },
+                      "&:focus-visible": { outlineOffset: "-2px" },
                       transition: "all 0.2s ease",
                     }}
                   >
-                    <Box sx={{ color: mod.completed ? "#34d399" : moduleColor(mod.modtype, mod.content_mimetype), flexShrink: 0 }}>
+                    <Box component="span" sx={{ display: "flex", color: mod.completed ? DONE_GREEN : moduleColor(mod.modtype, mod.content_mimetype), flexShrink: 0 }}>
                       {mod.completed
                         ? <CheckCircleRoundedIcon sx={{ fontSize: 16 }} />
                         : <ModuleIcon modtype={mod.modtype} mimetype={mod.content_mimetype} sx={{ fontSize: 16 }} />}
                     </Box>
                     <Typography
                       variant="body2"
+                      component="span"
                       sx={{
-                        color: isModuleActive ? "#1bbbb3" : mod.completed ? "#9ca3af" : "#374151",
-                        fontSize: 12,
+                        color: isModuleActive ? TEAL_TEXT : mod.completed ? INK_BODY : INK,
+                        fontSize: 13,
                         fontWeight: isModuleActive ? 600 : 400,
                         flex: 1,
                         minWidth: 0,
@@ -297,13 +333,13 @@ function CourseSidebar({ sections, activeSectionId, activeModule, onSelectSectio
                     >
                       {decodeEntities(mod.name)}
                     </Typography>
-                    {!mod.visible && <LockRoundedIcon sx={{ fontSize: 12, color: "#9ca3af", flexShrink: 0 }} />}
+                    {!mod.visible && <LockRoundedIcon titleAccess="Not available" sx={{ fontSize: 12, color: INK_BODY, flexShrink: 0 }} />}
                   </Box>
                 );
               })}
             </Collapse>
 
-            <Divider sx={{ borderColor: "#e5e7eb", my: 0.5 }} />
+            <Divider sx={{ borderColor: BORDER, my: 0.5 }} />
           </Box>
         );
       })}
@@ -515,13 +551,13 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
   const { module_url, modtype, completion } = module;
 
   if (loading) {
-    return <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress sx={{ color: "#1bbbb3" }} /></Box>;
+    return <Box sx={{ p: 3, textAlign: "center" }}><CircularProgress sx={{ color: TEAL }} /></Box>;
   }
 
   if (error || !detail) {
     return (
       <Box sx={{ p: 3, textAlign: "center" }}>
-        <Typography sx={{ color: "#6b7280", mb: 2 }}>Could not load content.</Typography>
+        <Typography sx={{ color: INK_BODY, mb: 2 }}>Could not load content.</Typography>
         {module_url && (
           <Button variant="outlined" endIcon={<OpenInNewRoundedIcon />} href={module_url} target="_blank" rel="noopener noreferrer">
             Open in LMS
@@ -532,7 +568,7 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
   }
 
   return (
-    <Box sx={{ p: 3, maxWidth: "100%" }}>
+    <Box sx={{ p: { xs: 2, sm: 3 }, maxWidth: "100%" }}>
       {/* Assignment */}
       {modtype === "assign" && (
         <>
@@ -559,7 +595,7 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
                       icon={<DoneRoundedIcon sx={{ fontSize: 14 }} />}
                       label="Done"
                       size="small"
-                      sx={{ bgcolor: "#34d39922", color: "#34d399", border: "1px solid #34d39944", height: 26, fontSize: 11 }}
+                      sx={DONE_CHIP_SX}
                     />
                   ) : (
                     <Button
@@ -570,10 +606,10 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
                       sx={{
                         textTransform: "none",
                         fontSize: 12,
-                        color: "#9ca3af",
-                        borderColor: "#e5e7eb",
+                        color: INK_BODY,
+                        borderColor: BORDER,
                         whiteSpace: "nowrap",
-                        "&:hover": { borderColor: "#1bbbb3", color: "#1bbbb3" },
+                        "&:hover": { borderColor: TEAL, color: TEAL_TEXT },
                       }}
                     >
                       {marking ? <CircularProgress size={12} /> : "Mark as done"}
@@ -588,12 +624,12 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
           {detail.intro && (
             <Box
               sx={{
-                bgcolor: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 2, p: 3,
-                fontSize: 14, color: "#374151", lineHeight: 1.8,
+                bgcolor: SURFACE_MUTED, border: `1px solid ${BORDER}`, borderRadius: CARD_RADIUS, p: { xs: 2, sm: 3 },
+                fontSize: 14, color: INK_BODY, lineHeight: 1.8, overflowWrap: "anywhere",
                 "& img": { maxWidth: "100%", height: "auto", borderRadius: 1, my: 1 },
                 "& p": { margin: "0 0 10px 0" },
                 "& ol, & ul": { pl: 3, mb: 1 },
-                "& a": { color: "#1bbbb3" },
+                "& a": { color: TEAL_TEXT },
                 mb: 3,
               }}
               dangerouslySetInnerHTML={{ __html: detail.intro }}
@@ -635,7 +671,7 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
                       icon={<DoneRoundedIcon sx={{ fontSize: 14 }} />}
                       label="Done"
                       size="small"
-                      sx={{ bgcolor: "#34d39922", color: "#34d399", border: "1px solid #34d39944", height: 26, fontSize: 11 }}
+                      sx={DONE_CHIP_SX}
                     />
                   ) : (
                     <Button
@@ -646,10 +682,10 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
                       sx={{
                         textTransform: "none",
                         fontSize: 12,
-                        color: "#9ca3af",
-                        borderColor: "#e5e7eb",
+                        color: INK_BODY,
+                        borderColor: BORDER,
                         whiteSpace: "nowrap",
-                        "&:hover": { borderColor: "#1bbbb3", color: "#1bbbb3" },
+                        "&:hover": { borderColor: TEAL, color: TEAL_TEXT },
                       }}
                     >
                       {marking ? <CircularProgress size={12} /> : "Mark as done"}
@@ -660,7 +696,7 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
             </Box>
           )}
           {detail.intro && (
-            <Box sx={{ bgcolor: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 2, p: 3, fontSize: 14, color: "#374151", lineHeight: 1.8, "& img": { maxWidth: "100%" }, "& p": { margin: "0 0 10px 0" }, mb: 3 }}
+            <Box sx={{ bgcolor: SURFACE_MUTED, border: `1px solid ${BORDER}`, borderRadius: CARD_RADIUS, p: { xs: 2, sm: 3 }, fontSize: 14, color: INK_BODY, lineHeight: 1.8, overflowWrap: "anywhere", "& img": { maxWidth: "100%" }, "& p": { margin: "0 0 10px 0" }, mb: 3 }}
               dangerouslySetInnerHTML={{ __html: detail.intro }}
             />
           )}
@@ -709,9 +745,10 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
       ref={moduleRef}
       sx={{
         mb: 2,
-        borderRadius: 2,
-        border: "1px solid #e5e7eb",
+        borderRadius: CARD_RADIUS,
+        border: `1px solid ${BORDER}`,
         bgcolor: "#ffffff",
+        boxShadow: "var(--imaa-shadow-sm)",
         overflow: "hidden",
       }}
     >
@@ -730,10 +767,10 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
               </Box>
             </Box>
           ) : (
-            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb", cursor: "pointer", "&:hover": { bgcolor: "#f3f4f6" }, transition: "background-color 0.2s ease" }}>
-              <OndemandVideoRoundedIcon sx={{ fontSize: 40, color: "#1bbbb3" }} />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
+            <Box component="button" type="button" onClick={() => onSelectModule?.(module)} sx={{ ...ROW_BUTTON_RESET, bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}`, cursor: "pointer", "&:hover": { bgcolor: SURFACE_HOVER }, "&:focus-visible": { outlineOffset: "-2px" }, transition: "background-color 0.2s ease" }}>
+              <OndemandVideoRoundedIcon sx={{ fontSize: 40, color: "#0A9396" }} />
+              <Box component="span" sx={{ flex: 1, minWidth: 0, display: "block" }}>
+                <Typography variant="body2" component="span" sx={{ color: INK, fontWeight: 600, mb: 0.5, display: "block" }}>{decodeEntities(name)}</Typography>
               </Box>
             </Box>
           )}
@@ -744,12 +781,12 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
       {modtype === "resource" && is_pdf && content_url && (
         <>
           {showPreview ? (
-            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#ffffff", borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden", display: "flex", flexDirection: "column", height: "800px", cursor: "pointer" }}>
+            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#ffffff", borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column", height: { xs: "70vh", md: "800px" }, cursor: "pointer" }}>
               {/* Header with title and controls */}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 3, py: 2, borderBottom: "1px solid #e5e7eb", bgcolor: "#f9fafb", flexShrink: 0 }}>
+              <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: `1px solid ${BORDER}`, bgcolor: SURFACE_MUTED, flexShrink: 0 }}>
                 <PictureAsPdfRoundedIcon sx={{ fontSize: 28, color: "#ef4444", flexShrink: 0 }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
-                  <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600 }}>
+                  <Typography variant="body2" sx={{ color: INK, fontWeight: 600 }}>
                     {decodeEntities(name)}
                   </Typography>
                 </Box>
@@ -768,10 +805,11 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
               </Box>
 
               {/* PDF Viewer Container */}
-              <Box sx={{ flex: 1, display: "flex", overflow: "hidden", bgcolor: "#f3f4f6" }}>
+              <Box sx={{ flex: 1, display: "flex", overflow: "hidden", bgcolor: SURFACE_HOVER }}>
                 {/* Embedded PDF with controls */}
                 <Box sx={{ flex: 1, bgcolor: "#fff", position: "relative" }}>
                   <embed
+                    title={decodeEntities(name)}
                     src={`${content_url}#toolbar=1&navpanes=0&scrollbar=1`}
                     type="application/pdf"
                     style={{ width: "100%", height: "100%", border: "none" }}
@@ -780,10 +818,10 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
               </Box>
             </Box>
           ) : (
-            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb", cursor: "pointer", "&:hover": { bgcolor: "#f3f4f6" }, transition: "background-color 0.2s ease" }}>
+            <Box component="button" type="button" onClick={() => onSelectModule?.(module)} sx={{ ...ROW_BUTTON_RESET, bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}`, cursor: "pointer", "&:hover": { bgcolor: SURFACE_HOVER }, "&:focus-visible": { outlineOffset: "-2px" }, transition: "background-color 0.2s ease" }}>
               <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: "#ef4444" }} />
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
+              <Box component="span" sx={{ flex: 1, minWidth: 0, display: "block" }}>
+                <Typography variant="body2" component="span" sx={{ color: INK, fontWeight: 600, mb: 0.5, display: "block" }}>{decodeEntities(name)}</Typography>
               </Box>
             </Box>
           )}
@@ -792,10 +830,10 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
 
       {/* ── External URL ── */}
       {modtype === "url" && (
-        <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
+        <Box sx={{ bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}` }}>
           <LinkRoundedIcon sx={{ fontSize: 40, color: "#3b82f6" }} />
           <Box>
-            <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
+            <Typography variant="body2" sx={{ color: INK, fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
             {openBtn("Open Link", "#3b82f6")}
           </Box>
         </Box>
@@ -803,30 +841,30 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
 
       {/* ── Quiz ── */}
       {modtype === "quiz" && (
-        <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
+        <Box sx={{ bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}` }}>
           <QuizRoundedIcon sx={{ fontSize: 40, color: "#8b5cf6" }} />
-          <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onSelectModule?.(module)}>
-            <Typography variant="body2" sx={{ color: "#3b82f6", fontWeight: 600, mb: 0.5, "&:hover": { textDecoration: "underline" } }}>{decodeEntities(name)}</Typography>
+          <Box component="button" type="button" sx={{ ...ROW_BUTTON_RESET, width: "auto", p: 0, bgcolor: "transparent", flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onSelectModule?.(module)}>
+            <Typography variant="body2" component="span" sx={{ display: "block", color: TEAL_TEXT, fontWeight: 600, mb: 0.5, "&:hover": { textDecoration: "underline" } }}>{decodeEntities(name)}</Typography>
           </Box>
         </Box>
       )}
 
       {/* ── Assignment ── */}
       {modtype === "assign" && (
-        <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
+        <Box sx={{ bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}` }}>
           <AssignmentRoundedIcon sx={{ fontSize: 40, color: "#ec4899" }} />
-          <Box sx={{ flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onSelectModule?.(module)}>
-            <Typography variant="body2" sx={{ color: "#3b82f6", fontWeight: 600, mb: 0.5, "&:hover": { textDecoration: "underline" } }}>{decodeEntities(name)}</Typography>
+          <Box component="button" type="button" sx={{ ...ROW_BUTTON_RESET, width: "auto", p: 0, bgcolor: "transparent", flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onSelectModule?.(module)}>
+            <Typography variant="body2" component="span" sx={{ display: "block", color: TEAL_TEXT, fontWeight: 600, mb: 0.5, "&:hover": { textDecoration: "underline" } }}>{decodeEntities(name)}</Typography>
           </Box>
         </Box>
       )}
 
       {/* ── Folder ── */}
       {modtype === "folder" && (
-        <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
+        <Box sx={{ bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}` }}>
           <FolderRoundedIcon sx={{ fontSize: 40, color: "#f59e0b" }} />
           <Box>
-            <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
+            <Typography variant="body2" sx={{ color: INK, fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
             {openBtn("Open Folder", "#f59e0b")}
           </Box>
         </Box>
@@ -834,10 +872,10 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
 
       {/* ── Other (forum, page, etc.) ── */}
       {!["resource", "url", "quiz", "assign", "folder"].includes(modtype) && module_url && (
-        <Box sx={{ bgcolor: "#f9fafb", p: 3, display: "flex", alignItems: "center", gap: 2, borderBottom: "1px solid #e5e7eb" }}>
-          <ModuleIcon modtype={modtype} mimetype={content_mimetype} sx={{ fontSize: 40, color: "#6b7280" }} />
+        <Box sx={{ bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}` }}>
+          <ModuleIcon modtype={modtype} mimetype={content_mimetype} sx={{ fontSize: 40, color: INK_BODY }} />
           <Box>
-            <Typography variant="body2" sx={{ color: "#111827", fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
+            <Typography variant="body2" sx={{ color: INK, fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
             {openBtn("Open", "#6b7280")}
           </Box>
         </Box>
@@ -861,7 +899,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
           display: "flex",
           alignItems: "center",
           gap: 1.5,
-          borderTop: "1px solid #e5e7eb",
+          borderTop: `1px solid ${BORDER}`,
         }}
       >
         <Box
@@ -884,7 +922,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
             sx={{
               flex: 1,
               minWidth: 0,
-              color: "#6b7280",
+              color: INK_BODY,
               fontSize: 13,
               fontWeight: 500,
               overflow: "hidden",
@@ -905,7 +943,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
               icon={<DoneRoundedIcon sx={{ fontSize: 14 }} />}
               label="Done"
               size="small"
-              sx={{ bgcolor: "#34d39922", color: "#34d399", border: "1px solid #34d39944", height: 26, fontSize: 11 }}
+              sx={DONE_CHIP_SX}
             />
           ) : (
             <Button
@@ -916,10 +954,10 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
               sx={{
                 textTransform: "none",
                 fontSize: 12,
-                color: "#9ca3af",
-                borderColor: "#e5e7eb",
+                color: INK_BODY,
+                borderColor: BORDER,
                 whiteSpace: "nowrap",
-                "&:hover": { borderColor: "#1bbbb3", color: "#1bbbb3" },
+                "&:hover": { borderColor: TEAL, color: TEAL_TEXT },
               }}
             >
               {marking ? <CircularProgress size={12} /> : "Mark as done"}
@@ -935,12 +973,12 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
 function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs, onMarkDone, onOpenInPlatform, loading, expandedSections, onToggleSection, onSelectModule }) {
   if (loading) {
     return (
-      <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 2 }}>
+      <Box sx={{ p: { xs: 2, sm: 3 }, display: "flex", flexDirection: "column", gap: 2 }}>
         {[1, 2, 3].map((i) => (
-          <Box key={i} sx={{ borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden" }}>
-            <Skeleton variant="rectangular" height={200} sx={{ bgcolor: "#f3f4f6" }} />
+          <Box key={i} sx={{ borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, overflow: "hidden" }}>
+            <Skeleton variant="rectangular" height={200} sx={{ bgcolor: SURFACE_HOVER }} />
             <Box sx={{ p: 2 }}>
-              <Skeleton height={20} width="60%" sx={{ bgcolor: "#f3f4f6" }} />
+              <Skeleton height={20} width="60%" sx={{ bgcolor: SURFACE_HOVER }} />
             </Box>
           </Box>
         ))}
@@ -950,9 +988,8 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
 
   if (!sections || sections.length === 0) {
     return (
-      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2 }}>
-        <SchoolRoundedIcon sx={{ fontSize: 64, color: "#d1d5db" }} />
-        <Typography sx={{ color: "#6b7280" }}>No course content available</Typography>
+      <Box sx={{ flex: 1, p: { xs: 2, sm: 3 } }}>
+        <EmptyState icon={<SchoolRoundedIcon />} title="No course content available" />
       </Box>
     );
   }
@@ -964,22 +1001,22 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
       // For interactive modules (assign, quiz), show inline details instead of card
       if (["assign", "quiz"].includes(activeModule.modtype)) {
         return (
-          <Box sx={{ p: 3, width: "100%" }}>
+          <Box sx={{ p: { xs: 2, sm: 3 }, width: "100%" }}>
             {/* Breadcrumb */}
-            <Typography variant="caption" sx={{ color: "#6b7280", mb: 3, display: "block" }}>
+            <Typography variant="caption" sx={{ color: INK_BODY, mb: 3, display: "block" }}>
               {decodeEntities(section.name)} › {decodeEntities(activeModule.name)}
             </Typography>
 
             {/* Module details container */}
-            <Box sx={{ bgcolor: "#ffffff", borderRadius: 2, border: "1px solid #e5e7eb", overflow: "hidden" }}>
+            <Box sx={{ bgcolor: "#ffffff", borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, boxShadow: "var(--imaa-shadow-sm)", overflow: "hidden" }}>
               {/* Header with icon and title */}
-              <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: 3, py: 2, borderBottom: "1px solid #e5e7eb" }}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: `1px solid ${BORDER}` }}>
                 <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: `${moduleColor(activeModule.modtype, activeModule.content_mimetype)}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                   <ModuleIcon modtype={activeModule.modtype} mimetype={activeModule.content_mimetype} sx={{ fontSize: 20, color: moduleColor(activeModule.modtype, activeModule.content_mimetype) }} />
                 </Box>
-                <Typography variant="h6" fontWeight={700} sx={{ color: "#111827", flex: 1 }}>
+                <Box component="h2" sx={{ m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: 20, lineHeight: 1.3, color: INK, flex: 1, minWidth: 0, overflowWrap: "anywhere" }}>
                   {decodeEntities(activeModule.name)}
-                </Typography>
+                </Box>
               </Box>
 
               {/* Loading state - fetch details */}
@@ -991,9 +1028,9 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
 
       // For other modules, show card view
       return (
-        <Box sx={{ p: 3, width: "100%" }}>
+        <Box sx={{ p: { xs: 2, sm: 3 }, width: "100%" }}>
           {/* Breadcrumb */}
-          <Typography variant="caption" sx={{ color: "#6b7280", mb: 2, display: "block" }}>
+          <Typography variant="caption" sx={{ color: INK_BODY, mb: 2, display: "block" }}>
             {decodeEntities(section.name)} › {decodeEntities(activeModule.name)}
           </Typography>
           <ModuleCard
@@ -1010,7 +1047,7 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
 
   // Show all sections (scroll spy view)
   return (
-    <Box sx={{ p: 3, width: "100%" }}>
+    <Box sx={{ p: { xs: 2, sm: 3 }, width: "100%" }}>
       {sections.map((section) => {
         const mods = (section.modules || []);
         const isExpanded = expandedSections[section.id] === true; // All sections collapsed by default
@@ -1019,58 +1056,63 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
             key={section.id}
             ref={(el) => { if (el) sectionRefs.current[section.id] = el; }}
             data-section-id={section.id}
-            sx={{ mb: 3, borderRadius: 1, border: "1px solid #e5e7eb", bgcolor: "#ffffff", overflow: "hidden" }}
+            sx={{ mb: 3, borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, bgcolor: "#ffffff", boxShadow: "var(--imaa-shadow-sm)", overflow: "hidden" }}
           >
-            {/* Section heading with expand/collapse */}
-            <Box
-              onClick={() => onToggleSection(section.id)}
-              sx={{
-                display: "flex",
-                alignItems: "center",
-                gap: 1.5,
-                px: 3,
-                py: 2,
-                borderBottom: "1px solid #e5e7eb",
-                cursor: "pointer",
-                transition: "background-color 0.2s ease",
-                "&:hover": { bgcolor: "#f9fafb" },
-              }}
-            >
-              <ExpandMoreRoundedIcon
+            {/* Section heading with expand/collapse: an h2 containing a real toggle button */}
+            <Box component="h2" sx={{ m: 0 }}>
+              <Box
+                component="button"
+                type="button"
+                aria-expanded={isExpanded}
+                onClick={() => onToggleSection(section.id)}
                 sx={{
-                  fontSize: 24,
-                  color: "#6b7280",
-                  transition: "transform 0.2s ease",
-                  transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)",
+                  ...ROW_BUTTON_RESET,
+                  bgcolor: "transparent",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 1.5,
+                  px: { xs: 2, sm: 3 },
+                  py: 2,
+                  borderBottom: `1px solid ${BORDER}`,
+                  cursor: "pointer",
+                  transition: "background-color 0.2s ease",
+                  "&:hover": { bgcolor: SURFACE_MUTED },
+                  "&:focus-visible": { outlineOffset: "-2px" },
                 }}
-              />
-              <Typography
-                variant="h6"
-                fontWeight={700}
-                sx={{ color: "#111827", flex: 1 }}
               >
-                {decodeEntities(section.name) || `Section ${section.position + 1}`}
-              </Typography>
+                <ExpandMoreRoundedIcon
+                  sx={{
+                    fontSize: 24,
+                    color: INK_BODY,
+                    transition: "transform 0.2s ease",
+                    transform: isExpanded ? "rotate(0deg)" : "rotate(-90deg)",
+                  }}
+                />
+                <Box component="span" sx={{ flex: 1, minWidth: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: 18, lineHeight: 1.35, color: INK, overflowWrap: "anywhere" }}>
+                  {decodeEntities(section.name) || `Section ${section.position + 1}`}
+                </Box>
+              </Box>
             </Box>
 
             {/* Section content (summary + modules) */}
             <Collapse in={isExpanded} timeout="auto">
-              <Box sx={{ px: 3, py: 2 }}>
+              <Box sx={{ px: { xs: 2, sm: 3 }, py: 2 }}>
                 {/* Section summary HTML (instructor info, welcome text, schedule, etc.) */}
                 {section.summary?.trim() && (
                   <Box
                     sx={{
                       mb: 2.5,
                       p: 2,
-                      bgcolor: "#f9fafb",
-                      border: "1px solid #e5e7eb",
-                      borderRadius: 2,
+                      bgcolor: SURFACE_MUTED,
+                      border: `1px solid ${BORDER}`,
+                      borderRadius: CARD_RADIUS,
                       fontSize: 14,
-                      color: "#374151",
+                      color: INK_BODY,
                       lineHeight: 1.7,
+                      overflowWrap: "anywhere",
                       "& img": { maxWidth: "100%", height: "auto", borderRadius: 1 },
                       "& p": { margin: "0 0 8px 0" },
-                      "& strong": { color: "#111827" },
+                      "& strong": { color: INK },
                     }}
                     dangerouslySetInnerHTML={{ __html: section.summary }}
                   />
@@ -1666,14 +1708,14 @@ export default function CoursePlayerPage() {
   if (loading) {
     return (
       <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "#ffffff" }}>
-        <Box sx={{ px: 2, py: 1.5, bgcolor: "#ffffff", borderBottom: "1px solid #e5e7eb", display: "flex", alignItems: "center", gap: 2 }}>
-          <Skeleton variant="circular" width={32} height={32} sx={{ bgcolor: "#f3f4f6" }} />
-          <Skeleton variant="text" width={260} height={24} sx={{ bgcolor: "#f3f4f6" }} />
+        <Box sx={{ px: 2, py: 1.5, bgcolor: "#ffffff", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 2 }}>
+          <Skeleton variant="circular" width={32} height={32} sx={{ bgcolor: SURFACE_HOVER }} />
+          <Skeleton variant="text" width={260} height={24} sx={{ bgcolor: SURFACE_HOVER, maxWidth: "50%" }} />
           <Box sx={{ flex: 1 }} />
-          <Skeleton variant="rectangular" width={140} height={8} sx={{ bgcolor: "#f3f4f6", borderRadius: 2 }} />
+          <Skeleton variant="rectangular" width={140} height={8} sx={{ bgcolor: SURFACE_HOVER, borderRadius: 2 }} />
         </Box>
-        <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "#f9fafb" }}>
-          <CircularProgress size={40} sx={{ color: "#1bbbb3" }} />
+        <Box sx={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", bgcolor: SURFACE_MUTED }}>
+          <CircularProgress size={40} sx={{ color: TEAL }} aria-label="Loading course" />
         </Box>
       </Box>
     );
@@ -1681,7 +1723,7 @@ export default function CoursePlayerPage() {
 
   if (error) {
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "#ffffff", alignItems: "center", justifyContent: "center", gap: 2, px: 3 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: SURFACE_MUTED, alignItems: "center", justifyContent: "center", gap: 2, px: 3 }}>
         <Alert severity="error" sx={{ maxWidth: 480 }}>{error}</Alert>
         <Button variant="outlined" onClick={() => navigate("/account/courses")} startIcon={<ArrowBackRoundedIcon />}>
           Back to Courses
@@ -1691,7 +1733,10 @@ export default function CoursePlayerPage() {
   }
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", overflow: "hidden", bgcolor: "#f9fafb" }}>
+    // lg+: fixed-height three-column player (as before). Below lg: curriculum, content and the
+    // Mergers.AI panel stack (no fixed side columns on phones/tablets); the content region keeps
+    // its own bounded scroll so the existing scroll behaviour still works.
+    <Box sx={{ display: "flex", flexDirection: "column", height: { lg: "100vh" }, minHeight: { xs: "100vh", lg: 0 }, overflow: { lg: "hidden" }, bgcolor: SURFACE_MUTED }}>
       {/* Top bar */}
       <PlayerTopBar
         course={course}
@@ -1702,23 +1747,25 @@ export default function CoursePlayerPage() {
       />
 
       {/* Body */}
-      <Box sx={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <Box sx={{ flex: 1, display: "flex", flexDirection: { xs: "column", lg: "row" }, overflow: { lg: "hidden" }, minHeight: 0 }}>
 
-        {/* Sidebar - Left (Course Content) */}
+        {/* Sidebar - Left (Course Content); a capped, scrollable panel above the content below lg */}
         <Box
           sx={{
-            width: 280,
+            width: { xs: "100%", lg: 280 },
+            maxHeight: { xs: "40vh", lg: "none" },
             flexShrink: 0,
             bgcolor: "#ffffff",
-            borderRight: "1px solid #e5e7eb",
+            borderRight: { lg: `1px solid ${BORDER}` },
+            borderBottom: { xs: `1px solid ${BORDER}`, lg: "none" },
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
           }}
         >
           {/* Course Content */}
-          <Box sx={{ px: 2, py: 1.25, borderBottom: "1px solid #e5e7eb" }}>
-            <Typography variant="caption" fontWeight={700} sx={{ color: "#374151", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+          <Box sx={{ px: 2, py: 1.25, borderBottom: `1px solid ${BORDER}` }}>
+            <Typography component="h2" variant="caption" fontWeight={700} sx={{ m: 0, color: INK, textTransform: "uppercase", letterSpacing: "0.08em" }}>
               Course Content
             </Typography>
           </Box>
@@ -1733,8 +1780,22 @@ export default function CoursePlayerPage() {
         </Box>
 
         {/* Main content area - show all sections or inline detail view */}
-        <Box sx={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <Box ref={mainRef} sx={{ flex: 1, overflowY: "auto", bgcolor: "#f3f4f6" }}>
+        <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: { lg: "hidden" } }}>
+          {/* mainRef stays the scroll container at every width: section scroll-to, scroll-spy and the
+              module scroll-reset all scroll this element. Below lg it is a bounded region (the page
+              itself only scrolls between the stacked panels). position: relative below lg makes the
+              sections' offsetTop measure from this region, not from above the stacked curriculum;
+              desktop keeps its original positioning. */}
+          <Box
+            ref={mainRef}
+            sx={{
+              flex: 1,
+              overflowY: "auto",
+              height: { xs: "80vh", lg: "auto" },
+              position: { xs: "relative", lg: "static" },
+              bgcolor: SURFACE_MUTED,
+            }}
+          >
             <SectionView
               courseId={courseId}
               sections={sections}
@@ -1755,10 +1816,12 @@ export default function CoursePlayerPage() {
         {activeModule?.is_video && (
           <Box
             sx={{
-              width: 340,
+              width: { xs: "100%", lg: 340 },
+              height: { xs: 520, lg: "auto" },
               flexShrink: 0,
               bgcolor: "#ffffff",
-              borderLeft: "1px solid #e5e7eb",
+              borderLeft: { lg: `1px solid ${BORDER}` },
+              borderTop: { xs: `1px solid ${BORDER}`, lg: "none" },
               display: "flex",
               flexDirection: "column",
               overflow: "hidden",

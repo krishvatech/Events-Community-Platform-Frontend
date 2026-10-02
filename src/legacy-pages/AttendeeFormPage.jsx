@@ -465,11 +465,11 @@ export default function AttendeeFormPage() {
   };
 
   if (loading) {
-    return <div className="form-page loading">Loading form...</div>;
+    return <div className="form-page loading" role="status">Loading form...</div>;
   }
 
   if (error) {
-    return <div className="form-page error">{error}</div>;
+    return <div className="form-page error" role="alert">{error}</div>;
   }
 
   if (!assignment) {
@@ -517,7 +517,7 @@ export default function AttendeeFormPage() {
           {assignment.deadline && (
             <p className="deadline">Due: {new Date(assignment.deadline).toLocaleDateString()}</p>
           )}
-          <p className="event-format" style={{ fontSize: '12px', color: '#666' }}>
+          <p className="event-format" style={{ fontSize: '13px', color: 'var(--imaa-ink-body)' }}>
             Format: {isInPerson ? 'In-Person' : isHybrid ? 'Hybrid (Select Attendance)' : 'Online'}
           </p>
         </div>
@@ -529,9 +529,9 @@ export default function AttendeeFormPage() {
         {/* Privacy Notice - Different messages for participant info vs promotional profile */}
         {assignment.form_type === 'participant_information' && (
           <div className="privacy-notice">
-            <div className="privacy-notice-icon">🔒</div>
+            <div className="privacy-notice-icon" aria-hidden="true">🔒</div>
             <div className="privacy-notice-content">
-              <h3>Data Privacy Notice</h3>
+              <h2>Data Privacy Notice</h2>
               <p>
                 The following information is <strong>restricted to authorized event staff only</strong> and will not be shared publicly:
               </p>
@@ -551,9 +551,9 @@ export default function AttendeeFormPage() {
         {/* Privacy Notice for Promotional Profile */}
         {assignment.form_type === 'promotional_profile' && (
           <div className="privacy-notice promotional-privacy">
-            <div className="privacy-notice-icon">🌐</div>
+            <div className="privacy-notice-icon" aria-hidden="true">🌐</div>
             <div className="privacy-notice-content">
-              <h3>Public Profile Notice</h3>
+              <h2>Public Profile Notice</h2>
               <p>
                 The information you provide will be published on the event website and may be used in promotional materials:
               </p>
@@ -569,7 +569,7 @@ export default function AttendeeFormPage() {
           </div>
         )}
 
-        {draftSaved && <div className="draft-saved-message">✓ Draft saved successfully</div>}
+        {draftSaved && <div className="draft-saved-message" role="status"><span aria-hidden="true">✓</span> Draft saved successfully</div>}
 
         <form onSubmit={handleSubmit}>
           {sections.map((section, sectionIndex) => {
@@ -598,13 +598,13 @@ export default function AttendeeFormPage() {
                 {/* Restricted data notice for relevant sections */}
                 {isRestrictedSection && (
                   <div className="restricted-notice">
-                    🔒 Restricted data: Visible only to authorized event staff and deleted 30 days after the event
+                    <span aria-hidden="true">🔒</span> Restricted data: Visible only to authorized event staff and deleted 30 days after the event
                   </div>
                 )}
 
                 {isAccessibilitySection && (
                   <div className="restricted-notice">
-                    🔒 Your accessibility and medical information is restricted to authorized event staff only
+                    <span aria-hidden="true">🔒</span> Your accessibility and medical information is restricted to authorized event staff only
                   </div>
                 )}
 
@@ -719,9 +719,11 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             placeholder={field.placeholder}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.id}-error` : undefined}
             className={error ? 'input-error' : ''}
           />
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -737,9 +739,11 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             placeholder={field.placeholder}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.id}-error` : undefined}
             className={error ? 'input-error' : ''}
           />
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -755,9 +759,11 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             placeholder={field.placeholder}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.id}-error` : undefined}
             className={error ? 'input-error' : ''}
           />
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -772,10 +778,12 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             placeholder={field.placeholder}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.id}-error` : undefined}
             className={error ? 'input-error' : ''}
             rows="4"
           />
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -794,9 +802,11 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
               const numericOnly = e.target.value.replace(/\D/g, '');
               onChange(numericOnly);
             }}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.id}-error` : undefined}
             className={error ? 'input-error' : ''}
           />
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -813,9 +823,11 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             max={field.max}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.id}-error` : undefined}
             className={error ? 'input-error' : ''}
           />
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -830,9 +842,11 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             type="date"
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.id}-error` : undefined}
             className={error ? 'input-error' : ''}
           />
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -846,6 +860,8 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             id={field.id}
             value={value}
             onChange={(e) => onChange(e.target.value)}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={error ? `${field.id}-error` : undefined}
             className={error ? 'input-error' : ''}
           >
             <option value="">-- Select --</option>
@@ -860,7 +876,7 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
               );
             })}
           </select>
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -871,20 +887,27 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
             <input
               id={field.id}
               type="checkbox"
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? `${field.id}-error` : undefined}
               checked={value === 'true' || value === true}
               onChange={(e) => onChange(e.target.checked ? 'true' : 'false')}
             />
             <span>{field.label}{isRequired}</span>
           </label>
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
     case 'multi_select':
       return (
         <div className="field-wrapper">
-          <label>{field.label}{isRequired}</label>
-          <div className="multi-select-options">
+          <label id={`${field.id}-label`}>{field.label}{isRequired}</label>
+          <div
+            className="multi-select-options"
+            role="group"
+            aria-labelledby={`${field.id}-label`}
+            aria-describedby={error ? `${field.id}-error` : undefined}
+          >
             {field.options?.map((option) => {
               // Support both string[] and {value, label}[] formats
               const optionValue = typeof option === 'string' ? option : option.value;
@@ -919,7 +942,7 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
               );
             })}
           </div>
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -953,12 +976,13 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
                   onChange(file);
                 }
               }}
-              className={error ? 'input-error' : ''}
-              style={{ display: 'none' }}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? `${field.id}-error` : undefined}
+              className={`visually-hidden-file${error ? ' input-error' : ''}`}
             />
             <div className="file-upload-area">
               <label htmlFor={field.id} className="file-upload-label">
-                <div className="file-upload-icon">📎</div>
+                <div className="file-upload-icon" aria-hidden="true">📎</div>
                 <div className="file-upload-text">
                   {fileName ? (
                     <>
@@ -980,12 +1004,13 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
                 className="file-remove-btn"
                 onClick={() => onChange(null)}
                 title="Remove file"
+                aria-label={`Remove ${fileName}`}
               >
                 ✕
               </button>
             )}
           </div>
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 
@@ -1024,12 +1049,13 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
                   onChange([...fileList, ...validFiles]);
                 }
               }}
-              className={error ? 'input-error' : ''}
-              style={{ display: 'none' }}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? `${field.id}-error` : undefined}
+              className={`visually-hidden-file${error ? ' input-error' : ''}`}
             />
             <div className="file-upload-multiple-area">
               <label htmlFor={field.id} className="file-upload-multiple-label">
-                <div className="file-upload-icon">📁</div>
+                <div className="file-upload-icon" aria-hidden="true">📁</div>
                 <div className="file-upload-text">
                   <p className="file-action">Click to select or drag files here</p>
                   <p className="file-hint">
@@ -1055,6 +1081,7 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
                         onChange(newFiles.length > 0 ? newFiles : null);
                       }}
                       title="Remove file"
+                      aria-label={`Remove ${file instanceof File ? file.name : file}`}
                     >
                       ✕
                     </button>
@@ -1063,7 +1090,7 @@ function FormField({ field, value, onChange, error, allFormData, touched }) {
               </div>
             )}
           </div>
-          {error && <p className="field-error">{error}</p>}
+          {error && <p className="field-error" id={`${field.id}-error`}>{error}</p>}
         </div>
       );
 

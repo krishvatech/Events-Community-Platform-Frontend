@@ -27,8 +27,8 @@ const HeroSection = () => {
         borderRadius: 0,
         mx: 0,
         width: '100%',
-        // lighter gradient background like your 2nd image
-        background: 'linear-gradient(135deg, #2563EB 0%, #3B82F6 100%)',
+        // Flat brand navy (design tokens; gradients retired)
+        background: 'var(--imaa-navy)',
       }}
     >
       {/* Badge */}
@@ -60,7 +60,7 @@ const HeroSection = () => {
             height: 20,
             width: 20,
             borderRadius: '50%',
-            bgcolor: '#FACC15', // yellow-400
+            bgcolor: 'var(--imaa-gold)',
             border: '2px solid #fff',
             display: 'flex',
             alignItems: 'center',
@@ -72,10 +72,11 @@ const HeroSection = () => {
         </Box>
       </Box>
 
-      {/* Headings */}
+      {/* Brand name (not the page heading: the form title is the page's h1). White set explicitly. */}
       <Typography
-        component="h1"
+        component="p"
         sx={{
+          color: '#fff',
           fontWeight: 400,
           letterSpacing: '-0.01em',
           lineHeight: 1.2,
@@ -104,8 +105,8 @@ const HeroSection = () => {
           alt="Learning session"
           sx={{
             width: '100%',
-            borderRadius: 4, // ~ rounded-2xl
-            boxShadow: '0 20px 40px rgba(0,0,0,0.35)',
+            borderRadius: 'var(--imaa-radius-popup)',
+            boxShadow: 'var(--imaa-shadow-lg)',
             border: '1px solid rgba(255,255,255,0.15)',
             objectFit: 'cover',
             objectPosition: 'left',

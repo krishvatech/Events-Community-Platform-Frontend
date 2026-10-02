@@ -32,6 +32,8 @@ export default function KYCCallbackPage() {
 
     return (
         <div
+            role="status"
+            aria-live="polite"
             style={{
                 minHeight: "70vh",
                 display: "flex",
@@ -48,22 +50,22 @@ export default function KYCCallbackPage() {
     `}</style>
 
             <div
-                aria-label="Loading"
+                aria-hidden="true"
                 style={{
                     width: 44,
                     height: 44,
                     borderRadius: "50%",
-                    border: "4px solid rgba(0,0,0,0.12)",
-                    borderTopColor: "rgba(0,0,0,0.55)",
+                    border: "4px solid var(--imaa-border)",
+                    borderTopColor: "var(--imaa-teal)",
                     animation: "kycSpin 0.9s linear infinite",
                 }}
             />
 
-            <div style={{ fontSize: "18px", fontWeight: 600 }}>
+            <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--imaa-ink)" }}>
                 Updating Your Account…
             </div>
 
-            <div style={{ fontSize: "14px", opacity: 0.75, maxWidth: 420 }}>
+            <div style={{ fontSize: "14px", color: "var(--imaa-ink-body)", maxWidth: 420 }}>
                 Please wait. You’ll be redirected automatically.
             </div>
         </div>

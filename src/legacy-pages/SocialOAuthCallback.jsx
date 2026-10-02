@@ -187,8 +187,8 @@ const SocialOAuthCallback = () => {
   }, [navigate, searchParams]);
 
   return (
-    <div className="w-full h-screen flex items-center justify-center">
-      <p style={{ color: "#555", fontSize: 14 }}>Completing sign-in…</p>
+    <div role="status" aria-live="polite" className="w-full min-h-[70vh] flex items-center justify-center">
+      <p style={{ color: "var(--imaa-ink-body)", fontSize: 15 }}>Completing sign-in…</p>
     </div>
   );
 };

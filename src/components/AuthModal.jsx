@@ -51,8 +51,8 @@ const IMAA_ICON = (
       width: 18,
       height: 18,
       borderRadius: "50%",
-      bgcolor: "#0F2040",
-      color: "#14B8A6",
+      bgcolor: "var(--imaa-navy)",
+      color: "var(--imaa-teal)",
       display: "inline-flex",
       alignItems: "center",
       justifyContent: "center",
@@ -104,18 +104,29 @@ const getAccountStatusMessage = (error) => {
   return "";
 };
 
+// Auth field styling (design tokens). 16px text on phones so iOS doesn't zoom in on focus.
 const inputSx = {
   "& .MuiOutlinedInput-root": {
-    borderRadius: "8px",
+    borderRadius: "var(--imaa-radius-field)",
     fontSize: 14,
-    bgcolor: "#F8FAFC",
-    "& fieldset": { borderColor: "#E2E8F0" },
-    "&:hover fieldset": { borderColor: "#CBD5E1" },
-    "&.Mui-focused fieldset": { borderColor: "#0F2040" },
+    bgcolor: "var(--imaa-bg-member)",
+    "& fieldset": { borderColor: "var(--imaa-border)" },
+    "&:hover fieldset": { borderColor: "var(--imaa-border-hover)" },
+    "&.Mui-focused fieldset": { borderColor: "var(--imaa-navy)" },
+    "@media (max-width: 599.95px)": { fontSize: 16 },
   },
   "& .MuiInputLabel-root": { fontSize: 14 },
-  "& .MuiInputLabel-root.Mui-focused": { color: "#0F2040" },
+  "& .MuiInputLabel-root.Mui-focused": { color: "var(--imaa-navy)" },
 };
+
+// Primary auth action: navy with white text (existing treatment, token colours)
+const primaryButtonSx = {
+  borderRadius: 2, py: 1.25, bgcolor: "var(--imaa-navy)", color: "#FFFFFF", fontWeight: 600, fontSize: 15,
+  textTransform: "none", "&:hover": { bgcolor: "var(--imaa-navy-2)" }, boxShadow: "none",
+};
+
+// Modal title: serif heading, the dialog's accessible name
+const AUTH_TITLE_ID = "auth-modal-title";
 
 export default function AuthModal({ open, onClose, initialMode = "login", onLoginSuccess }) {
   const navigate = useNavigate();
@@ -521,46 +532,55 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
       onClose={handleClose}
       maxWidth="xs"
       fullWidth
+      aria-labelledby={AUTH_TITLE_ID}
       PaperProps={{
         sx: {
-          borderRadius: "16px",
-          boxShadow: "0 20px 60px rgba(0,0,0,.15)",
+          borderRadius: "var(--imaa-radius-popup)",
+          boxShadow: "var(--imaa-shadow-lg)",
           p: 0,
           overflow: "hidden",
         },
       }}
-      BackdropProps={{ sx: { backdropFilter: "blur(4px)", bgcolor: "rgba(0,0,0,.35)" } }}
+      BackdropProps={{ sx: { backdropFilter: "blur(4px)", bgcolor: "rgba(27,42,74,.45)" } }}
     >
       <Box sx={{ position: "relative" }}>
         {/* Close button */}
         <IconButton
           onClick={handleClose}
           size="small"
-          sx={{ position: "absolute", top: 12, right: 12, zIndex: 1, color: "#64748B" }}
+          sx={{ position: "absolute", top: 12, right: 12, zIndex: 1, color: "var(--imaa-ink-body)" }}
           aria-label="Close"
         >
           <CloseIcon fontSize="small" />
         </IconButton>
 
-        <DialogContent sx={{ p: 4 }}>
-          {/* ── Title ── */}
-          <Typography variant="h6" sx={{ fontWeight: 700, fontSize: 20, color: "#0F2040", mb: 0.5, textAlign: "center" }}>
+        <DialogContent sx={{ p: { xs: 3, sm: 4 } }}>
+          {/* ── Title (one h1 for the active view; plain element because index.css forces sans on Typography) ── */}
+          <Box
+            component="h1"
+            id={AUTH_TITLE_ID}
+            sx={{ m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: 22, lineHeight: 1.3, color: "var(--imaa-navy)", mb: 0.5, textAlign: "center" }}
+          >
             {mode === "confirm" ? "Verify your email" : "Sign in or create an account"}
-          </Typography>
+          </Box>
 
           {/* ── Mode toggle (Login / Signup) ── */}
           {mode !== "confirm" && (
-            <Box sx={{ display: "flex", bgcolor: "#F1F5F9", borderRadius: 100, p: 0.5, mb: 3, mt: 2 }}>
+            <Box role="group" aria-label="Log in or sign up" sx={{ display: "flex", bgcolor: "var(--imaa-bg-cool)", borderRadius: 100, p: 0.5, mb: 3, mt: 2 }}>
               {["login", "signup"].map((m) => (
                 <Box
                   key={m}
+                  component="button"
+                  type="button"
+                  aria-pressed={mode === m}
                   onClick={() => { setMode(m); setError(""); }}
                   sx={{
                     flex: 1, textAlign: "center", py: 0.75, borderRadius: 100,
+                    border: 0, font: "inherit", fontFamily: "var(--imaa-font-sans)",
                     cursor: "pointer", fontSize: 14, fontWeight: mode === m ? 600 : 500,
-                    color: mode === m ? "#0F2040" : "#64748B",
+                    color: mode === m ? "var(--imaa-navy)" : "var(--imaa-ink-body)",
                     bgcolor: mode === m ? "#FFFFFF" : "transparent",
-                    boxShadow: mode === m ? "0 1px 4px rgba(0,0,0,.1)" : "none",
+                    boxShadow: mode === m ? "var(--imaa-shadow-sm)" : "none",
                     transition: "all .18s ease",
                     userSelect: "none",
                   }}
@@ -572,7 +592,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           )}
 
           {/* ── Error alert ── */}
-          {error && <Alert severity="error" sx={{ mb: 2, fontSize: 13, borderRadius: 2 }}>{error}</Alert>}
+          {error && <Alert severity="error" sx={{ mb: 2, fontSize: 13, borderRadius: "var(--imaa-radius-card)" }}>{error}</Alert>}
 
           {/* ─────────── LOGIN FORM ─────────── */}
           {mode === "login" && (
@@ -600,7 +620,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setShowPwd(v => !v)} tabIndex={-1}>
+                      <IconButton size="small" onClick={() => setShowPwd(v => !v)} aria-label={showPwd ? "Hide password" : "Show password"}>
                         {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
@@ -611,7 +631,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 <MuiLink
                   href="/forgot-password"
                   underline="hover"
-                  sx={{ fontSize: 13, color: "#0F2040", fontWeight: 500 }}
+                  sx={{ fontSize: 13, color: "var(--imaa-navy)", fontWeight: 500 }}
                   onClick={handleClose}
                 >
                   Forgot password?
@@ -622,7 +642,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 fullWidth
                 variant="contained"
                 disabled={loading}
-                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", color: "#FFFFFF", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
+                sx={primaryButtonSx}
               >
                 {loading ? <CircularProgress size={20} color="inherit" /> : "Log in"}
               </Button>
@@ -632,7 +652,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           {/* ─────────── SIGNUP FORM ─────────── */}
           {mode === "signup" && (
             <Box component="form" onSubmit={handleSignup} noValidate>
-              <Box sx={{ display: "flex", gap: 1.5, mb: 2 }}>
+              <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, gap: 1.5, mb: 2 }}>
                 <TextField
                   label="First name" fullWidth value={signupData.firstName}
                   onChange={e => setSignupData(p => ({ ...p, firstName: filterInput(e.target.value, "firstName") }))}
@@ -661,7 +681,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setShowPwd(v => !v)} tabIndex={-1}>
+                      <IconButton size="small" onClick={() => setShowPwd(v => !v)} aria-label={showPwd ? "Hide password" : "Show password"}>
                         {showPwd ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
@@ -677,7 +697,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 InputProps={{
                   endAdornment: (
                     <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setShowPwd2(v => !v)} tabIndex={-1}>
+                      <IconButton size="small" onClick={() => setShowPwd2(v => !v)} aria-label={showPwd2 ? "Hide confirm password" : "Show confirm password"}>
                         {showPwd2 ? <VisibilityOff fontSize="small" /> : <Visibility fontSize="small" />}
                       </IconButton>
                     </InputAdornment>
@@ -689,7 +709,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 fullWidth
                 variant="contained"
                 disabled={loading}
-                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", color: "#FFFFFF", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
+                sx={primaryButtonSx}
               >
                 {loading ? <CircularProgress size={20} color="inherit" /> : "Create account"}
               </Button>
@@ -699,7 +719,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           {/* ─────────── CONFIRM FORM ─────────── */}
           {mode === "confirm" && (
             <Box component="form" onSubmit={handleConfirm} noValidate>
-              <Typography variant="body2" sx={{ color: "#64748B", mb: 2.5, textAlign: "center" }}>
+              <Typography variant="body2" sx={{ color: "var(--imaa-ink-body)", mb: 2.5, textAlign: "center" }}>
                 We sent a verification code to <strong>{signupData.email}</strong>. Enter it below.
               </Typography>
               <TextField
@@ -720,7 +740,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                     setError("");
                     setResendTimer(0);
                   }}
-                  sx={{ color: "#64748B", textDecoration: "none", fontSize: 13, "&:hover": { textDecoration: "underline" } }}
+                  sx={{ color: "var(--imaa-ink-body)", textDecoration: "none", fontSize: 13, "&:hover": { textDecoration: "underline" } }}
                 >
                   Change email address
                 </MuiLink>
@@ -733,7 +753,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                   sx={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: resendTimer > 0 ? "#94A3B8" : "#0F2040",
+                    color: resendTimer > 0 ? "var(--imaa-ink-hint)" : "var(--imaa-navy)",
                     textTransform: "none",
                     "&:hover": { bgcolor: "transparent", textDecoration: "underline" }
                   }}
@@ -747,7 +767,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 fullWidth
                 variant="contained"
                 disabled={loading}
-                sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", color: "#FFFFFF", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
+                sx={primaryButtonSx}
               >
                 {loading ? <CircularProgress size={20} color="inherit" /> : "Verify & continue"}
               </Button>
@@ -758,9 +778,9 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           {mode !== "confirm" && (
             <>
               <Box sx={{ display: "flex", alignItems: "center", my: 2.5, gap: 1.5 }}>
-                <Box sx={{ flex: 1, height: "1px", bgcolor: "#E2E8F0" }} />
-                <Typography variant="caption" sx={{ color: "#94A3B8", fontWeight: 500, whiteSpace: "nowrap" }}>Continue with</Typography>
-                <Box sx={{ flex: 1, height: "1px", bgcolor: "#E2E8F0" }} />
+                <Box sx={{ flex: 1, height: "1px", bgcolor: "var(--imaa-border)" }} />
+                <Typography variant="caption" sx={{ color: "var(--imaa-ink-body)", fontWeight: 500, whiteSpace: "nowrap" }}>Continue with</Typography>
+                <Box sx={{ flex: 1, height: "1px", bgcolor: "var(--imaa-border)" }} />
               </Box>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
                 {ENABLE_IMAA_SSO && (
@@ -771,8 +791,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                     onClick={() => handleSocialLogin(IMAA_SSO_IDP_NAME)}
                     sx={{
                       textTransform: "none", fontWeight: 600, fontSize: 14,
-                      borderColor: "#0F2040", color: "#0F2040", borderRadius: 2, py: 1,
-                      "&:hover": { borderColor: "#0F2040", bgcolor: "#F8FAFC" },
+                      borderColor: "var(--imaa-navy)", color: "var(--imaa-navy)", borderRadius: 2, py: 1,
+                      "&:hover": { borderColor: "var(--imaa-navy)", bgcolor: "var(--imaa-bg-member)" },
                     }}
                   >
                     Continue with IMAA
@@ -786,8 +806,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                     onClick={() => handleSocialLogin("Google")}
                     sx={{
                       textTransform: "none", fontWeight: 500, fontSize: 14,
-                      borderColor: "#E2E8F0", color: "#374151", borderRadius: 2, py: 1,
-                      "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" },
+                      borderColor: "var(--imaa-border)", color: "var(--imaa-ink)", borderRadius: 2, py: 1,
+                      "&:hover": { borderColor: "var(--imaa-border-hover)", bgcolor: "var(--imaa-bg-member)" },
                     }}
                   >
                     Google
@@ -799,8 +819,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                     onClick={() => handleSocialLogin("LinkedIn")}
                     sx={{
                       textTransform: "none", fontWeight: 500, fontSize: 14,
-                      borderColor: "#E2E8F0", color: "#374151", borderRadius: 2, py: 1,
-                      "&:hover": { borderColor: "#CBD5E1", bgcolor: "#F8FAFC" },
+                      borderColor: "var(--imaa-border)", color: "var(--imaa-ink)", borderRadius: 2, py: 1,
+                      "&:hover": { borderColor: "var(--imaa-border-hover)", bgcolor: "var(--imaa-bg-member)" },
                     }}
                   >
                     LinkedIn

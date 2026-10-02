@@ -54,6 +54,7 @@ import PeopleAltOutlinedIcon from "@mui/icons-material/PeopleAltOutlined";
 import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { API_BASE, getToken } from "../utils/api.js";
 import { LeadGenModal } from "../components/LeadGenModal.jsx";
+import { PageHeader, EmptyState } from "../components/page";
 
 const navItems = [
   { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon /> },
@@ -94,7 +95,7 @@ function SuccessToast({
         color: "#fff",
         zIndex: (t) => t.zIndex.modal + 2,
         backdropFilter: "blur(2px)",
-        backgroundColor: "rgba(15,23,42,0.35)",
+        backgroundColor: "rgba(27,42,74,0.35)",
         p: 2,
       }}
     >
@@ -104,7 +105,7 @@ function SuccessToast({
           sx={{
             width: "100%",
             maxWidth: 420,
-            borderRadius: 3,
+            borderRadius: "var(--imaa-radius-popup)",
             textAlign: "center",
             p: 3,
           }}
@@ -753,25 +754,22 @@ export default function MyCartPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-imaa-member">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           {/* MAIN */}
           <main className="col-span-12">
-            {/* Page Header */}
-            <div className="mb-6">
-              <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
-                My Cart
-              </h1>
-              <p className="text-slate-600">
-                Manage your shopping cart and view your orders.
-              </p>
-            </div>
+            {/* Page Header (shared A3 PageHeader; same wording) */}
+            <PageHeader
+              title="My Cart"
+              subtitle="Manage your shopping cart and view your orders."
+              sx={{ mb: 3 }}
+            />
 
             {/* Tabs row (Cart | Orders | Addresses | Account details) */}
             <Paper
               elevation={0}
-              className="rounded-2xl border border-slate-200 mb-4"
+              className="rounded-lg border border-imaa-border mb-4"
             >
               <Tabs
                 value={tab}
@@ -782,10 +780,10 @@ export default function MyCartPage() {
                   px: 1,
                   "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
                   "& .Mui-selected": {
-                    color: "#0ea5a4 !important",
+                    color: "var(--imaa-ink) !important",
                     fontWeight: 700,
                   },
-                  "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+                  "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal)" },
                 }}
               >
                 <Tab label="Cart" />
@@ -802,47 +800,45 @@ export default function MyCartPage() {
                 <div className="col-span-12 lg:col-span-8">
                   <Paper
                     elevation={0}
-                    className="rounded-2xl border border-slate-200 overflow-hidden"
+                    className="rounded-lg border border-imaa-border overflow-hidden"
                   >
                     {viewItems.length === 0 ? (
-                      <Box className="p-8 text-center">
-                        <h3 className="text-xl font-semibold text-slate-700">
-                          Your cart is empty
-                        </h3>
-                        <p className="text-slate-500 mt-2">
-                          Browse events and add tickets to your cart.
-                        </p>
-                        <Button
-                          component={Link}
-                          to="/events"
-                          className="mt-4 rounded-xl"
-                          sx={{
-                            textTransform: "none",
-                            backgroundColor: "#10b8a6",
-                            "&:hover": { backgroundColor: "#0ea5a4" },
-                          }}
-                          variant="contained"
-                        >
-                          Explore events
-                        </Button>
-                      </Box>
+                      <EmptyState
+                        surface={false}
+                        title="Your cart is empty"
+                        description="Browse events and add tickets to your cart."
+                        action={
+                          <Button
+                            component={Link}
+                            to="/events"
+                            className="rounded-xl"
+                            sx={{ textTransform: "none" }}
+                            variant="contained"
+                          >
+                            Explore events
+                          </Button>
+                        }
+                      />
                     ) : (
                       <>
-                        <Box sx={{ width: "100%", overflowX: "auto" }}>
+                        {/* The table scrolls sideways inside this region on narrow screens (focusable for keyboard scrolling) */}
+                        <Box role="region" aria-label="Cart items" tabIndex={0} sx={{ width: "100%", overflowX: "auto" }}>
                           <Table sx={{ minWidth: 700 }} size="small">
                             <TableHead>
                               <TableRow>
-                                <TableCell />
-                                <TableCell className="font-semibold text-slate-600">
+                                <TableCell>
+                                  <span className="sr-only">Remove</span>
+                                </TableCell>
+                                <TableCell className="font-semibold text-imaa-body">
                                   Product
                                 </TableCell>
-                                <TableCell className="font-semibold text-slate-600">
+                                <TableCell className="font-semibold text-imaa-body">
                                   Price
                                 </TableCell>
-                                <TableCell className="font-semibold text-slate-600">
+                                <TableCell className="font-semibold text-imaa-body">
                                   Quantity
                                 </TableCell>
-                                <TableCell className="font-semibold text-slate-600">
+                                <TableCell className="font-semibold text-imaa-body">
                                   Subtotal
                                 </TableCell>
                               </TableRow>
@@ -854,7 +850,7 @@ export default function MyCartPage() {
                                     <IconButton
                                       size="small"
                                       onClick={() => removeItem(it.id)}
-                                      aria-label="remove"
+                                      aria-label={`Remove ${it.title || "item"} from cart`}
                                     >
                                       <CloseOutlinedIcon />
                                     </IconButton>
@@ -865,7 +861,7 @@ export default function MyCartPage() {
                                         <img
                                           src={toAbs(it.image)}
                                           alt={it.title}
-                                          className="w-12 h-12 rounded-md object-cover border border-slate-200"
+                                          className="w-12 h-12 rounded-md object-cover border border-imaa-border"
                                           loading="lazy"
                                         />
                                       ) : (
@@ -878,7 +874,7 @@ export default function MyCartPage() {
                                               ? `/events/${it.slug}`
                                               : "#"
                                           }
-                                          className="text-slate-800 font-medium hover:text-teal-700 line-clamp-2"
+                                          className="text-imaa-ink font-medium hover:text-imaa-teal-dark line-clamp-2"
                                         >
                                           {it.title}
                                         </Link>
@@ -896,7 +892,8 @@ export default function MyCartPage() {
                                       onChange={(e) =>
                                         updateQty(it.id, e.target.value)
                                       }
-                                      inputProps={{ min: 1 }}
+                                      inputProps={{ min: 1, "aria-label": `Quantity for ${it.title || "item"}` }}
+                                      sx={{ minWidth: 72 }}
                                     />
                                   </TableCell>
                                   <TableCell className="font-semibold">
@@ -946,22 +943,22 @@ export default function MyCartPage() {
                 <div className="col-span-12 lg:col-span-4 lg:sticky lg:top-24">
                   <Paper
                     elevation={0}
-                    className="rounded-2xl border border-slate-200"
+                    className="rounded-lg border border-imaa-border"
                   >
                     <Box className="p-5">
-                      <h3 className="text-2xl font-extrabold text-slate-800 mb-3">
+                      <h2 className="font-serif text-xl font-bold text-imaa-ink mb-3">
                         Cart totals
-                      </h3>
-                      <div className="border border-slate-200 rounded-xl overflow-hidden">
-                        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                          <span className="text-slate-600">Subtotal</span>
+                      </h2>
+                      <div className="border border-imaa-border rounded-lg overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-3 border-b border-imaa-border">
+                          <span className="text-imaa-body">Subtotal</span>
                           <span className="font-semibold">
                             {fmt(displaySubtotal)}
                           </span>
                         </div>
                         {discount > 0 && (
-                          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200">
-                            <span className="text-slate-600 flex items-center gap-2">
+                          <div className="flex items-center justify-between px-4 py-3 border-b border-imaa-border">
+                            <span className="text-imaa-body flex items-center gap-2">
                               Discount{" "}
                               <Chip
                                 label={couponCode.toUpperCase()}
@@ -974,10 +971,10 @@ export default function MyCartPage() {
                           </div>
                         )}
                         <div className="flex items-center justify-between px-4 py-3">
-                          <span className="text-slate-800 font-semibold">
+                          <span className="text-imaa-ink font-semibold">
                             Total
                           </span>
-                          <span className="text-slate-900 font-extrabold">
+                          <span className="text-imaa-ink font-extrabold">
                             {fmt(displayTotal)}
                           </span>
                         </div>
@@ -990,8 +987,8 @@ export default function MyCartPage() {
                         sx={{
                           textTransform: "none",
                           py: 1.25,
-                          backgroundColor: "teal-500",
-                          "&:hover": { backgroundColor: "teal-400" },
+                          bgcolor: "primary.main",
+                          "&:hover": { bgcolor: "primary.dark" },
                         }}
                         variant="contained"
                       >
@@ -1005,12 +1002,12 @@ export default function MyCartPage() {
 
             {/* TAB 1: PREVIOUS ORDERS */}
             {tab === 1 && (
-              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-700">
+              <Box className="mt-4 p-4 sm:p-6 rounded-lg border border-imaa-border bg-white text-imaa-ink">
                 {/* Header with filters on the right */}
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, gap: 2, flexWrap: "wrap" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                  <Box component="h2" sx={{ m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: 20, color: "var(--imaa-ink)" }}>
                     Your orders
-                  </Typography>
+                  </Box>
 
                   {/* Filter and Sort Controls */}
                   <Box sx={{ display: "flex", gap: 2, alignItems: "center", flexWrap: "wrap" }}>
@@ -1101,19 +1098,17 @@ export default function MyCartPage() {
                 )}
 
                 {!ordersLoading && ordersError && (
-                  <Typography variant="body2" color="error">
+                  <Typography variant="body2" color="error" role="alert">
                     {ordersError}
                   </Typography>
                 )}
 
                 {!ordersLoading && !ordersError && viewOrders.length === 0 && (
-                  <Typography variant="body2" color="text.secondary">
-                    You don’t have any orders yet.
-                  </Typography>
+                  <EmptyState surface={false} titleComponent="h3" title="You don’t have any orders yet." />
                 )}
 
                 {!ordersLoading && !ordersError && viewOrders.length > 0 && (
-                  <Box sx={{ width: "100%", overflowX: "auto", mt: 1 }}>
+                  <Box role="region" aria-label="Your orders" tabIndex={0} sx={{ width: "100%", overflowX: "auto", mt: 1 }}>
                     <Table size="small" sx={{ minWidth: 600 }}>
                       <TableHead>
                         <TableRow>
@@ -1133,7 +1128,19 @@ export default function MyCartPage() {
                             sx={{ cursor: "pointer" }}
                             onClick={() => handleOrderClick(o)} // ⬅️ open popup
                           >
-                            <TableCell>#{o.number}</TableCell>
+                            <TableCell>
+                              <Box
+                                component="button"
+                                type="button"
+                                aria-label={`View order #${o.number}`}
+                                sx={{
+                                  p: 0, border: "none", bgcolor: "transparent", font: "inherit", cursor: "pointer",
+                                  color: "var(--imaa-teal-hover)", fontWeight: 600, textDecoration: "underline",
+                                }}
+                              >
+                                #{o.number}
+                              </Box>
+                            </TableCell>
                             <TableCell>
                               <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                                 {(o.items || []).map((item, idx) => (
@@ -1211,10 +1218,10 @@ export default function MyCartPage() {
 
             {/* TAB 2 & 3: simple placeholders for now */}
             {tab === 2 && (
-              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-700">
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+              <Box className="mt-4 p-4 sm:p-6 rounded-lg border border-imaa-border bg-white text-imaa-ink">
+                <Box component="h2" sx={{ m: 0, mb: 1, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: 20, color: "var(--imaa-ink)" }}>
                   Billing address
-                </Typography>
+                </Box>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
                   This address is required for Saleor order creation and invoice generation.
                 </Typography>
@@ -1264,17 +1271,17 @@ export default function MyCartPage() {
 
                     {billingError && (
                       <Grid item xs={12}>
-                        <Typography variant="body2" color="error">{billingError}</Typography>
+                        <Typography variant="body2" color="error" role="alert">{billingError}</Typography>
                       </Grid>
                     )}
                     {billingMessage && (
                       <Grid item xs={12}>
-                        <Typography variant="body2" color="success.main">{billingMessage}</Typography>
+                        <Typography variant="body2" color="success.main" role="status">{billingMessage}</Typography>
                       </Grid>
                     )}
 
-                    <Grid item xs={12} sx={{ display: "flex", gap: 2 }}>
-                      <Button variant="contained" disabled={billingSaving} onClick={saveBillingAddress} sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}>
+                    <Grid item xs={12} sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
+                      <Button variant="contained" disabled={billingSaving} onClick={saveBillingAddress} sx={{ textTransform: "none" }}>
                         {billingSaving ? "Saving..." : "Save billing address"}
                       </Button>
                       {billingAddress.first_name && (
@@ -1289,7 +1296,7 @@ export default function MyCartPage() {
             )}
 
             {tab === 3 && (
-              <Box className="mt-4 p-6 rounded-2xl border border-slate-200 bg-white text-slate-600">
+              <Box className="mt-4 p-4 sm:p-6 rounded-lg border border-imaa-border bg-white text-imaa-body">
                 Account details section coming soon.
               </Box>
             )}
@@ -1317,8 +1324,8 @@ export default function MyCartPage() {
         onClose={() => setDeleteConfirmOpen(false)}
         PaperProps={{
           sx: {
-            borderRadius: "12px",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+            borderRadius: "var(--imaa-radius-popup)",
+            boxShadow: "var(--imaa-shadow-lg)",
           },
         }}
       >
@@ -1356,13 +1363,13 @@ export default function MyCartPage() {
         onClose={() => setCheckoutWarningOpen(false)}
         PaperProps={{
           sx: {
-            borderRadius: "12px",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+            borderRadius: "var(--imaa-radius-popup)",
+            boxShadow: "var(--imaa-shadow-lg)",
           },
         }}
       >
         <DialogTitle sx={{ fontSize: "1.1rem", fontWeight: 700, pb: 1, display: "flex", alignItems: "center", gap: 1 }}>
-          ⚠️ Billing address required
+          <span aria-hidden="true">⚠️</span> Billing address required
         </DialogTitle>
         <DialogContent sx={{ py: 2 }}>
           <Typography variant="body2" color="text.secondary">
@@ -1383,7 +1390,7 @@ export default function MyCartPage() {
               setTab(2);
             }}
             variant="contained"
-            sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+            sx={{ textTransform: "none" }}
           >
             Go to Addresses
           </Button>
@@ -1398,8 +1405,8 @@ export default function MyCartPage() {
         maxWidth="sm"
         PaperProps={{
           sx: {
-            borderRadius: "12px",
-            boxShadow: "0 10px 40px rgba(0,0,0,0.12)",
+            borderRadius: "var(--imaa-radius-popup)",
+            boxShadow: "var(--imaa-shadow-lg)",
           },
         }}
       >
@@ -1409,7 +1416,7 @@ export default function MyCartPage() {
             fontWeight: 700,
             color: "text.primary",
             paddingY: 2.5,
-            borderBottom: "1px solid #e5e7eb",
+            borderBottom: "1px solid var(--imaa-border)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
@@ -1439,7 +1446,7 @@ export default function MyCartPage() {
                   alignItems: "center",
                   justifyContent: "space-between",
                   pb: 2,
-                  borderBottom: "1px solid #e5e7eb",
+                  borderBottom: "1px solid var(--imaa-border)",
                 }}
               >
                 <Typography variant="body2" color="text.secondary">
@@ -1462,7 +1469,7 @@ export default function MyCartPage() {
                 <Box sx={{ width: "100%", overflowX: "auto" }}>
                   <Table size="small" sx={{ minWidth: 300 }}>
                     <TableHead>
-                      <TableRow sx={{ backgroundColor: "#f9fafb" }}>
+                      <TableRow sx={{ backgroundColor: "var(--imaa-bg-member)" }}>
                         <TableCell sx={{ fontWeight: 600, color: "text.secondary" }}>
                           Item
                         </TableCell>
@@ -1479,14 +1486,14 @@ export default function MyCartPage() {
                     </TableHead>
                     <TableBody>
                       {(selectedOrder.items || []).map((item) => (
-                        <TableRow key={item.id} sx={{ "&:hover": { backgroundColor: "#fafafa" } }}>
+                        <TableRow key={item.id} sx={{ "&:hover": { backgroundColor: "var(--imaa-bg-member)" } }}>
                           <TableCell>
                             <Box className="flex items-center gap-2">
                               {item.image ? (
                                 <img
                                   src={toAbs(item.image)}
                                   alt={item.title}
-                                  className="w-10 h-10 rounded-md object-cover border border-slate-200"
+                                  className="w-10 h-10 rounded-md object-cover border border-imaa-border"
                                 />
                               ) : (
                                 <div className="w-10 h-10 rounded-md bg-slate-200" />
@@ -1519,9 +1526,9 @@ export default function MyCartPage() {
                 elevation={0}
                 sx={{
                   p: 2.5,
-                  border: "1px solid #e5e7eb",
-                  borderRadius: 2,
-                  backgroundColor: "#f9fafb",
+                  border: "1px solid var(--imaa-border)",
+                  borderRadius: "var(--imaa-radius-card)",
+                  backgroundColor: "var(--imaa-bg-member)",
                 }}
               >
                 <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5 }}>
@@ -1550,8 +1557,6 @@ export default function MyCartPage() {
                       onClick={(e) => handleDownloadInvoice(selectedOrder.invoice, e)}
                       sx={{
                         textTransform: "none",
-                        backgroundColor: "#1bbbb3",
-                        "&:hover": { backgroundColor: "#0ea5a4" },
                         alignSelf: "flex-start",
                       }}
                     >
@@ -1564,8 +1569,8 @@ export default function MyCartPage() {
                       onClick={(e) => handleGenerateInvoicePdf(selectedOrder.invoice, e)}
                       sx={{
                         textTransform: "none",
-                        borderColor: "#1bbbb3",
-                        color: "#1bbbb3",
+                        borderColor: "var(--imaa-teal)",
+                        color: "var(--imaa-teal-hover)",
                         alignSelf: "flex-start",
                       }}
                     >
@@ -1578,7 +1583,7 @@ export default function MyCartPage() {
               <Box
                 sx={{
                   pt: 2,
-                  borderTop: "1px solid #e5e7eb",
+                  borderTop: "1px solid var(--imaa-border)",
                 }}
               >
                 {parseFloat(selectedOrder.discount_amount || 0) > 0 && (
@@ -1589,7 +1594,7 @@ export default function MyCartPage() {
                     </Box>
                     <Box sx={{ display: "flex", justifyContent: "space-between" }}>
                       <Typography variant="body2" sx={{ color: "text.secondary" }}>Discount:</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 600, color: "#ef4444" }}>-{fmt(selectedOrder.discount_amount)}</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600, color: "error.main" }}>-{fmt(selectedOrder.discount_amount)}</Typography>
                     </Box>
                   </Box>
                 )}
@@ -1599,7 +1604,7 @@ export default function MyCartPage() {
                 </Typography>
                 <Typography
                   variant="h6"
-                  sx={{ fontWeight: 800, color: "#1bbbb3" }}
+                  sx={{ fontWeight: 800, color: "var(--imaa-teal-hover)" }}
                 >
                   {fmt(selectedOrder.total)}
                 </Typography>

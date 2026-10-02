@@ -1,17 +1,32 @@
 import React from "react";
 import { Container, Box, Paper, Alert, Skeleton } from "@mui/material";
 import { apiClient } from "../utils/api";
+import { EmptyState } from "../components/page";
 
-// Same Title Style Like HomePage
+// Section title: serif heading in ink (design tokens)
 const SectionTitle = ({ children }) => (
-  <h2 className="text-2xl md:text-3xl font-bold text-neutral-900">{children}</h2>
+  <h2 className="font-serif text-2xl md:text-3xl font-bold text-imaa-ink">{children}</h2>
 );
 
-// Same Card Style Like HomePage FeaturedCard
+// Hero height grows with long CMS titles (was a fixed height); same minimum sizes as before
+const HERO_CLASS = "relative min-h-[max(380px,50vh)] md:min-h-[60vh] py-16 flex items-center justify-center text-center";
+
+// Readable defaults for the CMS HTML blocks. The `prose` classes used before had no effect
+// (the Tailwind typography plugin isn't installed). Styling only; the HTML itself is rendered as before.
+const CMS_HTML_CLASS = [
+  "max-w-4xl mx-auto text-center text-base md:text-lg leading-relaxed text-imaa-body",
+  "[&_p]:mt-4 [&_p:first-child]:mt-0",
+  "[&_h2]:mt-8 [&_h2]:font-serif [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-imaa-ink",
+  "[&_h3]:mt-6 [&_h3]:font-serif [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-imaa-ink",
+  "[&_ul]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:text-left [&_ol]:mt-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:text-left",
+  "[&_a]:text-imaa-link [&_a]:underline [&_strong]:font-semibold [&_strong]:text-imaa-ink",
+].join(" ");
+
+// Feature card: 8px corners, token border and shadows
 const FeaturedCard = ({ image, title, desc }) => (
   <Box
     component="article"
-    className="bg-white rounded-2xl overflow-hidden shadow-sm card-hover-effect h-full flex flex-col"
+    className="bg-white rounded-lg border border-imaa-border overflow-hidden shadow-imaa-sm transition-shadow hover:shadow-imaa-md h-full flex flex-col"
   >
     <Box className="w-full overflow-hidden">
       <img
@@ -23,17 +38,17 @@ const FeaturedCard = ({ image, title, desc }) => (
     </Box>
 
     <Box className="p-5 flex-1 flex flex-col">
-      <div className="font-semibold text-neutral-900">{title}</div>
-      <p className="mt-2 text-sm text-neutral-600">{desc}</p>
+      <h3 className="font-serif text-lg font-semibold text-imaa-ink">{title}</h3>
+      <p className="mt-2 text-sm text-imaa-body">{desc}</p>
     </Box>
   </Box>
 );
 
 const AboutPageSkeleton = () => {
   return (
-    <>
+    <div className="bg-white">
       {/* HERO Skeleton */}
-      <section className="relative h-[50vh] min-h-[380px] md:h-[60vh] flex items-center justify-center text-center bg-cover bg-center">
+      <section className={`${HERO_CLASS} bg-cover bg-center`}>
         <div className="absolute inset-0 bg-black/10" />
         <Container maxWidth="lg" disableGutters className="px-4 md:px-6 z-10">
           <Skeleton variant="text" sx={{ mx: "auto" }} width="60%" height={70} />
@@ -69,7 +84,7 @@ const AboutPageSkeleton = () => {
             {[0, 1, 2].map((i) => (
               <Box
                 key={i}
-                className="bg-white rounded-2xl overflow-hidden shadow-sm h-full flex flex-col"
+                className="bg-white rounded-lg border border-imaa-border overflow-hidden shadow-imaa-sm h-full flex flex-col"
               >
                 <Skeleton variant="rectangular" height={220} />
                 <Box className="p-5">
@@ -86,7 +101,7 @@ const AboutPageSkeleton = () => {
       {/* Mission Skeleton */}
       <section className="py-12 md:py-20">
         <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <Paper elevation={0} className="bg-white rounded-2xl p-6 md:p-10 neumorphic-shadow">
+          <Paper elevation={0} className="bg-white rounded-lg border border-imaa-border shadow-imaa-sm p-6 md:p-10">
             <div className="text-center">
               <Skeleton variant="text" sx={{ mx: "auto" }} width="30%" height={40} />
             </div>
@@ -98,7 +113,7 @@ const AboutPageSkeleton = () => {
           </Paper>
         </Container>
       </section>
-    </>
+    </div>
   );
 };
 
@@ -106,6 +121,8 @@ const AboutPageSkeleton = () => {
 export default function AboutPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState("");
+  // True only when the CMS answered 404 for every candidate slug (shown as "not found", not as an error)
+  const [notFound, setNotFound] = React.useState(false);
   const [page, setPage] = React.useState(null);
 
   React.useEffect(() => {
@@ -139,6 +156,7 @@ export default function AboutPage() {
         setError("");
       } catch (e) {
         if (!mounted) return;
+        setNotFound(e?.response?.status === 404);
         setError(e?.response?.data?.detail || e?.message || "Failed To Load About Page");
       } finally {
         if (mounted) setLoading(false);
@@ -154,6 +172,21 @@ export default function AboutPage() {
     return <AboutPageSkeleton />;
   }
 
+  if (error && notFound) {
+    return (
+      <div className="bg-white">
+        <Container maxWidth="lg" sx={{ py: { xs: 6, md: 10 } }}>
+          <EmptyState
+            titleComponent="h1"
+            title="Page not found"
+            description="The About page content is not available yet."
+          />
+        </Container>
+      </div>
+    );
+  }
+
+  // Any other failure (network, server) is still shown as an error
   if (error) {
     return (
       <Container sx={{ py: 6 }}>
@@ -169,22 +202,24 @@ export default function AboutPage() {
   const features = Array.isArray(page?.features) ? page.features : [];
 
   return (
-    <>
-      {/* HERO Like HomePage */}
+    // White surface scoped to this page (the app body is cream)
+    <div className="bg-white">
+      {/* HERO: CMS image under a flat navy overlay (design tokens) */}
       <section
-        className="relative h-[50vh] min-h-[380px] md:h-[60vh] flex items-center justify-center text-center text-white bg-cover bg-center hero-image-overlay"
+        className={`${HERO_CLASS} text-white bg-cover bg-center`}
         style={{
-          backgroundImage: `linear-gradient(rgba(17,33,32,0.55), rgba(17,33,32,0.75)), url("${heroBg}")`,
+          backgroundImage: `url("${heroBg}")`,
         }}
       >
-        <div className="absolute inset-0 bg-black/30" />
+        <div className="absolute inset-0 bg-imaa-navy/75" />
         <Container maxWidth="lg" disableGutters className="px-4 md:px-6 z-10">
-          <h1 className="text-3xl md:text-6xl font-semibold leading-tight">
+          {/* text-white is set on the heading itself: the global h1 rule in index.css would otherwise make it navy */}
+          <h1 className="font-serif text-3xl md:text-5xl font-bold leading-tight text-white break-words">
             {page?.hero_title || page?.title || "About"}
           </h1>
 
           {!!page?.hero_subtitle && (
-            <p className="mt-3 md:mt-4 text-base md:text-xl max-w-3xl mx-auto text-white/90">
+            <p className="mt-3 md:mt-4 text-base md:text-xl max-w-3xl mx-auto text-white/90 break-words">
               {page.hero_subtitle}
             </p>
           )}
@@ -199,12 +234,7 @@ export default function AboutPage() {
           </div>
 
           <div
-            className="
-              prose prose-neutral prose-lg md:prose-xl
-              max-w-4xl mx-auto mt-6 md:mt-8
-              text-center
-              prose-ul:text-left prose-ol:text-left prose-li:text-left
-            "
+            className={`${CMS_HTML_CLASS} mt-6 md:mt-8`}
             dangerouslySetInnerHTML={{
               __html: page?.intro_html || page?.body_html || "",
             }}
@@ -212,9 +242,9 @@ export default function AboutPage() {
         </Container>
       </section>
 
-      {/* Feature Cards Section */}
+      {/* Feature Cards Section (cool-grey band between the white sections) */}
       {features.length > 0 && (
-        <section className="py-12 md:py-20">
+        <section className="py-12 md:py-20 bg-imaa-cool">
           <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
             <div className="text-center">
               <SectionTitle>{page?.features_title || "What You Can Do"}</SectionTitle>
@@ -239,23 +269,18 @@ export default function AboutPage() {
       {(page?.mission_title || page?.mission_html) && (
         <section className="py-12 md:py-20">
           <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-            <Paper elevation={0} className="bg-white rounded-2xl p-6 md:p-10 neumorphic-shadow">
+            <Paper elevation={0} className="bg-white rounded-lg border border-imaa-border shadow-imaa-sm p-6 md:p-10">
               <div className="text-center">
                 <SectionTitle>{page?.mission_title || "Our Mission"}</SectionTitle>
               </div>
               <div
-                className="
-                  prose prose-neutral prose-lg md:prose-xl
-                  max-w-4xl mx-auto mt-6
-                  text-center
-                  prose-ul:text-left prose-ol:text-left prose-li:text-left
-                "
+                className={`${CMS_HTML_CLASS} mt-6`}
                 dangerouslySetInnerHTML={{ __html: page?.mission_html || "" }}
               />
             </Paper>
           </Container>
         </section>
       )}
-    </>
+    </div>
   );
 }

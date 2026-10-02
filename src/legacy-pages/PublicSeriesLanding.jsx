@@ -5,6 +5,7 @@ import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import GroupsIcon from '@mui/icons-material/Groups';
 import { API_BASE, authConfig, getToken } from '../utils/api';
+import { EmptyState } from '../components/page';
 
 const PublicSeriesLanding = () => {
   const { slug } = useParams();
@@ -139,7 +140,7 @@ const PublicSeriesLanding = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-neutral-50">
+      <div className="flex justify-center items-center min-h-screen bg-imaa-member">
         <CircularProgress />
       </div>
     );
@@ -147,12 +148,12 @@ const PublicSeriesLanding = () => {
 
   if (!series) {
     return (
-      <div className="min-h-screen bg-neutral-50 flex items-center justify-center">
+      <div className="min-h-screen bg-imaa-member flex items-center justify-center">
         <div className="max-w-md w-full mx-auto px-4">
           <Alert severity="error" className="mb-4">{error || 'Series not found'}</Alert>
           <button
             onClick={() => navigate('/')}
-            className="w-full bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-lg transition-colors"
+            className="w-full bg-imaa-teal-dark hover:brightness-90 text-white font-semibold py-3 rounded-lg transition"
           >
             Back to Events
           </button>
@@ -172,7 +173,7 @@ const PublicSeriesLanding = () => {
     !isSeriesOwner;
 
   return (
-    <div className="min-h-screen bg-neutral-50">
+    <div className="min-h-screen bg-imaa-member">
       {error && (
         <div className="sticky top-0 z-40 bg-red-50 border-b border-red-200 p-4">
           <div className="max-w-7xl mx-auto">
@@ -190,13 +191,13 @@ const PublicSeriesLanding = () => {
 
       {/* Hero Section with Cover Image */}
       {series.cover_image && (
-        <div className="relative h-96 bg-gradient-to-br from-teal-600 to-teal-800 overflow-hidden">
+        <div className="relative h-64 sm:h-96 bg-imaa-navy overflow-hidden">
           <img
             src={series.cover_image}
             alt={series.title}
             className="w-full h-full object-cover opacity-80"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/30 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-imaa-navy/60 via-imaa-navy/30 to-transparent" />
         </div>
       )}
 
@@ -204,7 +205,7 @@ const PublicSeriesLanding = () => {
       <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
         {/* Header Section */}
         <div className={`${series.cover_image ? '-mt-24 relative z-10' : ''} mb-12`}>
-          <div className={`${series.cover_image ? 'bg-white rounded-lg shadow-lg p-8' : ''}`}>
+          <div className={`${series.cover_image ? 'bg-white rounded-lg border border-imaa-border shadow-imaa-md p-5 sm:p-8' : ''}`}>
             {/* Status Badge */}
             <div className="mb-4">
               <Chip
@@ -215,32 +216,32 @@ const PublicSeriesLanding = () => {
             </div>
 
             {/* Title */}
-            <h1 className="text-4xl md:text-5xl font-bold text-neutral-900 mb-4 leading-tight">
+            <h1 className="font-serif text-3xl md:text-5xl font-bold text-imaa-ink mb-4 leading-tight break-words">
               {series.title}
             </h1>
 
             {/* Meta Info */}
-            <div className="flex flex-wrap gap-6 mb-6 text-neutral-600">
+            <div className="flex flex-wrap gap-x-6 gap-y-3 mb-6 text-imaa-body">
               <div className="flex items-center gap-2">
-                <CalendarMonthIcon className="text-teal-600" />
+                <CalendarMonthIcon className="text-imaa-teal" />
                 <span className="font-medium">{events.length} {events.length === 1 ? 'Event' : 'Events'}</span>
               </div>
               <div className="flex items-center gap-2">
-                <GroupsIcon className="text-teal-600" />
+                <GroupsIcon className="text-imaa-teal" />
                 <span className="font-medium">{series.registrations_count || 0} Registered</span>
               </div>
               <div className="font-medium">
                 {series.is_free || !series.price ? (
-                  <span className="text-teal-600 font-semibold">Free</span>
+                  <span className="text-imaa-teal-dark font-semibold">Free</span>
                 ) : (
-                  <span className="text-teal-600 font-semibold">${series.price}</span>
+                  <span className="text-imaa-teal-dark font-semibold">${series.price}</span>
                 )}
               </div>
             </div>
 
             {/* Description */}
             {series.description && (
-              <p className="text-lg text-neutral-700 mb-8 leading-relaxed max-w-3xl">
+              <p className="text-lg text-imaa-body mb-8 leading-relaxed max-w-3xl">
                 {series.description}
               </p>
             )}
@@ -254,7 +255,7 @@ const PublicSeriesLanding = () => {
                 <button
                   onClick={handleRegisterForSeries}
                   disabled={registering}
-                  className="rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 px-8 transition-colors text-lg"
+                  className="rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed bg-imaa-teal-dark hover:brightness-90 text-white font-semibold py-3 px-8 transition text-lg"
                 >
                   {registering ? 'Registering...' : 'Register for Series'}
                 </button>
@@ -271,14 +272,14 @@ const PublicSeriesLanding = () => {
               )}
               <button
                 onClick={() => navigate('/')}
-                className="rounded-lg border-2 border-teal-600 text-teal-600 hover:bg-teal-50 font-semibold py-3 px-8 transition-colors text-lg"
+                className="rounded-lg border-2 border-imaa-teal-dark text-imaa-teal-dark hover:bg-[var(--imaa-teal-light)] font-semibold py-3 px-8 transition-colors text-lg"
               >
                 Back to Events
               </button>
             </div>
             {/* Under "Back to Events": confirm the user is already registered. */}
             {isSeriesRegistered && (
-              <p className="mt-3 text-teal-700 font-medium">
+              <p className="mt-3 text-imaa-teal-dark font-medium">
                 You are already registered for this Series
               </p>
             )}
@@ -287,19 +288,19 @@ const PublicSeriesLanding = () => {
 
         {/* Series Info Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-          <div className="rounded-lg border border-neutral-200 bg-white p-6">
-            <h3 className="text-sm font-semibold text-neutral-500 uppercase mb-2">Visibility</h3>
-            <p className="text-lg font-semibold text-neutral-900 capitalize">{series.visibility}</p>
+          <div className="rounded-lg border border-imaa-border bg-white shadow-imaa-sm p-5 sm:p-6">
+            <p className="text-sm font-semibold text-imaa-body uppercase mb-2">Visibility</p>
+            <p className="text-lg font-semibold text-imaa-ink capitalize">{series.visibility}</p>
           </div>
-          <div className="rounded-lg border border-neutral-200 bg-white p-6">
-            <h3 className="text-sm font-semibold text-neutral-500 uppercase mb-2">Registration Mode</h3>
-            <p className="text-lg font-semibold text-neutral-900 capitalize">
+          <div className="rounded-lg border border-imaa-border bg-white shadow-imaa-sm p-5 sm:p-6">
+            <p className="text-sm font-semibold text-imaa-body uppercase mb-2">Registration Mode</p>
+            <p className="text-lg font-semibold text-imaa-ink capitalize">
               {series.registration_mode?.replace(/_/g, ' ')}
             </p>
           </div>
-          <div className="rounded-lg border border-neutral-200 bg-white p-6">
-            <h3 className="text-sm font-semibold text-neutral-500 uppercase mb-2">Price</h3>
-            <p className="text-lg font-semibold text-teal-600">
+          <div className="rounded-lg border border-imaa-border bg-white shadow-imaa-sm p-5 sm:p-6">
+            <p className="text-sm font-semibold text-imaa-body uppercase mb-2">Price</p>
+            <p className="text-lg font-semibold text-imaa-teal-dark">
               {series.is_free || !series.price ? 'Free' : `$${series.price}`}
             </p>
           </div>
@@ -307,12 +308,10 @@ const PublicSeriesLanding = () => {
 
         {/* Events Section */}
         <div>
-          <h2 className="text-3xl font-bold text-neutral-900 mb-8">Events in this Series</h2>
+          <h2 className="font-serif text-2xl sm:text-3xl font-bold text-imaa-ink mb-6 sm:mb-8">Events in this Series</h2>
 
           {events.length === 0 ? (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-6">
-              <p className="text-neutral-700">No events added to this series yet</p>
-            </div>
+            <EmptyState titleComponent="h3" title="No events added to this series yet" />
           ) : (
             <div className="grid grid-cols-1 gap-6">
               {events
@@ -320,14 +319,14 @@ const PublicSeriesLanding = () => {
                 .map((event, idx) => (
                 <div
                   key={event.id}
-                  className="rounded-lg border border-neutral-200 bg-white p-6 hover:shadow-md transition-shadow"
+                  className="rounded-lg border border-imaa-border bg-white shadow-imaa-sm p-5 sm:p-6 hover:shadow-imaa-md transition-shadow"
                 >
                   {/* Event Order Badge */}
                   <div className="flex items-start justify-between mb-4">
-                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-teal-100">
-                      <span className="text-sm font-bold text-teal-700">{event.series_order || idx + 1}</span>
+                    <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-[var(--imaa-teal-light)]" aria-hidden="true">
+                      <span className="text-sm font-bold text-imaa-teal-dark">{event.series_order || idx + 1}</span>
                     </div>
-                    <span className="text-xs font-semibold text-neutral-500 uppercase">
+                    <span className="text-xs font-semibold text-imaa-body uppercase">
                       Session {event.series_order || idx + 1}
                     </span>
                   </div>
@@ -335,21 +334,21 @@ const PublicSeriesLanding = () => {
                   {/* Event Title and Label */}
                   <div className="mb-4">
                     {event.series_session_label && (
-                      <p className="text-sm font-semibold text-teal-600 mb-1">
+                      <p className="text-sm font-semibold text-imaa-teal-dark mb-1">
                         {event.series_session_label}
                       </p>
                     )}
-                    <h3 className="text-xl font-bold text-neutral-900">{event.title}</h3>
+                    <h3 className="font-serif text-xl font-bold text-imaa-ink break-words">{event.title}</h3>
                   </div>
 
                   {/* Event Details Grid */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4 pb-4 border-b border-neutral-100">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 mb-4 pb-4 border-b border-imaa-border">
                     {/* Date */}
                     <div className="flex items-start gap-3">
-                      <CalendarMonthIcon className="text-teal-600 mt-1 flex-shrink-0" />
+                      <CalendarMonthIcon className="text-imaa-teal mt-1 flex-shrink-0" />
                       <div>
-                        <p className="text-xs text-neutral-500 font-semibold uppercase mb-1">Date</p>
-                        <p className="text-sm font-semibold text-neutral-900">
+                        <p className="text-xs text-imaa-body font-semibold uppercase mb-1">Date</p>
+                        <p className="text-sm font-semibold text-imaa-ink">
                           {event.start_time
                             ? new Date(event.start_time).toLocaleDateString('en-US', {
                               weekday: 'short',
@@ -364,10 +363,10 @@ const PublicSeriesLanding = () => {
 
                     {/* Time */}
                     <div className="flex items-start gap-3">
-                      <AccessTimeIcon className="text-teal-600 mt-1 flex-shrink-0" />
+                      <AccessTimeIcon className="text-imaa-teal mt-1 flex-shrink-0" />
                       <div>
-                        <p className="text-xs text-neutral-500 font-semibold uppercase mb-1">Time</p>
-                        <p className="text-sm font-semibold text-neutral-900">
+                        <p className="text-xs text-imaa-body font-semibold uppercase mb-1">Time</p>
+                        <p className="text-sm font-semibold text-imaa-ink">
                           {event.start_time
                             ? new Date(event.start_time).toLocaleTimeString('en-US', {
                               hour: '2-digit',
@@ -381,10 +380,10 @@ const PublicSeriesLanding = () => {
 
                     {/* Registrations */}
                     <div className="flex items-start gap-3">
-                      <GroupsIcon className="text-teal-600 mt-1 flex-shrink-0" />
+                      <GroupsIcon className="text-imaa-teal mt-1 flex-shrink-0" />
                       <div>
-                        <p className="text-xs text-neutral-500 font-semibold uppercase mb-1">Registered</p>
-                        <p className="text-sm font-semibold text-neutral-900">
+                        <p className="text-xs text-imaa-body font-semibold uppercase mb-1">Registered</p>
+                        <p className="text-sm font-semibold text-imaa-ink">
                           {event.registrations_count || 0} {event.registrations_count === 1 ? 'person' : 'people'}
                         </p>
                       </div>
@@ -394,9 +393,10 @@ const PublicSeriesLanding = () => {
                   {/* Event Link */}
                   <button
                     onClick={() => navigate(`/events/${event.slug || event.id}`)}
-                    className="text-teal-600 hover:text-teal-700 font-semibold text-sm transition-colors"
+                    aria-label={`View Event Details: ${event.title}`}
+                    className="text-imaa-teal-dark hover:text-imaa-ink font-semibold text-sm transition-colors"
                   >
-                    View Event Details →
+                    View Event Details <span aria-hidden="true">→</span>
                   </button>
                 </div>
               ))}

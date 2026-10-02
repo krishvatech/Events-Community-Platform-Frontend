@@ -10,22 +10,22 @@ const FEATURES = [
     title: "Continuous Learning",
     // desc: "Keep your knowledge up-to-date with new content.",
     Icon: MenuBookRoundedIcon,
-    color: "#2E5BFF",
-    tint: "rgba(46,91,255,0.14)",
+    color: "var(--imaa-teal)",
+    tint: "rgba(10,147,150,0.12)",
   },
   {
     title: "Professional Network",
     // desc: "Connect with peers and industry experts.",
     Icon: AccountTreeRoundedIcon,
-    color: "#00C853",
-    tint: "rgba(0,200,83,0.14)",
+    color: "var(--imaa-orange)",
+    tint: "rgba(232,83,47,0.12)",
   },
   {
     title: "Exclusive Events",
     // desc: "Participate in transformative events.",
     Icon: EventAvailableRoundedIcon,
-    color: "#AA00FF",
-    tint: "rgba(170,0,255,0.14)",
+    color: "var(--imaa-purple)",
+    tint: "rgba(123,45,142,0.12)",
   },
 ];
 
@@ -44,9 +44,9 @@ export default function FeaturesSection() {
           elevation={0}
           sx={{
             p: 2.25,
-            borderRadius: 1,                 // small, not pill
-            border: "1px solid #E6EAF2",
-            boxShadow: "0 8px 20px rgba(15,23,42,0.06)",
+            borderRadius: "var(--imaa-radius-card)",
+            border: "1px solid var(--imaa-border)",
+            boxShadow: "var(--imaa-shadow-sm)",
             bgcolor: "#fff",
             display: "flex",
             flexDirection: "column",
@@ -68,12 +68,15 @@ export default function FeaturesSection() {
             <Icon sx={{ fontSize: 24, color }} />
           </Box>
 
-          <Typography variant="subtitle1" fontWeight={400} fontSize={14} color="Grey">
+          {/* Feature name (was an <h6> via subtitle1, in "Grey" text below AA contrast) */}
+          <Typography variant="subtitle1" component="p" fontWeight={500} fontSize={14} sx={{ color: "var(--imaa-ink)" }}>
             {title}
           </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {desc}
-          </Typography>
+          {desc && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {desc}
+            </Typography>
+          )}
         </Paper>
       ))}
     </Box>

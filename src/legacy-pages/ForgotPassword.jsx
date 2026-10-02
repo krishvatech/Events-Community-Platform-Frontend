@@ -24,6 +24,9 @@ import {
 // It only changes wording and where we land on success — the OTP request and
 // confirm calls are identical, so the public /forgot-password flow is
 // unchanged by default.
+// Visible field labels (block so their spacing applies), Inter, ink
+const labelSx = { display: 'block', mb: 0.5, fontWeight: 500, fontSize: 13, color: 'var(--imaa-ink)' };
+
 const ForgotPassword = ({ authedMode = false }) => {
     const navigate = useNavigate();
     const location = useLocation();
@@ -151,7 +154,6 @@ const ForgotPassword = ({ authedMode = false }) => {
             <CssBaseline />
 
             <Box
-                component="main"
                 sx={{
                     width: 1,
                     minHeight: authedMode ? 'auto' : '100svh',
@@ -187,25 +189,25 @@ const ForgotPassword = ({ authedMode = false }) => {
                         alignItems: 'center',
                         justifyContent: 'center',
                         p: { xs: 3, md: 6 },
-                        bgcolor: authedMode ? 'transparent' : '#f9fafb',
+                        bgcolor: authedMode ? 'transparent' : 'var(--imaa-bg-member)',
                     }}
                 >
                     <Box sx={{ width: '100%', maxWidth: 480 }}>
                         {/* Heading */}
                         <Box sx={{ textAlign: 'center', mb: 2 }}>
-                            <Typography
-                                variant="h5"
-                                sx={{ fontWeight: 400, letterSpacing: '-0.2px' }}
+                            <Box
+                                component="h1"
+                                sx={{ m: 0, fontFamily: 'var(--imaa-font-serif)', fontWeight: 700, fontSize: { xs: 24, md: 28 }, lineHeight: 1.25, color: 'var(--imaa-ink)' }}
                             >
                                 {authedMode ? 'Set your password' : 'Forgot your password?'}
-                            </Typography>
+                            </Box>
                             <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5 }}>
                                 {authedMode
                                     ? 'Confirm your email and we’ll send you a verification code (OTP) to set your password.'
                                     : 'Enter your email and we’ll send you a verification code (OTP).'}
                             </Typography>
                             {step === 'confirm' && deliveryHint ? (
-                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                                <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }} role="status">
                                     {deliveryHint}
                                 </Typography>
                             ) : null}
@@ -215,20 +217,23 @@ const ForgotPassword = ({ authedMode = false }) => {
                         <Paper
                             elevation={0}
                             sx={{
-                                borderRadius: 2,
+                                borderRadius: 'var(--imaa-radius-card)',
                                 p: { xs: 2.5, md: 3 },
-                                border: '1px solid #e5e7eb',
+                                border: '1px solid var(--imaa-border)',
                                 bgcolor: '#ffffff',
                             }}
                         >
                             <Box component="form" noValidate onSubmit={handleSubmit}>
                                 <Typography
+                                    component="label"
+                                    htmlFor="forgot-email"
                                     variant="caption"
-                                    sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}
+                                    sx={labelSx}
                                 >
                                     Email Address
                                 </Typography>
                                 <TextField
+                                    id="forgot-email"
                                     size="small"
                                     name="email"
                                     type="text"
@@ -240,25 +245,21 @@ const ForgotPassword = ({ authedMode = false }) => {
                                     helperText={errors.email}
                                     sx={{
                                         mb: 2,
-                                        '& .MuiOutlinedInput-root': {
-                                            borderRadius: 1,
-                                            '& fieldset': { borderColor: '#d1d5db' },
-                                            '&:hover fieldset': { borderColor: '#155dfc' },
-                                            '&.Mui-focused fieldset': { borderColor: '#155dfc' },
-                                        },
+                                        '& .MuiOutlinedInput-root': { borderRadius: 1 },
                                         '& .MuiInputBase-input': {
-                                            fontSize: 12,
-                                            '::placeholder': { fontSize: 14, opacity: 0.6 },
+                                            fontSize: 14,
+                                            '@media (max-width: 599.95px)': { fontSize: 16 },
                                         },
                                     }}
                                 />
 
                                 {step === 'confirm' && (
                                     <>
-                                        <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
+                                        <Typography component="label" htmlFor="forgot-code" variant="caption" sx={labelSx}>
                                             Verification Code (OTP)
                                         </Typography>
                                         <TextField
+                                            id="forgot-code"
                                             size="small"
                                             value={code}
                                             onChange={(e) => setCode(e.target.value.replace(/\s/g, ''))}
@@ -268,10 +269,11 @@ const ForgotPassword = ({ authedMode = false }) => {
                                             sx={{ mb: 2 }}
                                         />
 
-                                        <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
+                                        <Typography component="label" htmlFor="forgot-new-password" variant="caption" sx={labelSx}>
                                             New Password
                                         </Typography>
                                         <TextField
+                                            id="forgot-new-password"
                                             size="small"
                                             type={showPassword ? 'text' : 'password'}
                                             value={newPassword}
@@ -283,7 +285,7 @@ const ForgotPassword = ({ authedMode = false }) => {
                                             InputProps={{
                                                 endAdornment: (
                                                     <InputAdornment position="end">
-                                                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                                                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end" aria-label={showPassword ? 'Hide passwords' : 'Show passwords'}>
                                                             {showPassword ? <VisibilityOff /> : <Visibility />}
                                                         </IconButton>
                                                     </InputAdornment>
@@ -291,10 +293,11 @@ const ForgotPassword = ({ authedMode = false }) => {
                                             }}
                                         />
 
-                                        <Typography variant="caption" sx={{ mb: 0.5, fontWeight: 490, fontSize: 13 }}>
+                                        <Typography component="label" htmlFor="forgot-confirm-password" variant="caption" sx={labelSx}>
                                             Confirm Password
                                         </Typography>
                                         <TextField
+                                            id="forgot-confirm-password"
                                             size="small"
                                             type={showPassword ? 'text' : 'password'}
                                             value={confirmPassword}
@@ -318,10 +321,10 @@ const ForgotPassword = ({ authedMode = false }) => {
                                         fontWeight: 600,
                                         borderRadius: 1,
                                         textTransform: 'none',
-                                        bgcolor: '#155dfc',
-                                        '&:hover': { bgcolor: '#165DFF' },
+                                        bgcolor: 'var(--imaa-navy)',
+                                        '&:hover': { bgcolor: 'var(--imaa-navy-2)' },
                                         color: 'white',
-                                        fontSize: 12,
+                                        fontSize: 15,
                                     }}
                                 >
                                     {loading
@@ -349,7 +352,7 @@ const ForgotPassword = ({ authedMode = false }) => {
                                             minWidth: 'auto',
                                             textTransform: 'none',
                                             fontSize: 13,
-                                            color: '#155dfc',
+                                            color: 'var(--imaa-navy)',
                                             fontWeight: 600,
                                         }}
                                     >

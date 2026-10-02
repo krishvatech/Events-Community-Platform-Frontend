@@ -285,8 +285,8 @@ const CognitoOAuthCallback = () => {
   }, [navigate, params]);
 
   return (
-    <div className="w-full h-screen flex items-center justify-center">
-      <p style={{ color: "#555", fontSize: 14 }}>Completing sign-in…</p>
+    <div role="status" aria-live="polite" className="w-full h-screen flex items-center justify-center bg-imaa-member">
+      <p style={{ color: "var(--imaa-ink-body)", fontSize: 15 }}>Completing sign-in…</p>
     </div>
   );
 };

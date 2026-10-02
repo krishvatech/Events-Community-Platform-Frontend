@@ -193,11 +193,11 @@ export default function MagicLinkPage() {
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100vh",
-          background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+          background: "var(--imaa-navy)", // brand navy (was an off-brand purple gradient)
         }}
       >
-        <Box sx={{ textAlign: "center" }}>
-          <CircularProgress sx={{ color: "white", mb: 2 }} />
+        <Box role="status" aria-live="polite" sx={{ textAlign: "center" }}>
+          <CircularProgress aria-hidden="true" sx={{ color: "white", mb: 2 }} />
           <Typography variant="h6" sx={{ color: "white" }}>
             Logging you in...
           </Typography>
@@ -215,8 +215,10 @@ export default function MagicLinkPage() {
             {error}
           </Typography>
           <Typography
+            component="button"
+            type="button"
             variant="body2"
-            sx={{ mt: 2, color: "#1976d2", cursor: "pointer" }}
+            sx={{ mt: 2, p: 0, border: 0, bgcolor: "transparent", color: "var(--imaa-navy)", textDecoration: "underline", cursor: "pointer" }}
             onClick={() => navigate("/events")}
           >
             ← Back to Events
