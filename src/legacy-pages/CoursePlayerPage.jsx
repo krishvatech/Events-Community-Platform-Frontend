@@ -1532,6 +1532,9 @@ export default function CoursePlayerPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [snack, setSnack] = useState(null);
   const [expandedSections, setExpandedSections] = useState({});
+  // "Open in platform" viewer (ModuleLaunchModal). This state was removed in an earlier refactor while
+  // handleOpenInPlatform still called setLaunchModal, so those buttons threw a ReferenceError.
+  const [launchModal, setLaunchModal] = useState({ open: false, module: null });
 
   const mainRef = useRef(null);
   const sectionRefs = useRef({});
@@ -1781,6 +1784,16 @@ export default function CoursePlayerPage() {
 
         {/* Main content area - show all sections or inline detail view */}
         <Box sx={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", overflow: { lg: "hidden" } }}>
+          {/* "Open in platform" viewer: takes the content area while open (as before it was removed).
+              The section view below stays mounted but hidden, so mainRef and the scroll-spy observer
+              keep the same element when the viewer closes. */}
+          {launchModal.open && (
+            <ModuleLaunchModal
+              courseId={courseId}
+              module={launchModal.module}
+              onClose={() => setLaunchModal({ open: false, module: null })}
+            />
+          )}
           {/* mainRef stays the scroll container at every width: section scroll-to, scroll-spy and the
               module scroll-reset all scroll this element. Below lg it is a bounded region (the page
               itself only scrolls between the stacked panels). position: relative below lg makes the
@@ -1788,6 +1801,7 @@ export default function CoursePlayerPage() {
               desktop keeps its original positioning. */}
           <Box
             ref={mainRef}
+            hidden={launchModal.open}
             sx={{
               flex: 1,
               overflowY: "auto",

@@ -858,9 +858,10 @@ const profileNameSx = {
   overflowWrap: "anywhere",
 };
 
-function SectionCard({ title, action, children, sx }) {
+function SectionCard({ title, action, children, sx, id }) {
   return (
     <Card
+      id={id}
       variant="outlined"
       sx={{ ...profileCardSx, width: '100%', mx: { xs: 'auto', md: 0 }, ...sx }}
     >
@@ -879,6 +880,8 @@ function VerificationCard({ status, pendingRequest, onVerify, onRenew }) {
 
   return (
     <SectionCard
+      // Deep-link target for the Dashboard's "Get Verified" link (/account/profile#verify)
+      id="verify"
       title="Verification"
       sx={{
         mb: 2,

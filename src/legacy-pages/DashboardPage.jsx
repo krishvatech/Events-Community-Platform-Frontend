@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link, useNavigate } from "#navigation";
 import { apiClient } from "../utils/api";
-import { Badge } from "@mui/material";
+import { Badge, Box } from "@mui/material";
 import {
   Search as SearchIcon,
   NotificationsRounded as NotifIcon,
@@ -18,14 +18,26 @@ import {
 } from "@mui/icons-material";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
 
+// Brand hex values (identical to the --imaa-* tokens). Kept as hex because they are combined with
+// alpha suffixes (e.g. `${O}15`). Surfaces, borders and text use the CSS tokens below.
 const O = "#E8532F";
 const N = "#1B2A4A";
 const T = "#0A9396";
 // const P = "#7B2D8E"; // COMMENTED OUT - used only in commented Community section
 // const G = "#D4920B"; // COMMENTED OUT - used only in commented Community section
-const BG = "#FAF9F7";
-const BORDER = "#EEECEA";
+const BG = "var(--imaa-bg-member)"; // member page surface (was cream #FAF9F7)
+const BORDER = "var(--imaa-border)";
 const FONT = "var(--imaa-font-sans)"; // Inter (design token in src/styles/brand.css)
+const SERIF = "var(--imaa-font-serif)"; // Source Serif 4 for page/section headings
+const INK = "var(--imaa-ink)";
+const INK_BODY = "var(--imaa-ink-body)"; // secondary text that meets AA contrast
+const ORANGE_DARK = "var(--imaa-orange-hover)"; // white text on it meets AA (plain orange does not)
+const TEAL_DARK = "var(--imaa-teal-hover)"; // AA as text, and white text on it meets AA
+const CARD_RADIUS = "var(--imaa-radius-card)";
+const FIELD_RADIUS = "var(--imaa-radius-field)";
+const PAGE_PX = { xs: 2, sm: 3, md: 5 }; // 16 / 24 / 40px side padding
+// Events grid: 1 column on phones, 2 on tablets, 3 from lg (room for the member sidebar)
+const EVENT_GRID_COLUMNS = { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" };
 
 const FALLBACK_IMGS = [
   "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80",
@@ -105,13 +117,15 @@ function FadeIn({ children, delay = 0 }) {
     return () => { obs.disconnect(); clearTimeout(fallback); };
   }, [delay]);
   return (
-    <div ref={ref} style={{
+    <Box ref={ref} sx={{
       opacity: vis ? 1 : 0,
       transform: vis ? "translateY(0)" : "translateY(16px)",
       transition: `opacity 0.5s ${delay}ms ease, transform 0.5s ${delay}ms ease`,
+      // Reduced motion: content is shown straight away, without the fade/slide
+      "@media (prefers-reduced-motion: reduce)": { opacity: 1, transform: "none", transition: "none" },
     }}>
       {children}
-    </div>
+    </Box>
   );
 }
 
@@ -138,63 +152,123 @@ function DashTopbar({ notifCount, messageCount, isAdmin }) {
   };
 
   return (
-    <div style={{
-      height: 50, background: "#fff", borderBottom: `1px solid ${BORDER}`,
-      display: "flex", alignItems: "center", padding: "0 28px",
-      position: "sticky", top: 0, zIndex: 100, gap: 16, fontFamily: FONT,
+    <Box sx={{
+      minHeight: 50, bgcolor: "#fff", borderBottom: `1px solid ${BORDER}`,
+      display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 2, rowGap: 1,
+      px: { xs: 2, md: 3.5 }, py: 1,
+      // Sticky on desktop. Below md it scrolls with the page, so it never sits under the shell's
+      // fixed menu button (AppChrome shows that button below md).
+      position: { xs: "static", md: "sticky" }, top: 0, zIndex: 100, fontFamily: FONT,
     }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-        <span style={{ fontSize: 12, color: "#C0BAB4", fontWeight: 500 }}>Home</span>
-        <ChevronIcon sx={{ fontSize: 14, color: "#C0BAB4" }} />
+      <Box sx={{ order: 1, display: "flex", alignItems: "center", gap: 0.75, flexShrink: 0 }}>
+        <span style={{ fontSize: 12, color: INK_BODY, fontWeight: 500 }}>Home</span>
+        <ChevronIcon sx={{ fontSize: 14, color: INK_BODY }} />
         <span style={{ fontSize: 12, fontWeight: 700, color: N }}>Dashboard</span>
-      </div>
-      <div style={{
-        flex: 1, maxWidth: 360, height: 34,
-        background: BG, border: `1px solid ${BORDER}`, borderRadius: 8,
-        display: "flex", alignItems: "center", gap: 8, padding: "0 12px",
+      </Box>
+      {/* Search field: visual only (no search behaviour is wired up). Full-width row on phones. */}
+      <Box sx={{
+        order: { xs: 3, md: 2 }, flex: { xs: "1 1 100%", md: "1 1 auto" }, maxWidth: { md: 360 }, minWidth: 0,
+        height: 34, bgcolor: BG, border: `1px solid ${BORDER}`, borderRadius: FIELD_RADIUS,
+        display: "flex", alignItems: "center", gap: 1, px: 1.5,
+        // The input hides its own outline (inline style), so keyboard focus is shown on the field
+        "&:focus-within": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "1px" },
       }}>
-        <SearchIcon sx={{ fontSize: 16, color: "#C0BAB4" }} />
-        <input
+        <SearchIcon sx={{ fontSize: 16, color: INK_BODY }} />
+        <Box
+          component="input"
+          aria-label="Search events, people, resources"
           placeholder="Search events, people, resources…"
-          style={{ flex: 1, border: "none", background: "transparent", outline: "none", fontSize: 12, color: N, fontFamily: FONT }}
+          style={{ outline: "none" }}
+          sx={{
+            flex: 1, minWidth: 0, border: "none", background: "transparent",
+            fontSize: { xs: 16, md: 13 }, color: N, fontFamily: FONT,
+            "&::placeholder": { color: INK_BODY, opacity: 1 },
+          }}
         />
-      </div>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginLeft: "auto" }}>
-        <button
+      </Box>
+      <Box sx={{ order: { xs: 2, md: 3 }, display: "flex", alignItems: "center", gap: 1, ml: "auto" }}>
+        <Box
+          component="button"
+          type="button"
+          aria-label="Messages"
           onClick={handleMessagesClick}
-          style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          sx={iconButtonSx}
         >
           <Badge badgeContent={messageCount || 0} color="error" sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, padding: "0 3px" } }}>
-            <MsgIcon sx={{ fontSize: 17, color: "#888" }} />
+            <MsgIcon sx={{ fontSize: 17, color: INK_BODY }} />
           </Badge>
-        </button>
-        <button
+        </Box>
+        <Box
+          component="button"
+          type="button"
+          aria-label="Notifications"
           onClick={handleNotificationsClick}
-          style={{ background: BG, border: `1px solid ${BORDER}`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}
+          sx={iconButtonSx}
         >
           <Badge badgeContent={notifCount || 0} color="error" sx={{ "& .MuiBadge-badge": { fontSize: 9, height: 14, minWidth: 14, padding: "0 3px" } }}>
-            <NotifIcon sx={{ fontSize: 17, color: "#888" }} />
+            <NotifIcon sx={{ fontSize: 17, color: INK_BODY }} />
           </Badge>
-        </button>
+        </Box>
         {isAdmin ? (
-          <button
+          <Box
+            component="button"
+            type="button"
             onClick={() => navigate("/admin/events")}
-            style={{ height: 34, padding: "0 16px", background: O, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}
+            sx={{ ...topActionSx, bgcolor: ORANGE_DARK }}
           >
             + Post Event
-          </button>
+          </Box>
         ) : (
-          <button
+          <Box
+            component="button"
+            type="button"
             onClick={() => navigate("/events")}
-            style={{ height: 34, padding: "0 16px", background: N, color: "#fff", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap" }}
+            sx={{ ...topActionSx, bgcolor: N }}
           >
             Explore Events
-          </button>
+          </Box>
         )}
-      </div>
-    </div>
+      </Box>
+    </Box>
   );
 }
+
+const iconButtonSx = {
+  bgcolor: BG, border: `1px solid ${BORDER}`, borderRadius: FIELD_RADIUS, width: 34, height: 34, p: 0,
+  display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+  "&:hover": { bgcolor: "var(--imaa-bg-cool)" },
+};
+
+const topActionSx = {
+  height: 34, px: 2, color: "#fff", border: "none", borderRadius: FIELD_RADIUS,
+  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap",
+  "&:hover": { filter: "brightness(0.92)" },
+};
+
+// ── Shared look for the notice banners (profile, verification, pending forms) ──
+// Flat white surface, token border, coloured left edge (was a tinted gradient). Wraps on phones.
+const bannerSx = (accent, hasDismiss) => ({
+  position: "relative", bgcolor: "#fff",
+  border: `1px solid ${BORDER}`, borderLeft: `4px solid ${accent}`, borderRadius: CARD_RADIUS,
+  boxShadow: "var(--imaa-shadow-sm)",
+  py: 1.75, pl: { xs: 2, sm: 2.5 }, pr: hasDismiss ? { xs: 5, sm: 6 } : { xs: 2, sm: 2.5 },
+  display: "flex", flexWrap: "wrap", alignItems: "center", gap: 2, fontFamily: FONT,
+});
+// Icon/ring + text stay on one row; the call-to-action wraps below them when space runs out
+const bannerBodySx = { display: "flex", alignItems: "center", gap: 2, flex: "1 1 260px", minWidth: 0 };
+const bannerTitleSx = { fontSize: 13, fontWeight: 700, color: N, mb: 0.25, fontFamily: FONT };
+const bannerTextSx = { fontSize: 12, color: INK_BODY, lineHeight: 1.5, fontFamily: FONT };
+const bannerCtaSx = (bg) => ({
+  display: "inline-block", fontSize: 12, fontWeight: 700, color: "#fff", bgcolor: bg, textDecoration: "none",
+  whiteSpace: "nowrap", px: 1.75, py: 0.75, borderRadius: FIELD_RADIUS, border: "none", cursor: "pointer",
+  fontFamily: FONT, "&:hover": { filter: "brightness(0.92)" },
+});
+const dismissSx = {
+  position: "absolute", top: 8, right: 8, width: 28, height: 28, p: 0,
+  display: "flex", alignItems: "center", justifyContent: "center",
+  background: "none", border: "none", borderRadius: FIELD_RADIUS, cursor: "pointer",
+  fontSize: 18, color: INK_BODY, lineHeight: 1, "&:hover": { bgcolor: "var(--imaa-bg-cool)" },
+};
 
 // ── Format missing sections into readable text ────────────────────────────────
 function formatMissingSections(missing) {
@@ -236,71 +310,60 @@ function ProfileBanner({ completion, onDismiss, profile }) {
   const helperText = formatMissingSections(missing);
 
   return (
-    <div style={{
-      margin: "0 40px 14px",
-      background: `linear-gradient(135deg, ${O}08 0%, ${O}14 100%)`,
-      border: `1px solid ${O}28`, borderRadius: 12,
-      padding: "14px 20px", display: "flex", alignItems: "center", gap: 16,
-      fontFamily: FONT, position: "relative",
-    }}>
-      <svg width="52" height="52" style={{ flexShrink: 0 }}>
-        <circle cx="26" cy="26" r={r} fill="none" stroke={`${O}20`} strokeWidth="3" />
-        <circle cx="26" cy="26" r={r} fill="none" stroke={O} strokeWidth="3"
-          strokeDasharray={`${filled} ${gap}`} strokeLinecap="round"
-          transform="rotate(-90 26 26)" />
-        <text x="26" y="31" textAnchor="middle" fontSize="11" fontWeight="800" fill={O} fontFamily={FONT}>
-          {completion}%
-        </text>
-      </svg>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: N, marginBottom: 2, fontFamily: FONT }}>Complete your profile</div>
-        <div style={{ fontSize: 12, color: "#777", lineHeight: 1.5, fontFamily: FONT }}>
-          {helperText}
-        </div>
-      </div>
-      <a href="/account/profile"
-        style={{ fontSize: 12, fontWeight: 700, color: O, textDecoration: "none", whiteSpace: "nowrap", background: `${O}14`, padding: "6px 14px", borderRadius: 7, fontFamily: FONT }}>
+    <Box sx={{ ...bannerSx(O, true), mx: PAGE_PX, mb: 1.75 }}>
+      <Box sx={bannerBodySx}>
+        <svg width="52" height="52" style={{ flexShrink: 0 }} role="img" aria-label={`Profile ${completion}% complete`}>
+          <circle cx="26" cy="26" r={r} fill="none" stroke={`${O}20`} strokeWidth="3" />
+          <circle cx="26" cy="26" r={r} fill="none" stroke={O} strokeWidth="3"
+            strokeDasharray={`${filled} ${gap}`} strokeLinecap="round"
+            transform="rotate(-90 26 26)" />
+          {/* Darker orange so the percentage meets AA contrast */}
+          <text x="26" y="31" textAnchor="middle" fontSize="11" fontWeight="800" style={{ fill: ORANGE_DARK }} fontFamily={FONT}>
+            {completion}%
+          </text>
+        </svg>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={bannerTitleSx}>Complete your profile</Box>
+          <Box sx={bannerTextSx}>
+            {helperText}
+          </Box>
+        </Box>
+      </Box>
+      <Box component="a" href="/account/profile" sx={bannerCtaSx(ORANGE_DARK)}>
         Update Profile →
-      </a>
-      <button onClick={onDismiss} aria-label="Dismiss"
-        style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#C0BAB4", lineHeight: 1 }}>
+      </Box>
+      <Box component="button" type="button" onClick={onDismiss} aria-label="Dismiss profile completion reminder" sx={dismissSx}>
         ×
-      </button>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
 // ── Verify Identity Banner ────────────────────────────────────────────────────
 function VerifyBanner({ onDismiss }) {
   return (
-    <div style={{
-      margin: "0 40px 20px",
-      background: `linear-gradient(135deg, ${T}08 0%, ${T}14 100%)`,
-      border: `1px solid ${T}28`, borderRadius: 12,
-      padding: "14px 20px", display: "flex", alignItems: "center", gap: 16,
-      fontFamily: FONT, position: "relative",
-    }}>
-      <div style={{
-        width: 48, height: 48, borderRadius: 10, background: `${T}15`,
-        display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-      }}>
-        <ShieldIcon sx={{ color: T, fontSize: 22 }} />
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: N, marginBottom: 2, fontFamily: FONT }}>Verify your identity</div>
-        <div style={{ fontSize: 12, color: "#777", lineHeight: 1.5, fontFamily: FONT }}>
-          Unlock full platform features and boost credibility with verified status.
-        </div>
-      </div>
-      <a href="/account/profile#verify"
-        style={{ fontSize: 12, fontWeight: 700, color: T, textDecoration: "none", whiteSpace: "nowrap", background: `${T}14`, padding: "6px 14px", borderRadius: 7, fontFamily: FONT }}>
+    <Box sx={{ ...bannerSx(T, true), mx: PAGE_PX, mb: 2.5 }}>
+      <Box sx={bannerBodySx}>
+        <Box aria-hidden="true" sx={{
+          width: 48, height: 48, borderRadius: CARD_RADIUS, bgcolor: `${T}15`,
+          display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        }}>
+          <ShieldIcon sx={{ color: T, fontSize: 22 }} />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box sx={bannerTitleSx}>Verify your identity</Box>
+          <Box sx={bannerTextSx}>
+            Unlock full platform features and boost credibility with verified status.
+          </Box>
+        </Box>
+      </Box>
+      <Box component="a" href="/account/profile#verify" sx={bannerCtaSx(TEAL_DARK)}>
         Get Verified →
-      </a>
-      <button onClick={onDismiss} aria-label="Dismiss"
-        style={{ position: "absolute", top: 10, right: 12, background: "none", border: "none", cursor: "pointer", fontSize: 18, color: "#C0BAB4", lineHeight: 1 }}>
+      </Box>
+      <Box component="button" type="button" onClick={onDismiss} aria-label="Dismiss identity verification reminder" sx={dismissSx}>
         ×
-      </button>
-    </div>
+      </Box>
+    </Box>
   );
 }
 
@@ -310,39 +373,38 @@ function PendingFormsBanner({ forms }) {
   if (!forms || forms.length === 0) return null;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12, margin: "0 40px 20px" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", gap: 1.5, mx: PAGE_PX, mb: 2.5 }}>
       {forms.map((form, idx) => {
         const formTitle = form.form_template?.title || (form.form_type === 'promotional_profile' ? 'Promotional Profile' : 'Participant Information');
         const eventTitle = form.event?.title || 'Your Event';
 
         return (
-          <div key={form.id} style={{
-            background: `linear-gradient(135deg, ${O}08 0%, ${O}14 100%)`,
-            border: `1px solid ${O}28`, borderRadius: 12,
-            padding: "14px 20px", display: "flex", alignItems: "center", gap: 16,
-            fontFamily: FONT, position: "relative",
-          }}>
-            <div style={{
-              width: 48, height: 48, borderRadius: 10, background: `${O}15`,
-              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            }}>
-              <EventNoteIcon sx={{ color: O, fontSize: 22 }} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: N, marginBottom: 2, fontFamily: FONT }}>Pending Form: {formTitle}</div>
-              <div style={{ fontSize: 12, color: "#777", lineHeight: 1.5, fontFamily: FONT }}>
-                {eventTitle} — Due {form.deadline ? new Date(form.deadline).toLocaleDateString() : 'soon'}
-              </div>
-            </div>
-            <button
+          <Box key={form.id} sx={bannerSx(O, false)}>
+            <Box sx={bannerBodySx}>
+              <Box aria-hidden="true" sx={{
+                width: 48, height: 48, borderRadius: CARD_RADIUS, bgcolor: `${O}15`,
+                display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              }}>
+                <EventNoteIcon sx={{ color: O, fontSize: 22 }} />
+              </Box>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Box sx={bannerTitleSx}>Pending Form: {formTitle}</Box>
+                <Box sx={bannerTextSx}>
+                  {eventTitle} — Due {form.deadline ? new Date(form.deadline).toLocaleDateString() : 'soon'}
+                </Box>
+              </Box>
+            </Box>
+            <Box
+              component="button"
+              type="button"
               onClick={() => navigate(`/forms/${form.id}`)}
-              style={{ fontSize: 12, fontWeight: 700, color: O, textDecoration: "none", whiteSpace: "nowrap", background: `${O}14`, padding: "6px 14px", borderRadius: 7, fontFamily: FONT, border: "none", cursor: "pointer" }}>
+              sx={bannerCtaSx(ORANGE_DARK)}>
               Complete →
-            </button>
-          </div>
+            </Box>
+          </Box>
         );
       })}
-    </div>
+    </Box>
   );
 }
 
@@ -358,38 +420,44 @@ function FeaturedHero({ event }) {
   const eventLocation = getEventLocation(event);
   const href = getEventHref(event);
   return (
-    <a href={href} style={{ textDecoration: "none", display: "block", marginBottom: 24 }}>
-      <div style={{
-        borderRadius: 16, overflow: "hidden", border: `1px solid ${BORDER}`,
-        display: "grid", gridTemplateColumns: "1fr 1fr",
-        boxShadow: "0 2px 14px rgba(0,0,0,.07)", position: "relative",
-      }}>
-        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, background: accent, zIndex: 3 }} />
-        <div style={{ padding: "32px 32px 32px", background: "#fff", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-          <span style={{
-            fontSize: 10, fontWeight: 800, color: accent, background: `${accent}14`,
-            padding: "3px 10px", borderRadius: 100, display: "inline-block", marginBottom: 14,
-            textTransform: "uppercase", letterSpacing: 1, width: "fit-content", fontFamily: FONT,
-          }}>
-            ✦ {heroLabel} — {getEventType(event)}
-          </span>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: N, margin: "0 0 10px", lineHeight: 1.3, fontFamily: FONT }}>
-            {event?.title}
-          </h2>
-          <p style={{ fontSize: 13, color: "#666", lineHeight: 1.65, margin: "0 0 16px", fontFamily: FONT }}>
-            {event?.description || event?.desc || event?.short_description || "Join fellow M&A professionals at this premier industry event."}
-          </p>
-          {(dateStr || eventLocation) && (
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 20, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: FONT }}>
-              <EventNoteIcon sx={{ fontSize: 14, color: "#C0BAB4" }} />
-              {dateStr}{eventLocation && <> · {eventLocation}</>}
-            </div>
-          )}
-          <span style={{ display: "inline-block", background: accent, color: "#fff", padding: "9px 20px", borderRadius: 8, fontSize: 13, fontWeight: 700, width: "fit-content", fontFamily: FONT }}>
-            {event?.registration_type === 'apply' ? 'Apply Now →' : 'Register Now →'}
-          </span>
-        </div>
-        <div style={{ height: 300, overflow: "hidden" }}>
+    // The whole card is one link (unchanged destination). Two columns from lg; stacked below.
+    <Box component="a" href={href} sx={{
+      textDecoration: "none", color: "inherit", mb: 3,
+      borderRadius: CARD_RADIUS, overflow: "hidden", border: `1px solid ${BORDER}`, bgcolor: "#fff",
+      display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+      boxShadow: "var(--imaa-shadow-sm)", position: "relative",
+      transition: "box-shadow .2s", "&:hover": { boxShadow: "var(--imaa-shadow-md)" },
+    }}>
+      {/* Event-type colour stripe (kept: it identifies the event type) */}
+      <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, height: 4, bgcolor: accent, zIndex: 3 }} />
+      <Box sx={{ p: { xs: 2.5, sm: 4 }, display: "flex", flexDirection: "column", justifyContent: "center", minWidth: 0 }}>
+        <Box component="span" sx={{
+          fontSize: 11, fontWeight: 800, color: INK, bgcolor: `${accent}1A`,
+          px: 1.25, py: 0.375, borderRadius: 100, display: "inline-flex", alignItems: "center", gap: 0.75, mb: 1.75,
+          textTransform: "uppercase", letterSpacing: 1, width: "fit-content", fontFamily: FONT,
+        }}>
+          <Box component="span" aria-hidden="true" sx={{ color: accent }}>✦</Box>
+          {heroLabel} — {getEventType(event)}
+        </Box>
+        {/* h3: the featured event sits inside the "Upcoming Events" section (h2) */}
+        <Box component="h3" sx={{ fontFamily: SERIF, fontSize: { xs: 20, sm: 22 }, fontWeight: 700, color: INK, m: "0 0 10px", lineHeight: 1.3, overflowWrap: "anywhere" }}>
+          {event?.title}
+        </Box>
+        <Box component="p" sx={{ fontSize: 14, color: INK_BODY, lineHeight: 1.65, m: "0 0 16px", fontFamily: FONT }}>
+          {event?.description || event?.desc || event?.short_description || "Join fellow M&A professionals at this premier industry event."}
+        </Box>
+        {(dateStr || eventLocation) && (
+          <Box sx={{ fontSize: 13, color: INK_BODY, mb: 2.5, display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", fontFamily: FONT }}>
+            <EventNoteIcon sx={{ fontSize: 15, color: INK_BODY }} />
+            {dateStr}{eventLocation && <> · {eventLocation}</>}
+          </Box>
+        )}
+        {/* Navy so the white label meets AA on every event type (the coloured stripe keeps the type colour) */}
+        <Box component="span" sx={{ display: "inline-block", bgcolor: N, color: "#fff", px: 2.5, py: 1.125, borderRadius: FIELD_RADIUS, fontSize: 13, fontWeight: 700, width: "fit-content", fontFamily: FONT }}>
+          {event?.registration_type === 'apply' ? 'Apply Now →' : 'Register Now →'}
+        </Box>
+      </Box>
+      <Box sx={{ height: { xs: 200, sm: 240, lg: 300 }, overflow: "hidden", order: { xs: -1, lg: 0 } }}>
           <img src={imgSrc} alt={event?.title || "Event"}
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
             onError={(e) => {
@@ -402,9 +470,8 @@ function FeaturedHero({ event }) {
               }
             }}
           />
-        </div>
-      </div>
-    </a>
+      </Box>
+    </Box>
   );
 }
 
@@ -419,12 +486,15 @@ function DashEventCard({ event, index }) {
   const eventLocation = getEventLocation(event);
   const href = getEventHref(event);
   return (
-    <a href={href} style={{ textDecoration: "none" }}>
-      <div
-        style={{ borderRadius: 12, overflow: "hidden", border: `1px solid ${BORDER}`, background: "#fff", cursor: "pointer", position: "relative", transition: "box-shadow .2s", display: "flex", flexDirection: "column", height: 280 }}
-        onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,.09)"; e.currentTarget.style.borderColor = accent + "50"; }}
-        onMouseLeave={e => { e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = BORDER; }}
-      >
+    // One link per card (unchanged destination). Hover is CSS now (was JS style mutation).
+    <Box component="a" href={href} sx={{
+      textDecoration: "none", color: "inherit",
+      borderRadius: CARD_RADIUS, overflow: "hidden", border: `1px solid ${BORDER}`, bgcolor: "#fff",
+      boxShadow: "var(--imaa-shadow-sm)", cursor: "pointer", position: "relative",
+      transition: "box-shadow .2s, border-color .2s", display: "flex", flexDirection: "column", height: 280,
+      "&:hover": { boxShadow: "var(--imaa-shadow-md)", borderColor: `${accent}50` },
+    }}>
+        {/* Event-type colour stripe (kept: it identifies the event type) */}
         <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: accent, zIndex: 2 }} />
         <div style={{ height: 152, overflow: "hidden", flexShrink: 0 }}>
           <img src={imgSrc} alt={event?.title || "Event"}
@@ -442,20 +512,20 @@ function DashEventCard({ event, index }) {
         </div>
         <div style={{ padding: "14px 16px 18px", fontFamily: FONT, flex: 1, display: "flex", flexDirection: "column" }}>
           {(dateStr || getEventType(event)) && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 5 }}>
-              {dateStr && <span style={{ fontSize: 11, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: 0.5 }}>{dateStr}</span>}
-              {getEventType(event) && <span style={{ fontSize: 10, color: "#AAA", background: "#F5F4F2", padding: "2px 6px", borderRadius: 4 }}>{getEventType(event)}</span>}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6, flexWrap: "wrap" }}>
+              {/* Date in ink (accent-coloured small text was below AA contrast) */}
+              {dateStr && <span style={{ fontSize: 12, fontWeight: 700, color: INK, textTransform: "uppercase", letterSpacing: 0.5 }}>{dateStr}</span>}
+              {getEventType(event) && <span style={{ fontSize: 11, color: INK_BODY, background: "var(--imaa-bg-cool)", padding: "2px 6px", borderRadius: 4 }}>{getEventType(event)}</span>}
             </div>
           )}
-          <h3 style={{ fontSize: 13, fontWeight: 700, color: N, margin: "0 0 4px", lineHeight: 1.4, fontFamily: FONT, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+          <h3 style={{ fontSize: 15, fontWeight: 700, color: INK, margin: "0 0 4px", lineHeight: 1.35, fontFamily: SERIF, display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
             {event?.title}
           </h3>
           <div style={{ marginTop: "auto" }}>
-            {eventLocation && <div style={{ fontSize: 11, color: "#AAA", marginTop: 4 }}>📍 {eventLocation}</div>}
+            {eventLocation && <div style={{ fontSize: 12, color: INK_BODY, marginTop: 4 }}><span aria-hidden="true">📍</span> {eventLocation}</div>}
           </div>
         </div>
-      </div>
-    </a>
+    </Box>
   );
 }
 
@@ -520,48 +590,56 @@ const USP_ITEMS = [
 
 function USPStrip() {
   return (
-    <div style={{ background: N, padding: "36px 40px", display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 24, fontFamily: FONT }}>
+    <Box sx={{ bgcolor: N, py: 4.5, px: PAGE_PX, display: "flex", justifyContent: "space-around", flexWrap: "wrap", gap: 3, fontFamily: FONT }}>
       {USP_ITEMS.map(({ value, label, Icon, color }) => (
         <div key={label} style={{ textAlign: "center", minWidth: 100 }}>
-          <div style={{ width: 44, height: 44, borderRadius: 10, background: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", border: `1px solid ${color}30` }}>
+          <div aria-hidden="true" style={{ width: 44, height: 44, borderRadius: 8, background: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 8px", border: `1px solid ${color}30` }}>
             <Icon sx={{ color, fontSize: 20 }} />
           </div>
           <div style={{ fontSize: 22, fontWeight: 800, color: "#fff", letterSpacing: "-0.01em", fontFamily: FONT }}>{value}</div>
-          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginTop: 3, fontFamily: FONT }}>{label}</div>
+          <div style={{ fontSize: 12, color: "rgba(255,255,255,.75)", marginTop: 3, fontFamily: FONT }}>{label}</div>
         </div>
       ))}
-    </div>
+    </Box>
   );
 }
 
 // ── Footer CTA ────────────────────────────────────────────────────────────────
+// Flat navy (gradient retired). Darker teal/orange button fills so the white labels meet AA.
+const footerHeadingSx = { m: "0 0 10px", fontFamily: SERIF, fontSize: { xs: 22, sm: 26 }, fontWeight: 700, color: "#fff", lineHeight: 1.25 };
+const footerTextSx = { fontSize: 14, color: "rgba(255,255,255,.75)", maxWidth: 460, m: "0 auto 28px", lineHeight: 1.65, fontFamily: FONT };
+const footerButtonSx = (bg) => ({
+  display: "inline-block", bgcolor: bg, color: "#fff", px: { xs: 3, sm: 3.75 }, py: 1.625, borderRadius: CARD_RADIUS,
+  fontSize: 14, fontWeight: 700, textDecoration: "none", fontFamily: FONT, "&:hover": { filter: "brightness(0.92)" },
+});
+
 function FooterCTA({ isMember }) {
   return (
-    <div style={{ background: `linear-gradient(135deg, ${N} 0%, #2C3E5A 100%)`, padding: "52px 40px", textAlign: "center", fontFamily: FONT }}>
+    <Box sx={{ bgcolor: N, py: { xs: 5, md: 6.5 }, px: PAGE_PX, textAlign: "center", fontFamily: FONT }}>
       {isMember ? (
         <>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", marginBottom: 10, fontFamily: FONT }}>Grow the IMAA Community</div>
-          <div style={{ fontSize: 14, color: "rgba(255,255,255,.65)", maxWidth: 460, margin: "0 auto 28px", lineHeight: 1.65, fontFamily: FONT }}>
+          <Box component="h2" sx={footerHeadingSx}>Grow the IMAA Community</Box>
+          <Box sx={footerTextSx}>
             Help your colleagues find the world's largest M&A network. Invite them to join today.
-          </div>
-          <a href="mailto:?subject=Join%20IMAA%20Connect&body=I%20wanted%20to%20share%20this%20great%20network%20with%20you%3A%20https%3A%2F%2Fconnect.imaa-institute.org"
-            style={{ display: "inline-block", background: T, color: "#fff", padding: "13px 30px", borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: "none", fontFamily: FONT }}>
+          </Box>
+          <Box component="a" href="mailto:?subject=Join%20IMAA%20Connect&body=I%20wanted%20to%20share%20this%20great%20network%20with%20you%3A%20https%3A%2F%2Fconnect.imaa-institute.org"
+            sx={footerButtonSx(TEAL_DARK)}>
             Invite a Colleague →
-          </a>
+          </Box>
         </>
       ) : (
         <>
-          <div style={{ fontSize: 26, fontWeight: 800, color: "#fff", marginBottom: 10, fontFamily: FONT }}>Unlock Full IMAA Membership</div>
-          <div style={{ fontSize: 14, color: "rgba(255,255,255,.65)", maxWidth: 460, margin: "0 auto 28px", lineHeight: 1.65, fontFamily: FONT }}>
+          <Box component="h2" sx={footerHeadingSx}>Unlock Full IMAA Membership</Box>
+          <Box sx={footerTextSx}>
             Access unlimited events, certifications, the E-Library, and the complete IMAA professional network.
-          </div>
-          <a href="https://imaa-institute.org/membership" target="_blank" rel="noopener noreferrer"
-            style={{ display: "inline-block", background: O, color: "#fff", padding: "13px 30px", borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: "none", fontFamily: FONT }}>
+          </Box>
+          <Box component="a" href="https://imaa-institute.org/membership" target="_blank" rel="noopener noreferrer"
+            sx={footerButtonSx(ORANGE_DARK)}>
             Upgrade to Membership →
-          </a>
+          </Box>
         </>
       )}
-    </div>
+    </Box>
   );
 }
 
@@ -662,49 +740,53 @@ export default function DashboardPage() {
   const gridEvents = [...realGridEvents, ...staticGridEvents];
 
   return (
-    <div style={{ minHeight: "100vh", background: BG, fontFamily: FONT }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: BG, fontFamily: FONT }}>
       <DashTopbar notifCount={0} messageCount={0} isAdmin={isAdminUser} />
 
       {/* Welcome Section */}
       <FadeIn>
-        <div style={{ padding: "32px 40px 20px", maxWidth: 1200, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: 18, flexWrap: "wrap" }}>
-            <div style={{ width: 52, height: 52, borderRadius: 12, background: N, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <Box sx={{ pt: { xs: 3, md: 4 }, pb: 2.5, px: PAGE_PX, maxWidth: 1200, mx: "auto" }}>
+          <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2.25, flexWrap: "wrap" }}>
+            <Box aria-hidden="true" sx={{ width: 52, height: 52, borderRadius: CARD_RADIUS, bgcolor: N, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke={T} strokeWidth="1.5" />
                 <ellipse cx="12" cy="12" rx="4" ry="10" stroke={O} strokeWidth="1.5" />
                 <line x1="2" y1="12" x2="22" y2="12" stroke={T} strokeWidth="1.5" />
               </svg>
-            </div>
-            <div style={{ flex: 1 }}>
+            </Box>
+            <Box sx={{ flex: "1 1 240px", minWidth: 0 }}>
               {loading ? (
-                <div style={{ height: 32, width: 300, background: BORDER, borderRadius: 4 }} />
+                <>
+                  {/* Page heading for screen readers while the welcome text loads */}
+                  <h1 className="sr-only">Dashboard</h1>
+                  <Box sx={{ height: 32, width: 300, maxWidth: "100%", bgcolor: BORDER, borderRadius: 1 }} />
+                </>
               ) : (
-                <h1 style={{ fontSize: 26, fontWeight: 800, color: N, margin: 0, letterSpacing: "-0.01em", lineHeight: 1.2, fontFamily: FONT }}>
-                  Welcome back, {firstName} 👋
-                </h1>
+                <Box component="h1" sx={{ fontFamily: SERIF, fontSize: { xs: 24, md: 28 }, fontWeight: 700, color: INK, m: 0, letterSpacing: "-0.01em", lineHeight: 1.2, overflowWrap: "anywhere" }}>
+                  Welcome back, {firstName} <span aria-hidden="true">👋</span>
+                </Box>
               )}
               {loading ? (
-                <div style={{ height: 16, width: 360, background: BORDER, borderRadius: 4, marginTop: 10 }} />
+                <Box sx={{ height: 16, width: 360, maxWidth: "100%", bgcolor: BORDER, borderRadius: 1, mt: 1.25 }} />
               ) : (
-                <p style={{ fontSize: 14, color: "#666", margin: "8px 0 0", lineHeight: 1.7, fontFamily: FONT }}>
+                <Box component="p" sx={{ fontSize: 14, color: INK_BODY, m: "8px 0 0", lineHeight: 1.7, fontFamily: FONT }}>
                   You are part of a global network of{" "}
-                  <strong style={{ color: O }}>4,000+ M&A professionals</strong> across{" "}
-                  <strong style={{ color: T }}>100+ countries</strong>.
-                  {kycApproved && <> ✅ Your identity is verified.</>}
+                  <strong style={{ color: INK }}>4,000+ M&A professionals</strong> across{" "}
+                  <strong style={{ color: INK }}>100+ countries</strong>.
+                  {kycApproved && <> <span aria-hidden="true">✅</span> Your identity is verified.</>}
                   {" "}Explore events, connect with peers, and grow your career.
-                </p>
+                </Box>
               )}
-            </div>
-          </div>
-        </div>
+            </Box>
+          </Box>
+        </Box>
       </FadeIn>
 
       {/* Banners */}
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         {showProfileBanner && !loading && profileCompletion < 100 && (
           <FadeIn delay={80}>
-            <ProfileBanner completion={profileCompletion || 40} onDismiss={() => setShowProfileBanner(false)} profile={user?.profile} />
+            <ProfileBanner completion={profile.profile_completion_percentage ?? 40} onDismiss={() => setShowProfileBanner(false)} profile={user?.profile} />
           </FadeIn>
         )}
         {showVerifyBanner && !loading && !kycApproved && (
@@ -721,35 +803,37 @@ export default function DashboardPage() {
 
       {/* Events Section */}
       <FadeIn delay={200}>
-        <div style={{ padding: "12px 40px 48px", maxWidth: 1200, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 28 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: T, textTransform: "uppercase", letterSpacing: 2, display: "block", marginBottom: 6, fontFamily: FONT }}>
+        <Box component="section" aria-labelledby="dashboard-upcoming-events" sx={{ pt: 1.5, pb: 6, px: PAGE_PX, maxWidth: 1200, mx: "auto" }}>
+          <Box sx={{ textAlign: "center", mb: 3.5 }}>
+            <Box component="span" sx={{ fontSize: 11, fontWeight: 800, color: TEAL_DARK, textTransform: "uppercase", letterSpacing: 2, display: "block", mb: 0.75, fontFamily: FONT }}>
               WHAT'S HAPPENING
-            </span>
-            <h2 style={{ fontSize: 27, fontWeight: 800, color: N, margin: 0, fontFamily: FONT }}>Upcoming Events</h2>
-          </div>
+            </Box>
+            {/* Section heading: smaller than the page h1 */}
+            <Box component="h2" id="dashboard-upcoming-events" sx={{ fontFamily: SERIF, fontSize: { xs: 20, md: 22 }, fontWeight: 700, color: INK, m: 0 }}>Upcoming Events</Box>
+          </Box>
           {loading ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+            <Box sx={{ display: "grid", gridTemplateColumns: EVENT_GRID_COLUMNS, gap: 2.5 }}>
               {[0, 1, 2].map(i => (
-                <div key={i} style={{ height: 240, borderRadius: 12, background: BORDER, opacity: 0.5 }} />
+                <Box key={i} sx={{ height: 240, borderRadius: CARD_RADIUS, bgcolor: BORDER, opacity: 0.5 }} />
               ))}
-            </div>
+            </Box>
           ) : (
             <>
               <FeaturedHero event={featuredEvent} />
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 20 }}>
+              <Box sx={{ display: "grid", gridTemplateColumns: EVENT_GRID_COLUMNS, gap: 2.5 }}>
                 {gridEvents.map((ev, i) => (
                   <DashEventCard key={ev.id || i} event={ev} index={i} />
                 ))}
-              </div>
+              </Box>
             </>
           )}
-          <div style={{ textAlign: "center", marginTop: 28 }}>
-            <a href="/events" style={{ display: "inline-block", fontSize: 13, fontWeight: 700, color: O, textDecoration: "none", border: `1.5px solid ${O}`, padding: "9px 22px", borderRadius: 8, fontFamily: FONT }}>
+          <Box sx={{ textAlign: "center", mt: 3.5 }}>
+            {/* Navy outline: the orange text/border was below AA contrast */}
+            <Box component="a" href="/events" sx={{ display: "inline-block", fontSize: 13, fontWeight: 700, color: INK, textDecoration: "none", border: `1.5px solid ${N}`, px: 2.75, py: 1.125, borderRadius: FIELD_RADIUS, fontFamily: FONT, "&:hover": { bgcolor: "#fff" } }}>
               Browse All Events →
-            </a>
-          </div>
-        </div>
+            </Box>
+          </Box>
+        </Box>
       </FadeIn>
 
       {/* Community Section - COMMENTED OUT FOR NOW - will add back in future
@@ -786,6 +870,6 @@ export default function DashboardPage() {
 
       {/* Footer CTA */}
       <FadeIn delay={500}><FooterCTA isMember={isMember} /></FadeIn>
-    </div>
+    </Box>
   );
 }
