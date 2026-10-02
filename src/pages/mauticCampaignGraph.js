@@ -400,7 +400,7 @@ export const hydrateCanvasFromEvents = (events, savedCanvas = {}) => {
   const storedOrphans = storedCanvasOrphans(savedCanvas);
   if (storedOrphans.length) {
     blockers.push(
-      `Mautic will refuse any change to this campaign: its saved canvas has ${storedOrphans.length === 1 ? "a step" : "steps"} with no incoming connection (${storedOrphans.join(", ")}), left by an earlier ECP save. Re-save the campaign in Mautic's own campaign builder to repair it, then reload this page.`
+      `Mautic will refuse any change to this campaign: its saved canvas has ${storedOrphans.length === 1 ? "a step" : "steps"} with no incoming connection (${storedOrphans.join(", ")}), left by an earlier ECP save. To repair it, open the campaign in Mautic, choose Launch Campaign Builder, then Close Builder, then Save & Close (saving without opening the builder keeps the broken canvas), and reload this page.`
     );
   }
 

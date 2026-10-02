@@ -375,4 +375,16 @@ test("a stored canvas Mautic's orphan rule rejects is detected and blocks saving
   assert.deepEqual(storedCanvasOrphans({ nodes: [{ id: "lists" }, { id: "1" }], connections: [{ targetId: "1" }] }), []);
   const { blockers } = hydrate([ev(1, "action")], saved);
   assert.equal(blockers.some((blocker) => blocker.includes("Mautic will refuse any change")), true);
+  // A plain Save in Mautic posts the broken canvas back; only the builder rebuilds it.
+  assert.equal(blockers.some((blocker) => blocker.includes("Launch Campaign Builder, then Close Builder, then Save & Close")), true);
+});
+
+test("a canvas re-saved by Mautic's own builder is no longer blocked", () => {
+  // What Mautic's builder stores after the repair: numeric positions, its own nodes only.
+  const repaired = {
+    nodes: [{ id: "1", positionX: 380, positionY: 260 }, { id: "lists", positionX: 380, positionY: 100 }],
+    connections: [{ sourceId: "lists", targetId: "1", anchors: { source: "leadsource", target: "top" } }],
+  };
+  assert.deepEqual(storedCanvasOrphans(repaired), []);
+  assert.deepEqual(hydrate([ev(1, "action")], repaired).blockers, []);
 });
