@@ -70,6 +70,20 @@ export const isSelectableEntityChoice = (choice) =>
 export const findChoiceByValue = (choices, value) =>
   asArray(choices).find((choice) => String(optionValue(choice)) === String(value)) || null;
 
+/**
+ * An inline field's options plus any value the event already holds that the
+ * provider no longer offers, so a stale or legacy value can be seen and
+ * unticked rather than sitting in the field with no option to clear it.
+ */
+export const withSavedChoices = (choices, selectedValues) => {
+  const offered = new Set(asArray(choices).map((choice) => String(optionValue(choice))));
+  const saved = asArray(selectedValues)
+    .map(String)
+    .filter((value, index, all) => !offered.has(value) && all.indexOf(value) === index)
+    .map((value) => ({ value, label: value, unresolved: true }));
+  return [...saved, ...asArray(choices)];
+};
+
 export const optionChoices = (value) => {
   if (Array.isArray(value)) return value;
   if (isPlainObject(value?.choices)) return Object.entries(value.choices).map(([key, label]) => ({ value: key, label }));
