@@ -52,6 +52,13 @@ import {
   updateNewsletterStage,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = { borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, boxShadow: "var(--imaa-shadow-sm)" };
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+const dialogPaperProps = { sx: { m: { xs: 2, sm: 4 }, width: { xs: "calc(100% - 32px)", sm: "auto" }, maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" }, borderRadius: "var(--imaa-radius-popup)" } };
+
 const blankForm = {
   name: "",
   description: "",
@@ -125,9 +132,9 @@ function StageDialog({ open, stage, saving, error, onClose, onSave }) {
   };
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{stage ? "Edit Stage" : "Create Stage"}</DialogTitle>
-      <DialogContent dividers>
+    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth aria-labelledby="stage-dialog-title" PaperProps={dialogPaperProps}>
+      <DialogTitle id="stage-dialog-title">{stage ? "Edit Stage" : "Create Stage"}</DialogTitle>
+      <DialogContent dividers sx={{ "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } }}>
         <Stack spacing={2}>
           {(error || formError) && <Alert severity="error">{error || formError}</Alert>}
           <TextField
@@ -170,9 +177,9 @@ function StageDialog({ open, stage, saving, error, onClose, onSave }) {
           />
         </Stack>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={saving}>
+      <DialogActions sx={{ flexWrap: "wrap", gap: 1, px: { xs: 2, sm: 3 }, py: 2 }}>
+        <Button onClick={onClose} disabled={saving} sx={actionSx}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={saving} sx={actionSx}>
           {saving ? <CircularProgress size={20} color="inherit" /> : stage ? "Save Changes" : "Create Stage"}
         </Button>
       </DialogActions>
@@ -182,8 +189,8 @@ function StageDialog({ open, stage, saving, error, onClose, onSave }) {
 
 function DeleteDialog({ open, stage, deleting, error, onClose, onConfirm }) {
   return (
-    <Dialog open={open} onClose={deleting ? undefined : onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>Delete Stage?</DialogTitle>
+    <Dialog open={open} onClose={deleting ? undefined : onClose} maxWidth="xs" fullWidth aria-labelledby="delete-stage-title" PaperProps={dialogPaperProps}>
+      <DialogTitle id="delete-stage-title">Delete Stage?</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={1.5}>
           {error && <Alert severity="error">{error}</Alert>}
@@ -196,8 +203,8 @@ function DeleteDialog({ open, stage, deleting, error, onClose, onConfirm }) {
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={deleting}>Cancel</Button>
-        <Button color="error" variant="contained" onClick={onConfirm} disabled={deleting}>
+        <Button onClick={onClose} disabled={deleting} sx={actionSx}>Cancel</Button>
+        <Button color="error" variant="contained" onClick={onConfirm} disabled={deleting} sx={actionSx}>
           {deleting ? <CircularProgress size={20} color="inherit" /> : "Delete"}
         </Button>
       </DialogActions>
@@ -331,14 +338,14 @@ export default function AdminNewsletterStagesPage() {
         spacing={2}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.5 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, mb: 0.5 }}>
             Stages
           </Typography>
           <Typography color="text.secondary">
             Manage Mautic lifecycle stages used to classify each contact's current position.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => {
@@ -346,7 +353,7 @@ export default function AdminNewsletterStagesPage() {
               loadAnalytics({ refresh: true });
             }}
             disabled={loading || analyticsLoading}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Refresh
           </Button>
@@ -354,7 +361,7 @@ export default function AdminNewsletterStagesPage() {
             variant="contained"
             startIcon={<AddRoundedIcon />}
             onClick={() => setDialog({ open: true, stage: null, saving: false, error: "" })}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Create Stage
           </Button>
@@ -387,7 +394,7 @@ export default function AdminNewsletterStagesPage() {
           <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
             <Paper
               variant="outlined"
-              sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", flex: 1 }}
+              sx={{ ...surfaceSx, p: 2.25, flex: 1 }}
             >
               <Typography variant="body2" color="text.secondary">
                 Total Contacts
@@ -401,7 +408,7 @@ export default function AdminNewsletterStagesPage() {
             </Paper>
             <Paper
               variant="outlined"
-              sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", flex: 1 }}
+              sx={{ ...surfaceSx, p: 2.25, flex: 1 }}
             >
               <Typography variant="body2" color="text.secondary">
                 Staged Contacts
@@ -415,7 +422,7 @@ export default function AdminNewsletterStagesPage() {
             </Paper>
             <Paper
               variant="outlined"
-              sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", flex: 1 }}
+              sx={{ ...surfaceSx, p: 2.25, flex: 1 }}
             >
               <Typography variant="body2" color="text.secondary">
                 No Stage
@@ -431,7 +438,7 @@ export default function AdminNewsletterStagesPage() {
 
           <Paper
             variant="outlined"
-            sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF" }}
+            sx={{ ...surfaceSx, p: 2.25 }}
           >
             <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1.5 }}>
               Stage Distribution
@@ -465,13 +472,13 @@ export default function AdminNewsletterStagesPage() {
         </>
       ) : null}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }} aria-busy={loading ? "true" : undefined}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
           justifyContent="space-between"
           alignItems={{ xs: "stretch", md: "center" }}
-          sx={{ p: 2, borderBottom: "1px solid #E7ECEF" }}
+          sx={{ p: 2, borderBottom: `1px solid ${UI_BORDER}` }}
         >
           <Stack direction="row" spacing={1} alignItems="center">
             <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>All Stages</Typography>
@@ -487,12 +494,13 @@ export default function AdminNewsletterStagesPage() {
                   handleSearch();
                 }
               }}
-              placeholder="Search stages"
+              label="Search stages"
               size="small"
               fullWidth
               disabled={loading}
+              sx={fieldSx}
             />
-            <Button variant="outlined" onClick={handleSearch} disabled={loading} sx={{ minWidth: 92, textTransform: "none" }}>
+            <Button variant="outlined" onClick={handleSearch} disabled={loading} sx={{ ...actionSx, minWidth: 92 }}>
               Search
             </Button>
           </Stack>
@@ -507,8 +515,8 @@ export default function AdminNewsletterStagesPage() {
         ) : loading ? (
           <Stack spacing={1} sx={{ p: 2 }}>{Array.from({ length: 5 }).map((_, index) => <Skeleton key={index} height={48} />)}</Stack>
         ) : (
-          <TableContainer sx={{ overflowX: "auto" }}>
-            <Table>
+          <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+            <Table aria-label="Mautic lifecycle stages" sx={{ minWidth: 880 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                   <TableCell>Stage</TableCell>
@@ -530,7 +538,7 @@ export default function AdminNewsletterStagesPage() {
                         <Stack direction="row" spacing={1} alignItems="flex-start">
                           <FlagRoundedIcon fontSize="small" sx={{ mt: 0.35, color: "#64748B" }} />
                           <Box>
-                            <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+                            <Typography sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}>
                               {stage.name || `Stage #${stage.id}`}
                             </Typography>
                             {stage.description && <Typography variant="body2" color="text.secondary">{stage.description}</Typography>}
@@ -602,7 +610,7 @@ export default function AdminNewsletterStagesPage() {
           justifyContent="space-between"
           alignItems={{ xs: "stretch", sm: "center" }}
           spacing={1.5}
-          sx={{ px: 2, py: 1.5, borderTop: "1px solid #E7ECEF" }}
+          sx={{ px: 2, py: 1.5, borderTop: `1px solid ${UI_BORDER}` }}
         >
           <Typography variant="body2" color="text.secondary">
             {count} stage{count === 1 ? "" : "s"} · Page {page} of {numPages}

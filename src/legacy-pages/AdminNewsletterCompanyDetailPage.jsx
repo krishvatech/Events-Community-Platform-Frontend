@@ -49,6 +49,13 @@ import {
   updateNewsletterCompany,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = { borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, boxShadow: "var(--imaa-shadow-sm)" };
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+const dialogPaperProps = { sx: { m: { xs: 2, sm: 4 }, width: { xs: "calc(100% - 32px)", sm: "auto" }, maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" }, borderRadius: "var(--imaa-radius-popup)" } };
+
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
 const getErrorMessage = (err, fallback = "Something went wrong. Please try again.") => {
@@ -137,7 +144,7 @@ function CompanyFieldEditor({ companyId, fields, values, onSaved, emptyMessage, 
           <Button
             onClick={() => setEdits({})}
             disabled={!isDirty || saving}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Discard
           </Button>
@@ -146,7 +153,7 @@ function CompanyFieldEditor({ companyId, fields, values, onSaved, emptyMessage, 
             onClick={handleSave}
             disabled={!isDirty || saving}
             startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <SaveRoundedIcon />}
-            sx={{ textTransform: "none", bgcolor: "#0f766e", "&:hover": { bgcolor: "#0d6259" } }}
+            sx={actionSx}
           >
             Save to Mautic
           </Button>
@@ -198,22 +205,23 @@ function AddContactDialog({ open, companyId, onClose, onAdded }) {
   };
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ fontWeight: 850 }}>Add Contact to Company</DialogTitle>
+    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="sm" aria-labelledby="add-company-contact-title" PaperProps={dialogPaperProps}>
+      <DialogTitle id="add-company-contact-title" sx={{ fontWeight: 850 }}>Add Contact to Company</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {error ? <Alert severity="error">{error}</Alert> : null}
-          <Stack direction="row" spacing={1}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
               size="small"
               fullWidth
               autoFocus
-              placeholder="Search contacts by name or email"
+              label="Search contacts by name or email"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") runSearch();
               }}
+              sx={fieldSx}
             />
             <Button variant="outlined" onClick={runSearch} disabled={loading} sx={{ textTransform: "none" }}>
               Search
@@ -235,10 +243,10 @@ function AddContactDialog({ open, companyId, onClose, onAdded }) {
                 >
                   <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }} noWrap>
+                      <Typography sx={{ fontWeight: 700, color: UI_TEXT, overflowWrap: "anywhere" }}>
                         {contact.name || contact.email || `Contact ${contact.mautic_contact_id}`}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap>
+                      <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
                         {contact.email}
                       </Typography>
                     </Box>
@@ -438,7 +446,7 @@ export default function AdminNewsletterCompanyDetailPage() {
             <ApartmentRoundedIcon sx={{ color: "#0f766e" }} />
           </Box>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+            <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, overflowWrap: "anywhere" }}>
               {company.name || `Company ${company.id}`}
             </Typography>
             <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
@@ -466,10 +474,14 @@ export default function AdminNewsletterCompanyDetailPage() {
         </Stack>
       </Stack>
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden" }}>
         <Tabs
           value={tab}
           onChange={(_, value) => setTab(value)}
+          aria-label="Company detail sections"
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
             px: 2,
             "& .MuiTab-root": { textTransform: "none", fontWeight: 750 },
@@ -485,8 +497,8 @@ export default function AdminNewsletterCompanyDetailPage() {
 
       {tab === "overview" ? (
         <Stack spacing={3}>
-          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 3 }}>
-            <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 2 }}>Mautic Metadata</Typography>
+          <Paper component="section" aria-labelledby="company-metadata-heading" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, sm: 3 } }}>
+            <Typography id="company-metadata-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT, mb: 2 }}>Mautic Metadata</Typography>
             <Grid container spacing={2}>
               {[
                 ["Mautic ID", company.id],
@@ -506,7 +518,7 @@ export default function AdminNewsletterCompanyDetailPage() {
             </Grid>
           </Paper>
 
-          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 3 }}>
+          <Paper component="section" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, sm: 3 } }}>
             <CompanyFieldEditor
               companyId={companyId}
               title="Company Details"
@@ -520,7 +532,7 @@ export default function AdminNewsletterCompanyDetailPage() {
       ) : null}
 
       {tab === "fields" ? (
-        <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 3 }}>
+        <Paper component="section" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, sm: 3 } }}>
           <CompanyFieldEditor
             companyId={companyId}
             title="Custom & Professional Fields"
@@ -534,11 +546,11 @@ export default function AdminNewsletterCompanyDetailPage() {
 
       {tab === "contacts" ? (
         <Stack spacing={2}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+          <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} spacing={1.5}>
+            <Typography component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT }}>
               Associated Contacts
             </Typography>
-            <Stack direction="row" spacing={1}>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <Button
                 startIcon={<RefreshRoundedIcon />}
                 onClick={loadContacts}
@@ -560,9 +572,9 @@ export default function AdminNewsletterCompanyDetailPage() {
 
           {contactsError ? <Alert severity="error">{contactsError}</Alert> : null}
 
-          <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+          <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}>
             <TableContainer sx={{ overflowX: "auto" }}>
-              <Table>
+              <Table aria-label="Contacts associated with this company" sx={{ minWidth: 720 }}>
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                     <TableCell>Contact</TableCell>
@@ -599,7 +611,9 @@ export default function AdminNewsletterCompanyDetailPage() {
                       <TableRow key={contact.mautic_contact_id} hover>
                         <TableCell>
                           <Typography
-                            sx={{ fontWeight: 700, color: "#0f766e", cursor: "pointer" }}
+                            component="button"
+                            type="button"
+                            sx={{ p: 0, border: 0, bgcolor: "transparent", font: "inherit", textAlign: "left", fontWeight: 700, color: "var(--imaa-teal-hover)", cursor: "pointer", overflowWrap: "anywhere", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
                             onClick={() =>
                               navigate(`/admin/newsletter/contacts/${contact.mautic_contact_id}`)
                             }
@@ -618,7 +632,7 @@ export default function AdminNewsletterCompanyDetailPage() {
                         <TableCell>{formatValue(contact.points)}</TableCell>
                         <TableCell align="right">
                           <Tooltip title="Remove from company">
-                            <IconButton size="small" onClick={() => setRemoveTarget(contact)}>
+                            <IconButton size="small" onClick={() => setRemoveTarget(contact)} aria-label={`Remove ${contact.name || `Contact ${contact.mautic_contact_id}`} from company`} sx={{ minWidth: 40, minHeight: 40 }}>
                               <LinkOffRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -634,7 +648,7 @@ export default function AdminNewsletterCompanyDetailPage() {
               <>
                 <Divider />
                 <Stack
-                  direction="row"
+                  direction={{ xs: "column", sm: "row" }}
                   justifyContent="space-between"
                   alignItems="center"
                   sx={{ px: 2, py: 1.5 }}
@@ -679,8 +693,8 @@ export default function AdminNewsletterCompanyDetailPage() {
         }}
       />
 
-      <Dialog open={Boolean(removeTarget)} onClose={busy ? undefined : () => setRemoveTarget(null)}>
-        <DialogTitle sx={{ fontWeight: 850 }}>Remove Contact from Company?</DialogTitle>
+      <Dialog open={Boolean(removeTarget)} onClose={busy ? undefined : () => setRemoveTarget(null)} aria-labelledby="remove-company-contact-title" PaperProps={dialogPaperProps}>
+        <DialogTitle id="remove-company-contact-title" sx={{ fontWeight: 850 }}>Remove Contact from Company?</DialogTitle>
         <DialogContent>
           <Typography>
             The contact stays in Mautic; only the association with this company is removed.
@@ -702,8 +716,8 @@ export default function AdminNewsletterCompanyDetailPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteOpen} onClose={busy ? undefined : () => setDeleteOpen(false)}>
-        <DialogTitle sx={{ fontWeight: 850 }}>Delete Company?</DialogTitle>
+      <Dialog open={deleteOpen} onClose={busy ? undefined : () => setDeleteOpen(false)} aria-labelledby="delete-company-detail-title" PaperProps={dialogPaperProps}>
+        <DialogTitle id="delete-company-detail-title" sx={{ fontWeight: 850 }}>Delete Company?</DialogTitle>
         <DialogContent>
           <Typography>
             {`"${company.name || company.id}" will be deleted in Mautic. Associated contacts are not deleted.`}

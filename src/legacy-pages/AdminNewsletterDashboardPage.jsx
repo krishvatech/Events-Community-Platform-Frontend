@@ -29,9 +29,20 @@ import { useNavigate } from "#navigation";
 
 import { getNewsletterDashboard } from "../services/newsletterService";
 
-const CARD_BORDER = "#E7ECEF";
-const TEXT = "#1B2A4A";
-const TEAL = "#0f766e";
+const CARD_BORDER = "var(--imaa-border)";
+const TEXT = "var(--imaa-ink)";
+const TEAL = "var(--imaa-teal-hover)";
+const SR_ONLY = {
+  position: "absolute",
+  width: 1,
+  height: 1,
+  p: 0,
+  m: -1,
+  overflow: "hidden",
+  clip: "rect(0 0 0 0)",
+  whiteSpace: "nowrap",
+  border: 0,
+};
 const TWO_COLUMN_GRID = {
   display: "grid",
   gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
@@ -81,10 +92,10 @@ const errorMessage = (err) => err?.response?.data?.detail || err?.message || "Da
 
 function Widget({ title, action, children, minHeight = 260, compact = false }) {
   return (
-    <Paper variant="outlined" sx={{ p: compact ? 1.75 : 2.25, borderRadius: 2, borderColor: CARD_BORDER, bgcolor: "#fff", minHeight, height: "100%" }}>
+    <Paper variant="outlined" sx={{ p: compact ? 1.75 : 2.25, borderRadius: "var(--imaa-radius-card)", borderColor: CARD_BORDER, bgcolor: "background.paper", minHeight, height: "100%", minWidth: 0, boxShadow: "var(--imaa-shadow-sm)" }}>
       <Stack spacing={2} sx={{ height: "100%" }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5}>
-          <Typography variant="h6" sx={{ color: TEXT, fontWeight: 850, fontSize: 18 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", sm: "center" }} spacing={1.5}>
+          <Typography component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", color: TEXT, fontWeight: 850, fontSize: 18 }}>
             {title}
           </Typography>
           {action}
@@ -274,8 +285,8 @@ function UpcomingEmails({ section, loading }) {
       ) : rows.length ? (
         <Stack spacing={1.25}>
           {rows.map((row) => (
-            <Box key={row.id} sx={{ p: 1.5, border: `1px solid ${CARD_BORDER}`, borderRadius: 1.5 }}>
-              <Stack direction="row" justifyContent="space-between" spacing={1.5}>
+            <Box key={row.id} sx={{ p: 1.5, border: `1px solid ${CARD_BORDER}`, borderRadius: "var(--imaa-radius-card)", minWidth: 0 }}>
+              <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1.5}>
                 <Box sx={{ minWidth: 0 }}>
                   <Typography sx={{ fontWeight: 800, color: TEXT }} noWrap>{row.name || row.subject || "Scheduled email"}</Typography>
                   <Typography variant="body2" color="text.secondary" noWrap>{row.subject || row.emailType || "Email"}</Typography>
@@ -303,7 +314,7 @@ function AttentionRequired({ section, loading }) {
       minHeight={120}
       compact
       action={
-        <Button size="small" startIcon={<SettingsRoundedIcon />} onClick={() => navigate("/admin/newsletter/settings")} sx={{ textTransform: "none" }}>
+        <Button size="small" startIcon={<SettingsRoundedIcon />} onClick={() => navigate("/admin/newsletter/settings")} sx={{ textTransform: "none", minHeight: 40, borderRadius: "var(--imaa-radius-field)" }}>
           View Settings
         </Button>
       }
@@ -394,7 +405,7 @@ function QuickActions() {
       minHeight={120}
       compact
       action={
-        <Button size="small" startIcon={<AnalyticsRoundedIcon />} onClick={() => navigate("/admin/newsletter/analytics")} sx={{ textTransform: "none" }}>
+        <Button size="small" startIcon={<AnalyticsRoundedIcon />} onClick={() => navigate("/admin/newsletter/analytics")} sx={{ textTransform: "none", minHeight: 40, borderRadius: "var(--imaa-radius-field)" }}>
           View Analytics
         </Button>
       }
@@ -406,7 +417,7 @@ function QuickActions() {
             variant="outlined"
             startIcon={action.icon}
             onClick={() => navigate(action.path)}
-            sx={{ justifyContent: "flex-start", textTransform: "none", borderColor: CARD_BORDER, color: TEXT, py: 1, minWidth: { xs: "100%", sm: 190 } }}
+            sx={{ justifyContent: "flex-start", textTransform: "none", borderColor: CARD_BORDER, color: TEXT, py: 1, minWidth: { xs: "100%", sm: 190 }, minHeight: 44, borderRadius: "var(--imaa-radius-field)" }}
           >
             {action.label}
           </Button>
@@ -446,20 +457,21 @@ export default function AdminNewsletterDashboardPage() {
   };
 
   return (
-    <Stack spacing={3}>
-      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: TEXT }}>Marketing Dashboard</Typography>
+    <Stack spacing={3} aria-busy={loading || undefined} sx={{ minWidth: 0 }}>
+      <Box role="status" aria-live="polite" sx={SR_ONLY}>{loading ? "Loading marketing dashboard" : ""}</Box>
+      <Stack component="header" direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: TEXT }}>Marketing Dashboard</Typography>
           <Typography color="text.secondary">Operational overview of your Mautic-powered marketing workspace.</Typography>
         </Box>
-        <Button startIcon={loading ? <CircularProgress size={18} color="inherit" /> : <RefreshRoundedIcon />} onClick={() => loadDashboard(range, { refresh: true })} disabled={loading} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
+        <Button startIcon={loading ? <CircularProgress size={18} color="inherit" aria-hidden="true" /> : <RefreshRoundedIcon />} onClick={() => loadDashboard(range, { refresh: true })} disabled={loading} sx={{ textTransform: "none", alignSelf: { xs: "stretch", sm: "flex-start" }, minHeight: 44, borderRadius: "var(--imaa-radius-field)" }}>
           Refresh
         </Button>
       </Stack>
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Paper variant="outlined" sx={{ px: 1.5, py: 1.25, borderRadius: 2, borderColor: CARD_BORDER, bgcolor: "#fff" }}>
+      <Paper component="section" aria-label="Dashboard date range" variant="outlined" sx={{ px: 1.5, py: 1.25, borderRadius: "var(--imaa-radius-card)", borderColor: CARD_BORDER, bgcolor: "background.paper", boxShadow: "var(--imaa-shadow-sm)" }}>
         <Stack direction={{ xs: "column", md: "row" }} spacing={1.25} alignItems={{ xs: "stretch", md: "center" }}>
           <TextField
             label="From"
@@ -477,12 +489,12 @@ export default function AdminNewsletterDashboardPage() {
             onChange={(event) => setRange((state) => ({ ...state, to: event.target.value }))}
             InputLabelProps={{ shrink: true }}
           />
-          <Button variant="contained" onClick={() => loadDashboard(range)} disabled={loading} sx={{ textTransform: "none" }}>
+          <Button variant="contained" onClick={() => loadDashboard(range)} disabled={loading} sx={{ textTransform: "none", minHeight: 40, borderRadius: "var(--imaa-radius-field)" }}>
             Apply
           </Button>
           <Stack direction="row" spacing={1} sx={{ ml: { md: 0.5 }, flexWrap: "wrap", rowGap: 1 }}>
             {[7, 30, 90].map((days) => (
-              <Button key={days} size="small" variant="outlined" onClick={() => applyPreset(days)} disabled={loading} sx={{ textTransform: "none", borderColor: CARD_BORDER }}>
+              <Button key={days} size="small" variant="outlined" onClick={() => applyPreset(days)} disabled={loading} sx={{ textTransform: "none", borderColor: CARD_BORDER, minHeight: 40, borderRadius: "var(--imaa-radius-field)" }}>
                 {days} days
               </Button>
             ))}

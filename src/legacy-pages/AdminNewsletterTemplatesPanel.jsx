@@ -47,6 +47,24 @@ import {
 } from "../services/newsletterService";
 
 const PAGE_SIZE = 25;
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: UI_BORDER,
+  bgcolor: "background.paper",
+  boxShadow: "var(--imaa-shadow-sm)",
+};
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { textTransform: "none", minHeight: 40, borderRadius: "var(--imaa-radius-field)" };
+const dialogPaperProps = {
+  sx: {
+    m: 2,
+    width: "calc(100% - 32px)",
+    maxHeight: "calc(100% - 32px)",
+    borderRadius: "var(--imaa-radius-popup)",
+  },
+};
 
 const starterHtml = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-family: Arial, sans-serif; color: #1B2A4A; background: #ffffff;">
   <tr>
@@ -209,6 +227,8 @@ function TemplateEditorDialog({
         onClose={saving ? undefined : onClose}
         maxWidth="lg"
         fullWidth
+        PaperProps={dialogPaperProps}
+        aria-busy={loading || saving}
       >
         <DialogTitle>
           {mode === "edit" ? "Edit Newsletter Template" : "Create Newsletter Template"}
@@ -236,6 +256,7 @@ function TemplateEditorDialog({
                     required
                     disabled={saving}
                     inputProps={{ maxLength: 190 }}
+                    sx={fieldSx}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -249,6 +270,7 @@ function TemplateEditorDialog({
                     required
                     disabled={saving}
                     inputProps={{ maxLength: 190 }}
+                    sx={fieldSx}
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -258,6 +280,7 @@ function TemplateEditorDialog({
                     onChange={(event) => setField("preheaderText", event.target.value)}
                     fullWidth
                     disabled={saving}
+                    sx={fieldSx}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -267,6 +290,7 @@ function TemplateEditorDialog({
                     onChange={(event) => setField("fromName", event.target.value)}
                     fullWidth
                     disabled={saving}
+                    sx={fieldSx}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -279,6 +303,7 @@ function TemplateEditorDialog({
                     helperText={formErrors.fromAddress}
                     fullWidth
                     disabled={saving}
+                    sx={fieldSx}
                   />
                 </Grid>
                 <Grid item xs={12}>
@@ -292,11 +317,12 @@ function TemplateEditorDialog({
                     disabled={saving}
                     helperText="Reusable HTML stored in the native Mautic email Template."
                     inputRef={htmlRef}
+                    sx={{ ...fieldSx, "& textarea": { overflowWrap: "anywhere" } }}
                   />
                 </Grid>
                 {Object.keys(groupedTokens).length > 0 && (
                   <Grid item xs={12}>
-                    <Paper variant="outlined" sx={{ p: 1.5, borderColor: "#E7ECEF" }}>
+                    <Paper component="section" aria-label="Mautic merge tokens" variant="outlined" sx={{ ...surfaceSx, p: 1.5, boxShadow: "none" }}>
                       <Typography variant="body2" sx={{ fontWeight: 800, mb: 1 }}>
                         Mautic Tokens
                       </Typography>
@@ -313,7 +339,7 @@ function TemplateEditorDialog({
                                   size="small"
                                   variant="outlined"
                                   onClick={() => insertToken(token.token)}
-                                  sx={{ textTransform: "none", my: 0.25 }}
+                                  sx={{ ...actionSx, my: 0.25 }}
                                 >
                                   {token.label}
                                 </Button>
@@ -335,6 +361,7 @@ function TemplateEditorDialog({
                     fullWidth
                     disabled={saving}
                     inputRef={textRef}
+                    sx={{ ...fieldSx, "& textarea": { overflowWrap: "anywhere" } }}
                   />
                 </Grid>
                 <Grid item xs={12} md={6}>
@@ -346,6 +373,7 @@ function TemplateEditorDialog({
                     fullWidth
                     disabled={saving}
                     helperText="Native Mautic email category."
+                    sx={fieldSx}
                   >
                     <MenuItem value="">Uncategorized</MenuItem>
                     {metadata.categories.map((category) => (
@@ -364,6 +392,7 @@ function TemplateEditorDialog({
                     fullWidth
                     disabled={saving}
                     helperText="Native Mautic email theme metadata."
+                    sx={fieldSx}
                   >
                     <MenuItem value="">No theme / custom HTML</MenuItem>
                     {metadata.themes.map((theme) => (
@@ -395,7 +424,7 @@ function TemplateEditorDialog({
                   startIcon={<PreviewRoundedIcon />}
                   onClick={() => setPreviewOpen(true)}
                   disabled={saving}
-                  sx={{ textTransform: "none" }}
+                  sx={actionSx}
                 >
                   Preview HTML
                 </Button>
@@ -422,6 +451,7 @@ function TemplateEditorDialog({
         onClose={() => setPreviewOpen(false)}
         maxWidth="md"
         fullWidth
+        PaperProps={dialogPaperProps}
       >
         <DialogTitle>Template Preview</DialogTitle>
         <DialogContent dividers>
@@ -441,7 +471,7 @@ function TemplateEditorDialog({
             </Box>
             <Paper
               variant="outlined"
-              sx={{ height: 420, overflow: "hidden", borderRadius: 2 }}
+              sx={{ height: { xs: "50vh", sm: 420 }, minHeight: 280, overflow: "hidden", borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER }}
             >
               <iframe
                 title="Newsletter Template HTML preview"
@@ -467,7 +497,7 @@ function TemplateEditorDialog({
 
 function TemplatePreviewDialog({ open, loading, template, error, onClose }) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={dialogPaperProps} aria-busy={loading}>
       <DialogTitle>Newsletter Template Preview</DialogTitle>
       <DialogContent dividers>
         {loading ? (
@@ -481,7 +511,7 @@ function TemplatePreviewDialog({ open, loading, template, error, onClose }) {
         ) : (
           <Stack spacing={2}>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+              <Typography variant="h6" sx={{ fontWeight: 850, color: UI_TEXT, overflowWrap: "anywhere" }}>
                 {template?.name || "Newsletter Template"}
               </Typography>
               <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
@@ -490,7 +520,7 @@ function TemplatePreviewDialog({ open, loading, template, error, onClose }) {
                   label={template?.isPublished ? "Published" : "Draft"}
                   color={template?.isPublished ? "success" : "default"}
                   variant={template?.isPublished ? "filled" : "outlined"}
-                  sx={{ fontWeight: 800 }}
+                  sx={{ fontWeight: 800, borderRadius: "var(--imaa-radius-tag)" }}
                 />
               </Stack>
             </Box>
@@ -509,7 +539,7 @@ function TemplatePreviewDialog({ open, loading, template, error, onClose }) {
             </Box>
             <Paper
               variant="outlined"
-              sx={{ height: 420, overflow: "hidden", borderRadius: 2 }}
+              sx={{ height: { xs: "50vh", sm: 420 }, minHeight: 280, overflow: "hidden", borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER }}
             >
               <iframe
                 title="Saved Newsletter Template preview"
@@ -550,7 +580,7 @@ function TemplateTestSendDialog({ state, onEmailChange, onClose, onSend }) {
   const invalid = Boolean(email) && !emailPattern.test(email);
 
   return (
-    <Dialog open={state.open} onClose={state.loading ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog open={state.open} onClose={state.loading ? undefined : onClose} maxWidth="xs" fullWidth PaperProps={dialogPaperProps} aria-busy={state.loading}>
       <DialogTitle>Send Test Email</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
@@ -570,6 +600,7 @@ function TemplateTestSendDialog({ state, onEmailChange, onClose, onSend }) {
             disabled={state.loading}
             autoFocus
             fullWidth
+            sx={fieldSx}
           />
         </Stack>
       </DialogContent>
@@ -929,26 +960,28 @@ export default function AdminNewsletterTemplatesPanel() {
   const totalPages = Math.max(1, Number(data.num_pages || 1));
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} aria-busy={loading} sx={{ minWidth: 0 }}>
       <Stack
         direction={{ xs: "column", md: "row" }}
         justifyContent="space-between"
         spacing={2}
       >
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>
             Newsletter Templates
           </Typography>
           <Typography color="text.secondary">
             Create and manage reusable Mautic email Templates without leaving ECP.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} alignItems="center">
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ width: { xs: "100%", md: "auto" } }}>
           <Tooltip title="Refresh from Mautic">
             <span>
               <IconButton
+                aria-label="Refresh Templates from Mautic"
                 onClick={() => loadTemplates({ nextPage: page, nextSearch: search, refresh: true })}
                 disabled={loading}
+                sx={{ minWidth: 44, minHeight: 44 }}
               >
                 <RefreshRoundedIcon />
               </IconButton>
@@ -958,7 +991,7 @@ export default function AdminNewsletterTemplatesPanel() {
             variant="contained"
             startIcon={<AddRoundedIcon />}
             onClick={openCreate}
-            sx={{ textTransform: "none" }}
+            sx={{ ...actionSx, flex: { xs: 1, md: "initial" } }}
           >
             Create Template
           </Button>
@@ -975,7 +1008,8 @@ export default function AdminNewsletterTemplatesPanel() {
         component="form"
         onSubmit={submitSearch}
         variant="outlined"
-        sx={{ p: 2, borderRadius: 2, borderColor: "#E7ECEF" }}
+        aria-label="Search Newsletter Templates"
+        sx={{ ...surfaceSx, p: 2 }}
       >
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
           <TextField
@@ -985,13 +1019,14 @@ export default function AdminNewsletterTemplatesPanel() {
             onChange={(event) => setSearchInput(event.target.value)}
             placeholder="Name or subject"
             fullWidth
+            sx={fieldSx}
           />
           <Button
             type="submit"
             variant="outlined"
             startIcon={<SearchRoundedIcon />}
             disabled={loading}
-            sx={{ textTransform: "none", minWidth: 112 }}
+            sx={{ ...actionSx, minWidth: 112 }}
           >
             Search
           </Button>
@@ -1003,7 +1038,7 @@ export default function AdminNewsletterTemplatesPanel() {
                 setPage(1);
               }}
               disabled={loading}
-              sx={{ textTransform: "none" }}
+              sx={actionSx}
             >
               Clear
             </Button>
@@ -1026,17 +1061,17 @@ export default function AdminNewsletterTemplatesPanel() {
       )}
 
       {loading ? (
-        <Grid container spacing={2}>
+        <Grid container spacing={2} role="status" aria-label="Loading Newsletter Templates">
           {Array.from({ length: 3 }).map((_, index) => (
             <Grid item xs={12} md={4} key={index}>
-              <Skeleton variant="rectangular" height={220} sx={{ borderRadius: 2 }} />
+              <Skeleton variant="rectangular" height={220} sx={{ borderRadius: "var(--imaa-radius-card)" }} />
             </Grid>
           ))}
         </Grid>
       ) : rows.length === 0 ? (
         <Paper
           variant="outlined"
-          sx={{ p: 3, borderRadius: 2, borderColor: "#E7ECEF" }}
+          sx={{ ...surfaceSx, p: 3 }}
         >
           <Stack spacing={1.5} alignItems="flex-start">
             <Typography sx={{ fontWeight: 850, color: "#1B2A4A" }}>
@@ -1052,7 +1087,7 @@ export default function AdminNewsletterTemplatesPanel() {
                 variant="contained"
                 startIcon={<AddRoundedIcon />}
                 onClick={openCreate}
-                sx={{ textTransform: "none" }}
+                sx={actionSx}
               >
                 Create Template
               </Button>
@@ -1067,8 +1102,7 @@ export default function AdminNewsletterTemplatesPanel() {
                 variant="outlined"
                 sx={{
                   p: 2.5,
-                  borderRadius: 2,
-                  borderColor: "#E7ECEF",
+                  ...surfaceSx,
                   minHeight: 245,
                   height: "100%",
                 }}
@@ -1084,8 +1118,8 @@ export default function AdminNewsletterTemplatesPanel() {
                       <Typography
                         sx={{
                           fontWeight: 850,
-                          color: "#1B2A4A",
-                          wordBreak: "break-word",
+                          color: UI_TEXT,
+                          overflowWrap: "anywhere",
                         }}
                       >
                         {template.name || `Template #${template.id}`}
@@ -1093,7 +1127,7 @@ export default function AdminNewsletterTemplatesPanel() {
                       <Typography
                         variant="body2"
                         color="text.secondary"
-                        sx={{ mt: 0.5, wordBreak: "break-word" }}
+                        sx={{ mt: 0.5, overflowWrap: "anywhere" }}
                       >
                         {template.subject || "No subject"}
                       </Typography>
@@ -1103,7 +1137,7 @@ export default function AdminNewsletterTemplatesPanel() {
                       label={template.isPublished ? "Published" : "Draft"}
                       color={template.isPublished ? "success" : "default"}
                       variant={template.isPublished ? "filled" : "outlined"}
-                      sx={{ fontWeight: 800, flexShrink: 0 }}
+                      sx={{ fontWeight: 800, flexShrink: 0, borderRadius: "var(--imaa-radius-tag)" }}
                     />
                   </Stack>
 
@@ -1140,19 +1174,19 @@ export default function AdminNewsletterTemplatesPanel() {
                     </Typography>
                   </Box>
 
-                  <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                  <Stack direction="row" spacing={0.5} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
                     <Tooltip title="Preview">
-                      <IconButton onClick={() => openPreview(template.id)}>
+                      <IconButton aria-label={`Preview ${template.name || "Template"}`} onClick={() => openPreview(template.id)} sx={{ minWidth: 44, minHeight: 44 }}>
                         <PreviewRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Edit">
-                      <IconButton onClick={() => openEdit(template.id)}>
+                      <IconButton aria-label={`Edit ${template.name || "Template"}`} onClick={() => openEdit(template.id)} sx={{ minWidth: 44, minHeight: 44 }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Duplicate">
-                      <IconButton onClick={() => duplicateTemplate(template)}>
+                      <IconButton aria-label={`Duplicate ${template.name || "Template"}`} onClick={() => duplicateTemplate(template)} sx={{ minWidth: 44, minHeight: 44 }}>
                         <ContentCopyRoundedIcon fontSize="small" />
                       </IconButton>
                     </Tooltip>
@@ -1162,6 +1196,7 @@ export default function AdminNewsletterTemplatesPanel() {
                           aria-label="Send test email"
                           disabled={Boolean(templateTestSendBlocker(template))}
                           onClick={() => openTestSend(template)}
+                          sx={{ minWidth: 44, minHeight: 44 }}
                         >
                           <EmailRoundedIcon fontSize="small" />
                         </IconButton>
@@ -1169,8 +1204,10 @@ export default function AdminNewsletterTemplatesPanel() {
                     </Tooltip>
                     <Tooltip title="Delete">
                       <IconButton
+                        aria-label={`Delete ${template.name || "Template"}`}
                         color="error"
                         onClick={() => openDelete(template)}
+                        sx={{ minWidth: 44, minHeight: 44 }}
                       >
                         <DeleteRoundedIcon fontSize="small" />
                       </IconButton>
@@ -1193,12 +1230,12 @@ export default function AdminNewsletterTemplatesPanel() {
           <Typography variant="body2" color="text.secondary">
             {data.count} Template{data.count === 1 ? "" : "s"} · Page {page} of {totalPages}
           </Typography>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} sx={{ justifyContent: { xs: "space-between", sm: "flex-start" } }}>
             <Button
               variant="outlined"
               disabled={page <= 1 || loading}
               onClick={() => setPage((current) => Math.max(1, current - 1))}
-              sx={{ textTransform: "none" }}
+              sx={{ ...actionSx, flex: { xs: 1, sm: "initial" } }}
             >
               Previous
             </Button>
@@ -1206,7 +1243,7 @@ export default function AdminNewsletterTemplatesPanel() {
               variant="outlined"
               disabled={page >= totalPages || loading}
               onClick={() => setPage((current) => current + 1)}
-              sx={{ textTransform: "none" }}
+              sx={{ ...actionSx, flex: { xs: 1, sm: "initial" } }}
             >
               Next
             </Button>
@@ -1263,6 +1300,8 @@ export default function AdminNewsletterTemplatesPanel() {
         }
         maxWidth="sm"
         fullWidth
+        PaperProps={dialogPaperProps}
+        aria-busy={deleteState.loading}
       >
         <DialogTitle>Delete Newsletter Template?</DialogTitle>
         <DialogContent dividers>

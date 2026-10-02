@@ -31,6 +31,7 @@ import {
   useTheme,
 } from "@mui/material";
 import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
@@ -38,6 +39,16 @@ import SecurityRoundedIcon from "@mui/icons-material/SecurityRounded";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 
 import { getMarketingAudit } from "../services/newsletterService";
+
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: UI_BORDER,
+  boxShadow: "var(--imaa-shadow-sm)",
+};
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
 
 const PAGE_SIZE = 25;
 
@@ -159,11 +170,11 @@ const getErrorMessage = (err) => {
 
 function SummaryCard({ label, value, loading }) {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", height: "100%" }}>
+    <Card variant="outlined" sx={{ ...surfaceSx, height: "100%" }} aria-busy={loading ? "true" : undefined}>
       <CardContent sx={{ p: 2.25, "&:last-child": { pb: 2.25 } }}>
         <Typography variant="body2" color="text.secondary">{label}</Typography>
         {loading ? <Skeleton width="60%" height={34} /> : (
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+          <Typography variant="h5" sx={{ fontWeight: 850, color: UI_TEXT }}>
             {Number(value || 0).toLocaleString()}
           </Typography>
         )}
@@ -191,7 +202,7 @@ function DetailLine({ label, value, copy }) {
         <Typography variant="body2" sx={{ wordBreak: "break-word", flex: 1 }}>{display}</Typography>
         {copy && value ? (
           <Tooltip title="Copy">
-            <IconButton size="small" onClick={() => navigator.clipboard?.writeText(String(value))}>
+            <IconButton size="small" onClick={() => navigator.clipboard?.writeText(String(value))} aria-label={`Copy ${label}`} sx={{ minWidth: 40, minHeight: 40 }}>
               <ContentCopyRoundedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -281,8 +292,8 @@ export default function AdminMarketingAuditPage() {
   };
 
   const table = (
-    <TableContainer sx={{ border: "1px solid #E7ECEF", borderRadius: 2, bgcolor: "#fff" }}>
-      <Table>
+    <TableContainer sx={{ border: `1px solid ${UI_BORDER}`, borderRadius: "var(--imaa-radius-card)", boxShadow: "var(--imaa-shadow-sm)", bgcolor: "background.paper", overflowX: "auto", maxWidth: "100%" }} aria-busy={loading ? "true" : undefined}>
+      <Table aria-label="Marketing activity" sx={{ minWidth: 940 }}>
         <TableHead>
           <TableRow sx={{ bgcolor: "#F8FAFC" }}>
             <TableCell>Time</TableCell>
@@ -303,10 +314,23 @@ export default function AdminMarketingAuditPage() {
               </TableCell>
             </TableRow>
           ) : rows.map((row) => (
-            <TableRow key={row.id} hover onClick={() => setSelected(row)} sx={{ cursor: "pointer" }}>
+            <TableRow
+              key={row.id}
+              hover
+              tabIndex={0}
+              aria-label={`View ${humanizeAction(row.action)} activity details`}
+              onClick={() => setSelected(row)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSelected(row);
+                }
+              }}
+              sx={{ cursor: "pointer", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: -2 } }}
+            >
               <TableCell>{formatDateTime(row.created_at)}</TableCell>
               <TableCell>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>{row.ecp_user?.label || "System"}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, overflowWrap: "anywhere" }}>{row.ecp_user?.label || "System"}</Typography>
                 <Typography variant="caption" color="text.secondary">ECP #{row.ecp_user?.id || "—"}</Typography>
               </TableCell>
               <TableCell>
@@ -316,8 +340,8 @@ export default function AdminMarketingAuditPage() {
                 {row.mautic_user?.id ? <Typography variant="caption" color="text.secondary">Mautic #{row.mautic_user.id}</Typography> : null}
               </TableCell>
               <TableCell>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>{humanizeAction(row.action)}</Typography>
-                <Typography variant="caption" color="text.secondary">{row.action}</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, overflowWrap: "anywhere" }}>{humanizeAction(row.action)}</Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>{row.action}</Typography>
               </TableCell>
               <TableCell><ModeChip mode={row.auth_mode} /></TableCell>
               <TableCell><StatusChip status={row.status} /></TableCell>
@@ -329,19 +353,37 @@ export default function AdminMarketingAuditPage() {
   );
 
   const cards = (
-    <Stack spacing={1.5}>
-      {rows.length === 0 && !loading ? (
-        <Card variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+    <Stack spacing={1.5} aria-busy={loading ? "true" : undefined}>
+      {loading && !rows.length ? (
+        <Stack spacing={1} role="status" aria-live="polite" aria-label="Loading Marketing activity">
+          {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} variant="rounded" height={132} />)}
+        </Stack>
+      ) : rows.length === 0 ? (
+        <Card variant="outlined" sx={{ ...surfaceSx, p: 2 }}>
           <Typography variant="body2" color="text.secondary">No Marketing activity found.</Typography>
           <Typography variant="caption" color="text.secondary">Try changing the date range or removing some filters.</Typography>
         </Card>
       ) : rows.map((row) => (
-        <Card key={row.id} variant="outlined" onClick={() => setSelected(row)} sx={{ borderRadius: 2, borderColor: "#E7ECEF", cursor: "pointer" }}>
+        <Card
+          key={row.id}
+          variant="outlined"
+          role="button"
+          tabIndex={0}
+          aria-label={`View ${humanizeAction(row.action)} activity details`}
+          onClick={() => setSelected(row)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              setSelected(row);
+            }
+          }}
+          sx={{ ...surfaceSx, cursor: "pointer", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
+        >
           <CardContent>
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between" spacing={1}>
                 <Box>
-                  <Typography sx={{ fontWeight: 800 }}>{humanizeAction(row.action)}</Typography>
+                  <Typography sx={{ fontWeight: 800, overflowWrap: "anywhere" }}>{humanizeAction(row.action)}</Typography>
                   <Typography variant="caption" color="text.secondary">{formatDateTime(row.created_at)}</Typography>
                 </Box>
                 <StatusChip status={row.status} />
@@ -357,13 +399,13 @@ export default function AdminMarketingAuditPage() {
   );
 
   return (
-    <Box>
+    <Box aria-busy={loading ? "true" : undefined}>
       <Stack direction={{ xs: "column", md: "row" }} spacing={2} justifyContent="space-between" alignItems={{ xs: "stretch", md: "flex-start" }} sx={{ mb: 3 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Marketing Audit & Activity</Typography>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>Marketing Audit & Activity</Typography>
           <Typography color="text.secondary">Review Marketing actions, execution identity, permissions, and failures.</Typography>
         </Box>
-        <Button variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={fetchAudit} disabled={loading}>Refresh</Button>
+        <Button variant="outlined" startIcon={<RefreshRoundedIcon />} onClick={fetchAudit} disabled={loading} sx={actionSx}>Refresh</Button>
       </Stack>
 
       {error ? <Alert severity="error" action={<Button onClick={fetchAudit}>Retry</Button>} sx={{ mb: 2 }}>{error}</Alert> : null}
@@ -375,42 +417,42 @@ export default function AdminMarketingAuditPage() {
         <Grid item xs={6} md={3}><SummaryCard label="Failed" value={summary.failed} loading={loading && !data} /></Grid>
       </Grid>
 
-      <Card variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", mb: 2 }}>
+      <Card component="section" aria-label="Marketing activity filters" variant="outlined" sx={{ ...surfaceSx, mb: 2, ...fieldSx }}>
         <CardContent>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1.5, alignItems: "flex-start" }}>
             <Box sx={compactFilterFieldSx}><TextField fullWidth size="small" type="date" label="From" InputLabelProps={{ shrink: true }} value={searchParams.get("date_from") || ""} onChange={(e) => setParam("date_from", e.target.value)} /></Box>
             <Box sx={compactFilterFieldSx}><TextField fullWidth size="small" type="date" label="To" InputLabelProps={{ shrink: true }} value={searchParams.get("date_to") || ""} onChange={(e) => setParam("date_to", e.target.value)} /></Box>
             <Box sx={{ ...filterFieldSx, flexBasis: 170 }}><TextField fullWidth size="small" label="Actor ID" value={searchParams.get("ecp_user_id") || ""} onChange={(e) => setParam("ecp_user_id", e.target.value)} /></Box>
             <Box sx={filterFieldSx}>
-              <FormControl fullWidth size="small"><InputLabel>Domain</InputLabel><Select label="Domain" value={searchParams.get("domain") || ""} onChange={(e) => setParam("domain", e.target.value)}>
+              <FormControl fullWidth size="small"><InputLabel id="activity-domain-label">Domain</InputLabel><Select labelId="activity-domain-label" label="Domain" value={searchParams.get("domain") || ""} onChange={(e) => setParam("domain", e.target.value)}>
                 <MenuItem value="">All</MenuItem>{domains.map((item) => <MenuItem key={item.value} value={item.value}>{item.label}</MenuItem>)}
               </Select></FormControl>
             </Box>
             <Box sx={{ ...filterFieldSx, flexBasis: 180 }}>
-              <FormControl fullWidth size="small"><InputLabel>Mode</InputLabel><Select label="Mode" value={searchParams.get("auth_mode") || ""} onChange={(e) => setParam("auth_mode", e.target.value)}>
+              <FormControl fullWidth size="small"><InputLabel id="activity-mode-label">Mode</InputLabel><Select labelId="activity-mode-label" label="Mode" value={searchParams.get("auth_mode") || ""} onChange={(e) => setParam("auth_mode", e.target.value)}>
                 <MenuItem value="">All</MenuItem><MenuItem value="asserted_user">Asserted User</MenuItem><MenuItem value="service_account">Service Account</MenuItem>
               </Select></FormControl>
             </Box>
             <Box sx={filterFieldSx}>
-              <FormControl fullWidth size="small"><InputLabel>Status</InputLabel><Select label="Status" value={searchParams.get("status") || ""} onChange={(e) => setParam("status", e.target.value)}>
+              <FormControl fullWidth size="small"><InputLabel id="activity-status-label">Status</InputLabel><Select labelId="activity-status-label" label="Status" value={searchParams.get("status") || ""} onChange={(e) => setParam("status", e.target.value)}>
                 <MenuItem value="">All</MenuItem><MenuItem value="succeeded">Succeeded</MenuItem><MenuItem value="denied">Denied</MenuItem><MenuItem value="failed">Failed</MenuItem>
               </Select></FormControl>
             </Box>
             <Box sx={searchFilterFieldSx}><TextField fullWidth size="small" label="Search" value={draftSearch} onChange={(e) => setDraftSearch(e.target.value)} placeholder="Actor, ID, correlation ID, JTI" /></Box>
             <Box sx={actionFilterFieldSx}>
-              <FormControl fullWidth size="small"><InputLabel>Action</InputLabel><Select label="Action" value={searchParams.get("action") || ""} onChange={(e) => setParam("action", e.target.value)}>
+              <FormControl fullWidth size="small"><InputLabel id="activity-action-label">Action</InputLabel><Select labelId="activity-action-label" label="Action" value={searchParams.get("action") || ""} onChange={(e) => setParam("action", e.target.value)}>
                 <MenuItem value="">All</MenuItem>{actions.map((action) => <MenuItem key={action} value={action}>{action}</MenuItem>)}
               </Select></FormControl>
             </Box>
           </Box>
-          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ mt: 2 }}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 2 }}>
             {[
               ["all", "All"],
               ["denied", "Denied"],
               ["failed", "Failed"],
               ["asserted", "Asserted"],
               ["service", "Service Account"],
-            ].map(([key, label]) => <Button key={key} size="small" variant="outlined" onClick={() => quick(key)}>{label}</Button>)}
+            ].map(([key, label]) => <Button key={key} size="small" variant="outlined" onClick={() => quick(key)} sx={actionSx}>{label}</Button>)}
           </Stack>
         </CardContent>
       </Card>
@@ -424,13 +466,18 @@ export default function AdminMarketingAuditPage() {
         <Pagination count={data?.num_pages || 1} page={page} onChange={(_, value) => setParam("page", String(value))} />
       </Stack>
 
-      <Drawer anchor="right" open={Boolean(selected)} onClose={() => setSelected(null)} PaperProps={{ sx: { width: { xs: "100%", sm: 460 }, p: 3 } }}>
+      <Drawer anchor="right" open={Boolean(selected)} onClose={() => setSelected(null)} aria-labelledby="marketing-activity-detail-title" PaperProps={{ sx: { width: { xs: "100%", sm: 460 }, p: { xs: 2, sm: 3 } } }}>
         {selected ? (
           <Stack spacing={2.25}>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 850 }}>Activity Details</Typography>
-              <Typography variant="body2" color="text.secondary">{formatDateTime(selected.created_at)}</Typography>
-            </Box>
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+              <Box sx={{ minWidth: 0 }}>
+                <Typography id="marketing-activity-detail-title" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>Activity Details</Typography>
+                <Typography variant="body2" color="text.secondary">{formatDateTime(selected.created_at)}</Typography>
+              </Box>
+              <IconButton onClick={() => setSelected(null)} aria-label="Close activity details" sx={{ minWidth: 40, minHeight: 40 }}>
+                <CloseRoundedIcon />
+              </IconButton>
+            </Stack>
             <Stack direction="row" spacing={1}><StatusChip status={selected.status} /><ModeChip mode={selected.auth_mode} /></Stack>
             <Divider />
             <DetailLine label="Operation" value={`${humanizeAction(selected.action)} (${selected.action})`} />

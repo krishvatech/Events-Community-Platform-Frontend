@@ -118,6 +118,30 @@ const STATUS_COLORS = {
   cancelled: "default",
 };
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const UI_TEAL = "var(--imaa-teal-hover)";
+const surfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: UI_BORDER,
+  bgcolor: "background.paper",
+  boxShadow: "var(--imaa-shadow-sm)",
+};
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionButtonSx = {
+  textTransform: "none",
+  minHeight: 40,
+  borderRadius: "var(--imaa-radius-field)",
+};
+const dialogPaperProps = {
+  sx: {
+    m: 2,
+    width: "calc(100% - 32px)",
+    maxHeight: "calc(100% - 32px)",
+    borderRadius: "var(--imaa-radius-popup)",
+  },
+};
+
 const starterHtml = `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="font-family: Arial, sans-serif; color: #1B2A4A; background: #ffffff;">
   <tr>
     <td style="padding: 24px;">
@@ -223,8 +247,21 @@ function StatusChip({ status }) {
       label={STATUS_LABELS[normalized] || normalized}
       color={STATUS_COLORS[normalized] || "default"}
       variant={normalized === "draft" || normalized === "cancelled" ? "outlined" : "filled"}
-      sx={{ fontWeight: 800 }}
+      sx={{ fontWeight: 800, borderRadius: "var(--imaa-radius-tag)" }}
     />
+  );
+}
+
+function MetadataItem({ label, value }) {
+  return (
+    <Box sx={{ minWidth: 0 }}>
+      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.25 }}>
+        {label}
+      </Typography>
+      <Box sx={{ color: UI_TEXT, fontSize: "0.875rem", lineHeight: 1.43, fontWeight: 700, overflowWrap: "anywhere" }}>
+        {value || "-"}
+      </Box>
+    </Box>
   );
 }
 
@@ -260,7 +297,7 @@ function NewsletterShell({ children }) {
 
 function ConfirmDialog({ open, title, children, confirmLabel, confirmColor = "primary", loading, onClose, onConfirm }) {
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="sm" fullWidth PaperProps={dialogPaperProps} aria-busy={loading}>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent dividers>{children}</DialogContent>
       <DialogActions>
@@ -275,7 +312,7 @@ function ConfirmDialog({ open, title, children, confirmLabel, confirmColor = "pr
 
 function PreviewDialog({ open, loading, preview, error, onClose }) {
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={dialogPaperProps} aria-busy={loading}>
       <DialogTitle>Newsletter Preview</DialogTitle>
       <DialogContent dividers>
         {loading ? (
@@ -299,7 +336,7 @@ function PreviewDialog({ open, loading, preview, error, onClose }) {
               <Typography sx={{ fontWeight: 700 }}>{preview?.subject || "-"}</Typography>
               {preview?.preview_text && <Typography color="text.secondary">{preview.preview_text}</Typography>}
             </Box>
-            <Paper variant="outlined" sx={{ height: 360, overflow: "hidden", borderRadius: 2 }}>
+            <Paper variant="outlined" sx={{ height: { xs: "50vh", sm: 360 }, minHeight: 280, overflow: "hidden", borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER }}>
               <iframe
                 title="Newsletter HTML preview"
                 sandbox=""
@@ -325,7 +362,7 @@ function TestEmailDialog({ open, loading, error, onClose, onSend }) {
   const invalid = email.trim() && !emailPattern.test(email.trim());
 
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth PaperProps={dialogPaperProps} aria-busy={loading}>
       <DialogTitle>Send Test Email</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
@@ -339,6 +376,7 @@ function TestEmailDialog({ open, loading, error, onClose, onSend }) {
             error={Boolean(invalid)}
             helperText={invalid ? "Enter a valid email address." : ""}
             fullWidth
+            sx={fieldSx}
           />
         </Stack>
       </DialogContent>
@@ -359,7 +397,7 @@ function ScheduleDialog({ open, loading, error, initialValue, onClose, onSchedul
   }, [open, initialValue]);
 
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth PaperProps={dialogPaperProps} aria-busy={loading}>
       <DialogTitle>{initialValue ? "Reschedule Broadcast" : "Schedule Broadcast"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
@@ -371,6 +409,8 @@ function ScheduleDialog({ open, loading, error, initialValue, onClose, onSchedul
             onChange={(event) => setValue(event.target.value)}
             fullWidth
             InputLabelProps={{ shrink: true }}
+            helperText="Enter the date and time in your local timezone."
+            sx={fieldSx}
           />
         </Stack>
       </DialogContent>
@@ -397,19 +437,19 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
     : campaigns.filter((row) => String(row?.status || "").toLowerCase() === filter);
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} aria-busy={loading}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Email Broadcasts</Typography>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>Email Broadcasts</Typography>
           <Typography color="text.secondary">Create, schedule, and review newsletter emails sent to subscription lists.</Typography>
         </Box>
-        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={onCreate} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
+        <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={onCreate} sx={{ ...actionButtonSx, alignSelf: "flex-start", width: { xs: "100%", sm: "auto" }, flexShrink: 0 }}>
           Create Broadcast
         </Button>
       </Stack>
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-        <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderBottom: "1px solid #E7ECEF", display: "flex", justifyContent: "space-between", gap: 2, flexDirection: { xs: "column", md: "row" } }}>
-          <Tabs value={filter} onChange={(_, value) => onFilter(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ minHeight: 40, "& .MuiTab-root": { textTransform: "none", minHeight: 40 }, "& .Mui-selected": { color: "#0f766e !important", fontWeight: 800 }, "& .MuiTabs-indicator": { backgroundColor: "#0f766e" } }}>
+      <Paper component="section" aria-label="Email broadcasts" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}>
+        <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderBottom: `1px solid ${UI_BORDER}`, display: "flex", justifyContent: "space-between", gap: 2, flexDirection: { xs: "column", md: "row" }, minWidth: 0 }}>
+          <Tabs aria-label="Filter email broadcasts by status" value={filter} onChange={(_, value) => onFilter(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ minHeight: 40, minWidth: 0, maxWidth: "100%", "& .MuiTab-root": { textTransform: "none", minHeight: 44 }, "& .Mui-selected": { color: `${UI_TEAL} !important`, fontWeight: 800 }, "& .MuiTabs-indicator": { backgroundColor: UI_TEAL } }}>
             <Tab label="All" value="all" />
             <Tab label="Draft" value="draft" />
             <Tab label="Scheduled" value="scheduled" />
@@ -418,19 +458,19 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
             <Tab label="Failed" value="failed" />
             <Tab label="Cancelled" value="cancelled" />
           </Tabs>
-          <Button startIcon={<RefreshRoundedIcon />} onClick={onRefresh} disabled={loading} sx={{ textTransform: "none", alignSelf: { xs: "flex-start", md: "center" } }}>
+          <Button startIcon={<RefreshRoundedIcon />} onClick={onRefresh} disabled={loading} sx={{ ...actionButtonSx, alignSelf: { xs: "stretch", sm: "flex-start", md: "center" }, flexShrink: 0 }}>
             Refresh
           </Button>
         </Box>
         {loading ? (
-          <Box sx={{ p: 3 }}><Stack spacing={1}>{Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} height={46} />)}</Stack></Box>
+          <Box role="status" aria-live="polite" sx={{ p: 3 }}><Typography sx={{ position: "absolute", width: 1, height: 1, p: 0, m: -1, overflow: "hidden", clip: "rect(0 0 0 0)", whiteSpace: "nowrap", border: 0 }}>Loading email broadcasts.</Typography><Stack spacing={1} aria-hidden="true">{Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} height={46} />)}</Stack></Box>
         ) : error ? (
           <Box sx={{ p: 3 }}><Alert severity="error" action={<Button color="inherit" size="small" onClick={onRefresh}>Retry</Button>}>{error}</Alert></Box>
         ) : filteredCampaigns.length === 0 ? (
           <Box sx={{ p: 3 }}><Alert severity="info" variant="outlined">No email broadcasts found.</Alert></Box>
         ) : (
-          <TableContainer sx={{ overflowX: "auto" }}>
-            <Table>
+          <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+            <Table aria-label="Email broadcasts" sx={{ minWidth: 1080 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                   <TableCell>Broadcast Name</TableCell>
@@ -446,32 +486,40 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
               </TableHead>
               <TableBody>
                 {filteredCampaigns.map((row) => (
-                  <TableRow hover key={row.uuid} sx={{ cursor: "pointer" }} onClick={() => onOpen(row.uuid)}>
-                    <TableCell>
-                      <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{row.name || "Untitled broadcast"}</Typography>
-                      <Typography variant="body2" color="text.secondary">{row.subject || "-"}</Typography>
+                  <TableRow hover key={row.uuid} tabIndex={0} aria-label={`Open ${row.name || "untitled broadcast"}`} sx={{ cursor: "pointer", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: -2 } }} onClick={() => onOpen(row.uuid)} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onOpen(row.uuid); } }}>
+                    <TableCell sx={{ minWidth: 230, maxWidth: 320 }}>
+                      <Typography sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}>{row.name || "Untitled broadcast"}</Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>{row.subject || "-"}</Typography>
+                      {(row.mautic_email_id || row.last_synced_to_mautic_at) && (
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5, overflowWrap: "anywhere" }}>
+                          {row.mautic_email_id ? `Mautic email ID: ${row.mautic_email_id}` : ""}
+                          {row.mautic_email_id && row.last_synced_to_mautic_at ? " · " : ""}
+                          {row.last_synced_to_mautic_at ? `Last synced ${formatDateTime(row.last_synced_to_mautic_at)}` : ""}
+                        </Typography>
+                      )}
                     </TableCell>
-                    <TableCell>{getCampaignAudienceLabels(row).join(", ") || "-"}</TableCell>
+                    <TableCell sx={{ minWidth: 160, maxWidth: 240, overflowWrap: "anywhere" }}>{getCampaignAudienceLabels(row).join(", ") || "-"}</TableCell>
                     <TableCell><StatusChip status={row.status} /></TableCell>
                     <TableCell>{formatDateTime(row.created_at)}</TableCell>
                     <TableCell>{formatDateTime(row.scheduled_at)}</TableCell>
                     <TableCell>{formatDateTime(row.sent_at || row.send_started_at)}</TableCell>
                     <TableCell><BroadcastRateCell status={row.status} analytics={analyticsByUuid[row.uuid]} rateKey="open_rate" /></TableCell>
                     <TableCell><BroadcastRateCell status={row.status} analytics={analyticsByUuid[row.uuid]} rateKey="click_rate" /></TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
                       <Tooltip title="Duplicate broadcast">
                         <span>
                           <IconButton
                             aria-label="Duplicate broadcast"
                             disabled={Boolean(duplicatingUuid)}
                             onClick={(event) => { event.stopPropagation(); onDuplicate(row.uuid); }}
+                            sx={{ minWidth: 44, minHeight: 44 }}
                           >
                             {duplicatingUuid === row.uuid ? <CircularProgress size={18} /> : <ContentCopyRoundedIcon fontSize="small" />}
                           </IconButton>
                         </span>
                       </Tooltip>
                       <Tooltip title="Open broadcast">
-                        <IconButton onClick={(event) => { event.stopPropagation(); onOpen(row.uuid); }}>
+                        <IconButton aria-label={`Open ${row.name || "broadcast"}`} onClick={(event) => { event.stopPropagation(); onOpen(row.uuid); }} sx={{ minWidth: 44, minHeight: 44 }}>
                           <EditRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -756,14 +804,14 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
   };
 
   return (
-    <Stack spacing={3}>
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
+    <Stack spacing={3} sx={{ minWidth: 0 }}>
+      <Paper component="nav" aria-label="Broadcast creation steps" variant="outlined" sx={{ ...surfaceSx, p: { xs: 1, sm: 2, md: 3 }, minWidth: 0 }}>
         <Stepper activeStep={activeStep} alternativeLabel sx={{ display: { xs: "none", md: "flex" } }}>
           {["Broadcast Information", "Subscription Lists", "Email Content", "Review & Actions"].map((label) => (
             <Step key={label}><StepLabel>{label}</StepLabel></Step>
           ))}
         </Stepper>
-        <Tabs value={activeStep} onChange={(_, value) => onStepChange(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ display: { xs: "flex", md: "none" }, "& .MuiTab-root": { textTransform: "none" } }}>
+        <Tabs aria-label="Broadcast creation steps" value={activeStep} onChange={(_, value) => onStepChange(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ display: { xs: "flex", md: "none" }, maxWidth: "100%", "& .MuiTab-root": { textTransform: "none", minHeight: 44 } }}>
           <Tab label="Info" value={0} />
           <Tab label="Lists" value={1} />
           <Tab label="Content" value={2} />
@@ -772,38 +820,38 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
       </Paper>
 
       {activeStep === 0 && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 2 }}>Broadcast Information</Typography>
+        <Paper component="section" aria-labelledby="broadcast-information-heading" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, md: 3 }, minWidth: 0 }}>
+          <Typography id="broadcast-information-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT, mb: 2 }}>Broadcast Information</Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
-              <TextField label="Broadcast Name" value={value.name} onChange={(event) => setField("name", event.target.value)} error={Boolean(errors.name)} helperText={errors.name} fullWidth required InputProps={{ readOnly }} />
+              <TextField label="Broadcast Name" value={value.name} onChange={(event) => setField("name", event.target.value)} error={Boolean(errors.name)} helperText={errors.name} fullWidth required InputProps={{ readOnly }} sx={fieldSx} />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField label="Subject" value={value.subject} onChange={(event) => setField("subject", event.target.value)} error={Boolean(errors.subject)} helperText={errors.subject} fullWidth required InputProps={{ readOnly }} />
+              <TextField label="Subject" value={value.subject} onChange={(event) => setField("subject", event.target.value)} error={Boolean(errors.subject)} helperText={errors.subject} fullWidth required InputProps={{ readOnly }} sx={fieldSx} />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField label="Sender Name" value={value.from_name} onChange={(event) => setField("from_name", event.target.value)} error={Boolean(errors.from_name)} helperText={errors.from_name} fullWidth required InputProps={{ readOnly }} />
+              <TextField label="Sender Name" value={value.from_name} onChange={(event) => setField("from_name", event.target.value)} error={Boolean(errors.from_name)} helperText={errors.from_name} fullWidth required InputProps={{ readOnly }} sx={fieldSx} />
             </Grid>
             <Grid item xs={12} md={6}>
-              <TextField label="Sender Email" type="email" value={value.from_email} onChange={(event) => setField("from_email", event.target.value)} error={Boolean(errors.from_email)} helperText={errors.from_email} fullWidth required InputProps={{ readOnly }} />
+              <TextField label="Sender Email" type="email" value={value.from_email} onChange={(event) => setField("from_email", event.target.value)} error={Boolean(errors.from_email)} helperText={errors.from_email} fullWidth required InputProps={{ readOnly }} sx={fieldSx} />
             </Grid>
             <Grid item xs={12}>
-              <TextField label="Preview Text" value={value.preview_text} onChange={(event) => setField("preview_text", event.target.value)} fullWidth InputProps={{ readOnly }} />
+              <TextField label="Preview Text" value={value.preview_text} onChange={(event) => setField("preview_text", event.target.value)} fullWidth InputProps={{ readOnly }} sx={fieldSx} />
             </Grid>
           </Grid>
         </Paper>
       )}
 
       {activeStep === 1 && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: errors.audience_slugs ? "error.main" : "#E7ECEF" }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>Subscription Lists</Typography>
+        <Paper component="section" aria-labelledby="broadcast-lists-heading" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, md: 3 }, borderColor: errors.audience_slugs ? "error.main" : UI_BORDER, minWidth: 0 }}>
+          <Typography id="broadcast-lists-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT, mb: 1 }}>Subscription Lists</Typography>
           <Typography color="text.secondary" sx={{ mb: 2 }}>Choose the newsletter lists this broadcast should be sent to.</Typography>
           <FormControl component="fieldset" fullWidth disabled={readOnly} error={Boolean(errors.audience_slugs)}>
             <FormGroup>
               <Grid container spacing={1}>
                 {categories.map((category) => (
                   <Grid item xs={12} md={6} key={category.slug}>
-                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: (value.audience_slugs || []).includes(category.slug) ? "#0f766e" : "#E7ECEF" }}>
+                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: "var(--imaa-radius-card)", borderColor: (value.audience_slugs || []).includes(category.slug) ? UI_TEAL : UI_BORDER }}>
                       <FormControlLabel
                         control={<Checkbox checked={(value.audience_slugs || []).includes(category.slug)} onChange={() => toggleAudience(category.slug)} />}
                         label={<Box><Typography sx={{ fontWeight: 800 }}>{category.name || category.slug}</Typography>{category.description && <Typography variant="body2" color="text.secondary">{category.description}</Typography>}</Box>}
@@ -820,19 +868,19 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
       )}
 
       {activeStep === 2 && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: errors.html_content ? "error.main" : "#E7ECEF" }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>Email Content</Typography>
+        <Paper component="section" aria-labelledby="broadcast-content-heading" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, md: 3 }, borderColor: errors.html_content ? "error.main" : UI_BORDER, minWidth: 0 }}>
+          <Typography id="broadcast-content-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT, mb: 1 }}>Email Content</Typography>
           <Alert severity="info" variant="outlined" sx={{ mb: 2 }}>Advanced Email Builder Coming Soon</Alert>
-          <Stack spacing={2}>
-            <TextField label="HTML Content" value={value.html_content} onChange={(event) => setField("html_content", event.target.value)} multiline minRows={12} fullWidth required error={Boolean(errors.html_content)} helperText={errors.html_content || "Use HTML content for the email body."} InputProps={{ readOnly }} />
-            <TextField label="Plain Text Fallback" value={value.plain_text} onChange={(event) => setField("plain_text", event.target.value)} multiline minRows={6} fullWidth InputProps={{ readOnly }} />
+          <Stack spacing={2} role="region" aria-label="Broadcast message editor" sx={{ minWidth: 0 }}>
+            <TextField label="HTML Content" value={value.html_content} onChange={(event) => setField("html_content", event.target.value)} multiline minRows={12} fullWidth required error={Boolean(errors.html_content)} helperText={errors.html_content || "Use HTML content for the email body."} InputProps={{ readOnly }} sx={{ ...fieldSx, "& textarea": { overflowWrap: "anywhere" } }} />
+            <TextField label="Plain Text Fallback" value={value.plain_text} onChange={(event) => setField("plain_text", event.target.value)} multiline minRows={6} fullWidth InputProps={{ readOnly }} sx={{ ...fieldSx, "& textarea": { overflowWrap: "anywhere" } }} />
           </Stack>
         </Paper>
       )}
 
       {activeStep === 3 && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 2 }}>Review & Actions</Typography>
+        <Paper component="section" aria-labelledby="broadcast-review-heading" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, md: 3 }, minWidth: 0 }}>
+          <Typography id="broadcast-review-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT, mb: 2 }}>Review & Actions</Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}><MetricCard label="Broadcast Name" value={value.name || "No data available"} /></Grid>
             <Grid item xs={12} md={6}><MetricCard label="Subscription Lists" value={(value.audience_slugs || []).join(", ") || "No data available"} /></Grid>
@@ -1220,33 +1268,45 @@ export default function AdminNewsletterPage() {
 
   return (
     <NewsletterShell>
-      <Stack spacing={3}>
-      <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
-        <Stack direction="row" spacing={1.5} alignItems="flex-start">
-          <IconButton onClick={() => navigate("/admin/newsletter/broadcasts")}><ArrowBackRoundedIcon /></IconButton>
-          <Box>
+      <Stack spacing={3} aria-busy={loading || saving} sx={{ minWidth: 0 }}>
+      <Stack direction={{ xs: "column", lg: "row" }} justifyContent="space-between" spacing={2}>
+        <Stack direction="row" spacing={{ xs: 0.75, sm: 1.5 }} alignItems="flex-start" sx={{ minWidth: 0 }}>
+          <IconButton aria-label="Back to email broadcasts" onClick={() => navigate("/admin/newsletter/broadcasts")} sx={{ minWidth: 44, minHeight: 44, flexShrink: 0 }}><ArrowBackRoundedIcon /></IconButton>
+          <Box sx={{ minWidth: 0 }}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>{isNew ? "Create Broadcast" : campaign?.name || "Email Broadcast"}</Typography>
+              <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, overflowWrap: "anywhere" }}>{isNew ? "Create Broadcast" : campaign?.name || "Email Broadcast"}</Typography>
               {!isNew && <StatusChip status={campaign?.status} />}
             </Stack>
             <Typography color="text.secondary">Build the email broadcast in four steps, then test, schedule, or send.</Typography>
           </Box>
         </Stack>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-          {!isNew && <Button startIcon={<PreviewRoundedIcon />} onClick={openPreview} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>Preview</Button>}
-          {!isNew && <Button startIcon={duplicatingUuid ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />} onClick={() => duplicateCampaign(campaignId)} disabled={confirmState.loading || Boolean(duplicatingUuid)} sx={{ textTransform: "none" }}>{duplicatingUuid ? "Duplicating..." : "Duplicate"}</Button>}
-          {!isNew && editable && <Button startIcon={<EmailRoundedIcon />} onClick={() => setTestState({ open: true, loading: false, error: "" })} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>Send Test Email</Button>}
-          {canSchedule && <Button startIcon={<ScheduleRoundedIcon />} onClick={() => setScheduleState({ open: true, loading: false, error: "" })} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>{status === "scheduled" ? "Reschedule" : "Schedule"}</Button>}
-          {canCancel && <Button color="warning" startIcon={<StopCircleRoundedIcon />} onClick={() => setConfirmState({ type: "cancel", loading: false })} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Cancel</Button>}
-          {canSendNow && <Button color="success" variant="contained" startIcon={<SendRoundedIcon />} onClick={() => setConfirmState({ type: "send", loading: false })} disabled={isDirty || confirmState.loading} sx={{ textTransform: "none" }}>Send Now</Button>}
-          {editable && <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={saveDraft} disabled={saving || loading} sx={{ textTransform: "none" }}>{saving ? "Saving..." : "Save Draft"}</Button>}
-          {canDelete && <Button color="error" startIcon={<DeleteRoundedIcon />} onClick={() => setConfirmState({ type: "delete", loading: false })} disabled={confirmState.loading} sx={{ textTransform: "none" }}>Delete</Button>}
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ width: { xs: "100%", lg: "auto" }, "& .MuiButton-root": { ...actionButtonSx, flex: { xs: "1 1 150px", sm: "0 0 auto" } } }}>
+          {!isNew && <Button startIcon={<PreviewRoundedIcon />} onClick={openPreview} disabled={isDirty || confirmState.loading}>Preview</Button>}
+          {!isNew && <Button startIcon={duplicatingUuid ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />} onClick={() => duplicateCampaign(campaignId)} disabled={confirmState.loading || Boolean(duplicatingUuid)}>{duplicatingUuid ? "Duplicating..." : "Duplicate"}</Button>}
+          {!isNew && editable && <Button startIcon={<EmailRoundedIcon />} onClick={() => setTestState({ open: true, loading: false, error: "" })} disabled={isDirty || confirmState.loading}>Send Test Email</Button>}
+          {canSchedule && <Button startIcon={<ScheduleRoundedIcon />} onClick={() => setScheduleState({ open: true, loading: false, error: "" })} disabled={isDirty || confirmState.loading}>{status === "scheduled" ? "Reschedule" : "Schedule"}</Button>}
+          {canCancel && <Button color="warning" startIcon={<StopCircleRoundedIcon />} onClick={() => setConfirmState({ type: "cancel", loading: false })} disabled={confirmState.loading}>Cancel</Button>}
+          {canSendNow && <Button color="success" variant="contained" startIcon={<SendRoundedIcon />} onClick={() => setConfirmState({ type: "send", loading: false })} disabled={isDirty || confirmState.loading}>Send Now</Button>}
+          {editable && <Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={saveDraft} disabled={saving || loading}>{saving ? "Saving..." : "Save Draft"}</Button>}
+          {canDelete && <Button color="error" startIcon={<DeleteRoundedIcon />} onClick={() => setConfirmState({ type: "delete", loading: false })} disabled={confirmState.loading}>Delete</Button>}
         </Stack>
       </Stack>
 
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
       {isDirty && <Alert severity="info">Save your changes before previewing, testing, scheduling, or sending.</Alert>}
       {!isNew && detailLoaded && campaign?.last_error && <Alert severity="error">{campaign.last_error}</Alert>}
+
+      {!isNew && detailLoaded && (
+        <Paper component="section" aria-label="Broadcast delivery and synchronization details" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, md: 2.5 } }}>
+          <Grid container spacing={2}>
+            <Grid item xs={6} sm={4} lg><MetadataItem label="Broadcast status" value={<StatusChip status={campaign?.status} />} /></Grid>
+            <Grid item xs={6} sm={4} lg><MetadataItem label="Scheduled for" value={formatDateTime(campaign?.scheduled_at)} /></Grid>
+            <Grid item xs={6} sm={4} lg><MetadataItem label="Schedule owner" value={campaign?.schedule_owner || "-"} /></Grid>
+            <Grid item xs={6} sm={6} lg><MetadataItem label="Mautic email ID" value={campaign?.mautic_email_id || "-"} /></Grid>
+            <Grid item xs={12} sm={6} lg><MetadataItem label="Last synced to Mautic" value={formatDateTime(campaign?.last_synced_to_mautic_at)} /></Grid>
+          </Grid>
+        </Paper>
+      )}
 
       {loading ? (
         <Stack spacing={2}>{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} variant="rectangular" height={140} />)}</Stack>
@@ -1313,9 +1373,9 @@ export default function AdminNewsletterPage() {
         </Paper>
       )}
 
-      <Stack direction="row" justifyContent="space-between">
-        <Button disabled={activeStep === 0} onClick={() => setActiveStep((step) => Math.max(0, step - 1))}>Back</Button>
-        <Button variant="contained" onClick={() => setActiveStep((step) => Math.min(3, step + 1))} disabled={activeStep === 3}>Next</Button>
+      <Stack direction="row" justifyContent="space-between" spacing={2}>
+        <Button disabled={activeStep === 0} onClick={() => setActiveStep((step) => Math.max(0, step - 1))} sx={actionButtonSx}>Back</Button>
+        <Button variant="contained" onClick={() => setActiveStep((step) => Math.min(3, step + 1))} disabled={activeStep === 3} sx={actionButtonSx}>Next</Button>
       </Stack>
 
       <PreviewDialog open={previewState.open} loading={previewState.loading} preview={previewState.data} error={previewState.error} onClose={() => setPreviewState({ open: false, loading: false, data: null, error: "" })} />

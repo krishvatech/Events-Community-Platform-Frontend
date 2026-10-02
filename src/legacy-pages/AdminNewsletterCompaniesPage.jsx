@@ -52,6 +52,12 @@ import {
 } from "../services/newsletterService";
 
 const COMPANY_NAME_ALIAS = "companyname";
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = { borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, boxShadow: "var(--imaa-shadow-sm)" };
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+const dialogPaperProps = { sx: { m: { xs: 2, sm: 4 }, width: { xs: "calc(100% - 32px)", sm: "auto" }, maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" }, borderRadius: "var(--imaa-radius-popup)" } };
 
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
@@ -133,8 +139,8 @@ export function CompanyCreateDialog({ open, onClose, onCreated }) {
   };
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="md">
-      <DialogTitle sx={{ fontWeight: 850 }}>Create Company</DialogTitle>
+    <Dialog open={open} onClose={saving ? undefined : onClose} fullWidth maxWidth="md" aria-labelledby="create-company-title" PaperProps={dialogPaperProps}>
+      <DialogTitle id="create-company-title" sx={{ fontWeight: 850 }}>Create Company</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2.5}>
           <Alert severity="info" variant="outlined">
@@ -162,8 +168,8 @@ export function CompanyCreateDialog({ open, onClose, onCreated }) {
           )}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2 }}>
-        <Button onClick={onClose} disabled={saving} sx={{ textTransform: "none" }}>
+      <DialogActions sx={{ px: { xs: 2, sm: 3 }, py: 2, flexWrap: "wrap", gap: 1 }}>
+        <Button onClick={onClose} disabled={saving} sx={actionSx}>
           Cancel
         </Button>
         <Button
@@ -171,7 +177,7 @@ export function CompanyCreateDialog({ open, onClose, onCreated }) {
           onClick={handleSubmit}
           disabled={saving || loadingFields}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <AddRoundedIcon />}
-          sx={{ textTransform: "none", bgcolor: "#0f766e", "&:hover": { bgcolor: "#0d6259" } }}
+          sx={actionSx}
         >
           Create Company
         </Button>
@@ -245,19 +251,19 @@ export default function AdminNewsletterCompaniesPage() {
         spacing={2}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.5 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, mb: 0.5 }}>
             Companies
           </Typography>
           <Typography color="text.secondary">
             Native Mautic companies. Mautic remains the source of truth for every value shown here.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => loadCompanies({ refresh: true })}
             disabled={loading}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Refresh
           </Button>
@@ -265,19 +271,19 @@ export default function AdminNewsletterCompaniesPage() {
             variant="contained"
             startIcon={<AddRoundedIcon />}
             onClick={() => setCreateOpen(true)}
-            sx={{ textTransform: "none", bgcolor: "#0f766e", "&:hover": { bgcolor: "#0d6259" } }}
+            sx={actionSx}
           >
             Create Company
           </Button>
         </Stack>
       </Stack>
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, p: 2 }}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
           <TextField
             size="small"
             fullWidth
-            placeholder="Search companies by name, email, or city"
+            label="Search companies by name, email, or city"
             value={searchInput}
             onChange={(event) => setSearchInput(event.target.value)}
             onKeyDown={(event) => {
@@ -286,6 +292,7 @@ export default function AdminNewsletterCompaniesPage() {
                 setSearch(searchInput.trim());
               }
             }}
+            sx={fieldSx}
           />
           <Button
             variant="outlined"
@@ -293,7 +300,7 @@ export default function AdminNewsletterCompaniesPage() {
               setPage(1);
               setSearch(searchInput.trim());
             }}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Search
           </Button>
@@ -304,7 +311,7 @@ export default function AdminNewsletterCompaniesPage() {
                 setSearch("");
                 setPage(1);
               }}
-              sx={{ textTransform: "none" }}
+              sx={actionSx}
             >
               Clear
             </Button>
@@ -314,9 +321,9 @@ export default function AdminNewsletterCompaniesPage() {
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-        <TableContainer sx={{ overflowX: "auto" }}>
-          <Table>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }} aria-busy={loading ? "true" : undefined}>
+        <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+          <Table aria-label="Mautic companies" sx={{ minWidth: 900 }}>
             <TableHead>
               <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                 <TableCell>Company</TableCell>
@@ -358,20 +365,29 @@ export default function AdminNewsletterCompaniesPage() {
                   <TableRow
                     key={company.id}
                     hover
-                    sx={{ cursor: "pointer" }}
+                    tabIndex={0}
+                    aria-label={`Open ${company.name || `Company ${company.id}`}`}
+                    sx={{ cursor: "pointer", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: -2 } }}
                     onClick={() => navigate(`/admin/newsletter/companies/${company.id}`)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        navigate(`/admin/newsletter/companies/${company.id}`);
+                      }
+                    }}
                   >
                     <TableCell>
-                      <Typography sx={{ fontWeight: 750, color: "#1B2A4A" }}>
+                      <Typography sx={{ fontWeight: 750, color: UI_TEXT, overflowWrap: "anywhere" }}>
                         {formatValue(company.name)}
                       </Typography>
                       {company.website ? (
-                        <Typography variant="caption" color="text.secondary">
+                        <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
                           {company.website}
                         </Typography>
                       ) : null}
                     </TableCell>
-                    <TableCell>{formatValue(company.email)}</TableCell>
+                    <TableCell sx={{ maxWidth: 260, overflowWrap: "anywhere" }}>{formatValue(company.email)}</TableCell>
                     <TableCell>{formatValue(company.phone)}</TableCell>
                     <TableCell>{formatValue(company.city)}</TableCell>
                     <TableCell>{formatValue(company.country)}</TableCell>
@@ -384,7 +400,7 @@ export default function AdminNewsletterCompaniesPage() {
                     </TableCell>
                     <TableCell align="right" onClick={(event) => event.stopPropagation()}>
                       <Tooltip title="Delete company in Mautic">
-                        <IconButton size="small" onClick={() => setDeleteTarget(company)}>
+                        <IconButton size="small" onClick={() => setDeleteTarget(company)} aria-label={`Delete ${company.name || `Company ${company.id}`}`} sx={{ minWidth: 40, minHeight: 40 }}>
                           <DeleteRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -400,7 +416,7 @@ export default function AdminNewsletterCompaniesPage() {
           <>
             <Divider />
             <Stack
-              direction="row"
+              direction={{ xs: "column", sm: "row" }}
               justifyContent="space-between"
               alignItems="center"
               sx={{ px: 2, py: 1.5 }}
@@ -408,12 +424,12 @@ export default function AdminNewsletterCompaniesPage() {
               <Typography variant="body2" color="text.secondary">
                 {`${Number(data?.count || 0)} compan${Number(data?.count) === 1 ? "y" : "ies"} in Mautic`}
               </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: "space-between", sm: "flex-end" }}>
                 <Button
                   size="small"
                   disabled={page <= 1 || loading}
                   onClick={() => setPage((current) => Math.max(1, current - 1))}
-                  sx={{ textTransform: "none" }}
+                  sx={actionSx}
                 >
                   Previous
                 </Button>
@@ -422,7 +438,7 @@ export default function AdminNewsletterCompaniesPage() {
                   size="small"
                   disabled={page >= numPages || loading}
                   onClick={() => setPage((current) => current + 1)}
-                  sx={{ textTransform: "none" }}
+                  sx={actionSx}
                 >
                   Next
                 </Button>
@@ -442,15 +458,15 @@ export default function AdminNewsletterCompaniesPage() {
         }}
       />
 
-      <Dialog open={Boolean(deleteTarget)} onClose={deleting ? undefined : () => setDeleteTarget(null)}>
-        <DialogTitle sx={{ fontWeight: 850 }}>Delete Company?</DialogTitle>
+      <Dialog open={Boolean(deleteTarget)} onClose={deleting ? undefined : () => setDeleteTarget(null)} aria-labelledby="delete-company-title" PaperProps={dialogPaperProps}>
+        <DialogTitle id="delete-company-title" sx={{ fontWeight: 850 }}>Delete Company?</DialogTitle>
         <DialogContent>
           <Typography>
             {`"${deleteTarget?.name || ""}" will be deleted in Mautic. Contacts are not deleted, but their association with this company is removed.`}
           </Typography>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setDeleteTarget(null)} disabled={deleting} sx={{ textTransform: "none" }}>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleting} sx={actionSx}>
             Cancel
           </Button>
           <Button
@@ -459,7 +475,7 @@ export default function AdminNewsletterCompaniesPage() {
             onClick={handleDelete}
             disabled={deleting}
             startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : <DeleteRoundedIcon />}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Delete
           </Button>

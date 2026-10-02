@@ -74,6 +74,13 @@ import {
   updateNewsletterAdminContact,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = { borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, boxShadow: "var(--imaa-shadow-sm)" };
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+const dialogPaperProps = { sx: { m: { xs: 2, sm: 4 }, width: { xs: "calc(100% - 32px)", sm: "auto" }, maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" }, borderRadius: "var(--imaa-radius-popup)" } };
+
 const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -155,22 +162,23 @@ function AddCompanyDialog({ open, busy, onClose, onSelect }) {
   };
 
   return (
-    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm">
-      <DialogTitle sx={{ fontWeight: 850 }}>Add Contact to a Company</DialogTitle>
+    <Dialog open={open} onClose={busy ? undefined : onClose} fullWidth maxWidth="sm" aria-labelledby="add-contact-company-title" PaperProps={dialogPaperProps}>
+      <DialogTitle id="add-contact-company-title" sx={{ fontWeight: 850 }}>Add Contact to a Company</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {error ? <Alert severity="error">{error}</Alert> : null}
-          <Stack direction="row" spacing={1}>
+          <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
               size="small"
               fullWidth
               autoFocus
-              placeholder="Search companies by name"
+              label="Search companies by name"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter") runSearch();
               }}
+              sx={fieldSx}
             />
             <Button variant="outlined" onClick={runSearch} disabled={loading} sx={{ textTransform: "none" }}>
               Search
@@ -184,10 +192,10 @@ function AddCompanyDialog({ open, busy, onClose, onSelect }) {
                 <Paper key={company.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }} noWrap>
+                      <Typography sx={{ fontWeight: 700, color: UI_TEXT, overflowWrap: "anywhere" }}>
                         {company.name || `Company #${company.id}`}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap>
+                      <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
                         {[company.email, company.city, company.country].filter(Boolean).join(" · ")}
                       </Typography>
                     </Box>
@@ -920,26 +928,26 @@ export default function AdminNewsletterContactDetailPage() {
   };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} aria-busy={loading ? "true" : undefined}>
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
         <Stack direction="row" spacing={1.25} alignItems="flex-start">
-          <IconButton onClick={() => navigate("/admin/newsletter/contacts")}><ArrowBackRoundedIcon /></IconButton>
+          <IconButton onClick={() => navigate("/admin/newsletter/contacts")} aria-label="Back to contacts" sx={{ minWidth: 40, minHeight: 40 }}><ArrowBackRoundedIcon /></IconButton>
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+              <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, overflowWrap: "anywhere" }}>
                 {contact?.name || `Contact #${mauticContactId}`}
               </Typography>
               {contact && <Chip size="small" label={contact.mapped_in_ecp ? "Mapped to ECP" : "Mautic only"} color={contact.mapped_in_ecp ? "success" : "default"} />}
             </Stack>
-            <Typography color="text.secondary">{contact?.email || "Mautic contact activity and ECP subscription state."}</Typography>
+            <Typography color="text.secondary" sx={{ overflowWrap: "anywhere" }}>{contact?.email || "Mautic contact activity and ECP subscription state."}</Typography>
           </Box>
         </Stack>
-        <Button startIcon={<RefreshRoundedIcon />} onClick={refreshAll} disabled={loading}>Refresh</Button>
+        <Button startIcon={<RefreshRoundedIcon />} onClick={refreshAll} disabled={loading} sx={actionSx}>Refresh</Button>
       </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden" }}>
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
           <Tabs
             value={contactDetailTab}
@@ -947,6 +955,7 @@ export default function AdminNewsletterContactDetailPage() {
             variant="scrollable"
             scrollButtons="auto"
             allowScrollButtonsMobile
+            aria-label="Contact detail sections"
           >
             <Tab label="Overview" value="overview" />
             <Tab label="Activity" value="activity" />
@@ -961,7 +970,7 @@ export default function AdminNewsletterContactDetailPage() {
         {contactDetailTab === "activity" && (
         <Grid item xs={12}>
           <Stack spacing={2.5}>
-            <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+            <Paper component="section" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden" }}>
               <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2} sx={{ p: 2.25, borderBottom: "1px solid #E7ECEF" }}>
                 <Box>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Engagements</Typography>
@@ -979,7 +988,7 @@ export default function AdminNewsletterContactDetailPage() {
               </Box>
             </Paper>
 
-            <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+            <Paper component="section" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}>
               <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2} sx={{ p: 2.25, borderBottom: "1px solid #E7ECEF" }}>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>History</Typography>
@@ -991,10 +1000,10 @@ export default function AdminNewsletterContactDetailPage() {
               </Stack>
               {activityError && <Alert severity="error" sx={{ m: 2 }}>{activityError}</Alert>}
               {activityLoading ? (
-                <Stack spacing={1} sx={{ p: 2 }}>{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} height={44} />)}</Stack>
+                <Stack spacing={1} sx={{ p: 2 }} role="status" aria-live="polite" aria-label="Loading contact activity">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} height={44} />)}</Stack>
               ) : (
-                <TableContainer>
-                  <Table>
+                <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+                  <Table aria-label="Contact activity history" sx={{ minWidth: 680 }}>
                     <TableHead>
                       <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                         <TableCell>Event Name</TableCell>
@@ -1017,7 +1026,7 @@ export default function AdminNewsletterContactDetailPage() {
                   </Table>
                 </TableContainer>
               )}
-              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 2, py: 1.5, borderTop: "1px solid #E7ECEF" }}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }} sx={{ px: 2, py: 1.5, borderTop: `1px solid ${UI_BORDER}` }}>
                 <Typography variant="body2" color="text.secondary">Page {activityPage} of {historyPages}</Typography>
                 <Stack direction="row" spacing={1}>
                   <Button size="small" variant="outlined" disabled={activityLoading || activityPage <= 1} onClick={() => { const page = activityPage - 1; setActivityPage(page); loadActivity({ page }); }}>Previous</Button>
@@ -1514,14 +1523,15 @@ export default function AdminNewsletterContactDetailPage() {
                       >
                         <Box sx={{ minWidth: 0 }}>
                           <Typography
+                            component="button"
+                            type="button"
                             variant="body2"
-                            sx={{ fontWeight: 750, color: "#0f766e", cursor: "pointer" }}
+                            sx={{ p: 0, border: 0, bgcolor: "transparent", font: "inherit", textAlign: "left", fontWeight: 750, color: "var(--imaa-teal-hover)", cursor: "pointer", overflowWrap: "anywhere", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
                             onClick={() => navigate(`/admin/newsletter/companies/${company.id}`)}
-                            noWrap
                           >
                             {company.name || `Company #${company.id}`}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
                             {[company.email, company.city, company.country, company.is_primary ? "Primary" : ""].filter(Boolean).join(" · ")}
                           </Typography>
                         </Box>
@@ -1531,6 +1541,8 @@ export default function AdminNewsletterContactDetailPage() {
                               size="small"
                               disabled={companyBusy}
                               onClick={() => handleRemoveCompany(company)}
+                              aria-label={`Remove ${company.name || `Company ${company.id}`} from contact`}
+                              sx={{ minWidth: 40, minHeight: 40 }}
                             >
                               <LinkOffRoundedIcon fontSize="small" />
                             </IconButton>

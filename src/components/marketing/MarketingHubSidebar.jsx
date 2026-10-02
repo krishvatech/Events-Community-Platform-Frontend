@@ -93,7 +93,17 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
           navigate(MARKETING_HOME_PATH);
           closeMobile();
         }}
-        sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", gap: 1.5, borderBottom: `1px solid ${CARD_BORDER}`, cursor: "pointer" }}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            navigate(MARKETING_HOME_PATH);
+            closeMobile();
+          }
+        }}
+        role="link"
+        tabIndex={0}
+        aria-label="Marketing Hub dashboard"
+        sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", gap: 1.5, borderBottom: `1px solid ${CARD_BORDER}`, cursor: "pointer", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "calc(-1 * var(--imaa-focus-offset))" } }}
       >
         <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#1B2A4A", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -122,6 +132,7 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
                   <ListItemButton
                     key={item.id}
                     selected={selected}
+                    aria-current={selected ? "page" : undefined}
                     onClick={() => {
                       navigate(item.path);
                       closeMobile();
@@ -173,9 +184,19 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
             navigate("/account/profile");
             closeMobile();
           }}
-          sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0, flex: 1, cursor: "pointer", p: 0.5, borderRadius: 2, "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" } }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              navigate("/account/profile");
+              closeMobile();
+            }
+          }}
+          role="link"
+          tabIndex={0}
+          aria-label="Open account profile"
+          sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0, flex: 1, cursor: "pointer", p: 0.5, borderRadius: 2, "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" }, "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
         >
-          <Avatar src={getAvatarUrl(user)} sx={{ width: 40, height: 40 }}>
+          <Avatar src={getAvatarUrl(user)} alt={user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.username : "User"} sx={{ width: 40, height: 40 }}>
             {(user?.first_name || user?.username || "U")[0]?.toUpperCase()}
           </Avatar>
           <Box sx={{ minWidth: 0 }}>
@@ -195,7 +216,7 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
           </Box>
         </Box>
         <Tooltip title="Logout">
-          <IconButton onClick={() => setOpenLogoutDialog(true)} color="error" sx={{ bgcolor: "rgba(211, 47, 47, 0.04)", "&:hover": { bgcolor: "rgba(211, 47, 47, 0.12)" } }}>
+          <IconButton aria-label="Log out" onClick={() => setOpenLogoutDialog(true)} color="error" sx={{ minWidth: 40, minHeight: 40, bgcolor: "rgba(211, 47, 47, 0.04)", "&:hover": { bgcolor: "rgba(211, 47, 47, 0.12)" } }}>
             <LogoutRoundedIcon fontSize="small" />
           </IconButton>
         </Tooltip>

@@ -49,6 +49,13 @@ import {
   updateNewsletterPointTriggerEvent,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = { borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, boxShadow: "var(--imaa-shadow-sm)" };
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+const dialogPaperProps = { sx: { m: { xs: 2, sm: 4 }, width: { xs: "calc(100% - 32px)", sm: "auto" }, maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" }, borderRadius: "var(--imaa-radius-popup)" } };
+
 const pageSize = 25;
 
 const blankTriggerForm = {
@@ -211,8 +218,8 @@ function PointTriggerDialog({
   };
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{trigger ? "Edit Point Trigger" : "Create Point Trigger"}</DialogTitle>
+    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth aria-labelledby="point-trigger-dialog-title" PaperProps={dialogPaperProps}>
+      <DialogTitle id="point-trigger-dialog-title">{trigger ? "Edit Point Trigger" : "Create Point Trigger"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {(error || formError) && <Alert severity="error">{error || formError}</Alert>}
@@ -398,8 +405,8 @@ function PointTriggerEventDialog({ open, event, types, saving, error, onClose, o
   };
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="md" fullWidth>
-      <DialogTitle>{event ? "Edit Trigger Event" : "Create Trigger Event"}</DialogTitle>
+    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="md" fullWidth aria-labelledby="trigger-event-dialog-title" PaperProps={dialogPaperProps}>
+      <DialogTitle id="trigger-event-dialog-title">{event ? "Edit Trigger Event" : "Create Trigger Event"}</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           {(error || formError) && <Alert severity="error">{error || formError}</Alert>}
@@ -578,8 +585,8 @@ function TriggerEventsDialog({ open, trigger, types, typesLoading, typesError, o
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-        <DialogTitle>
+      <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth aria-labelledby="trigger-events-title" PaperProps={dialogPaperProps}>
+        <DialogTitle id="trigger-events-title">
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ sm: "center" }}>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 850 }}>
@@ -881,7 +888,7 @@ export default function AdminNewsletterPointTriggersPanel() {
         <Box>
           <Stack direction="row" spacing={1} alignItems="center">
             <RuleRoundedIcon sx={{ color: "#0f766e" }} />
-            <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+            <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>
               Point Triggers
             </Typography>
           </Stack>
@@ -889,7 +896,7 @@ export default function AdminNewsletterPointTriggersPanel() {
             Run Mautic Trigger Events when contacts reach configured Point thresholds.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => {
@@ -898,7 +905,7 @@ export default function AdminNewsletterPointTriggersPanel() {
               loadPointGroups();
             }}
             disabled={loading || typesLoading}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Refresh
           </Button>
@@ -906,7 +913,7 @@ export default function AdminNewsletterPointTriggersPanel() {
             variant="contained"
             startIcon={<AddRoundedIcon />}
             onClick={() => setDialog({ open: true, trigger: null, saving: false, error: "" })}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Create Point Trigger
           </Button>
@@ -923,7 +930,7 @@ export default function AdminNewsletterPointTriggersPanel() {
         </Alert>
       )}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }} aria-busy={loading ? "true" : undefined}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
@@ -939,9 +946,9 @@ export default function AdminNewsletterPointTriggersPanel() {
               onKeyDown={(event) => {
                 if (event.key === "Enter") handleSearch();
               }}
-              sx={{ minWidth: { sm: 320 } }}
+              sx={{ ...fieldSx, minWidth: { sm: 320 } }}
             />
-            <Button variant="outlined" onClick={handleSearch} disabled={loading}>Search</Button>
+            <Button variant="outlined" onClick={handleSearch} disabled={loading} sx={actionSx}>Search</Button>
             {(search || searchInput) && (
               <Button
                 onClick={() => {
@@ -978,8 +985,8 @@ export default function AdminNewsletterPointTriggersPanel() {
             </Alert>
           </Box>
         ) : (
-          <TableContainer>
-            <Table>
+          <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+            <Table aria-label="Mautic point triggers" sx={{ minWidth: 960 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                   <TableCell>Name</TableCell>
@@ -1010,7 +1017,7 @@ export default function AdminNewsletterPointTriggersPanel() {
                             }}
                           />
                           <Box>
-                            <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+                            <Typography sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}>
                               {row.name || `Point Trigger #${row.id}`}
                             </Typography>
                             {row.description && <Typography variant="body2" color="text.secondary">{row.description}</Typography>}
@@ -1042,7 +1049,7 @@ export default function AdminNewsletterPointTriggersPanel() {
                       <TableCell>{formatDateTime(row.dateModified || row.dateAdded)}</TableCell>
                       <TableCell align="right">
                         <Tooltip title="Manage Trigger Events">
-                          <IconButton size="small" onClick={() => setEventsTrigger(row)}>
+                          <IconButton size="small" onClick={() => setEventsTrigger(row)} aria-label={`Manage events for ${row.name || `Point Trigger ${row.id}`}`} sx={{ minWidth: 40, minHeight: 40 }}>
                             <SettingsSuggestRoundedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -1050,6 +1057,8 @@ export default function AdminNewsletterPointTriggersPanel() {
                           <IconButton
                             size="small"
                             onClick={() => setDialog({ open: true, trigger: row, saving: false, error: "" })}
+                            aria-label={`Edit ${row.name || `Point Trigger ${row.id}`}`}
+                            sx={{ minWidth: 40, minHeight: 40 }}
                           >
                             <EditRoundedIcon fontSize="small" />
                           </IconButton>
@@ -1059,6 +1068,8 @@ export default function AdminNewsletterPointTriggersPanel() {
                             size="small"
                             color="error"
                             onClick={() => setDeleteDialog({ open: true, trigger: row, deleting: false, error: "" })}
+                            aria-label={`Delete ${row.name || `Point Trigger ${row.id}`}`}
+                            sx={{ minWidth: 40, minHeight: 40 }}
                           >
                             <DeleteRoundedIcon fontSize="small" />
                           </IconButton>
@@ -1073,10 +1084,10 @@ export default function AdminNewsletterPointTriggersPanel() {
         )}
 
         <Stack
-          direction="row"
+          direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
           alignItems="center"
-          sx={{ px: 2, py: 1.5, borderTop: "1px solid #E7ECEF" }}
+          sx={{ px: 2, py: 1.5, borderTop: `1px solid ${UI_BORDER}` }}
         >
           <Typography variant="body2" color="text.secondary">Page {page} of {numPages}</Typography>
           <Stack direction="row" spacing={1}>
@@ -1135,8 +1146,10 @@ export default function AdminNewsletterPointTriggersPanel() {
         onClose={deleteDialog.deleting ? undefined : () => setDeleteDialog({ open: false, trigger: null, deleting: false, error: "" })}
         maxWidth="xs"
         fullWidth
+        aria-labelledby="delete-point-trigger-title"
+        PaperProps={dialogPaperProps}
       >
-        <DialogTitle>Delete Point Trigger?</DialogTitle>
+        <DialogTitle id="delete-point-trigger-title">Delete Point Trigger?</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
             {deleteDialog.error && <Alert severity="error">{deleteDialog.error}</Alert>}

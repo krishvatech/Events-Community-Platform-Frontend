@@ -55,6 +55,24 @@ import {
   updateNativeMauticSegment,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const UI_TEAL = "var(--imaa-teal-hover)";
+const surfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: UI_BORDER,
+  bgcolor: "background.paper",
+  boxShadow: "var(--imaa-shadow-sm)",
+};
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { textTransform: "none", minHeight: 40, borderRadius: "var(--imaa-radius-field)" };
+const dialogPaperSx = {
+  m: 2,
+  width: "calc(100% - 32px)",
+  maxHeight: "calc(100% - 32px)",
+  borderRadius: "var(--imaa-radius-popup)",
+};
+
 const asArray = (value) => (Array.isArray(value) ? value : []);
 
 const getErrorMessage = (err, fallback = "Something went wrong. Please try again.") => {
@@ -93,11 +111,11 @@ function ManagementChip({ segment }) {
         size="small"
         color="warning"
         label="Managed by Subscription List"
-        sx={{ fontWeight: 800 }}
+        sx={{ fontWeight: 800, borderRadius: "var(--imaa-radius-tag)" }}
       />
     );
   }
-  return <Chip size="small" variant="outlined" label="Native Mautic" />;
+  return <Chip size="small" variant="outlined" label="Native Mautic" sx={{ borderRadius: "var(--imaa-radius-tag)" }} />;
 }
 
 function PublishedChip({ value }) {
@@ -107,7 +125,7 @@ function PublishedChip({ value }) {
       color={value ? "success" : "default"}
       variant={value ? "filled" : "outlined"}
       label={value ? "Published" : "Unpublished"}
-      sx={{ fontWeight: 800 }}
+      sx={{ fontWeight: 800, borderRadius: "var(--imaa-radius-tag)" }}
     />
   );
 }
@@ -118,17 +136,18 @@ function SegmentTypeChip({ segment }) {
       size="small"
       variant="outlined"
       label={segment?.is_dynamic ? "Dynamic" : "Static"}
+      sx={{ borderRadius: "var(--imaa-radius-tag)" }}
     />
   );
 }
 
 function DetailField({ label, value }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: "#E7ECEF", height: "100%" }}>
+    <Paper variant="outlined" sx={{ ...surfaceSx, p: 2, height: "100%" }}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 0.75 }}>
         {label}
       </Typography>
-      <Typography sx={{ fontWeight: 800, color: "#1B2A4A", overflowWrap: "anywhere" }}>
+      <Typography sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}>
         {value || "-"}
       </Typography>
     </Paper>
@@ -165,7 +184,7 @@ function SegmentContactsPanel({
           size="small"
           value={contactSearch}
           onChange={(event) => onContactSearch(event.target.value)}
-          sx={{ minWidth: { sm: 280 } }}
+          sx={{ ...fieldSx, minWidth: { sm: 280 } }}
         />
         <Stack direction="row" spacing={1}>
           <Button startIcon={<RefreshRoundedIcon />} onClick={onRefresh} disabled={contactsState.loading}>
@@ -185,8 +204,8 @@ function SegmentContactsPanel({
       ) : contacts.length === 0 ? (
         <Alert severity="info" variant="outlined">No contacts were returned for this segment.</Alert>
       ) : (
-        <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF" }}>
-          <Table size="small">
+        <TableContainer component={Paper} variant="outlined" sx={{ ...surfaceSx, overflowX: "auto", maxWidth: "100%", boxShadow: "none" }}>
+          <Table size="small" aria-label="Segment contacts" sx={{ minWidth: 720 }}>
             <TableHead>
               <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                 <TableCell>Contact</TableCell>
@@ -240,7 +259,7 @@ function SegmentDetailDialog({
   const filters = asArray(segment?.filters);
 
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="md" fullWidth PaperProps={{ sx: dialogPaperSx }} aria-busy={loading}>
       <DialogTitle>Segment Details</DialogTitle>
       <DialogContent dividers>
         {loading ? (
@@ -263,13 +282,13 @@ function SegmentDetailDialog({
               <PublishedChip value={segment?.isPublished} />
               <SegmentTypeChip segment={segment} />
             </Stack>
-            <Stack direction="row" spacing={1} sx={{ borderBottom: "1px solid #E7ECEF" }}>
+            <Stack direction="row" spacing={1} sx={{ borderBottom: `1px solid ${UI_BORDER}`, overflowX: "auto" }}>
               {["details", "contacts", "filters"].map((tab) => (
                 <Button
                   key={tab}
                   variant={activeTab === tab ? "contained" : "text"}
                   onClick={() => onTabChange(tab)}
-                  sx={{ textTransform: "none" }}
+                  sx={actionSx}
                 >
                   {tab === "details" ? "Details" : tab === "contacts" ? "Contacts" : "Filters"}
                 </Button>
@@ -308,7 +327,7 @@ function SegmentDetailDialog({
                   Membership is decided by these filters. Edit them with the Edit button.
                 </Typography>
                 {filters.length ? (
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: "#E7ECEF", bgcolor: "#F8FAFC", overflow: "auto" }}>
+                  <Paper variant="outlined" sx={{ p: 2, borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, bgcolor: "#F8FAFC", overflow: "auto" }}>
                     <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: 13 }}>
                       {JSON.stringify(filters, null, 2)}
                     </pre>
@@ -384,7 +403,8 @@ function SegmentFormDialog({
       fullWidth
       // A filter row is five controls wide, so this dialog needs room the other
       // segment dialogs do not.
-      PaperProps={{ sx: { width: "min(1100px, calc(100vw - 48px))" } }}
+      PaperProps={{ sx: { ...dialogPaperSx, width: "min(1100px, calc(100% - 32px))" } }}
+      aria-busy={loading}
     >
       <DialogTitle>{isEdit ? "Edit Segment" : "Create Segment"}</DialogTitle>
       <DialogContent dividers>
@@ -405,6 +425,7 @@ function SegmentFormDialog({
               onChange={(event) => updateField("name", event.target.value)}
               required
               fullWidth
+              sx={fieldSx}
             />
             <TextField
               label="Alias"
@@ -412,6 +433,7 @@ function SegmentFormDialog({
               onChange={(event) => updateField("alias", event.target.value)}
               helperText="Leave blank to let Mautic assign an alias when supported."
               fullWidth
+              sx={fieldSx}
             />
             <TextField
               label="Description"
@@ -420,6 +442,7 @@ function SegmentFormDialog({
               multiline
               minRows={3}
               fullWidth
+              sx={fieldSx}
             />
           </Stack>
           <FormControlLabel
@@ -457,7 +480,7 @@ function SegmentFormDialog({
 
 function DeleteSegmentDialog({ open, segment, loading, error, onClose, onConfirm }) {
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth PaperProps={{ sx: dialogPaperSx }} aria-busy={loading}>
       <DialogTitle>Delete Segment</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
@@ -494,7 +517,7 @@ function AddContactDialog({
   onSubmit,
 }) {
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth PaperProps={{ sx: dialogPaperSx }} aria-busy={loading || saving}>
       <DialogTitle>Add Contact</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
@@ -505,6 +528,7 @@ function AddContactDialog({
             value={search}
             onChange={(event) => onSearchChange(event.target.value)}
             fullWidth
+            sx={fieldSx}
           />
           {loading ? (
             <Stack spacing={1}>{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} height={38} />)}</Stack>
@@ -520,15 +544,25 @@ function AddContactDialog({
                     key={contactId}
                     variant="outlined"
                     onClick={() => onSelect(contactId)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onSelect(contactId);
+                      }
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selected}
                     sx={{
                       p: 1.5,
-                      borderRadius: 2,
-                      borderColor: selected ? "#0f766e" : "#E7ECEF",
+                      borderRadius: "var(--imaa-radius-card)",
+                      borderColor: selected ? UI_TEAL : UI_BORDER,
                       bgcolor: selected ? "#ECFDF5" : "#fff",
                       cursor: "pointer",
+                      "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" },
                     }}
                   >
-                    <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+                    <Typography sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}>
                       {contact.name || contact.email || `Contact #${contactId}`}
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
@@ -553,7 +587,7 @@ function AddContactDialog({
 
 function RemoveContactDialog({ open, contact, loading, error, onClose, onConfirm }) {
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth PaperProps={{ sx: dialogPaperSx }} aria-busy={loading}>
       <DialogTitle>Remove Contact</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
@@ -910,10 +944,10 @@ export default function AdminNewsletterNativeSegmentsPanel() {
   };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} aria-busy={loading} sx={{ minWidth: 0 }}>
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
-        <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>
             Segments
           </Typography>
           <Typography color="text.secondary">
@@ -923,28 +957,29 @@ export default function AdminNewsletterNativeSegmentsPanel() {
             Mautic is the source of truth for native marketing segments.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1} sx={{ alignSelf: "flex-start" }}>
-          <Button startIcon={<RefreshRoundedIcon />} onClick={loadSegments} disabled={loading} sx={{ textTransform: "none" }}>
+        <Stack direction="row" spacing={1} sx={{ alignSelf: "flex-start", width: { xs: "100%", sm: "auto" } }}>
+          <Button startIcon={<RefreshRoundedIcon />} onClick={loadSegments} disabled={loading} sx={{ ...actionSx, flex: { xs: 1, sm: "initial" } }}>
             Refresh
           </Button>
-          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openCreate} sx={{ textTransform: "none" }}>
+          <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={openCreate} sx={{ ...actionSx, flex: { xs: 1, sm: "initial" } }}>
             Create Segment
           </Button>
         </Stack>
       </Stack>
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-        <Box sx={{ p: 2, borderBottom: "1px solid #E7ECEF" }}>
+      <Paper component="section" aria-label="Mautic segments" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}>
+        <Box sx={{ p: 2, borderBottom: `1px solid ${UI_BORDER}` }}>
           <TextField
             label="Search segments"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             size="small"
             fullWidth
+            sx={fieldSx}
           />
         </Box>
         {loading ? (
-          <Box sx={{ p: 3 }}>
+          <Box sx={{ p: 3 }} role="status" aria-label="Loading Mautic segments">
             <Stack spacing={1}>{Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} height={46} />)}</Stack>
           </Box>
         ) : error ? (
@@ -960,8 +995,8 @@ export default function AdminNewsletterNativeSegmentsPanel() {
             </Alert>
           </Box>
         ) : (
-          <TableContainer sx={{ overflowX: "auto" }}>
-            <Table>
+          <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+            <Table aria-label="Mautic segments" sx={{ minWidth: 900 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                   <TableCell>Name</TableCell>
@@ -976,17 +1011,17 @@ export default function AdminNewsletterNativeSegmentsPanel() {
               <TableBody>
                 {filteredSegments.map((segment) => (
                   <TableRow hover key={segment.id}>
-                    <TableCell>
-                      <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+                    <TableCell sx={{ minWidth: 220, maxWidth: 340 }}>
+                      <Typography sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}>
                         {segment.name || `Segment #${segment.id}`}
                       </Typography>
                       {segment.description && (
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
                           {segment.description}
                         </Typography>
                       )}
                     </TableCell>
-                    <TableCell>{segment.alias || "-"}</TableCell>
+                    <TableCell sx={{ maxWidth: 220, overflowWrap: "anywhere" }}>{segment.alias || "-"}</TableCell>
                     <TableCell><SegmentTypeChip segment={segment} /></TableCell>
                     <TableCell><PublishedChip value={segment.isPublished} /></TableCell>
                     <TableCell>{formatCount(segment.contact_count)}</TableCell>
@@ -1000,9 +1035,9 @@ export default function AdminNewsletterNativeSegmentsPanel() {
                         )}
                       </Stack>
                     </TableCell>
-                    <TableCell align="right">
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap", "& .MuiIconButton-root": { minWidth: 44, minHeight: 44 } }}>
                       <Tooltip title="View segment">
-                        <IconButton onClick={() => openDetail(segment.id)}>
+                        <IconButton aria-label={`View ${segment.name || `Segment ${segment.id}`}`} onClick={() => openDetail(segment.id)}>
                           <VisibilityRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
@@ -1013,12 +1048,12 @@ export default function AdminNewsletterNativeSegmentsPanel() {
                       ) : (
                         <>
                           <Tooltip title="Edit segment">
-                            <IconButton onClick={() => openEdit(segment)}>
+                            <IconButton aria-label={`Edit ${segment.name || `Segment ${segment.id}`}`} onClick={() => openEdit(segment)}>
                               <EditRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Delete segment">
-                            <IconButton color="error" onClick={() => openDelete(segment)}>
+                            <IconButton aria-label={`Delete ${segment.name || `Segment ${segment.id}`}`} color="error" onClick={() => openDelete(segment)}>
                               <DeleteRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>

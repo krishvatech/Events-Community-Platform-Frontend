@@ -133,10 +133,10 @@ export default function NewsletterPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
       <Stack spacing={3}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 0.75 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: "var(--imaa-ink)", mb: 0.75 }}>
             Newsletter
           </Typography>
           <Typography color="text.secondary">
@@ -147,10 +147,11 @@ export default function NewsletterPage() {
         <Paper
           variant="outlined"
           sx={{
-            borderRadius: 2,
-            borderColor: "#F0EEEB",
+            borderRadius: "var(--imaa-radius-card)",
+            borderColor: "var(--imaa-border)",
             overflow: "hidden",
-            bgcolor: "#ffffff",
+            bgcolor: "background.paper",
+            boxShadow: "var(--imaa-shadow-sm)",
           }}
         >
           <Box
@@ -162,12 +163,12 @@ export default function NewsletterPage() {
               justifyContent: "space-between",
               gap: 1.25,
               flexDirection: { xs: "column", sm: "row" },
-              borderBottom: "1px solid #F0EEEB",
+              borderBottom: "1px solid var(--imaa-border)",
             }}
           >
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, width: { xs: "100%", sm: "auto" } }}>
-              <MarkEmailReadRoundedIcon sx={{ color: "#E8532F" }} />
-              <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A" }}>
+              <MarkEmailReadRoundedIcon aria-hidden="true" sx={{ color: "var(--imaa-coral)" }} />
+              <Typography component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)" }}>
                 My Subscriptions
               </Typography>
             </Box>
@@ -177,13 +178,14 @@ export default function NewsletterPage() {
               variant="scrollable"
               scrollButtons="auto"
               allowScrollButtonsMobile
+              aria-label="Newsletter subscription filters"
               sx={{
                 minHeight: 40,
                 maxWidth: { xs: "100%", sm: "auto" },
                 "& .MuiTabs-scroller": { maxWidth: "100%" },
                 "& .MuiTab-root": { textTransform: "none", minHeight: 40, px: 1.5 },
-                "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
-                "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
+                "& .Mui-selected": { color: "var(--imaa-teal-hover) !important", fontWeight: 700 },
+                "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal)" },
               }}
             >
               <Tab label="All" value="all" />
@@ -202,8 +204,9 @@ export default function NewsletterPage() {
 
           <Box sx={{ p: { xs: 2, md: 3 } }}>
             {loading ? (
-              <Stack alignItems="center" justifyContent="center" sx={{ minHeight: 220 }}>
+              <Stack role="status" aria-live="polite" aria-label="Loading newsletter preferences" alignItems="center" justifyContent="center" spacing={1.5} sx={{ minHeight: 220 }}>
                 <CircularProgress />
+                <Typography variant="body2" color="text.secondary">Loading newsletter preferences…</Typography>
               </Stack>
             ) : error ? (
               <Alert
@@ -243,7 +246,7 @@ export default function NewsletterPage() {
                       }}
                     >
                       <Box sx={{ minWidth: 0, pr: { sm: 2 } }}>
-                        <Typography sx={{ fontWeight: 700, color: "#1B2A4A", overflowWrap: "anywhere" }}>
+                        <Typography component="h3" sx={{ fontWeight: 700, color: "var(--imaa-ink)", overflowWrap: "anywhere" }}>
                           {preference.name}
                         </Typography>
                         {preference.description && (
@@ -255,6 +258,12 @@ export default function NewsletterPage() {
                             {preference.description}
                           </Typography>
                         )}
+                        <Typography
+                          variant="caption"
+                          sx={{ display: "block", mt: 0.75, color: preference.subscribed ? "var(--imaa-teal-hover)" : "text.secondary", fontWeight: 700 }}
+                        >
+                          {preference.subscribed ? "Subscribed" : "Unsubscribed"}
+                        </Typography>
                       </Box>
 
                       <Box
@@ -264,6 +273,7 @@ export default function NewsletterPage() {
                           justifyContent: { xs: "flex-start", sm: "flex-end" },
                           flexShrink: 0,
                           width: { xs: "100%", sm: "auto" },
+                          "& .MuiButton-root": { width: { xs: "100%", sm: "auto" } },
                         }}
                       >
                         <Button
@@ -273,17 +283,21 @@ export default function NewsletterPage() {
                           sx={{
                             textTransform: "none",
                             minWidth: 128,
-                            borderRadius: 2,
+                            minHeight: 44,
+                            borderRadius: "var(--imaa-radius-field)",
                             ...(preference.subscribed
                               ? {}
                               : {
-                                  backgroundColor: "#10b8a6",
-                                  "&:hover": { backgroundColor: "#0ea5a4" },
+                                  backgroundColor: "var(--imaa-teal)",
+                                  "&:hover": { backgroundColor: "var(--imaa-teal-hover)" },
                                 }),
                           }}
                         >
                           {saving ? (
-                            <CircularProgress size={18} color="inherit" />
+                            <Stack component="span" direction="row" spacing={1} alignItems="center">
+                              <CircularProgress size={18} color="inherit" aria-hidden="true" />
+                              <span>Updating…</span>
+                            </Stack>
                           ) : preference.subscribed ? (
                             "Unsubscribe"
                           ) : (

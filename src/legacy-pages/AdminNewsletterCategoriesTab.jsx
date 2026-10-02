@@ -45,6 +45,26 @@ import {
   syncNewsletterCategoryMautic,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const UI_TEAL = "var(--imaa-teal-hover)";
+const surfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: UI_BORDER,
+  bgcolor: "background.paper",
+  boxShadow: "var(--imaa-shadow-sm)",
+};
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { textTransform: "none", minHeight: 40, borderRadius: "var(--imaa-radius-field)" };
+const dialogPaperProps = {
+  sx: {
+    m: 2,
+    width: "calc(100% - 32px)",
+    maxHeight: "calc(100% - 32px)",
+    borderRadius: "var(--imaa-radius-popup)",
+  },
+};
+
 const getErrorMessage = (err, fallback = "Something went wrong") => {
   const data = err?.response?.data;
   if (!data) return err?.message || fallback;
@@ -290,17 +310,17 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
   });
 
   return (
-    <Stack spacing={3}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2 }}>
-        <Box>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A" }}>
+    <Stack spacing={3} aria-busy={loading} sx={{ minWidth: 0 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "flex-start" }} spacing={2}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>
             Subscription Lists
           </Typography>
           <Typography variant="body2" color="text.secondary">
             Manage ECP subscription lists and their Mautic segment connections.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Tooltip title="Refresh">
             <Button
               variant="outlined"
@@ -308,7 +328,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
               startIcon={<RefreshRoundedIcon />}
               onClick={loadCategories}
               disabled={loading}
-              sx={{ textTransform: "none" }}
+              sx={{ ...actionSx, flex: { xs: 1, sm: "initial" } }}
             >
               Refresh
             </Button>
@@ -318,12 +338,12 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
             startIcon={<AddRoundedIcon />}
             onClick={() => handleOpen()}
             disabled={loading}
-            sx={{ textTransform: "none" }}
+            sx={{ ...actionSx, flex: { xs: 1, sm: "initial" } }}
           >
             Create List
           </Button>
         </Stack>
-      </Box>
+      </Stack>
 
       {error && (
         <Alert severity="error" onClose={() => setError("")}>
@@ -332,17 +352,17 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
       )}
 
       {loading && (
-        <Box>
+        <Box role="status" aria-label="Loading subscription lists">
           <Stack spacing={1}>
             {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} height={60} variant="rectangular" sx={{ borderRadius: 1 }} />
+              <Skeleton key={i} height={60} variant="rectangular" sx={{ borderRadius: "var(--imaa-radius-card)" }} />
             ))}
           </Stack>
         </Box>
       )}
 
       {!loading && categories.length === 0 && (
-        <Paper variant="outlined" sx={{ p: 3, textAlign: "center", borderRadius: 2, borderColor: "#F0EEEB" }}>
+        <Paper variant="outlined" sx={{ ...surfaceSx, p: 3, textAlign: "center" }}>
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             No subscription lists yet
           </Typography>
@@ -353,8 +373,8 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
       )}
 
       {!loading && categories.length > 0 && (
-        <TableContainer component={Paper} sx={{ borderRadius: 2, borderColor: "#F0EEEB", overflow: "hidden" }}>
-          <Table>
+        <TableContainer component={Paper} variant="outlined" sx={{ ...surfaceSx, overflowX: "auto", maxWidth: "100%" }}>
+          <Table aria-label="Subscription lists" sx={{ minWidth: 860 }}>
             <TableHead>
               <TableRow sx={{ bgcolor: "#f3f4f6" }}>
                 <TableCell sx={{ fontWeight: 700 }}>List Name</TableCell>
@@ -373,7 +393,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
 
                 return (
                   <TableRow key={category.slug} sx={{ "&:hover": { bgcolor: "#fafafa" } }}>
-                    <TableCell sx={{ minWidth: 220 }}>
+                    <TableCell sx={{ minWidth: 220, maxWidth: 360 }}>
                       <Typography
                         role="button"
                         tabIndex={0}
@@ -383,18 +403,19 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                             navigate(`/admin/newsletter/lists/${category.slug}`);
                           }
                         }}
-                        sx={{ fontWeight: 700, color: "#1B2A4A", cursor: "pointer", "&:hover": { color: "#0f766e" } }}
+                        aria-label={`Open ${category.name} subscription list`}
+                        sx={{ fontWeight: 700, color: UI_TEXT, cursor: "pointer", overflowWrap: "anywhere", "&:hover": { color: UI_TEAL }, "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
                       >
                         {category.name}
                       </Typography>
                       {category.description && (
-                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.4, maxWidth: 360 }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.4, maxWidth: 360, overflowWrap: "anywhere" }}>
                           {category.description}
                         </Typography>
                       )}
                     </TableCell>
                     <TableCell>
-                      <code style={{ fontSize: "12px", color: "#666" }}>{category.slug}</code>
+                      <code style={{ fontSize: "12px", color: "#5A6070", overflowWrap: "anywhere" }}>{category.slug}</code>
                     </TableCell>
                     <TableCell align="center">
                       <Chip
@@ -402,25 +423,26 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                         color={category.is_active ? "success" : "default"}
                         size="small"
                         variant={category.is_active ? "filled" : "outlined"}
-                        sx={{ fontWeight: 700 }}
+                        sx={{ fontWeight: 700, borderRadius: "var(--imaa-radius-tag)" }}
                       />
                     </TableCell>
                     <TableCell sx={{ minWidth: 180 }}>
                       {segmentId ? (
                         <Stack spacing={0.35} alignItems="flex-start">
-                          <Chip label="Connected" color="success" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                          <Chip label="Connected" color="success" size="small" variant="outlined" sx={{ fontWeight: 700, borderRadius: "var(--imaa-radius-tag)" }} />
                           <Typography variant="caption" color="text.secondary">
                             Segment #{segmentId}
                           </Typography>
                         </Stack>
                       ) : (
-                        <Chip label="Not Connected" color="warning" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                        <Chip label="Not Connected" color="warning" size="small" variant="outlined" sx={{ fontWeight: 700, borderRadius: "var(--imaa-radius-tag)" }} />
                       )}
                     </TableCell>
-                    <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                    <TableCell align="right" sx={{ whiteSpace: "nowrap", "& .MuiIconButton-root": { minWidth: 44, minHeight: 44 } }}>
                       <Tooltip title="View subscribers">
                         <span>
                           <IconButton
+                            aria-label={`View subscribers for ${category.name}`}
                             size="small"
                             onClick={() => navigate(`/admin/newsletter/lists/${category.slug}`)}
                             disabled={saving || Boolean(actionKey)}
@@ -434,6 +456,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                       <Tooltip title="Edit list">
                         <span>
                           <IconButton
+                            aria-label={`Edit ${category.name}`}
                             size="small"
                             onClick={() => handleOpen(category)}
                             disabled={saving || Boolean(actionKey)}
@@ -447,6 +470,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                       <Tooltip title={segmentId ? "Sync / repair Mautic connection" : "Create / sync Mautic segment"}>
                         <span>
                           <IconButton
+                            aria-label={`${segmentId ? "Sync or repair" : "Create or sync Mautic segment for"} ${category.name}`}
                             size="small"
                             onClick={() => handleSync(category)}
                             disabled={saving || Boolean(actionKey)}
@@ -461,6 +485,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                         <Tooltip title="Connect existing Mautic segment">
                           <span>
                             <IconButton
+                              aria-label={`Connect an existing Mautic segment to ${category.name}`}
                               size="small"
                               onClick={() => handleOpenConnect(category)}
                               disabled={saving || Boolean(actionKey)}
@@ -476,6 +501,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                         <Tooltip title="Deactivate list">
                           <span>
                             <IconButton
+                              aria-label={`Deactivate ${category.name}`}
                               size="small"
                               onClick={() => setDeactivateConfirm(category)}
                               disabled={saving || Boolean(actionKey)}
@@ -489,6 +515,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                         <Tooltip title="Reactivate list">
                           <span>
                             <IconButton
+                              aria-label={`Reactivate ${category.name}`}
                               size="small"
                               onClick={() => handleReactivate(category.slug)}
                               disabled={saving || Boolean(actionKey)}
@@ -508,7 +535,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
         </TableContainer>
       )}
 
-      <Dialog open={open} onClose={() => !saving && setOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={open} onClose={() => !saving && setOpen(false)} maxWidth="sm" fullWidth PaperProps={dialogPaperProps} aria-busy={saving}>
         <DialogTitle sx={{ fontWeight: 700, color: "#1B2A4A" }}>
           {editing ? "Edit List" : "Create New List"}
         </DialogTitle>
@@ -524,6 +551,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
               disabled={saving}
               autoFocus
               size="small"
+              sx={fieldSx}
             />
             {editing && (
               <TextField
@@ -533,6 +561,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                 disabled
                 size="small"
                 helperText="The slug is a stable integration identifier and cannot be changed."
+                sx={fieldSx}
               />
             )}
             <TextField
@@ -545,6 +574,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
               fullWidth
               disabled={saving}
               size="small"
+              sx={fieldSx}
             />
             {!editing && (
               <Alert severity="info" sx={{ py: 0.5 }}>
@@ -559,7 +589,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
             onClick={handleSave}
             variant="contained"
             disabled={saving || !form.name.trim()}
-            sx={{ background: "linear-gradient(135deg, #10b8a6 0%, #0ea5a4 100%)" }}
+            sx={actionSx}
           >
             {saving ? <CircularProgress size={20} color="inherit" sx={{ mr: 1 }} /> : null}
             {editing ? "Update" : "Create"}
@@ -567,7 +597,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(deactivateConfirm)} onClose={() => !actionKey && setDeactivateConfirm(null)}>
+      <Dialog open={Boolean(deactivateConfirm)} onClose={() => !actionKey && setDeactivateConfirm(null)} maxWidth="xs" fullWidth PaperProps={dialogPaperProps} aria-busy={Boolean(actionKey)}>
         <DialogTitle sx={{ fontWeight: 700 }}>Deactivate List?</DialogTitle>
         <DialogContent>
           <Typography color="text.secondary">
@@ -592,7 +622,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={Boolean(connectCategory)} onClose={handleCloseConnect} maxWidth="sm" fullWidth>
+      <Dialog open={Boolean(connectCategory)} onClose={handleCloseConnect} maxWidth="sm" fullWidth PaperProps={dialogPaperProps} aria-busy={segmentsLoading || connectBusy}>
         <DialogTitle sx={{ fontWeight: 700, color: "#1B2A4A" }}>
           Connect Mautic Segment
         </DialogTitle>
@@ -618,6 +648,8 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                   fullWidth
                   size="small"
                   disabled={connectBusy || selectableSegments.length === 0}
+                  inputProps={{ "aria-label": "Mautic segment" }}
+                  sx={fieldSx}
                   renderValue={(value) => {
                     if (!value) return "Select a Mautic segment";
                     const segment = mauticSegments.find((item) => String(item.id) === String(value));

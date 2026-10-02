@@ -58,6 +58,13 @@ import {
 import AdminNewsletterPointTriggersPanel from "./AdminNewsletterPointTriggersPanel";
 import AdminNewsletterPointGroupsPanel from "./AdminNewsletterPointGroupsPanel";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = { borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, boxShadow: "var(--imaa-shadow-sm)" };
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+const dialogPaperProps = { sx: { m: { xs: 2, sm: 4 }, width: { xs: "calc(100% - 32px)", sm: "auto" }, maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" }, borderRadius: "var(--imaa-radius-popup)" } };
+
 const blankForm = {
   name: "",
   description: "",
@@ -275,9 +282,9 @@ function PointActionDialog({
   const listConfig = listPropertyByType[form.type];
 
   return (
-    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{action ? "Edit Point Action" : "Create Point Action"}</DialogTitle>
-      <DialogContent dividers>
+    <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth aria-labelledby="point-action-dialog-title" PaperProps={dialogPaperProps}>
+      <DialogTitle id="point-action-dialog-title">{action ? "Edit Point Action" : "Create Point Action"}</DialogTitle>
+      <DialogContent dividers sx={{ "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } }}>
         <Stack spacing={2}>
           {(error || formError) && <Alert severity="error">{error || formError}</Alert>}
           <TextField
@@ -391,7 +398,7 @@ function PointActionDialog({
           )}
 
           {form.type === "url.hit" && (
-            <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: "#E7ECEF" }}>
+            <Paper variant="outlined" sx={{ ...surfaceSx, p: 2 }}>
               <Stack spacing={2}>
                 <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>Specific URL rules</Typography>
                 <TextField
@@ -470,9 +477,9 @@ function PointActionDialog({
           />
         </Stack>
       </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose} disabled={saving}>Cancel</Button>
-        <Button variant="contained" onClick={submit} disabled={saving}>
+      <DialogActions sx={{ flexWrap: "wrap", gap: 1, px: { xs: 2, sm: 3 }, py: 2 }}>
+        <Button onClick={onClose} disabled={saving} sx={actionSx}>Cancel</Button>
+        <Button variant="contained" onClick={submit} disabled={saving} sx={actionSx}>
           {saving ? <CircularProgress size={20} color="inherit" /> : action ? "Save Changes" : "Create Action"}
         </Button>
       </DialogActions>
@@ -636,10 +643,14 @@ export default function AdminNewsletterPointsPage() {
     <Stack spacing={3}>
       {success && <Alert severity="success" onClose={() => setSuccess("")}>{success}</Alert>}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden" }}>
         <Tabs
           value={pointsSection}
           onChange={(_, value) => setPointsSection(value)}
+          aria-label="Points sections"
+          variant="scrollable"
+          scrollButtons="auto"
+          allowScrollButtonsMobile
           sx={{
             px: 2,
             minHeight: 48,
@@ -670,7 +681,7 @@ export default function AdminNewsletterPointsPage() {
         <Box>
           <Stack direction="row" spacing={1} alignItems="center">
             <StarsRoundedIcon sx={{ color: "#0f766e" }} />
-            <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+            <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>
               Point Actions
             </Typography>
           </Stack>
@@ -678,7 +689,7 @@ export default function AdminNewsletterPointsPage() {
             Award or subtract Mautic contact points when configured engagement actions occur.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => {
@@ -687,7 +698,7 @@ export default function AdminNewsletterPointsPage() {
               loadPointGroups();
             }}
             disabled={loading || typesLoading}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Refresh
           </Button>
@@ -696,7 +707,7 @@ export default function AdminNewsletterPointsPage() {
             startIcon={<AddRoundedIcon />}
             onClick={() => setDialog({ open: true, action: null, saving: false, error: "" })}
             disabled={typesLoading || Boolean(typesError) || types.length === 0}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Create Point Action
           </Button>
@@ -713,7 +724,7 @@ export default function AdminNewsletterPointsPage() {
         </Alert>
       )}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }} aria-busy={loading ? "true" : undefined}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
@@ -729,9 +740,9 @@ export default function AdminNewsletterPointsPage() {
               onKeyDown={(event) => {
                 if (event.key === "Enter") handleSearch();
               }}
-              sx={{ minWidth: { sm: 320 } }}
+              sx={{ ...fieldSx, minWidth: { sm: 320 } }}
             />
-            <Button variant="outlined" onClick={handleSearch} disabled={loading}>Search</Button>
+            <Button variant="outlined" onClick={handleSearch} disabled={loading} sx={actionSx}>Search</Button>
             {(search || searchInput) && (
               <Button
                 onClick={() => {
@@ -768,8 +779,8 @@ export default function AdminNewsletterPointsPage() {
             </Alert>
           </Box>
         ) : (
-          <TableContainer>
-            <Table>
+          <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+            <Table aria-label="Mautic point actions" sx={{ minWidth: 920 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                   <TableCell>Name</TableCell>
@@ -785,8 +796,8 @@ export default function AdminNewsletterPointsPage() {
                 {rows.map((row) => (
                   <TableRow hover key={row.id}>
                     <TableCell>
-                      <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{row.name || `Point Action #${row.id}`}</Typography>
-                      {row.description && <Typography variant="body2" color="text.secondary">{row.description}</Typography>}
+                      <Typography sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}>{row.name || `Point Action #${row.id}`}</Typography>
+                      {row.description && <Typography variant="body2" color="text.secondary" sx={{ overflowWrap: "anywhere" }}>{row.description}</Typography>}
                     </TableCell>
                     <TableCell>
                       <Typography>{row.type_label || typeLabelMap.get(row.type) || row.type || "—"}</Typography>
@@ -816,6 +827,8 @@ export default function AdminNewsletterPointsPage() {
                         <IconButton
                           onClick={() => setDialog({ open: true, action: row, saving: false, error: "" })}
                           size="small"
+                          aria-label={`Edit ${row.name || `Point Action ${row.id}`}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
                         >
                           <EditRoundedIcon fontSize="small" />
                         </IconButton>
@@ -825,6 +838,8 @@ export default function AdminNewsletterPointsPage() {
                           color="error"
                           onClick={() => setDeleteDialog({ open: true, action: row, deleting: false, error: "" })}
                           size="small"
+                          aria-label={`Delete ${row.name || `Point Action ${row.id}`}`}
+                          sx={{ minWidth: 40, minHeight: 40 }}
                         >
                           <DeleteRoundedIcon fontSize="small" />
                         </IconButton>
@@ -838,10 +853,10 @@ export default function AdminNewsletterPointsPage() {
         )}
 
         <Stack
-          direction="row"
+          direction={{ xs: "column", sm: "row" }}
           justifyContent="space-between"
           alignItems="center"
-          sx={{ px: 2, py: 1.5, borderTop: "1px solid #E7ECEF" }}
+          sx={{ px: 2, py: 1.5, borderTop: `1px solid ${UI_BORDER}` }}
         >
           <Typography variant="body2" color="text.secondary">Page {page} of {numPages}</Typography>
           <Stack direction="row" spacing={1}>
@@ -891,8 +906,10 @@ export default function AdminNewsletterPointsPage() {
         onClose={deleteDialog.deleting ? undefined : () => setDeleteDialog({ open: false, action: null, deleting: false, error: "" })}
         maxWidth="xs"
         fullWidth
+        aria-labelledby="delete-point-action-title"
+        PaperProps={dialogPaperProps}
       >
-        <DialogTitle>Delete Point Action?</DialogTitle>
+        <DialogTitle id="delete-point-action-title">Delete Point Action?</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
             {deleteDialog.error && <Alert severity="error">{deleteDialog.error}</Alert>}

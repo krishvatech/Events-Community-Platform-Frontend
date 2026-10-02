@@ -15,7 +15,7 @@ export default function MarketingHubLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", bgcolor: "#F8FAFC" }}>
+    <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, minHeight: "100vh", minWidth: 0, bgcolor: "var(--imaa-bg-member)" }}>
       <MarketingHubSidebar mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
 
       {isMobile && (
@@ -34,7 +34,7 @@ export default function MarketingHubLayout({ children }) {
             borderBottom: "1px solid #F0EEEB",
           }}
         >
-          <IconButton onClick={() => setMobileOpen(true)} sx={{ bgcolor: "#fff", boxShadow: 1, "&:hover": { bgcolor: "#f9fafb" } }}>
+          <IconButton aria-label="Open Marketing Hub navigation" onClick={() => setMobileOpen(true)} sx={{ minWidth: 44, minHeight: 44, bgcolor: "#fff", border: "1px solid var(--imaa-border)", "&:hover": { bgcolor: "var(--imaa-bg-cool)" } }}>
             <MenuRoundedIcon />
           </IconButton>
           <Stack spacing={0}>
@@ -48,6 +48,8 @@ export default function MarketingHubLayout({ children }) {
         component="main"
         sx={{
           flexGrow: 1,
+          minWidth: 0,
+          maxWidth: "100%",
           width: { xs: "100%", md: `calc(100% - ${SIDEBAR_WIDTH}px)` },
           ml: { xs: 0, md: `${SIDEBAR_WIDTH}px` },
           px: { xs: 2, md: 3 },

@@ -59,6 +59,25 @@ import {
   updateNewsletterCategory,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: UI_BORDER,
+  bgcolor: "background.paper",
+  boxShadow: "var(--imaa-shadow-sm)",
+};
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { textTransform: "none", minHeight: 40, borderRadius: "var(--imaa-radius-field)" };
+const dialogPaperProps = {
+  sx: {
+    m: 2,
+    width: "calc(100% - 32px)",
+    maxHeight: "calc(100% - 32px)",
+    borderRadius: "var(--imaa-radius-popup)",
+  },
+};
+
 const toArray = (value) => {
   if (Array.isArray(value)) return value;
   if (value && typeof value === "object") return Object.values(value);
@@ -617,18 +636,19 @@ export default function AdminNewsletterListManagePage() {
   };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} aria-busy={loading || contactsLoading} sx={{ minWidth: 0 }}>
       <Stack direction={{ xs: "column", lg: "row" }} justifyContent="space-between" spacing={2}>
-        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+        <Stack direction="row" spacing={{ xs: 0.75, sm: 1.5 }} alignItems="flex-start" sx={{ minWidth: 0 }}>
           <IconButton
             onClick={() => navigate("/admin/newsletter/lists")}
             aria-label="Back to subscription lists"
+            sx={{ minWidth: 44, minHeight: 44, flexShrink: 0 }}
           >
             <ArrowBackRoundedIcon />
           </IconButton>
-          <Box>
+          <Box sx={{ minWidth: 0 }}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+              <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, overflowWrap: "anywhere" }}>
                 {loading ? "Subscription List" : category?.name || slug}
               </Typography>
               {category && (
@@ -637,7 +657,7 @@ export default function AdminNewsletterListManagePage() {
                   label={category.is_active ? "Active" : "Inactive"}
                   color={category.is_active ? "success" : "default"}
                   variant={category.is_active ? "filled" : "outlined"}
-                  sx={{ fontWeight: 700 }}
+                  sx={{ fontWeight: 700, borderRadius: "var(--imaa-radius-tag)" }}
                 />
               )}
             </Stack>
@@ -647,7 +667,7 @@ export default function AdminNewsletterListManagePage() {
           </Box>
         </Stack>
 
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center" sx={{ width: { xs: "100%", lg: "auto" }, "& .MuiButton-root": { ...actionSx, flex: { xs: "1 1 150px", sm: "0 0 auto" } } }}>
           <Button startIcon={<RefreshRoundedIcon />} onClick={refreshAll} disabled={loading || contactsLoading || Boolean(action)}>
             Refresh
           </Button>
@@ -677,39 +697,39 @@ export default function AdminNewsletterListManagePage() {
       {error && <Alert severity="error">{error}</Alert>}
 
       {loading ? (
-        <Grid container spacing={2}>
+        <Grid container spacing={2} role="status" aria-label="Loading subscription list details">
           {Array.from({ length: 4 }).map((_, index) => (
             <Grid item xs={12} md={6} lg={3} key={index}>
-              <Skeleton variant="rectangular" height={108} sx={{ borderRadius: 2 }} />
+              <Skeleton variant="rectangular" height={108} sx={{ borderRadius: "var(--imaa-radius-card)" }} />
             </Grid>
           ))}
         </Grid>
       ) : category ? (
         <Grid container spacing={2}>
           <Grid item xs={12} md={6} lg={3}>
-            <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", height: "100%" }}>
+            <Paper variant="outlined" sx={{ ...surfaceSx, p: 2.25, height: "100%" }}>
               <Typography variant="body2" color="text.secondary">Current Subscribers</Typography>
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mt: 0.5 }}>{count}</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: UI_TEXT, mt: 0.5 }}>{count}</Typography>
             </Paper>
           </Grid>
           <Grid item xs={12} md={6} lg={3}>
-            <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", height: "100%" }}>
+            <Paper variant="outlined" sx={{ ...surfaceSx, p: 2.25, height: "100%" }}>
               <Typography variant="body2" color="text.secondary">Mautic</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mt: 0.75 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: UI_TEXT, mt: 0.75, overflowWrap: "anywhere" }}>
                 {segmentId ? `Connected · Segment #${segmentId}` : "Not connected"}
               </Typography>
             </Paper>
           </Grid>
           <Grid item xs={12} md={6} lg={3}>
-            <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", height: "100%" }}>
+            <Paper variant="outlined" sx={{ ...surfaceSx, p: 2.25, height: "100%" }}>
               <Typography variant="body2" color="text.secondary">Slug</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mt: 0.75 }}>{category.slug}</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: UI_TEXT, mt: 0.75, overflowWrap: "anywhere" }}>{category.slug}</Typography>
             </Paper>
           </Grid>
           <Grid item xs={12} md={6} lg={3}>
-            <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", height: "100%" }}>
+            <Paper variant="outlined" sx={{ ...surfaceSx, p: 2.25, height: "100%" }}>
               <Typography variant="body2" color="text.secondary">ECP Status</Typography>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mt: 0.75 }}>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: UI_TEXT, mt: 0.75 }}>
                 {category.is_active ? "Active" : "Inactive"}
               </Typography>
             </Paper>
@@ -717,16 +737,16 @@ export default function AdminNewsletterListManagePage() {
         </Grid>
       ) : null}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper component="section" aria-labelledby="list-contact-timeline-heading" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}>
         <Stack
           direction={{ xs: "column", lg: "row" }}
           spacing={2}
           justifyContent="space-between"
           alignItems={{ xs: "stretch", lg: "center" }}
-          sx={{ p: 2.25, borderBottom: "1px solid #E7ECEF" }}
+          sx={{ p: 2.25, borderBottom: `1px solid ${UI_BORDER}` }}
         >
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+            <Typography id="list-contact-timeline-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT }}>
               Contacts in time
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -742,7 +762,7 @@ export default function AdminNewsletterListManagePage() {
               onChange={(event) => setTimelineFrom(event.target.value)}
               InputLabelProps={{ shrink: true }}
               disabled={timelineLoading}
-              sx={{ minWidth: 160 }}
+              sx={{ ...fieldSx, minWidth: { sm: 160 } }}
             />
             <TextField
               type="date"
@@ -752,13 +772,13 @@ export default function AdminNewsletterListManagePage() {
               onChange={(event) => setTimelineTo(event.target.value)}
               InputLabelProps={{ shrink: true }}
               disabled={timelineLoading}
-              sx={{ minWidth: 160 }}
+              sx={{ ...fieldSx, minWidth: { sm: 160 } }}
             />
             <Button
               variant="outlined"
               onClick={applyTimelineRange}
               disabled={timelineLoading || !timelineFrom || !timelineTo}
-              sx={{ minWidth: 92 }}
+              sx={{ ...actionSx, minWidth: 92 }}
             >
               Apply
             </Button>
@@ -820,16 +840,16 @@ export default function AdminNewsletterListManagePage() {
         </Box>
       </Paper>
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper component="section" aria-labelledby="list-subscribers-heading" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
           justifyContent="space-between"
           alignItems={{ xs: "stretch", md: "center" }}
-          sx={{ p: 2.25, borderBottom: "1px solid #E7ECEF" }}
+          sx={{ p: 2.25, borderBottom: `1px solid ${UI_BORDER}` }}
         >
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>Subscribers</Typography>
+            <Typography id="list-subscribers-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT }}>Subscribers</Typography>
             <Typography variant="body2" color="text.secondary">
               Current ECP subscribers and their Mautic synchronization status.
             </Typography>
@@ -845,23 +865,25 @@ export default function AdminNewsletterListManagePage() {
                 }
               }}
               placeholder="Search name, email, or username"
+              label="Search subscribers"
               size="small"
               fullWidth
               disabled={contactsLoading}
+              sx={fieldSx}
             />
-            <Button variant="outlined" onClick={handleSearch} disabled={contactsLoading}>Search</Button>
+            <Button variant="outlined" onClick={handleSearch} disabled={contactsLoading} sx={actionSx}>Search</Button>
           </Stack>
         </Stack>
 
         {contactsError && <Alert severity="error" sx={{ m: 2 }}>{contactsError}</Alert>}
 
         {contactsLoading ? (
-          <Stack spacing={1} sx={{ p: 2 }}>
+          <Stack spacing={1} sx={{ p: 2 }} role="status" aria-label="Loading subscribers">
             {Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} height={46} />)}
           </Stack>
         ) : (
-          <TableContainer sx={{ overflowX: "auto" }}>
-            <Table>
+          <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+            <Table aria-label="Subscription list subscribers" sx={{ minWidth: 820 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                   <TableCell>Name</TableCell>
@@ -936,26 +958,26 @@ export default function AdminNewsletterListManagePage() {
           spacing={1.5}
           justifyContent="space-between"
           alignItems={{ xs: "stretch", sm: "center" }}
-          sx={{ px: 2, py: 1.5, borderTop: "1px solid #E7ECEF" }}
+          sx={{ px: 2, py: 1.5, borderTop: `1px solid ${UI_BORDER}` }}
         >
           <Typography variant="body2" color="text.secondary">
             {count} subscriber{count === 1 ? "" : "s"} · Page {page} of {numPages}
           </Typography>
-          <Stack direction="row" spacing={1}>
-            <Button size="small" variant="outlined" onClick={() => handlePageChange(page - 1)} disabled={contactsLoading || page <= 1}>
+          <Stack direction="row" spacing={1} sx={{ justifyContent: { xs: "space-between", sm: "flex-start" } }}>
+            <Button size="small" variant="outlined" onClick={() => handlePageChange(page - 1)} disabled={contactsLoading || page <= 1} sx={{ ...actionSx, flex: { xs: 1, sm: "initial" } }}>
               Previous
             </Button>
-            <Button size="small" variant="outlined" onClick={() => handlePageChange(page + 1)} disabled={contactsLoading || page >= numPages}>
+            <Button size="small" variant="outlined" onClick={() => handlePageChange(page + 1)} disabled={contactsLoading || page >= numPages} sx={{ ...actionSx, flex: { xs: 1, sm: "initial" } }}>
               Next
             </Button>
           </Stack>
         </Stack>
       </Paper>
 
-      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+      <Paper component="section" aria-labelledby="list-settings-heading" variant="outlined" sx={{ ...surfaceSx, p: 2.5 }}>
         <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2}>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>List Settings</Typography>
+            <Typography id="list-settings-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT }}>List Settings</Typography>
             <Typography variant="body2" color="text.secondary">
               ECP remains the source of truth for list metadata, active state, and newsletter consent.
             </Typography>
@@ -969,7 +991,7 @@ export default function AdminNewsletterListManagePage() {
         </Stack>
       </Paper>
 
-      <Dialog open={editOpen} onClose={() => action !== "edit" && setEditOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={editOpen} onClose={() => action !== "edit" && setEditOpen(false)} maxWidth="sm" fullWidth PaperProps={dialogPaperProps} aria-busy={action === "edit"}>
         <DialogTitle sx={{ fontWeight: 700 }}>Edit Subscription List</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2.5}>
@@ -980,8 +1002,9 @@ export default function AdminNewsletterListManagePage() {
               fullWidth
               required
               disabled={action === "edit"}
+              sx={fieldSx}
             />
-            <TextField label="Slug" value={slug} fullWidth disabled helperText="Stable integration identifier." />
+            <TextField label="Slug" value={slug} fullWidth disabled helperText="Stable integration identifier." sx={fieldSx} />
             <TextField
               label="Description"
               value={editForm.description}
@@ -990,6 +1013,7 @@ export default function AdminNewsletterListManagePage() {
               rows={4}
               fullWidth
               disabled={action === "edit"}
+              sx={fieldSx}
             />
           </Stack>
         </DialogContent>
@@ -1001,7 +1025,7 @@ export default function AdminNewsletterListManagePage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deactivateOpen} onClose={() => action !== "deactivate" && setDeactivateOpen(false)}>
+      <Dialog open={deactivateOpen} onClose={() => action !== "deactivate" && setDeactivateOpen(false)} maxWidth="xs" fullWidth PaperProps={dialogPaperProps} aria-busy={action === "deactivate"}>
         <DialogTitle sx={{ fontWeight: 700 }}>Deactivate Subscription List?</DialogTitle>
         <DialogContent dividers>
           <Typography color="text.secondary">
@@ -1016,7 +1040,7 @@ export default function AdminNewsletterListManagePage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={connectOpen} onClose={() => action !== "connect" && setConnectOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog open={connectOpen} onClose={() => action !== "connect" && setConnectOpen(false)} maxWidth="sm" fullWidth PaperProps={dialogPaperProps} aria-busy={segmentsLoading || action === "connect"}>
         <DialogTitle sx={{ fontWeight: 700 }}>Connect Existing Mautic Segment</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
@@ -1032,6 +1056,8 @@ export default function AdminNewsletterListManagePage() {
                 onChange={(event) => setSelectedSegmentId(String(event.target.value))}
                 displayEmpty
                 fullWidth
+                inputProps={{ "aria-label": "Mautic segment" }}
+                sx={fieldSx}
               >
                 <MenuItem value="" disabled>Select a Mautic segment</MenuItem>
                 {segments.map((segment) => {

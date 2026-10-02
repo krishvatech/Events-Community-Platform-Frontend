@@ -29,6 +29,16 @@ import {
   listNewsletterAnalyticsSegments,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: UI_BORDER,
+  boxShadow: "var(--imaa-shadow-sm)",
+};
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+
 const pageSize = 25;
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -76,7 +86,7 @@ const formatDateTime = (value) => {
 
 function MetricCard({ metric, loading }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", minHeight: 128 }}>
+    <Paper variant="outlined" sx={{ ...surfaceSx, p: 2.25, minHeight: 128 }} aria-busy={loading ? "true" : undefined}>
       <Stack spacing={0.75}>
         <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
           <Typography variant="body2" color="text.secondary">{metric?.label}</Typography>
@@ -85,7 +95,7 @@ function MetricCard({ metric, loading }) {
         {loading ? (
           <Skeleton width="70%" height={36} />
         ) : (
-          <Typography variant="h5" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+          <Typography variant="h5" sx={{ color: UI_TEXT, fontWeight: 850, overflowWrap: "anywhere" }}>
             {metric?.available === false ? "Not available" : formatNumber(metric?.value)}
           </Typography>
         )}
@@ -98,7 +108,7 @@ function MetricCard({ metric, loading }) {
 function DateRangeBar({ draftRange, setDraftRange, applyRange, refresh, loading }) {
   const setPreset = (days) => setDraftRange({ from: daysAgoIso(days), to: todayIso() });
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, borderColor: "#E7ECEF" }}>
+    <Paper component="section" aria-label="Analytics date range" variant="outlined" sx={{ ...surfaceSx, p: 2 }}>
       <Stack direction={{ xs: "column", md: "row" }} spacing={1.5} alignItems={{ xs: "stretch", md: "center" }}>
         <TextField
           label="From"
@@ -107,6 +117,7 @@ function DateRangeBar({ draftRange, setDraftRange, applyRange, refresh, loading 
           value={draftRange.from}
           onChange={(event) => setDraftRange((current) => ({ ...current, from: event.target.value }))}
           InputLabelProps={{ shrink: true }}
+          sx={fieldSx}
         />
         <TextField
           label="To"
@@ -115,25 +126,26 @@ function DateRangeBar({ draftRange, setDraftRange, applyRange, refresh, loading 
           value={draftRange.to}
           onChange={(event) => setDraftRange((current) => ({ ...current, to: event.target.value }))}
           InputLabelProps={{ shrink: true }}
+          sx={fieldSx}
         />
-        <Button variant="contained" onClick={applyRange} disabled={loading} sx={{ textTransform: "none" }}>Apply</Button>
-        <Button variant="outlined" onClick={() => setPreset(7)} disabled={loading} sx={{ textTransform: "none" }}>7 days</Button>
-        <Button variant="outlined" onClick={() => setPreset(30)} disabled={loading} sx={{ textTransform: "none" }}>30 days</Button>
-        <Button variant="outlined" onClick={() => setPreset(90)} disabled={loading} sx={{ textTransform: "none" }}>90 days</Button>
+        <Button variant="contained" onClick={applyRange} disabled={loading} sx={actionSx}>Apply</Button>
+        <Button variant="outlined" onClick={() => setPreset(7)} disabled={loading} sx={actionSx}>7 days</Button>
+        <Button variant="outlined" onClick={() => setPreset(30)} disabled={loading} sx={actionSx}>30 days</Button>
+        <Button variant="outlined" onClick={() => setPreset(90)} disabled={loading} sx={actionSx}>90 days</Button>
         <Box sx={{ flexGrow: 1 }} />
-        <Button startIcon={<RefreshRoundedIcon />} onClick={refresh} disabled={loading} sx={{ textTransform: "none" }}>Refresh</Button>
+        <Button startIcon={<RefreshRoundedIcon />} onClick={refresh} disabled={loading} sx={actionSx}>Refresh</Button>
       </Stack>
     </Paper>
   );
 }
 
-function DataTable({ columns, rows, loading, empty }) {
+function DataTable({ columns, rows, loading, empty, label, minWidth = 760 }) {
   if (loading) {
-    return <Stack spacing={1}>{Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} height={48} />)}</Stack>;
+    return <Stack spacing={1} role="status" aria-live="polite" aria-label={`Loading ${label}`}>{Array.from({ length: 6 }).map((_, index) => <Skeleton key={index} height={48} />)}</Stack>;
   }
   return (
-    <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF" }}>
-      <Table>
+    <TableContainer component={Paper} variant="outlined" sx={{ ...surfaceSx, overflowX: "auto", maxWidth: "100%" }}>
+      <Table aria-label={label} sx={{ minWidth }}>
         <TableHead>
           <TableRow sx={{ bgcolor: "#F6F8FA" }}>
             {columns.map((column) => <TableCell key={column.key}>{column.label}</TableCell>)}
@@ -142,7 +154,7 @@ function DataTable({ columns, rows, loading, empty }) {
         <TableBody>
           {rows.length ? rows.map((row) => (
             <TableRow hover key={row.id}>
-              {columns.map((column) => <TableCell key={column.key}>{column.render ? column.render(row) : row[column.key]}</TableCell>)}
+              {columns.map((column) => <TableCell key={column.key} sx={{ maxWidth: 360, overflowWrap: "anywhere" }}>{column.render ? column.render(row) : row[column.key]}</TableCell>)}
             </TableRow>
           )) : (
             <TableRow>
@@ -227,9 +239,9 @@ export default function AdminNewsletterAnalyticsPage() {
   ];
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={3} aria-busy={state.loading ? "true" : undefined}>
       <Box>
-        <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Analytics</Typography>
+        <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>Analytics</Typography>
         <Typography color="text.secondary">Mautic-backed marketing reporting. ECP newsletter consent is kept separate.</Typography>
       </Box>
 
@@ -244,8 +256,8 @@ export default function AdminNewsletterAnalyticsPage() {
         loading={state.loading}
       />
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
-        <Tabs value={tab} onChange={switchTab} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ px: 2, "& .MuiTab-root": { textTransform: "none", fontWeight: 800 }, "& .Mui-selected": { color: "#0f766e !important" }, "& .MuiTabs-indicator": { backgroundColor: "#0f766e" } }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden" }}>
+        <Tabs value={tab} onChange={switchTab} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile aria-label="Analytics sections" sx={{ px: 2, "& .MuiTab-root": { textTransform: "none", fontWeight: 800 }, "& .Mui-selected": { color: "var(--imaa-teal-hover) !important" }, "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal-hover)" } }}>
           <Tab label="Overview" value="overview" />
           <Tab label="Campaigns" value="campaigns" />
           <Tab label="Emails" value="emails" />
@@ -269,9 +281,9 @@ export default function AdminNewsletterAnalyticsPage() {
         </Stack>
       ) : null}
 
-      {tab === "campaigns" ? <DataTable columns={campaignColumns} rows={rows} loading={state.loading} empty="No native Mautic campaigns found." /> : null}
-      {tab === "emails" ? <DataTable columns={emailColumns} rows={rows} loading={state.loading} empty="No native Mautic emails found." /> : null}
-      {tab === "segments" ? <DataTable columns={segmentColumns} rows={rows} loading={state.loading} empty="No native Mautic segments found." /> : null}
+      {tab === "campaigns" ? <DataTable label="Mautic campaign analytics" columns={campaignColumns} rows={rows} loading={state.loading} empty="No native Mautic campaigns found." /> : null}
+      {tab === "emails" ? <DataTable label="Mautic email analytics" minWidth={1180} columns={emailColumns} rows={rows} loading={state.loading} empty="No native Mautic emails found." /> : null}
+      {tab === "segments" ? <DataTable label="Mautic segment analytics" columns={segmentColumns} rows={rows} loading={state.loading} empty="No native Mautic segments found." /> : null}
 
       {tab === "contacts" ? (
         <Stack spacing={2}>
@@ -283,12 +295,12 @@ export default function AdminNewsletterAnalyticsPage() {
             ))}
           </Grid>
           {state.data?.stage_distribution ? (
-            <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF" }}>
-              <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1.5 }}>Stage Distribution</Typography>
+            <Paper component="section" aria-labelledby="analytics-stage-distribution-heading" variant="outlined" sx={{ ...surfaceSx, p: 2.25 }}>
+              <Typography id="analytics-stage-distribution-heading" component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: UI_TEXT, mb: 1.5 }}>Stage Distribution</Typography>
               <Stack spacing={1}>
                 {(state.data.stage_distribution.stages || []).map((stage) => (
-                  <Stack key={stage.id} direction="row" justifyContent="space-between">
-                    <Typography>{stage.name || `Stage ${stage.id}`}</Typography>
+                  <Stack key={stage.id} direction="row" justifyContent="space-between" spacing={2}>
+                    <Typography sx={{ overflowWrap: "anywhere" }}>{stage.name || `Stage ${stage.id}`}</Typography>
                     <Typography color="text.secondary">{formatNumber(stage.count)} · {formatRate((stage.percentage || 0) / 100)}</Typography>
                   </Stack>
                 ))}
@@ -300,11 +312,11 @@ export default function AdminNewsletterAnalyticsPage() {
       ) : null}
 
       {["campaigns", "emails", "segments"].includes(tab) ? (
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} justifyContent="space-between" alignItems={{ xs: "stretch", sm: "center" }}>
           <Typography variant="body2" color="text.secondary">Page {page} of {numPages}</Typography>
-          <Stack direction="row" spacing={1}>
-            <Button size="small" variant="outlined" disabled={state.loading || page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
-            <Button size="small" variant="outlined" disabled={state.loading || page >= numPages} onClick={() => setPage((current) => current + 1)}>Next</Button>
+          <Stack direction="row" spacing={1} sx={{ "& > *": { flex: { xs: 1, sm: "initial" } } }}>
+            <Button size="small" variant="outlined" disabled={state.loading || page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))} sx={actionSx}>Previous</Button>
+            <Button size="small" variant="outlined" disabled={state.loading || page >= numPages} onClick={() => setPage((current) => current + 1)} sx={actionSx}>Next</Button>
           </Stack>
         </Stack>
       ) : null}

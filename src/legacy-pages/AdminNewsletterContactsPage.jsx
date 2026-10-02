@@ -51,6 +51,24 @@ import {
   listNewsletterStages,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: UI_BORDER,
+  boxShadow: "var(--imaa-shadow-sm)",
+};
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+const dialogPaperProps = {
+  sx: {
+    m: { xs: 2, sm: 4 },
+    width: { xs: "calc(100% - 32px)", sm: "auto" },
+    maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" },
+    borderRadius: "var(--imaa-radius-popup)",
+  },
+};
+
 const formatDateTime = (value) => {
   if (!value) return "—";
   const date = new Date(value);
@@ -308,7 +326,7 @@ export default function AdminNewsletterContactsPage() {
         spacing={2}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.5 }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, mb: 0.5 }}>
             Contacts
           </Typography>
           <Typography color="text.secondary">
@@ -316,7 +334,7 @@ export default function AdminNewsletterContactsPage() {
           </Typography>
         </Box>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-          <Button variant="contained" onClick={() => setCreateOpen(true)} sx={{ textTransform: "none" }}>
+          <Button variant="contained" onClick={() => setCreateOpen(true)} sx={actionSx}>
             Create Contact
           </Button>
           <Button
@@ -330,20 +348,20 @@ export default function AdminNewsletterContactsPage() {
               })
             }
             disabled={loading}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Refresh
           </Button>
         </Stack>
       </Stack>
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }} aria-busy={loading ? "true" : undefined}>
         <Stack
           direction={{ xs: "column", md: "row" }}
           spacing={2}
           justifyContent="space-between"
           alignItems={{ xs: "stretch", md: "center" }}
-          sx={{ p: 2, borderBottom: "1px solid #E7ECEF" }}
+          sx={{ p: 2, borderBottom: `1px solid ${UI_BORDER}` }}
         >
           <Stack direction="row" spacing={1} alignItems="center">
             <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>
@@ -363,7 +381,7 @@ export default function AdminNewsletterContactsPage() {
             spacing={1}
             sx={{ minWidth: { md: 680 } }}
           >
-            <FormControl size="small" sx={{ minWidth: { sm: 190 } }}>
+            <FormControl size="small" sx={{ minWidth: { sm: 190 }, ...fieldSx }}>
               <InputLabel id="newsletter-contact-stage-filter-label">Stage</InputLabel>
               <Select
                 labelId="newsletter-contact-stage-filter-label"
@@ -390,16 +408,17 @@ export default function AdminNewsletterContactsPage() {
                   handleSearch();
                 }
               }}
-              placeholder="Search contacts"
+              label="Search contacts"
               size="small"
               fullWidth
               disabled={loading}
+              sx={fieldSx}
             />
             <Button
               variant="outlined"
               onClick={handleSearch}
               disabled={loading}
-              sx={{ minWidth: 92, textTransform: "none" }}
+              sx={{ ...actionSx, minWidth: 92 }}
             >
               Search
             </Button>
@@ -435,14 +454,14 @@ export default function AdminNewsletterContactsPage() {
             direction={{ xs: "column", md: "row" }}
             spacing={1.5}
             alignItems={{ xs: "stretch", md: "center" }}
-            sx={{ p: 2, borderBottom: "1px solid #E7ECEF", bgcolor: "#F8FAFC" }}
+            sx={{ p: 2, borderBottom: `1px solid ${UI_BORDER}`, bgcolor: "var(--imaa-bg-cool)" }}
           >
             <Chip
               label={`${selectedIds.length} selected`}
               color="primary"
               variant="outlined"
             />
-            <FormControl size="small" sx={{ minWidth: 220 }}>
+            <FormControl size="small" sx={{ minWidth: 220, ...fieldSx }}>
               <InputLabel id="newsletter-bulk-stage-label">Move to Stage</InputLabel>
               <Select
                 labelId="newsletter-bulk-stage-label"
@@ -465,7 +484,7 @@ export default function AdminNewsletterContactsPage() {
               variant="contained"
               onClick={() => runBulkStageAction("move")}
               disabled={bulkLoading || !bulkStageId}
-              sx={{ textTransform: "none" }}
+              sx={actionSx}
             >
               {bulkLoading ? <CircularProgress size={20} color="inherit" /> : "Move to Stage"}
             </Button>
@@ -474,7 +493,7 @@ export default function AdminNewsletterContactsPage() {
               color="warning"
               onClick={() => runBulkStageAction("clear")}
               disabled={bulkLoading}
-              sx={{ textTransform: "none" }}
+              sx={actionSx}
             >
               Clear Stage
             </Button>
@@ -505,14 +524,14 @@ export default function AdminNewsletterContactsPage() {
             </Alert>
           </Box>
         ) : loading ? (
-          <Stack spacing={1} sx={{ p: 2 }}>
+          <Stack spacing={1} sx={{ p: 2 }} role="status" aria-live="polite" aria-label="Loading contacts">
             {Array.from({ length: 5 }).map((_, index) => (
               <Skeleton key={index} height={48} />
             ))}
           </Stack>
         ) : (
-          <TableContainer sx={{ overflowX: "auto" }}>
-            <Table>
+          <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+            <Table aria-label="Mautic contacts" sx={{ minWidth: 1180 }}>
               <TableHead>
                 <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                   <TableCell padding="checkbox">
@@ -548,12 +567,14 @@ export default function AdminNewsletterContactsPage() {
                       navigate(`/admin/newsletter/contacts/${contact.mautic_contact_id}`)
                     }
                     onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
                         navigate(`/admin/newsletter/contacts/${contact.mautic_contact_id}`);
                       }
                     }}
-                    sx={{ cursor: "pointer" }}
+                    aria-label={`Open ${contact.name || `Contact ${contact.mautic_contact_id}`}`}
+                    sx={{ cursor: "pointer", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: -2 } }}
                   >
                     <TableCell
                       padding="checkbox"
@@ -569,7 +590,7 @@ export default function AdminNewsletterContactsPage() {
                     </TableCell>
                     <TableCell sx={{ minWidth: 170 }}>
                       <Typography
-                        sx={{ fontWeight: 800, color: "#1B2A4A", "&:hover": { color: "#0f766e" } }}
+                        sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere", "&:hover": { color: "var(--imaa-teal-hover)" } }}
                       >
                         {contact.name || `Contact #${contact.mautic_contact_id}`}
                       </Typography>
@@ -577,7 +598,7 @@ export default function AdminNewsletterContactsPage() {
                         {contact.points ?? 0} point{Number(contact.points || 0) === 1 ? "" : "s"}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ minWidth: 220 }}>
+                    <TableCell sx={{ minWidth: 220, maxWidth: 300, overflowWrap: "anywhere" }}>
                       {contact.email || "—"}
                     </TableCell>
                     <TableCell sx={{ minWidth: 140 }}>
@@ -641,7 +662,7 @@ export default function AdminNewsletterContactsPage() {
                       {formatDateTime(contact.last_active_at || contact.date_modified)}
                     </TableCell>
                     <TableCell align="right">
-                      <Typography sx={{ fontWeight: 700 }}>
+                      <Typography sx={{ fontWeight: 700, overflowWrap: "anywhere" }}>
                         #{contact.mautic_contact_id}
                       </Typography>
                     </TableCell>
@@ -669,17 +690,18 @@ export default function AdminNewsletterContactsPage() {
           justifyContent="space-between"
           alignItems={{ xs: "stretch", sm: "center" }}
           spacing={1.5}
-          sx={{ px: 2, py: 1.5, borderTop: "1px solid #E7ECEF" }}
+          sx={{ px: 2, py: 1.5, borderTop: `1px solid ${UI_BORDER}` }}
         >
           <Typography variant="body2" color="text.secondary">
             {count} contact{count === 1 ? "" : "s"} · Page {page} of {numPages}
           </Typography>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} sx={{ "& > *": { flex: { xs: 1, sm: "initial" } } }}>
             <Button
               size="small"
               variant="outlined"
               onClick={() => handlePageChange(page - 1)}
               disabled={loading || page <= 1}
+              sx={actionSx}
             >
               Previous
             </Button>
@@ -688,6 +710,7 @@ export default function AdminNewsletterContactsPage() {
               variant="outlined"
               onClick={() => handlePageChange(page + 1)}
               disabled={loading || page >= numPages}
+              sx={actionSx}
             >
               Next
             </Button>
@@ -695,8 +718,8 @@ export default function AdminNewsletterContactsPage() {
         </Stack>
       </Paper>
 
-      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>Create Mautic Contact</DialogTitle>
+      <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="md" aria-labelledby="create-mautic-contact-title" PaperProps={dialogPaperProps}>
+        <DialogTitle id="create-mautic-contact-title">Create Mautic Contact</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
             {createError && <Alert severity="error">{createError}</Alert>}
@@ -731,9 +754,9 @@ export default function AdminNewsletterContactsPage() {
             ) : null}
           </Stack>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCreateOpen(false)} disabled={createLoading}>Cancel</Button>
-          <Button variant="contained" onClick={handleCreateContact} disabled={createLoading || !createForm.email.trim()}>
+        <DialogActions sx={{ flexWrap: "wrap", gap: 1, px: { xs: 2, sm: 3 }, py: 2 }}>
+          <Button onClick={() => setCreateOpen(false)} disabled={createLoading} sx={actionSx}>Cancel</Button>
+          <Button variant="contained" onClick={handleCreateContact} disabled={createLoading || !createForm.email.trim()} sx={actionSx}>
             {createLoading ? <CircularProgress size={20} color="inherit" /> : "Create"}
           </Button>
         </DialogActions>

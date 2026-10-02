@@ -42,6 +42,13 @@ import {
   updateNewsletterPointGroup,
 } from "../services/newsletterService";
 
+const UI_BORDER = "var(--imaa-border)";
+const UI_TEXT = "var(--imaa-ink)";
+const surfaceSx = { borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, boxShadow: "var(--imaa-shadow-sm)" };
+const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" } };
+const actionSx = { minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" };
+const dialogPaperProps = { sx: { m: { xs: 2, sm: 4 }, width: { xs: "calc(100% - 32px)", sm: "auto" }, maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" }, borderRadius: "var(--imaa-radius-popup)" } };
+
 const blankForm = {
   name: "",
   description: "",
@@ -355,8 +362,9 @@ export default function AdminNewsletterPointGroupsPanel() {
       >
         <Box>
           <Typography
-            variant="h5"
-            sx={{ fontWeight: 850, color: "#1B2A4A" }}
+            component="h1"
+            variant="h4"
+            sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}
           >
             Point Groups
           </Typography>
@@ -365,12 +373,12 @@ export default function AdminNewsletterPointGroupsPanel() {
             the source of truth.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => loadGroups(page, search, { refresh: true })}
             disabled={loading}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Refresh
           </Button>
@@ -378,7 +386,7 @@ export default function AdminNewsletterPointGroupsPanel() {
             variant="contained"
             startIcon={<AddRoundedIcon />}
             onClick={openCreate}
-            sx={{ textTransform: "none" }}
+            sx={actionSx}
           >
             Create Point Group
           </Button>
@@ -393,7 +401,8 @@ export default function AdminNewsletterPointGroupsPanel() {
 
       <Paper
         variant="outlined"
-        sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}
+        sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}
+        aria-busy={loading ? "true" : undefined}
       >
         <Box
           component="form"
@@ -411,7 +420,7 @@ export default function AdminNewsletterPointGroupsPanel() {
           >
             <TextField
               size="small"
-              placeholder="Search Point Groups"
+              label="Search Point Groups"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               InputProps={{
@@ -421,7 +430,7 @@ export default function AdminNewsletterPointGroupsPanel() {
                   </InputAdornment>
                 ),
               }}
-              sx={{ minWidth: { sm: 340 } }}
+              sx={{ ...fieldSx, minWidth: { sm: 340 } }}
             />
             <Button
               type="submit"
@@ -486,8 +495,8 @@ export default function AdminNewsletterPointGroupsPanel() {
           </Box>
         ) : !error ? (
           <>
-            <TableContainer sx={{ overflowX: "auto" }}>
-              <Table>
+            <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
+              <Table aria-label="Mautic point groups" sx={{ minWidth: 680 }}>
                 <TableHead>
                   <TableRow sx={{ bgcolor: "#F6F8FA" }}>
                     <TableCell>Point Group</TableCell>
@@ -501,7 +510,7 @@ export default function AdminNewsletterPointGroupsPanel() {
                     <TableRow hover key={group.id}>
                       <TableCell>
                         <Typography
-                          sx={{ fontWeight: 800, color: "#1B2A4A" }}
+                          sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}
                         >
                           {group.name || `Point Group #${group.id}`}
                         </Typography>
@@ -509,7 +518,7 @@ export default function AdminNewsletterPointGroupsPanel() {
                           <Typography
                             variant="body2"
                             color="text.secondary"
-                            sx={{ mt: 0.25, maxWidth: 650 }}
+                            sx={{ mt: 0.25, maxWidth: 650, overflowWrap: "anywhere" }}
                           >
                             {group.description}
                           </Typography>
@@ -529,7 +538,7 @@ export default function AdminNewsletterPointGroupsPanel() {
                       </TableCell>
                       <TableCell align="right">
                         <Tooltip title="Edit Point Group">
-                          <IconButton onClick={() => openEdit(group)}>
+                          <IconButton onClick={() => openEdit(group)} aria-label={`Edit ${group.name || `Point Group ${group.id}`}`} sx={{ minWidth: 40, minHeight: 40 }}>
                             <EditRoundedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -537,6 +546,8 @@ export default function AdminNewsletterPointGroupsPanel() {
                           <IconButton
                             color="error"
                             onClick={() => openDelete(group)}
+                            aria-label={`Delete ${group.name || `Point Group ${group.id}`}`}
+                            sx={{ minWidth: 40, minHeight: 40 }}
                           >
                             <DeleteRoundedIcon fontSize="small" />
                           </IconButton>
@@ -572,8 +583,10 @@ export default function AdminNewsletterPointGroupsPanel() {
         onClose={formDialog.saving ? undefined : closeForm}
         maxWidth="sm"
         fullWidth
+        aria-labelledby="point-group-dialog-title"
+        PaperProps={dialogPaperProps}
       >
-        <DialogTitle>
+        <DialogTitle id="point-group-dialog-title">
           {formDialog.group?.id ? "Edit Point Group" : "Create Point Group"}
         </DialogTitle>
         <DialogContent dividers>
@@ -667,8 +680,10 @@ export default function AdminNewsletterPointGroupsPanel() {
         onClose={deleteDialog.deleting ? undefined : closeDelete}
         maxWidth="sm"
         fullWidth
+        aria-labelledby="delete-point-group-title"
+        PaperProps={dialogPaperProps}
       >
-        <DialogTitle>Delete Point Group?</DialogTitle>
+        <DialogTitle id="delete-point-group-title">Delete Point Group?</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={2}>
             <Typography>
