@@ -12,7 +12,12 @@
 // builder concept: a pure interval wait before an event.
 
 import { getEventLabel, isPlainObject } from "./mauticCampaignEventHydration.js";
-import { buildFlatExecutionEvents, executionEventId, persistedEventName } from "./mauticCampaignSavePayload.js";
+import {
+  buildFlatExecutionEvents,
+  executionEventId,
+  isPersistedEventId,
+  persistedEventName,
+} from "./mauticCampaignSavePayload.js";
 
 export const BRANCH_PATHS = ["yes", "no"];
 export const EVENT_NODE_TYPES = new Set(["action", "condition", "decision"]);
@@ -126,6 +131,17 @@ export const preservedTiming = (event) => {
   return preserved;
 };
 
+/**
+ * Mautic stores no trigger mode on a Decision (its builder hides timing for
+ * decisions, and the scheduler runs `null` exactly like "immediate"). A saved
+ * Decision without one is left without one, so a no-change save changes
+ * nothing; leaving the field out of the save keeps the stored value.
+ */
+const keepsStoredDecisionTiming = (event) =>
+  event?.eventType === "decision" &&
+  isPersistedEventId(event?.id) &&
+  !persistedTiming(event).triggerMode;
+
 export const timingLabel = (event) => {
   const preserved = preservedTiming(event);
   if (!preserved) return "";
@@ -237,7 +253,7 @@ export const mapCanvasToExecution = (canvasNodes, canvasEdges, form) => {
           executionEvent.triggerIntervalUnit = delay.unit;
         } else if (preserved) {
           Object.assign(executionEvent, preserved);
-        } else {
+        } else if (!keepsStoredDecisionTiming(event)) {
           executionEvent.triggerMode = "immediate";
         }
 

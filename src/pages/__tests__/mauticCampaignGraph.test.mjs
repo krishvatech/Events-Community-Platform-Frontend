@@ -388,3 +388,26 @@ test("a canvas re-saved by Mautic's own builder is no longer blocked", () => {
   assert.deepEqual(storedCanvasOrphans(repaired), []);
   assert.deepEqual(hydrate([ev(1, "action")], repaired).blockers, []);
 });
+
+test("a native Decision with no stored trigger mode is saved without one", () => {
+  // Mautic stores trigger_mode NULL on a Decision; a no-change save must not
+  // turn it into "immediate" (Mautic's scheduler treats both the same).
+  const events = [
+    ev(10, "action"),
+    ev(11, "decision", { parent: 10, mode: null }),
+    ev(12, "action", { parent: 11, path: "yes" }),
+  ];
+  const { events: saved, errors } = serialize(hydrate(events, {}), events);
+  assert.deepEqual(errors, []);
+  const payload = Object.fromEntries(buildEventsPayload(saved).map((e) => [e.id, e]));
+  assert.equal("triggerMode" in payload["11"], false, "the Decision's stored NULL is left alone");
+  assert.equal(payload["10"].triggerMode, "immediate", "actions keep their explicit mode");
+  assert.equal(payload["12"].triggerMode, "immediate");
+
+  // Stored modes, and new Decisions, are unchanged by the rule.
+  const stored = serialize(hydrate([ev(10, "action"), ev(11, "decision", { parent: 10 })], {}), [ev(10, "action"), ev(11, "decision", { parent: 10 })]);
+  assert.equal(stored.events.find((e) => e.id === "11").triggerMode, "immediate");
+  const fresh = [ev(10, "action"), { ...ev(11, "decision", { parent: 10, mode: null }), id: "event-new-11" }];
+  const created = serialize(hydrate(fresh, {}), fresh);
+  assert.equal(created.events.find((e) => e.eventType === "decision").triggerMode, "immediate");
+});

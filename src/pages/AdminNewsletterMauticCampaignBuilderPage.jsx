@@ -97,6 +97,7 @@ import {
   requiresProviderDeletion,
 } from "./mauticCampaignEventRemoval";
 import MauticRemoteChoiceField from "./MauticRemoteChoiceField";
+import { duplicateFailureMessage, duplicateSuccessMessage } from "./mauticCampaignDuplicate";
 import {
   createNativeMauticCampaign,
   deleteNativeMauticCampaignEvent,
@@ -1356,25 +1357,21 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     }
   };
 
+  // One click is one copy (the ref closes the gap before the button disables).
+  // The copy is made from the campaign as saved in Mautic, not from unsaved edits.
+  const duplicateInFlight = useRef(false);
   const duplicateCampaign = async () => {
-    if (!isEditMode || !campaignId) return;
+    if (!isEditMode || !campaignId || duplicateInFlight.current) return;
+    duplicateInFlight.current = true;
     setIsDuplicating(true);
-    setFormError("");
     try {
-      const duplicated = await duplicateNativeMauticCampaign(campaignId);
-      setSnack({
-        open: true,
-        severity: "success",
-        message: `Campaign duplicated. New ID: ${duplicated?.id}`,
-      });
-      setTimeout(() => {
-        navigate(`/admin/newsletter/builder/${duplicated?.id}`);
-      }, 1500);
+      const copy = await duplicateNativeMauticCampaign(campaignId);
+      setSnack({ open: true, severity: "success", message: duplicateSuccessMessage(copy) });
+      navigate(`/admin/newsletter/builder/${copy.id}`);
     } catch (err) {
-      setFormError(
-        getErrorMessage(err, "We could not duplicate this native Mautic Campaign.")
-      );
+      setSnack({ open: true, severity: "error", message: duplicateFailureMessage(err) });
     } finally {
+      duplicateInFlight.current = false;
       setIsDuplicating(false);
     }
   };
@@ -1438,15 +1435,23 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     {form.isPublished ? "Unpublish" : "Publish"}
                   </Button>
                 </Tooltip>
-                <Tooltip title="Create a copy of this campaign">
-                  <Button
-                    startIcon={isDuplicating ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />}
-                    onClick={duplicateCampaign}
-                    disabled={saving || isDuplicating}
-                    sx={{ textTransform: "none" }}
-                  >
-                    Duplicate
-                  </Button>
+                <Tooltip
+                  title={
+                    graphBlockers.length || legacyValueBlockers.length
+                      ? "This campaign cannot be copied until the problem shown above is fixed"
+                      : "Copy the campaign as saved into a new unpublished campaign"
+                  }
+                >
+                  <span>
+                    <Button
+                      startIcon={isDuplicating ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />}
+                      onClick={duplicateCampaign}
+                      disabled={saving || isDuplicating || graphBlockers.length > 0 || legacyValueBlockers.length > 0}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Duplicate
+                    </Button>
+                  </span>
                 </Tooltip>
                 <Tooltip title="Delete this campaign">
                   <Button
