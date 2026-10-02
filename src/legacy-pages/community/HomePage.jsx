@@ -4088,10 +4088,10 @@ function AboutTab({
                     disableGutters
                     secondaryAction={
                       <Box sx={{ display: "flex", gap: 1 }}>
-                        <IconButton size="small" onClick={() => onEditLanguage(l)}>
+                        <IconButton size="small" onClick={() => onEditLanguage(l)} aria-label="Edit language" sx={{ minWidth: 40, minHeight: 40 }}>
                           <EditOutlinedIcon fontSize="small" />
                         </IconButton>
-                        <IconButton size="small" onClick={() => deleteLanguage(l.id)}>
+                        <IconButton size="small" onClick={() => deleteLanguage(l.id)} aria-label="Delete language" sx={{ minWidth: 40, minHeight: 40 }}>
                           <DeleteOutlineRoundedIcon fontSize="small" />
                         </IconButton>
                       </Box>
@@ -4383,7 +4383,7 @@ function AboutTab({
                             </TextField>
                           </Grid>
                           <Grid item xs={1} sm={1}>
-                            <IconButton onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))}>
+                            <IconButton aria-label={`Remove email ${idx + 1}`} onClick={() => setContactForm((prev) => ({ ...prev, emails: prev.emails.filter((_, i) => i !== idx) }))} sx={{ minWidth: 40, minHeight: 40 }}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
                           </Grid>
@@ -4483,7 +4483,7 @@ function AboutTab({
                             />
                           </Grid>
                           <Grid item xs={4} sm={1}>
-                            <IconButton onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))}>
+                            <IconButton aria-label={`Remove phone number ${idx + 1}`} onClick={() => setContactForm((prev) => ({ ...prev, phones: prev.phones.filter((_, i) => i !== idx) }))} sx={{ minWidth: 40, minHeight: 40 }}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
                           </Grid>
@@ -4629,7 +4629,7 @@ function AboutTab({
                             </TextField>
                           </Grid>
                           <Grid item xs={5} sm={1}>
-                            <IconButton onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))}>
+                            <IconButton aria-label={`Remove website ${idx + 1}`} onClick={() => setContactForm((prev) => ({ ...prev, websites: prev.websites.filter((_, i) => i !== idx) }))} sx={{ minWidth: 40, minHeight: 40 }}>
                               <DeleteOutlineRoundedIcon fontSize="small" />
                             </IconButton>
                           </Grid>

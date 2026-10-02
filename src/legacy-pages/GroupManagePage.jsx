@@ -1876,7 +1876,9 @@ function GroupLikesDialog({ open, onClose, groupIdOrSlug, postId }) {
                         value={activeFilter}
                         onChange={(_, v) => setActiveFilter(v)}
                         variant="scrollable"
+                        scrollButtons="auto"
                         allowScrollButtonsMobile
+                        aria-label="Filter managed group post reactions"
                         sx={{ minHeight: 40 }}
                     >
                         <Tab

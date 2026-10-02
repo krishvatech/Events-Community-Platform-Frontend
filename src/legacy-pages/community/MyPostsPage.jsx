@@ -324,7 +324,7 @@ function PostComposer({ communityId, onCreate }) {
           )}
         </Stack>
       )}
-      {tab === "poll" && <Stack spacing={2}><TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Ask a question..." />{pollOptions.map((opt, i) => <Stack key={i} direction="row" spacing={1}><TextField fullWidth value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} placeholder={`Option ${i + 1}`} /><IconButton onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}><RemoveRoundedIcon /></IconButton></Stack>)}<Button onClick={() => setPollOptions((o) => [...o, ""])} startIcon={<AddRoundedIcon />} sx={{ alignSelf: "flex-start" }}>Add option</Button></Stack>}
+      {tab === "poll" && <Stack spacing={2}><TextField fullWidth multiline minRows={2} value={content} onChange={(e) => setContent(e.target.value)} placeholder="Ask a question..." inputProps={{ "aria-label": "Poll question" }} />{pollOptions.map((opt, i) => <Stack key={i} direction="row" spacing={1} sx={{ minWidth: 0 }}><TextField fullWidth value={opt} onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }} placeholder={`Option ${i + 1}`} inputProps={{ "aria-label": `Poll option ${i + 1}` }} sx={{ flex: 1, minWidth: 0 }} /><IconButton aria-label={`Remove poll option ${i + 1}`} onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2} sx={{ minWidth: 40, minHeight: 40, flexShrink: 0 }}><RemoveRoundedIcon /></IconButton></Stack>)}<Button onClick={() => setPollOptions((o) => [...o, ""])} startIcon={<AddRoundedIcon />} sx={{ alignSelf: "flex-start" }}>Add option</Button></Stack>}
       <Box sx={{ display: "flex", justifyContent: "flex-end" }}><Button variant="contained" endIcon={<SendRoundedIcon />} onClick={handleSubmit} disabled={!canSubmit}>Post</Button></Box>
     </Stack>
   );
@@ -1068,8 +1068,8 @@ function CommentsDialog({ open, postId, onClose, isPostOwner }) {
         <DialogActions sx={{ p: 2, display: "block" }}>
           {replyingTo && <Typography variant="caption" display="block" sx={{ mb: 1 }}>Replying... <span style={{ textDecoration: "underline", cursor: "pointer" }} onClick={() => setReplyingTo(null)}>Cancel</span></Typography>}
           <Stack direction="row" spacing={1}>
-            <TextField fullWidth size="small" placeholder="Write a comment..." value={text} onChange={e => setText(e.target.value)} />
-            <IconButton color="primary" onClick={handleSubmit}><SendRoundedIcon /></IconButton>
+            <TextField fullWidth size="small" placeholder="Write a comment..." value={text} onChange={e => setText(e.target.value)} inputProps={{ "aria-label": "Write a comment" }} />
+            <IconButton color="primary" onClick={handleSubmit} aria-label="Post comment" sx={{ minWidth: 40, minHeight: 40, flexShrink: 0 }}><SendRoundedIcon /></IconButton>
           </Stack>
         </DialogActions>
       </Dialog>
@@ -1202,7 +1202,9 @@ function LikesDialog({ open, postId, onClose }) {
             value={activeFilter}
             onChange={(_, v) => setActiveFilter(v)}
             variant="scrollable"
+            scrollButtons="auto"
             allowScrollButtonsMobile
+            aria-label="Filter post reactions"
           >
             <Tab
               value="all"
@@ -1469,6 +1471,7 @@ function ShareToFriendDialog({ open, onClose, postId, onSharedSuccessfully }) {
         variant="fullWidth"
         textColor="primary"
         indicatorColor="primary"
+        aria-label="Share post destination"
         sx={{ borderBottom: 1, borderColor: "divider" }}
       >
         <Tab label="Contacts" />
@@ -1480,6 +1483,7 @@ function ShareToFriendDialog({ open, onClose, postId, onSharedSuccessfully }) {
           <TextField
             fullWidth size="small" placeholder={tab === 0 ? "Search Contacts..." : "Search Groups..."}
             value={search} onChange={e => setSearch(e.target.value)}
+            inputProps={{ "aria-label": tab === 0 ? "Search contacts" : "Search groups" }}
             InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon fontSize="small" /></InputAdornment> }}
           />
         </Box>
@@ -1553,14 +1557,16 @@ function PostEditDialog({ open, post, onClose, onSaved }) { /* ... (unchanged) .
         <Stack spacing={1}>
           <Typography variant="subtitle2">Options</Typography>
           {pollOptions.map((opt, i) => (
-            <Stack key={i} direction="row" spacing={1}>
+            <Stack key={i} direction="row" spacing={1} sx={{ minWidth: 0 }}>
               <TextField
                 fullWidth
                 size="small"
                 value={opt}
                 onChange={(e) => { const n = [...pollOptions]; n[i] = e.target.value; setPollOptions(n); }}
+                inputProps={{ "aria-label": `Poll option ${i + 1}` }}
+                sx={{ flex: 1, minWidth: 0 }}
               />
-              <IconButton size="small" onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2}>
+              <IconButton size="small" aria-label={`Remove poll option ${i + 1}`} onClick={() => setPollOptions((o) => o.filter((_, x) => x !== i))} disabled={pollOptions.length <= 2} sx={{ minWidth: 40, minHeight: 40, flexShrink: 0 }}>
                 <RemoveRoundedIcon fontSize="small" />
               </IconButton>
             </Stack>

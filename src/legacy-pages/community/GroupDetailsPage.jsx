@@ -4998,7 +4998,7 @@ export default function GroupDetailsPage() {
         <DialogTitle>Reactions</DialogTitle>
         <DialogContent dividers>
           <Box sx={{ mb: 1, borderBottom: 1, borderColor: "divider" }}>
-            <Tabs value={likesFilter} onChange={(_, v) => setLikesFilter(v)} variant="scrollable" allowScrollButtonsMobile>
+            <Tabs value={likesFilter} onChange={(_, v) => setLikesFilter(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile aria-label="Filter group post reactions">
               <Tab value="all" label={`All (${likesReactionCounts.all || 0})`} />
               {POST_REACTIONS.map(r => (
                 <Tab key={r.id} value={r.id} label={

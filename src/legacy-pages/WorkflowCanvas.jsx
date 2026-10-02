@@ -82,7 +82,7 @@ function CanvasNode({ data, isConnectable }) {
       elevation={data.isSelected ? 6 : 1}
       sx={{
         position: "relative",
-        borderRadius: 1.5,
+        borderRadius: "var(--imaa-radius-card)",
         overflow: "hidden",
         width: 200,
         bgcolor: "#fff",
@@ -109,19 +109,20 @@ function CanvasNode({ data, isConnectable }) {
           <Tooltip title="Delete node">
             <IconButton
               size="small"
+              aria-label={`Delete ${data.eventName || data.typeLabel} node`}
               onClick={(e) => {
                 e.stopPropagation();
                 data.onDelete(data.nodeId);
               }}
               sx={{
                 color: "#fff",
-                p: 0.15,
-                width: 18,
-                height: 18,
+                p: 0.5,
+                width: 32,
+                height: 32,
                 "&:hover": { bgcolor: "rgba(0,0,0,0.25)" },
               }}
             >
-              <DeleteRoundedIcon sx={{ fontSize: 12 }} />
+              <DeleteRoundedIcon sx={{ fontSize: 16 }} />
             </IconButton>
           </Tooltip>
         )}
@@ -130,7 +131,7 @@ function CanvasNode({ data, isConnectable }) {
       <Stack spacing={0.5} sx={{ px: 1, py: 0.85 }}>
         <Typography
           variant="body2"
-          sx={{ fontWeight: 750, color: "#1B2A4A", lineHeight: 1.25 }}
+          sx={{ fontWeight: 750, color: "#1B2A4A", lineHeight: 1.25, overflowWrap: "anywhere" }}
         >
           {data.eventName}
         </Typography>
@@ -385,11 +386,15 @@ export default function WorkflowCanvas({
   return (
     <Box
       ref={canvasRef}
+      component="section"
+      aria-label="Campaign workflow canvas"
       sx={{
         width: "100%",
-        height: 550,
+        maxWidth: "100%",
+        minWidth: 0,
+        height: { xs: 480, sm: 550 },
         position: "relative",
-        borderRadius: 2,
+        borderRadius: "var(--imaa-radius-card)",
         overflow: "hidden",
         border: "1px solid #E7ECEF",
       }}
@@ -418,6 +423,9 @@ export default function WorkflowCanvas({
               textAlign: "center",
               pointerEvents: "none",
               zIndex: 5,
+              width: "100%",
+              maxWidth: 360,
+              px: 2,
             }}
           >
             <Typography variant="body2" color="textSecondary" sx={{ mb: 1 }}>
@@ -450,7 +458,7 @@ export default function WorkflowCanvas({
               }
               setAnchorEl(e.currentTarget);
             }}
-            sx={{ textTransform: "none" }}
+            sx={{ minHeight: 40, borderRadius: "var(--imaa-radius-field)", textTransform: "none" }}
           >
             Add Node
           </Button>
@@ -465,6 +473,7 @@ export default function WorkflowCanvas({
           menuPosition ? { top: menuPosition.y, left: menuPosition.x } : undefined
         }
         anchorReference="anchorPosition"
+        MenuListProps={{ "aria-label": "Add workflow node" }}
       >
         <MenuItem onClick={() => handleAddNode("trigger")}>
           <TriggerIcon sx={{ mr: 1 }} /> Trigger

@@ -3987,7 +3987,7 @@ export default function MessagesPage() {
                     >
                       {/* Header */}
                       <Stack direction="row" alignItems="center" sx={{ p: 2, zIndex: 2 }}>
-                        <IconButton onClick={handleClearAttachments}>
+                        <IconButton onClick={handleClearAttachments} aria-label="Close attachment preview" sx={{ minWidth: 44, minHeight: 44 }}>
                           <CloseRoundedIcon sx={{ fontSize: 30 }} />
                         </IconButton>
                         <Typography variant="h6" sx={{ ml: 2 }}>
@@ -4012,6 +4012,7 @@ export default function MessagesPage() {
                           <IconButton
                             onClick={() => setActivePreviewIndex((prev) => (prev > 0 ? prev - 1 : prev))}
                             disabled={activePreviewIndex === 0}
+                            aria-label="Previous attachment"
                             sx={{
                               position: "absolute",
                               left: 10,
@@ -4055,6 +4056,7 @@ export default function MessagesPage() {
                           <IconButton
                             onClick={() => setActivePreviewIndex((prev) => (prev < draftAttachments.length - 1 ? prev + 1 : prev))}
                             disabled={activePreviewIndex === draftAttachments.length - 1}
+                            aria-label="Next attachment"
                             sx={{
                               position: "absolute",
                               right: 10,
@@ -4135,6 +4137,7 @@ export default function MessagesPage() {
                         />
                         <IconButton
                           onClick={handleSend}
+                          aria-label="Send message"
                           sx={{
                             bgcolor: "#00a884",
                             color: "white",
@@ -4389,6 +4392,7 @@ export default function MessagesPage() {
                         <IconButton
                           onClick={handleAttachClick}
                           size="small"
+                          aria-label="Add attachment"
                           sx={{
                             bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.08)" : "transparent",
                             transition: "transform 0.2s",
@@ -4492,6 +4496,7 @@ export default function MessagesPage() {
         fullWidth
         maxWidth="sm"
         fullScreen={isMobileOrTablet}
+        aria-labelledby="chat-details-title"
         sx={{
           // 🔹 make paper full-width on mobile & remove side margins
           "& .MuiDialog-paper": {
@@ -4508,8 +4513,8 @@ export default function MessagesPage() {
             pr: 1,
           }}
         >
-          <Typography variant="h6">Chat details</Typography>
-          <IconButton size="small" onClick={() => setDetailsOpen(false)}>
+          <Typography id="chat-details-title" component="h2" variant="h6">Chat details</Typography>
+          <IconButton size="small" onClick={() => setDetailsOpen(false)} aria-label="Close chat details" sx={{ minWidth: 40, minHeight: 40 }}>
             <CloseRoundedIcon fontSize="small" />
           </IconButton>
         </DialogTitle>
@@ -4546,7 +4551,7 @@ export default function MessagesPage() {
         </MenuItem>
       </Menu>
       {/* 🔹 Camera Modal */}
-      <Dialog open={cameraOpen} onClose={handleCloseCamera} maxWidth="md">
+      <Dialog open={cameraOpen} onClose={handleCloseCamera} maxWidth="md" aria-label="Take a photo">
         <DialogContent sx={{ p: 0, bgcolor: "black", display: "flex", justifyContent: "center" }}>
           <video
             ref={videoRef}
@@ -4563,11 +4568,12 @@ export default function MessagesPage() {
           spacing={2}
           sx={{ p: 2, bgcolor: "#000" }}
         >
-          <IconButton onClick={handleCloseCamera} sx={{ color: "white" }}>
+          <IconButton onClick={handleCloseCamera} aria-label="Close camera" sx={{ color: "white", minWidth: 44, minHeight: 44 }}>
             <CloseRoundedIcon />
           </IconButton>
           <IconButton
             onClick={handleCapturePhoto}
+            aria-label="Capture photo"
             sx={{
               width: 60,
               height: 60,

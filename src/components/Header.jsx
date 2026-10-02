@@ -377,7 +377,13 @@ const Header = () => {
               <>
                 {!owner && (
                   <Tooltip title="Cart">
-                    <IconButton component={Link} to={staff ? "/admin/carts" : "/account/cart"} size="medium">
+                    <IconButton
+                      component={Link}
+                      to={staff ? "/admin/carts" : "/account/cart"}
+                      size="medium"
+                      aria-label={cartCount ? `Open cart, ${cartCount} item${cartCount === 1 ? "" : "s"}` : "Open cart"}
+                      sx={{ minWidth: 44, minHeight: 44 }}
+                    >
                       <Badge badgeContent={cartCount} color="error" invisible={!cartCount} max={99}>
                         <ShoppingCartOutlinedIcon fontSize="small" />
                       </Badge>

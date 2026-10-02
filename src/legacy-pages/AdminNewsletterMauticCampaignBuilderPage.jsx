@@ -111,6 +111,30 @@ const getErrorMessage = (err, fallback = "Something went wrong. Please try again
   return fallback;
 };
 
+const BUILDER_BORDER = "var(--imaa-border)";
+const builderSurfaceSx = {
+  borderRadius: "var(--imaa-radius-card)",
+  borderColor: BUILDER_BORDER,
+  boxShadow: "var(--imaa-shadow-sm)",
+  minWidth: 0,
+};
+const builderFieldSx = {
+  "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" },
+};
+const builderActionSx = {
+  minHeight: 40,
+  borderRadius: "var(--imaa-radius-field)",
+  textTransform: "none",
+};
+const builderDialogPaperProps = {
+  sx: {
+    m: { xs: 2, sm: 4 },
+    width: { xs: "calc(100% - 32px)", sm: "100%" },
+    maxHeight: { xs: "calc(100% - 32px)", sm: "calc(100% - 64px)" },
+    borderRadius: "var(--imaa-radius-card)",
+  },
+};
+
 const eventTypeLabel = (eventType) => {
   const normalized = String(eventType || "").toLowerCase();
   if (normalized === "action") return "Action";
@@ -172,7 +196,7 @@ const validateExecutionMapping = (canvasNodes, canvasEdges, form) => {
 
 function CapabilityGroup({ title, description, events, loading }) {
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2.5 }}>
+    <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2.5 }}>
       <Stack spacing={1.5}>
         <Box>
           <Typography variant="h6" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
@@ -259,15 +283,15 @@ function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading 
   return (
     <Paper
       variant="outlined"
-      sx={{ borderRadius: 2, borderColor: status?.complete ? "#E7ECEF" : "#FCA5A5", p: 2 }}
+      sx={{ ...builderSurfaceSx, borderColor: status?.complete ? BUILDER_BORDER : "#FCA5A5", p: 2 }}
     >
       <Stack spacing={2}>
-        <Stack direction="row" spacing={2} alignItems="flex-start" justifyContent="space-between">
-          <Box sx={{ flex: 1 }}>
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "flex-start" }} justifyContent="space-between">
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
               Selected Event Configuration
             </Typography>
-            <Typography color="text.secondary">
+            <Typography color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
               {getEventLabel(event.metadata)}
             </Typography>
           </Box>
@@ -291,7 +315,7 @@ function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading 
             <Typography variant="caption" color="text.secondary">
               Key
             </Typography>
-            <Typography component="code" variant="body2">
+            <Typography component="code" variant="body2" sx={{ overflowWrap: "anywhere" }}>
               {event.key}
             </Typography>
           </Box>
@@ -457,11 +481,11 @@ function CanvasNodeConfigPanel({
   const isDelay = node.nodeType === "delay";
 
   return (
-    <Stack spacing={2}>
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+    <Stack spacing={2} sx={{ minWidth: 0 }}>
+      <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2 }}>
         <Stack spacing={2}>
           <Stack direction="row" spacing={1} alignItems="flex-start" justifyContent="space-between">
-            <Box sx={{ flex: 1 }}>
+            <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography variant="caption" color="text.secondary">
                 Node Type
               </Typography>
@@ -531,7 +555,7 @@ function CanvasNodeConfigPanel({
                 Waits before running the next step. It is not sent to Mautic as an
                 event of its own.
               </Typography>
-              <Stack direction="row" spacing={1.5}>
+              <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={builderFieldSx}>
                 <TextField
                   label="Wait"
                   type="number"
@@ -592,7 +616,7 @@ function CanvasNodeConfigPanel({
             startIcon={<DeleteRoundedIcon />}
             onClick={() => onDeleteNode(node.id)}
             disabled={disabled}
-            sx={{ alignSelf: "flex-start" }}
+            sx={{ ...builderActionSx, alignSelf: "flex-start" }}
           >
             Delete Node
           </Button>
@@ -621,6 +645,8 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   const [capabilities, setCapabilities] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [campaignLoading, setCampaignLoading] = useState(Boolean(campaignId));
+  const [campaignError, setCampaignError] = useState("");
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
   const [snack, setSnack] = useState({
@@ -726,46 +752,61 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
 
 
   const loadCampaign = useCallback(async () => {
-    if (!campaignId) return;
+    if (!campaignId) {
+      setCampaignLoading(false);
+      setCampaignError("");
+      return;
+    }
 
-    const campaign = await getNativeMauticCampaignBuilder(campaignId);
+    setCampaignLoading(true);
+    setCampaignError("");
+    try {
+      const campaign = await getNativeMauticCampaignBuilder(campaignId);
 
-    // Only provider-owned state is persisted; labels and form schema come from
-    // the live capability definition, joined here by provider event key.
-    const events = hydrateWorkflowEvents(
-      (campaign?.events || []).map((event) => ({
-        id: String(event.id || workflowEventId()),
-        key: event.key,
-        eventType: event.eventType,
-        metadata: event.metadata,
-        properties: isPlainObject(event.properties) ? event.properties : {},
-      })),
-      capabilityIndexRef.current
-    );
+      // Only provider-owned state is persisted; labels and form schema come from
+      // the live capability definition, joined here by provider event key.
+      const events = hydrateWorkflowEvents(
+        (campaign?.events || []).map((event) => ({
+          id: String(event.id || workflowEventId()),
+          key: event.key,
+          eventType: event.eventType,
+          metadata: event.metadata,
+          properties: isPlainObject(event.properties) ? event.properties : {},
+        })),
+        capabilityIndexRef.current
+      );
 
-    // The workflow shown is the one Mautic runs: rebuilt from each event's
-    // parent and YES/NO path. The saved canvas only lends node positions.
-    const graph = hydrateCanvasFromEvents(events, campaign?.canvasSettings || {});
+      // The workflow shown is the one Mautic runs: rebuilt from each event's
+      // parent and YES/NO path. The saved canvas only lends node positions.
+      const graph = hydrateCanvasFromEvents(events, campaign?.canvasSettings || {});
 
-    setForm({
-      name: campaign?.name || "",
-      description: campaign?.description || "",
-      isPublished: Boolean(campaign?.isPublished),
-      lists: (campaign?.sources?.segments || []).map((item) => item.id).filter(Boolean),
-      forms: (campaign?.sources?.forms || []).map((item) => item.id).filter(Boolean),
-      events,
-      canvasSettings: {
-        nodes: graph.nodes,
-        edges: graph.edges,
-      },
-    });
-    setCanvasNodes(graph.nodes);
-    setGraphBlockers(graph.blockers);
-    setSelectedCanvasNodeId("");
+      setForm({
+        name: campaign?.name || "",
+        description: campaign?.description || "",
+        isPublished: Boolean(campaign?.isPublished),
+        lists: (campaign?.sources?.segments || []).map((item) => item.id).filter(Boolean),
+        forms: (campaign?.sources?.forms || []).map((item) => item.id).filter(Boolean),
+        events,
+        canvasSettings: {
+          nodes: graph.nodes,
+          edges: graph.edges,
+        },
+      });
+      setCanvasNodes(graph.nodes);
+      setGraphBlockers(graph.blockers);
+      setSelectedCanvasNodeId("");
+    } catch (err) {
+      setCampaignError(
+        getErrorMessage(err, "We could not load this native Mautic Campaign.")
+      );
+      throw err;
+    } finally {
+      setCampaignLoading(false);
+    }
   }, [campaignId]);
 
   useEffect(() => {
-    loadCampaign();
+    loadCampaign().catch(() => {});
   }, [loadCampaign]);
 
   // Campaign detail and capabilities load independently, so rejoin saved events
@@ -1299,12 +1340,16 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   };
 
   return (
-    <Stack spacing={3}>
-      <Box>
+    <Stack
+      spacing={3}
+      sx={{ width: "100%", minWidth: 0 }}
+      aria-busy={loading || campaignLoading || saving ? "true" : undefined}
+    >
+      <Box sx={{ minWidth: 0 }}>
         <Button
           startIcon={<ArrowBackRoundedIcon />}
           onClick={() => navigate("/admin/newsletter/campaigns")}
-          sx={{ textTransform: "none", mb: 1 }}
+          sx={{ ...builderActionSx, mb: 1 }}
         >
           Back to Campaigns
         </Button>
@@ -1313,9 +1358,9 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           justifyContent="space-between"
           spacing={2}
         >
-          <Box sx={{ flex: 1 }}>
-            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 0.75 }}>
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 0.75 }}>
+              <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: "var(--imaa-ink)", overflowWrap: "anywhere" }}>
                 {isEditMode ? "Edit Native Mautic Campaign" : "Native Mautic Campaign Builder"}
               </Typography>
               {isEditMode && (
@@ -1331,7 +1376,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               {isEditMode ? "Update provider-owned Mautic Campaign." : "Create provider-owned Campaign drafts and inspect runtime Mautic Builder capabilities."}
             </Typography>
           </Box>
-          <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ alignSelf: "flex-start" }}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ alignSelf: "flex-start", width: { xs: "100%", md: "auto" }, "& .MuiButton-root": builderActionSx }}>
             <Button
               startIcon={<RefreshRoundedIcon />}
               onClick={loadCapabilities}
@@ -1346,7 +1391,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   <Button
                     startIcon={form.isPublished ? <UnpublishedRoundedIcon /> : <PublishRoundedIcon />}
                     onClick={form.isPublished ? unpublishCampaign : publishCampaign}
-                    disabled={saving || isDuplicating || (!form.isPublished && graphBlockers.length > 0)}
+                    disabled={saving || campaignLoading || isDuplicating || (!form.isPublished && graphBlockers.length > 0)}
                     variant="outlined"
                     sx={{ textTransform: "none" }}
                   >
@@ -1357,7 +1402,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   <Button
                     startIcon={isDuplicating ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />}
                     onClick={duplicateCampaign}
-                    disabled={saving || isDuplicating}
+                    disabled={saving || campaignLoading || isDuplicating}
                     sx={{ textTransform: "none" }}
                   >
                     Duplicate
@@ -1368,7 +1413,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     color="error"
                     startIcon={<DeleteRoundedIcon />}
                     onClick={() => setDeleteConfirmOpen(true)}
-                    disabled={saving || isDeleting}
+                    disabled={saving || campaignLoading || isDeleting}
                     sx={{ textTransform: "none" }}
                   >
                     Delete
@@ -1393,6 +1438,35 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         </Alert>
       )}
 
+      {campaignError && (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => loadCampaign().catch(() => {})}>
+              Retry
+            </Button>
+          }
+        >
+          {campaignError}
+        </Alert>
+      )}
+
+      {(loading || campaignLoading) && (
+        <Stack
+          direction="row"
+          spacing={1.25}
+          alignItems="center"
+          role="status"
+          aria-live="polite"
+          sx={{ color: "text.secondary" }}
+        >
+          <CircularProgress size={20} />
+          <Typography variant="body2">
+            {campaignLoading ? "Loading campaign workflow…" : "Loading Mautic Builder capabilities…"}
+          </Typography>
+        </Stack>
+      )}
+
       {capabilities?.builder_metadata?.available === false && (
         <Alert severity="warning" variant="outlined">
           {capabilities.builder_metadata.reason ||
@@ -1400,16 +1474,24 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         </Alert>
       )}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF" }}>
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Tabs value={builderTab} onChange={(e, val) => setBuilderTab(val)}>
+      <Paper variant="outlined" sx={{ ...builderSurfaceSx, overflow: "hidden" }}>
+        <Box sx={{ borderBottom: 1, borderColor: "divider", minWidth: 0 }}>
+          <Tabs
+            value={builderTab}
+            onChange={(e, val) => setBuilderTab(val)}
+            variant="scrollable"
+            scrollButtons="auto"
+            allowScrollButtonsMobile
+            aria-label="Campaign builder sections"
+            sx={{ maxWidth: "100%", "& .MuiTab-root": { minHeight: 44, textTransform: "none" } }}
+          >
             <Tab label="Edit" value="edit" />
             <Tab label="Workflow Events" value="workflow-events" />
             <Tab label="Canvas" value="canvas" />
           </Tabs>
         </Box>
 
-        <Stack spacing={2.5} component="form" onSubmit={createCampaign} sx={{ p: 2.5 }}>
+        <Stack spacing={2.5} component="form" onSubmit={createCampaign} sx={{ p: { xs: 2, sm: 2.5 }, minWidth: 0, ...builderFieldSx }}>
           {formError && <Alert severity="error">{formError}</Alert>}
           {graphBlockers.length > 0 && (
             <Alert severity="error">
@@ -1512,7 +1594,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                 label={form.isPublished ? "Published" : "Draft / Unpublished"}
               />
 
-              <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+              <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2 }}>
                 <Stack spacing={2}>
                   <Box>
                     <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
@@ -1538,7 +1620,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                         <Typography variant="caption" color="text.secondary">
                           Description
                         </Typography>
-                        <Typography variant="body2">
+                        <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
                           {form.description}
                         </Typography>
                       </Box>
@@ -1594,7 +1676,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                 </Box>
               </Stack>
 
-              <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+              <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2 }}>
                 <Stack spacing={2}>
                   <Box>
                     <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
@@ -1677,7 +1759,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                 capabilitiesLoading={loading}
               />
 
-              <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", p: 2 }}>
+              <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2 }}>
                 <Stack spacing={2}>
                   <Box>
                     <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
@@ -1693,9 +1775,9 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                       {form.events.map((event, index) => {
                         const status = eventConfigurationStatus(event);
                         return (
-                          <Stack key={event.id} direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-                            <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: 1 }}>
-                              <Typography variant="body2">
+                          <Stack key={event.id} direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ xs: "stretch", sm: "center" }} justifyContent="space-between">
+                            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ flex: 1, minWidth: 0 }}>
+                              <Typography variant="body2" sx={{ overflowWrap: "anywhere" }}>
                                 {index + 1}. {getEventLabel(event.metadata)}
                               </Typography>
                               <Chip
@@ -1705,7 +1787,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                                 size="small"
                               />
                             </Stack>
-                            <Stack direction="row" spacing={1}>
+                            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                               <Button
                                 type="button"
                                 variant="outlined"
@@ -1772,7 +1854,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   />
                 </Box>
 
-                <Box sx={{ width: { xs: "100%", lg: 380 }, flexShrink: 0 }}>
+                <Box component="aside" aria-label="Selected canvas node configuration" sx={{ width: { xs: "100%", lg: 380 }, minWidth: 0, flexShrink: 0 }}>
                   <CanvasNodeConfigPanel
                     node={selectedCanvasNode}
                     events={form.events}
@@ -1810,7 +1892,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                 setSelectedCanvasNodeId("");
                 setBuilderTab("edit");
               }}
-              disabled={saving}
+              disabled={saving || campaignLoading}
             >
               Reset
             </Button>
@@ -1818,7 +1900,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               type="submit"
               variant="contained"
               startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />}
-              disabled={saving || graphBlockers.length > 0}
+              disabled={saving || campaignLoading || graphBlockers.length > 0}
             >
               {isEditMode ? "Update Campaign" : "Create Campaign"}
             </Button>
@@ -1858,15 +1940,17 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         onClose={() => !removingEvent && setRemoveEventTarget(null)}
         maxWidth="sm"
         fullWidth
+        aria-labelledby="remove-workflow-event-title"
+        PaperProps={builderDialogPaperProps}
       >
-        <DialogTitle>Remove this workflow event from the campaign?</DialogTitle>
+        <DialogTitle id="remove-workflow-event-title">Remove this workflow event from the campaign?</DialogTitle>
         <DialogContent>
           <Typography>
             "{removeEventTarget?.label}" will be removed from this campaign. Any
             steps that followed it will no longer follow it.
           </Typography>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
           <Button onClick={() => setRemoveEventTarget(null)} disabled={removingEvent}>
             Cancel
           </Button>
@@ -1884,14 +1968,14 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteConfirmOpen} onClose={() => !isDeleting && setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>Delete Native Mautic Campaign?</DialogTitle>
+      <Dialog open={deleteConfirmOpen} onClose={() => !isDeleting && setDeleteConfirmOpen(false)} maxWidth="sm" fullWidth aria-labelledby="delete-mautic-campaign-title" PaperProps={builderDialogPaperProps}>
+        <DialogTitle id="delete-mautic-campaign-title">Delete Native Mautic Campaign?</DialogTitle>
         <DialogContent>
           <Typography>
             This removes the campaign from Mautic and is not reversible.
           </Typography>
         </DialogContent>
-        <DialogActions>
+        <DialogActions sx={{ flexWrap: "wrap", gap: 1 }}>
           <Button onClick={() => setDeleteConfirmOpen(false)} disabled={isDeleting}>
             Cancel
           </Button>
