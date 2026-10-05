@@ -11,7 +11,8 @@ import {
   Avatar, Box, Button, Chip, LinearProgress,
   MenuItem, Paper, Snackbar, Alert, Stack, TextField, Typography, Pagination, Dialog,
   DialogTitle, DialogContent, DialogActions, Popper, Skeleton, Container, Tooltip,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Divider, Tabs, Tab
+  Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Switch, Divider, Tabs, Tab,
+  useMediaQuery, useTheme
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import CloudSyncRoundedIcon from "@mui/icons-material/CloudSyncRounded";
@@ -1064,7 +1065,62 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
   );
 }
 
+// WordPress sync tables below md (where the sidebar collapses to a menu): one stacked card per row
+// instead of a 7–11 column table. The page is client-only, so the first render already matches.
+const useCompactSyncLayout = () => {
+  const theme = useTheme();
+  return useMediaQuery(theme.breakpoints.down("md"), { noSsr: true });
+};
+
+function WpSyncCompactItem({ title, slug, stats, status, actions }) {
+  return (
+    <Box component="li" className="py-3">
+      <Typography variant="body2" className="font-semibold text-slate-800" sx={{ overflowWrap: "break-word" }}>
+        {title}
+      </Typography>
+      <Typography variant="caption" className="text-slate-500 block" sx={{ overflowWrap: "anywhere" }}>
+        {slug || "—"}
+      </Typography>
+      <Box sx={{ mt: 1, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(84px, 1fr))", gap: 1 }}>
+        {stats.map(([label, value]) => (
+          <Box key={label} sx={{ minWidth: 0 }}>
+            <Typography variant="caption" className="text-slate-500 block">{label}</Typography>
+            <Typography variant="body2" className="font-semibold text-slate-800">{value}</Typography>
+          </Box>
+        ))}
+      </Box>
+      <Box sx={{ mt: 1.5, minWidth: 0 }}>{status}</Box>
+      <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center" sx={{ mt: 1.5 }}>
+        {actions}
+      </Stack>
+    </Box>
+  );
+}
+
+// "Connect Group" cell, shared by both WordPress tables and their compact lists
+function WpConnectLink({ row }) {
+  return row.linked_group_id ? (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Chip size="small" color="success" label="Linked" />
+      <Typography variant="caption" className="text-slate-500">
+        {row.linked_group_name || `#${row.linked_group_id}`}
+      </Typography>
+    </Stack>
+  ) : (
+    <Chip size="small" label="Not created" className="bg-slate-100 text-slate-500" />
+  );
+}
+
+function WpSyncCompactList({ label, children }) {
+  return (
+    <Box component="ul" aria-label={label} className="divide-y divide-slate-200" sx={{ listStyle: "none", m: 0, p: 0 }}>
+      {children}
+    </Box>
+  );
+}
+
 function WordPressGroupSyncPanel({ token }) {
+  const compact = useCompactSyncLayout();
   const [items, setItems] = React.useState([]);
   const [count, setCount] = React.useState(0);
   const [search, setSearch] = React.useState("");
@@ -1469,6 +1525,48 @@ function WordPressGroupSyncPanel({ token }) {
     }
   };
 
+  // Row controls shared by the table and the compact (phone/tablet) list
+  const renderSyncSwitch = (row) => (
+    <Switch
+      checked={!!row.sync_enabled}
+      onChange={(e) => toggleSync(row, e.target.checked)}
+      inputProps={{ "aria-label": `Toggle sync for ${row.name}` }}
+    />
+  );
+  const renderMembersButton = (row, label = "Sync") => (
+    <Button
+      size="small"
+      variant="outlined"
+      disabled={!row.sync_enabled || !row.linked_group_id || syncingMemberId === row.wp_group_id || syncingMembers || syncingContent}
+      onClick={() => syncOneMembers(row)}
+      sx={{ textTransform: "none" }}
+    >
+      {syncingMemberId === row.wp_group_id ? "Syncing…" : label}
+    </Button>
+  );
+  const renderToWpButton = (row) => (
+    <Button
+      size="small"
+      variant="outlined"
+      disabled={!row.sync_enabled || !row.linked_group_id || syncingToWordPressId === row.wp_group_id || syncingMemberId === row.wp_group_id || syncingMembers || syncingContent}
+      onClick={() => syncOneToWordPress(row)}
+      sx={{ textTransform: "none" }}
+    >
+      {syncingToWordPressId === row.wp_group_id ? "Syncing…" : "Sync to WP"}
+    </Button>
+  );
+  const renderContentButton = (row) => (
+    <Button
+      size="small"
+      variant="outlined"
+      disabled={!row.sync_enabled || !row.linked_group_id || syncingContentId === row.wp_group_id || syncingToWordPressId === row.wp_group_id || syncingContent || syncingMembers}
+      onClick={() => syncOneContent(row)}
+      sx={{ textTransform: "none" }}
+    >
+      {syncingContentId === row.wp_group_id ? "Importing…" : "Full Import"}
+    </Button>
+  );
+
   return (
     <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-6 overflow-hidden">
       <Box className="p-4 flex flex-col gap-3">
@@ -1639,6 +1737,39 @@ function WordPressGroupSyncPanel({ token }) {
               No WordPress groups imported yet. Click “Refresh from WP” after WP API credentials are configured.
             </Typography>
           </Box>
+        ) : compact ? (
+          <WpSyncCompactList label="Imported WordPress groups">
+            {items.map((row) => (
+              <WpSyncCompactItem
+                key={row.wp_group_id}
+                title={row.name}
+                slug={row.slug}
+                stats={[
+                  ["WP ID", row.wp_group_id],
+                  ["WP Members", row.member_count ?? 0],
+                  ["Synced", row.synced_member_count ?? 0],
+                  ["WP Posts", row.synced_post_count ?? 0],
+                ]}
+                status={
+                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" alignItems="center">
+                    <Chip size="small" label={row.status || "unknown"} className="bg-slate-100 text-slate-700" />
+                    <WpConnectLink row={row} />
+                  </Stack>
+                }
+                actions={
+                  <>
+                    <Stack component="label" direction="row" alignItems="center" sx={{ cursor: "pointer" }}>
+                      <Typography variant="caption" className="text-slate-500">Sync</Typography>
+                      {renderSyncSwitch(row)}
+                    </Stack>
+                    {renderMembersButton(row, "Sync members")}
+                    {renderToWpButton(row)}
+                    {renderContentButton(row)}
+                  </>
+                }
+              />
+            ))}
+          </WpSyncCompactList>
         ) : (
           <TableContainer>
             <Table size="small">
@@ -1673,59 +1804,22 @@ function WordPressGroupSyncPanel({ token }) {
                       <Chip size="small" label={row.status || "unknown"} className="bg-slate-100 text-slate-700" />
                     </TableCell>
                     <TableCell>
-                      {row.linked_group_id ? (
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip size="small" color="success" label="Linked" />
-                          <Typography variant="caption" className="text-slate-500">
-                            {row.linked_group_name || `#${row.linked_group_id}`}
-                          </Typography>
-                        </Stack>
-                      ) : (
-                        <Chip size="small" label="Not created" className="bg-slate-100 text-slate-500" />
-                      )}
+                      <WpConnectLink row={row} />
                     </TableCell>
                     <TableCell align="right">{row.member_count ?? 0}</TableCell>
                     <TableCell align="right">{row.synced_member_count ?? 0}</TableCell>
                     <TableCell align="right">{row.synced_post_count ?? 0}</TableCell>
                     <TableCell align="center">
-                      <Switch
-                        checked={!!row.sync_enabled}
-                        onChange={(e) => toggleSync(row, e.target.checked)}
-                        inputProps={{ "aria-label": `Toggle sync for ${row.name}` }}
-                      />
+                      {renderSyncSwitch(row)}
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={!row.sync_enabled || !row.linked_group_id || syncingMemberId === row.wp_group_id || syncingMembers || syncingContent}
-                        onClick={() => syncOneMembers(row)}
-                        sx={{ textTransform: "none" }}
-                      >
-                        {syncingMemberId === row.wp_group_id ? "Syncing…" : "Sync"}
-                      </Button>
+                      {renderMembersButton(row)}
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={!row.sync_enabled || !row.linked_group_id || syncingToWordPressId === row.wp_group_id || syncingMemberId === row.wp_group_id || syncingMembers || syncingContent}
-                        onClick={() => syncOneToWordPress(row)}
-                        sx={{ textTransform: "none" }}
-                      >
-                        {syncingToWordPressId === row.wp_group_id ? "Syncing…" : "Sync to WP"}
-                      </Button>
+                      {renderToWpButton(row)}
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        size="small"
-                        variant="outlined"
-                        disabled={!row.sync_enabled || !row.linked_group_id || syncingContentId === row.wp_group_id || syncingToWordPressId === row.wp_group_id || syncingContent || syncingMembers}
-                        onClick={() => syncOneContent(row)}
-                        sx={{ textTransform: "none" }}
-                      >
-                        {syncingContentId === row.wp_group_id ? "Importing…" : "Full Import"}
-                      </Button>
+                      {renderContentButton(row)}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -1769,6 +1863,7 @@ function WordPressGroupSyncPanel({ token }) {
 }
 
 function WordPressPublicForumSyncPanel({ token }) {
+  const compact = useCompactSyncLayout();
   const [items, setItems] = React.useState([]);
   const [count, setCount] = React.useState(0);
   const [search, setSearch] = React.useState("");
@@ -1927,6 +2022,32 @@ function WordPressPublicForumSyncPanel({ token }) {
     }
   };
 
+  // Row actions shared by the table and the compact (phone/tablet) list
+  const renderCreateButton = (row) => (
+    <Button
+      size="small"
+      type="button"
+      variant="outlined"
+      disabled={!!actionId}
+      onClick={(event) => { event.stopPropagation(); createForumGroup(row); }}
+      sx={{ textTransform: "none" }}
+    >
+      {actionId === `group-${row.wp_forum_id}` ? "Creating…" : row.linked_group_id ? "Update" : "Create"}
+    </Button>
+  );
+  const renderImportButton = (row) => (
+    <Button
+      size="small"
+      type="button"
+      variant="contained"
+      disabled={!row.linked_group_id || !!actionId}
+      onClick={(event) => { event.stopPropagation(); importForumContent(row); }}
+      sx={{ textTransform: "none" }}
+    >
+      {actionId === `import-${row.wp_forum_id}` ? "Importing…" : "Import"}
+    </Button>
+  );
+
   return (
     <Paper elevation={0} className="rounded-2xl border border-slate-200 bg-white p-4">
       <Box className="space-y-4">
@@ -2009,6 +2130,28 @@ function WordPressPublicForumSyncPanel({ token }) {
               No public forums loaded yet. Click “Refresh Forums” after the Forum Content API plugin is installed.
             </Typography>
           </Box>
+        ) : compact ? (
+          <WpSyncCompactList label="Public WordPress forums">
+            {items.map((row) => (
+              <WpSyncCompactItem
+                key={row.wp_forum_id}
+                title={row.title}
+                slug={row.slug}
+                stats={[
+                  ["WP ID", row.wp_forum_id],
+                  ["Topics", Number(row.topic_count || 0).toLocaleString()],
+                  ["Replies", Number(row.reply_count || 0).toLocaleString()],
+                ]}
+                status={<WpConnectLink row={row} />}
+                actions={
+                  <>
+                    {renderCreateButton(row)}
+                    {renderImportButton(row)}
+                  </>
+                }
+              />
+            ))}
+          </WpSyncCompactList>
         ) : (
           <TableContainer>
             <Table size="small">
@@ -2038,40 +2181,13 @@ function WordPressPublicForumSyncPanel({ token }) {
                     <TableCell align="right">{Number(row.topic_count || 0).toLocaleString()}</TableCell>
                     <TableCell align="right">{Number(row.reply_count || 0).toLocaleString()}</TableCell>
                     <TableCell>
-                      {row.linked_group_id ? (
-                        <Stack direction="row" spacing={1} alignItems="center">
-                          <Chip size="small" color="success" label="Linked" />
-                          <Typography variant="caption" className="text-slate-500">
-                            {row.linked_group_name || `#${row.linked_group_id}`}
-                          </Typography>
-                        </Stack>
-                      ) : (
-                        <Chip size="small" label="Not created" className="bg-slate-100 text-slate-500" />
-                      )}
+                      <WpConnectLink row={row} />
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        size="small"
-                        type="button"
-                        variant="outlined"
-                        disabled={!!actionId}
-                        onClick={(event) => { event.stopPropagation(); createForumGroup(row); }}
-                        sx={{ textTransform: "none" }}
-                      >
-                        {actionId === `group-${row.wp_forum_id}` ? "Creating…" : row.linked_group_id ? "Update" : "Create"}
-                      </Button>
+                      {renderCreateButton(row)}
                     </TableCell>
                     <TableCell align="center">
-                      <Button
-                        size="small"
-                        type="button"
-                        variant="contained"
-                        disabled={!row.linked_group_id || !!actionId}
-                        onClick={(event) => { event.stopPropagation(); importForumContent(row); }}
-                        sx={{ textTransform: "none" }}
-                      >
-                        {actionId === `import-${row.wp_forum_id}` ? "Importing…" : "Import"}
-                      </Button>
+                      {renderImportButton(row)}
                     </TableCell>
                   </TableRow>
                 ))}

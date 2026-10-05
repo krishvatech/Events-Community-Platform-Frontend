@@ -18,6 +18,8 @@ import {
   TableCell,
   TableHead,
   TableRow,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
@@ -38,6 +40,10 @@ import { colors, radii, semanticColors } from '../styles/designTokens';
 
 const VirtualSpeakersPage = () => {
   const navigate = useNavigate();
+  const theme = useTheme();
+  // Below md (where the sidebar collapses to a menu) speakers are shown as a stacked list instead of
+  // the table, which needs ~760px. The page is client-only, so the first render already matches.
+  const isCompact = useMediaQuery(theme.breakpoints.down('md'), { noSsr: true });
 
   // Role-based access control: Super Admin only
   useEffect(() => {
@@ -166,6 +172,73 @@ const VirtualSpeakersPage = () => {
     s.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  // Shared by the table and the compact list
+  const renderStatus = (speaker, emailSx) => (
+    <>
+      <AdminStatusChip
+        status={speaker.status || 'virtual'}
+        label={
+          speaker.status === 'converted'
+            ? '✓ User Account'
+            : 'Virtual'
+        }
+        color={speaker.status === 'converted' ? 'success' : 'default'}
+        size="small"
+        variant="outlined"
+      />
+      {speaker.is_converted && speaker.invited_email && (
+        <Typography variant="caption" display="block" color="textSecondary" sx={{ mt: 0.5, ...emailSx }}>
+          {speaker.invited_email}
+        </Typography>
+      )}
+    </>
+  );
+
+  const renderActions = (speaker) => (
+    <>
+      <IconButton
+        size="small"
+        onClick={() => handleEdit(speaker)}
+        title="Edit"
+        aria-label={`Edit ${speaker.name}`}
+        sx={{ minWidth: 40, minHeight: 40 }}
+      >
+        <EditRoundedIcon fontSize="small" />
+      </IconButton>
+      <IconButton
+        size="small"
+        color="error"
+        onClick={() => handleDeleteClick(speaker)}
+        title="Delete"
+        aria-label={`Delete ${speaker.name}`}
+        sx={{ minWidth: 40, minHeight: 40 }}
+      >
+        <DeleteRoundedIcon fontSize="small" />
+      </IconButton>
+
+      {speaker.status !== 'converted' ? (
+        <Button
+          size="small"
+          startIcon={<PersonAddRoundedIcon />}
+          onClick={() => handleConvert(speaker)}
+          variant="text"
+          sx={{ minHeight: 40 }}
+        >
+          Convert
+        </Button>
+      ) : (
+        <Button
+          size="small"
+          onClick={() => handleResendInvite(speaker)}
+          variant="text"
+          sx={{ minHeight: 40 }}
+        >
+          Resend Invite
+        </Button>
+      )}
+    </>
+  );
+
   return (
     <>
     <Box sx={{ width: '100%', minWidth: 0, p: { xs: 2, md: 3 } }}>
@@ -238,10 +311,55 @@ const VirtualSpeakersPage = () => {
             }
             minWidth={760}
           >
+            {isCompact ? (
+              <Box component="ul" aria-label="Virtual speakers" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+                {filteredSpeakers.map((speaker) => (
+                  <Box
+                    component="li"
+                    key={speaker.id}
+                    sx={{
+                      p: 2,
+                      '&:not(:first-of-type)': { borderTop: `1px solid ${semanticColors.border}` },
+                    }}
+                  >
+                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                      <Avatar
+                        src={speaker.profile_image_url}
+                        alt={speaker.name}
+                        sx={{ width: 44, height: 44 }}
+                      >
+                        {speaker.name.charAt(0)}
+                      </Avatar>
+                      <Box sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'break-word' }}>
+                          {speaker.name}
+                        </Typography>
+                        {(speaker.job_title || speaker.company) && (
+                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, overflowWrap: 'break-word' }}>
+                            {[speaker.job_title, speaker.company].filter(Boolean).join(' · ')}
+                          </Typography>
+                        )}
+                        {speaker.bio && (
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, overflowWrap: 'break-word' }}>
+                            {speaker.bio.substring(0, 50)}...
+                          </Typography>
+                        )}
+                        <Box sx={{ mt: 1 }}>
+                          {renderStatus(speaker, { overflowWrap: 'anywhere' })}
+                        </Box>
+                        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 1, ml: -1 }}>
+                          {renderActions(speaker)}
+                        </Stack>
+                      </Box>
+                    </Stack>
+                  </Box>
+                ))}
+              </Box>
+            ) : (
             <Table aria-label="Virtual speakers">
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600, minWidth: 220 }}>Name</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Job Title</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
@@ -260,12 +378,14 @@ const VirtualSpeakersPage = () => {
                         >
                           {speaker.name.charAt(0)}
                         </Avatar>
+                        {/* break-word, not anywhere: in a table, "anywhere" lets the column shrink until
+                            names break after every few letters */}
                         <Box sx={{ minWidth: 0, maxWidth: 300 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'anywhere' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'break-word' }}>
                             {speaker.name}
                           </Typography>
                           {speaker.bio && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, overflowWrap: 'anywhere' }}>
+                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, overflowWrap: 'break-word' }}>
                               {speaker.bio.substring(0, 50)}...
                             </Typography>
                           )}
@@ -283,71 +403,18 @@ const VirtualSpeakersPage = () => {
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      <AdminStatusChip
-                        status={speaker.status || 'virtual'}
-                        label={
-                          speaker.status === 'converted'
-                            ? '✓ User Account'
-                            : 'Virtual'
-                        }
-                        color={speaker.status === 'converted' ? 'success' : 'default'}
-                        size="small"
-                        variant="outlined"
-                      />
-                      {speaker.is_converted && speaker.invited_email && (
-                        <Typography variant="caption" display="block" color="textSecondary" sx={{ mt: 0.5 }}>
-                          {speaker.invited_email}
-                        </Typography>
-                      )}
+                      {renderStatus(speaker)}
                     </TableCell>
                     <TableCell align="right">
                       <Stack direction="row" spacing={0.5} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleEdit(speaker)}
-                          title="Edit"
-                          aria-label={`Edit ${speaker.name}`}
-                          sx={{ minWidth: 40, minHeight: 40 }}
-                        >
-                          <EditRoundedIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleDeleteClick(speaker)}
-                          title="Delete"
-                          aria-label={`Delete ${speaker.name}`}
-                          sx={{ minWidth: 40, minHeight: 40 }}
-                        >
-                          <DeleteRoundedIcon fontSize="small" />
-                        </IconButton>
-
-                        {speaker.status !== 'converted' ? (
-                          <Button
-                            size="small"
-                            startIcon={<PersonAddRoundedIcon />}
-                            onClick={() => handleConvert(speaker)}
-                            variant="text"
-                            sx={{ minHeight: 40 }}
-                          >
-                            Convert
-                          </Button>
-                        ) : (
-                          <Button
-                            size="small"
-                            onClick={() => handleResendInvite(speaker)}
-                            variant="text"
-                            sx={{ minHeight: 40 }}
-                          >
-                            Resend Invite
-                          </Button>
-                        )}
+                        {renderActions(speaker)}
                       </Stack>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            )}
           </AdminTableShell>
         )}
       </Box>

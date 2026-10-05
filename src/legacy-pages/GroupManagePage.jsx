@@ -5516,7 +5516,7 @@ export default function GroupManagePage() {
                                                                     key={m.user.id}
                                                                     direction="row"
                                                                     alignItems="center"
-                                                                    spacing={2}
+                                                                    spacing={{ xs: 1.5, sm: 2 }}
                                                                     role="button"
                                                                     tabIndex={0}
                                                                     onClick={() => openMemberProfile(m)}
@@ -5544,16 +5544,18 @@ export default function GroupManagePage() {
                                                                     }}
                                                                 >
                                                                     <Avatar src={toAbs(m.user.avatar)}>{(m.user.name || "U").slice(0, 1).toUpperCase()}</Avatar>
-                                                                    <Box sx={{ flex: 1 }}>
+                                                                    {/* minWidth 0 lets the text shrink so the role badge and menu stay inside the card;
+                                                                        on phones the email and dates stack and long emails wrap */}
+                                                                    <Box sx={{ flex: 1, minWidth: 0 }}>
                                                                         <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                                            <Typography className="font-medium">{m.user.name || m.user.email || m.user.id}</Typography>
+                                                                            <Typography className="font-medium" sx={{ overflowWrap: "anywhere" }}>{m.user.name || m.user.email || m.user.id}</Typography>
                                                                             {m.user?.kyc_status === "approved" && (
-                                                                                (<VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee" }} />) // Cyan verified icon
+                                                                                (<VerifiedIcon sx={{ fontSize: 16, color: "#22d3ee", flexShrink: 0 }} />) // Cyan verified icon
                                                                             )}
                                                                         </Stack>
-                                                                        <Stack direction="row" spacing={2}>
+                                                                        <Stack direction={{ xs: "column", sm: "row" }} spacing={{ xs: 0, sm: 2 }}>
                                                                             {m.user.email && (
-                                                                                <Typography variant="caption" className="text-slate-500">{m.user.email}</Typography>
+                                                                                <Typography variant="caption" className="text-slate-500" sx={{ overflowWrap: "anywhere" }}>{m.user.email}</Typography>
                                                                             )}
                                                                             {m.joined_at && (
                                                                                 <Typography variant="caption" className="text-slate-500">
