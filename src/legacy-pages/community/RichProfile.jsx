@@ -3530,8 +3530,9 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
   /* ========================= */
 
+  // Page ground: slate-50 (#f8fafc) in light mode, the member page background in dark mode.
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-[var(--imaa-dm-page,#f8fafc)]">
       <Container maxWidth="xl" sx={{ py: 3 }}>
         <div className="flex flex-col gap-4 md:gap-6">
           <main className="w-full">

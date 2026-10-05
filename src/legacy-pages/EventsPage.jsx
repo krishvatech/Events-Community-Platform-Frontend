@@ -994,7 +994,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                 hover:border-imaa-border-hover overflow-hidden cursor-pointer"
     >
       {/* MEDIA */}
-      <Box className="relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px] overflow-hidden">
+      <Box className="relative w-full aspect-video overflow-hidden">
         {(ev.cover_image || ev.image) ? (
           <img
             src={toAbs(ev.cover_image || ev.image)}
@@ -2180,7 +2180,7 @@ function CardFooterSkeleton() {
 function EventCardSkeleton() {
   return (
     <MUICard elevation={0} className="rounded-lg border border-imaa-border overflow-hidden">
-      <Skeleton variant="rectangular" height={200} />
+      <Skeleton variant="rectangular" sx={{ width: "100%", height: "auto", aspectRatio: "16 / 9" }} />
       <CardContent sx={{ p: 3 }}>
         <Skeleton variant="text" height={30} width="85%" />
         <Box sx={{ mt: 1 }}>
@@ -4059,12 +4059,10 @@ export default function EventsPage() {
                   mt: 3,
                   display: "grid",
                   gap: 3,
-                  gridTemplateColumns: {
-                    xs: "1fr",
-                    sm: "repeat(2, minmax(0,1fr))",
-                    md: "repeat(3, minmax(0,1fr))",
-                    lg: "repeat(3, minmax(0,1fr))",
-                  },
+                  // As many >=320px columns as fit the results column (which narrows with the sidebar and
+                  // the Advanced Filters panel); one column on small screens. auto-fill keeps a single card
+                  // at one column's width instead of stretching it across the row.
+                  gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 320px), 1fr))",
                 }}
               >
                 {rawEvents.length === 0 && initialLoading
@@ -4123,7 +4121,7 @@ export default function EventsPage() {
                             render img only when a valid URL exists, else a blank
                             media area (no broken-image icon, no banner).
                           */}
-                          <div className="relative w-full h-[180px] sm:h-[220px] md:h-[260px] lg:h-[300px] overflow-hidden">
+                          <div className="relative w-full aspect-video overflow-hidden">
                             {series.card_image_url ? (
                               <img
                                 src={series.card_image_url}
@@ -4406,6 +4404,107 @@ export default function EventsPage() {
             </Box>
             </>
             )}
+
+            {/* Available Replays Tab */}
+            {selectedTab === "replays" && (
+            <>
+            {view === "grid" ? (
+              <Box
+                sx={{
+                  mt: 3,
+                  display: "grid",
+                  gap: 3,
+                  // As many >=320px columns as fit the results column (which narrows with the sidebar and
+                  // the Advanced Filters panel); one column on small screens. auto-fill keeps a single card
+                  // at one column's width instead of stretching it across the row.
+                  gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 320px), 1fr))",
+                }}
+              >
+                {replayLoading
+                  ? skeletonItems.map((i) => (
+                    <Box key={`sk-replay-grid-${i}`}>
+                      <EventCardSkeleton />
+                    </Box>
+                  ))
+                  : replayEvents.map((ev) => {
+                    const replayCard = toCard(ev);
+                    return (
+                      <Box key={`replay-${ev.id}`} sx={{ width: '100%' }}>
+                        <EventCard
+                          ev={{ ...replayCard, isRegistered: !!myRegistrations[ev.id] }}
+                          myRegistrations={myRegistrations}
+                          setMyRegistrations={setMyRegistrations}
+                          setRawEvents={setRawEvents}
+                          onShowParticipants={handleShowParticipants}
+                          onGuestJoinRequested={handleGuestJoinRequested}
+                          isReplayEvent={true}
+                          onLeadGenNeeded={handleLeadGenNeeded}
+                          leadGenCallbackRef={leadGenCallbackRef}
+                          isSecondaryDataReady={registrationsLoaded}
+                          myApplication={myApplications[ev.id]}
+                        />
+                      </Box>
+                    );
+                  })}
+              </Box>
+            ) : (
+              <Grid container spacing={3} direction="column">
+                {replayLoading
+                  ? skeletonItems.map((i) => (
+                    <Grid item key={`sk-replay-list-${i}`} xs={12}>
+                      <EventRowSkeleton />
+                    </Grid>
+                  ))
+                  : replayEvents.map((ev) => {
+                    const replayCard = toCard(ev);
+                    return (
+                      <Grid item key={`replay-list-${ev.id}`} xs={12}>
+                        <EventRow
+                          ev={{ ...replayCard, isRegistered: !!myRegistrations[ev.id] }}
+                          myRegistrations={myRegistrations}
+                          setMyRegistrations={setMyRegistrations}
+                          setRawEvents={setRawEvents}
+                          onShowParticipants={handleShowParticipants}
+                          onGuestJoinRequested={handleGuestJoinRequested}
+                          isReplayEvent={true}
+                          onLeadGenNeeded={handleLeadGenNeeded}
+                          leadGenCallbackRef={leadGenCallbackRef}
+                          isSecondaryDataReady={registrationsLoaded}
+                          myApplication={myApplications[ev.id]}
+                        />
+                      </Grid>
+                    );
+                  })}
+              </Grid>
+            )}
+
+            {!replayLoading && replayEvents.length === 0 && (
+              <EmptyState
+                icon={<Video size={40} strokeWidth={1.5} />}
+                title="No replays available"
+                description="Recordings of past events will appear here once they are published."
+                titleComponent="h3"
+                sx={{ mt: 3 }}
+              />
+            )}
+
+            {/* Pagination for Replays */}
+            <Box
+              className="mt-8 flex items-center justify-center"
+              sx={{ opacity: replayLoading ? 0.6 : 1, pointerEvents: replayLoading ? "none" : "auto" }}
+            >
+              <Pagination
+                count={replayPageCount}
+                page={replayPage}
+                onChange={(e, value) => setReplayPage(value)}
+                color="primary"
+                shape="rounded"
+                siblingCount={1}
+                boundaryCount={1}
+              />
+            </Box>
+            </>
+            )}
           </Grid>
         </Grid>
 
@@ -4662,110 +4761,6 @@ export default function EventsPage() {
             </Button>
           </DialogActions>
         </Dialog>
-
-
-            {/* Available Replays Tab */}
-            {selectedTab === "replays" && (
-            <>
-            {view === "grid" ? (
-              <Box
-                sx={{
-                  mt: 3,
-                  display: "grid",
-                  gap: 3,
-                  gridTemplateColumns: {
-                    xs: "1fr",
-                    sm: "repeat(2, minmax(0,1fr))",
-                    md: "repeat(3, minmax(0,1fr))",
-                    lg: "repeat(3, minmax(0,1fr))",
-                  },
-                }}
-              >
-                {replayLoading
-                  ? skeletonItems.map((i) => (
-                    <Box key={`sk-replay-grid-${i}`}>
-                      <EventCardSkeleton />
-                    </Box>
-                  ))
-                  : replayEvents.map((ev) => {
-                    const replayCard = toCard(ev);
-                    return (
-                      <Box key={`replay-${ev.id}`} sx={{ width: '100%' }}>
-                        <EventCard
-                          ev={{ ...replayCard, isRegistered: !!myRegistrations[ev.id] }}
-                          myRegistrations={myRegistrations}
-                          setMyRegistrations={setMyRegistrations}
-                          setRawEvents={setRawEvents}
-                          onShowParticipants={handleShowParticipants}
-                          onGuestJoinRequested={handleGuestJoinRequested}
-                          isReplayEvent={true}
-                          onLeadGenNeeded={handleLeadGenNeeded}
-                          leadGenCallbackRef={leadGenCallbackRef}
-                          isSecondaryDataReady={registrationsLoaded}
-                          myApplication={myApplications[ev.id]}
-                        />
-                      </Box>
-                    );
-                  })}
-              </Box>
-            ) : (
-              <Grid container spacing={3} direction="column">
-                {replayLoading
-                  ? skeletonItems.map((i) => (
-                    <Grid item key={`sk-replay-list-${i}`} xs={12}>
-                      <EventRowSkeleton />
-                    </Grid>
-                  ))
-                  : replayEvents.map((ev) => {
-                    const replayCard = toCard(ev);
-                    return (
-                      <Grid item key={`replay-list-${ev.id}`} xs={12}>
-                        <EventRow
-                          ev={{ ...replayCard, isRegistered: !!myRegistrations[ev.id] }}
-                          myRegistrations={myRegistrations}
-                          setMyRegistrations={setMyRegistrations}
-                          setRawEvents={setRawEvents}
-                          onShowParticipants={handleShowParticipants}
-                          onGuestJoinRequested={handleGuestJoinRequested}
-                          isReplayEvent={true}
-                          onLeadGenNeeded={handleLeadGenNeeded}
-                          leadGenCallbackRef={leadGenCallbackRef}
-                          isSecondaryDataReady={registrationsLoaded}
-                          myApplication={myApplications[ev.id]}
-                        />
-                      </Grid>
-                    );
-                  })}
-              </Grid>
-            )}
-
-            {!replayLoading && replayEvents.length === 0 && (
-              <EmptyState
-                icon={<Video size={40} strokeWidth={1.5} />}
-                title="No replays available"
-                description="Recordings of past events will appear here once they are published."
-                titleComponent="h3"
-                sx={{ mt: 3 }}
-              />
-            )}
-
-            {/* Pagination for Replays */}
-            <Box
-              className="mt-8 flex items-center justify-center"
-              sx={{ opacity: replayLoading ? 0.6 : 1, pointerEvents: replayLoading ? "none" : "auto" }}
-            >
-              <Pagination
-                count={replayPageCount}
-                page={replayPage}
-                onChange={(e, value) => setReplayPage(value)}
-                color="primary"
-                shape="rounded"
-                siblingCount={1}
-                boundaryCount={1}
-              />
-            </Box>
-            </>
-            )}
       </Container>
 
       <ParticipantListDialog

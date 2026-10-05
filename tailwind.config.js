@@ -1,5 +1,8 @@
 // tailwind.config.js
-import defaultColors from "tailwindcss/colors";
+// Explicit ".js": tailwindcss has no package "exports" map, so a native ESM load of this config
+// cannot resolve "tailwindcss/colors" (only Tailwind's jiti fallback could). With the full path
+// the config loads the same way everywhere.
+import defaultColors from "tailwindcss/colors.js";
 import { colors, fontStacks, shadows } from "./src/styles/designTokens.js";
 
 // ── Dark mode ────────────────────────────────────────────────────────────────────────────────
