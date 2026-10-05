@@ -38,7 +38,7 @@ import { renderToMjml } from "@templatical/renderer";
 
 import AdminEmptyState from "../../components/admin/AdminEmptyState";
 import TemplaticalEmailEditor from "../../components/admin/TemplaticalEmailEditor";
-import { colors, focus, radii, shadows } from "../../styles/designTokens";
+import { colors, focus, radii, shadows, semanticColors } from "../../styles/designTokens";
 import {
   getEmailTemplate,
   listEmailTemplates,
@@ -349,9 +349,9 @@ export default function EmailTemplatesPage() {
   };
 
   const surfaceSx = {
-    borderColor: colors.border,
+    borderColor: semanticColors.border,
     borderRadius: `${radii.card}px`,
-    bgcolor: colors.white,
+    bgcolor: semanticColors.surface,
     boxShadow: shadows.sm,
   };
 
@@ -365,7 +365,7 @@ export default function EmailTemplatesPage() {
         gap={2}
       >
         <Box>
-          <Typography component="h1" variant="h4" sx={{ fontWeight: 750, color: colors.navy }}>
+          <Typography component="h1" variant="h4" sx={{ fontWeight: 750, color: semanticColors.text }}>
             Email Templates
           </Typography>
           <Typography variant="body1" color="text.secondary" sx={{ mt: 0.5, maxWidth: 680 }}>
@@ -382,10 +382,10 @@ export default function EmailTemplatesPage() {
                 alignSelf: "flex-start",
                 minWidth: 44,
                 minHeight: 44,
-                border: `1px solid ${colors.border}`,
+                border: `1px solid ${semanticColors.border}`,
                 borderRadius: `${radii.field}px`,
-                color: colors.navy,
-                bgcolor: colors.white,
+                color: semanticColors.text,
+                bgcolor: semanticColors.surface,
                 "&:focus-visible": { outline: `${focus.width}px solid ${focus.color}`, outlineOffset: focus.offset },
               }}
             >
@@ -522,7 +522,7 @@ export default function EmailTemplatesPage() {
               <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" gap={2}>
                 <Box sx={{ minWidth: 0 }}>
                   <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
-                    <Typography component="h2" variant="h5" sx={{ fontWeight: 750, color: colors.navy, overflowWrap: "anywhere" }}>
+                    <Typography component="h2" variant="h5" sx={{ fontWeight: 750, color: semanticColors.text, overflowWrap: "anywhere" }}>
                       {selected.label}
                     </Typography>
                     <Chip label={sourceLabel(selected)} color={sourceColor(selected)} size="small" />
@@ -561,9 +561,9 @@ export default function EmailTemplatesPage() {
                   gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 1fr) 220px" },
                   gap: 2,
                   p: { xs: 1.5, sm: 2 },
-                  border: `1px solid ${colors.border}`,
+                  border: `1px solid ${semanticColors.border}`,
                   borderRadius: `${radii.card}px`,
-                  bgcolor: colors.bgMember,
+                  bgcolor: semanticColors.page,
                 }}
               >
                 <TextField
@@ -574,7 +574,7 @@ export default function EmailTemplatesPage() {
                   sx={fieldSx}
                 />
                 <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ minHeight: 56, px: { md: 1 } }}>
-                  <Typography component="label" htmlFor="email-template-active" variant="body2" sx={{ fontWeight: 700, color: colors.navy }}>
+                  <Typography component="label" htmlFor="email-template-active" variant="body2" sx={{ fontWeight: 700, color: semanticColors.text }}>
                     Active
                   </Typography>
                   <Switch
@@ -587,7 +587,7 @@ export default function EmailTemplatesPage() {
               </Box>
 
               <Box component="section" aria-labelledby="required-variables-heading">
-                <Typography id="required-variables-heading" variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: colors.navy }}>
+                <Typography id="required-variables-heading" variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: semanticColors.text }}>
                   Required variables
                 </Typography>
                 <Stack direction="row" gap={1} flexWrap="wrap">
@@ -605,7 +605,7 @@ export default function EmailTemplatesPage() {
               )}
 
               <Box component="section" aria-labelledby="available-variables-heading">
-                <Typography id="available-variables-heading" variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: colors.navy }}>
+                <Typography id="available-variables-heading" variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: semanticColors.text }}>
                   Available variables
                 </Typography>
                 <Stack direction="row" gap={1} flexWrap="wrap">
@@ -634,10 +634,10 @@ export default function EmailTemplatesPage() {
                   aria-labelledby="visual-editor-heading"
                   sx={{
                     border: "1px solid",
-                    borderColor: colors.border,
+                    borderColor: semanticColors.border,
                     borderRadius: `${radii.card}px`,
                     overflow: "hidden",
-                    bgcolor: colors.white,
+                    bgcolor: semanticColors.surface,
                     minWidth: 0,
                     width: "100%",
                     maxWidth: "100%",
@@ -649,11 +649,11 @@ export default function EmailTemplatesPage() {
                       px: 1.75,
                       py: 1.25,
                       borderBottom: "1px solid",
-                      borderColor: colors.border,
-                      bgcolor: colors.bgCool,
+                      borderColor: semanticColors.border,
+                      bgcolor: semanticColors.surfaceCool,
                     }}
                   >
-                    <Typography id="visual-editor-heading" variant="subtitle2" sx={{ fontWeight: 800, color: colors.navy }}>
+                    <Typography id="visual-editor-heading" variant="subtitle2" sx={{ fontWeight: 800, color: semanticColors.text }}>
                       Visual editor
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
@@ -686,10 +686,10 @@ export default function EmailTemplatesPage() {
                   aria-labelledby="email-view-heading"
                   sx={{
                     border: "1px solid",
-                    borderColor: colors.border,
+                    borderColor: semanticColors.border,
                     borderRadius: `${radii.card}px`,
                     overflow: "hidden",
-                    bgcolor: colors.white,
+                    bgcolor: semanticColors.surface,
                     minWidth: 0,
                     boxShadow: shadows.sm,
                   }}
@@ -703,12 +703,12 @@ export default function EmailTemplatesPage() {
                       px: 1.75,
                       py: 1.25,
                       borderBottom: "1px solid",
-                      borderColor: colors.border,
-                      bgcolor: colors.bgCool,
+                      borderColor: semanticColors.border,
+                      bgcolor: semanticColors.surfaceCool,
                     }}
                   >
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography id="email-view-heading" variant="subtitle2" sx={{ fontWeight: 800, color: colors.navy }}>
+                      <Typography id="email-view-heading" variant="subtitle2" sx={{ fontWeight: 800, color: semanticColors.text }}>
                         Email view
                       </Typography>
                       <Typography variant="caption" color="text.secondary">
@@ -734,7 +734,7 @@ export default function EmailTemplatesPage() {
                       width: "100%",
                       height: { xs: 520, sm: 620, md: 700 },
                       border: 0,
-                      bgcolor: "#f4f7fb",
+                      bgcolor: "var(--imaa-dm-surface-alt, #f4f7fb)",
                       display: "block",
                     }}
                   />
@@ -781,7 +781,7 @@ export default function EmailTemplatesPage() {
         aria-labelledby="email-preview-title"
         PaperProps={{ sx: { width: { xs: "calc(100% - 24px)", sm: "calc(100% - 64px)" }, maxHeight: "calc(100dvh - 32px)", borderRadius: `${radii.popup}px` } }}
       >
-        <DialogTitle id="email-preview-title" sx={{ color: colors.navy, fontWeight: 750 }}>Email Preview</DialogTitle>
+        <DialogTitle id="email-preview-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>Email Preview</DialogTitle>
         <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2.5 } }}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
             {preview?.rendered_subject}
@@ -795,9 +795,9 @@ export default function EmailTemplatesPage() {
               height: { xs: "calc(100dvh - 190px)", sm: 560 },
               minHeight: { xs: 360, sm: 560 },
               border: "1px solid",
-              borderColor: colors.border,
+              borderColor: semanticColors.border,
               borderRadius: `${radii.field}px`,
-              bgcolor: "white",
+              bgcolor: "var(--imaa-dm-surface, white)",
               display: "block",
             }}
           />
@@ -808,7 +808,7 @@ export default function EmailTemplatesPage() {
       </Dialog>
 
       <Dialog open={testOpen} onClose={() => setTestOpen(false)} maxWidth="xs" fullWidth aria-labelledby="send-test-email-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
-        <DialogTitle id="send-test-email-title" sx={{ color: colors.navy, fontWeight: 750 }}>Send Test Email</DialogTitle>
+        <DialogTitle id="send-test-email-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>Send Test Email</DialogTitle>
         <DialogContent>
           <TextField
             autoFocus
@@ -831,7 +831,7 @@ export default function EmailTemplatesPage() {
       </Dialog>
 
       <Dialog open={resetOpen} onClose={() => setResetOpen(false)} maxWidth="sm" fullWidth aria-labelledby="reset-template-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
-        <DialogTitle id="reset-template-title" sx={{ color: colors.navy, fontWeight: 750 }}>Reset Template</DialogTitle>
+        <DialogTitle id="reset-template-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>Reset Template</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
             Reset {selected?.label} to the file default and clear the visual editor JSON?

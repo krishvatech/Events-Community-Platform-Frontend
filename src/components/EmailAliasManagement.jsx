@@ -237,7 +237,7 @@ export default function EmailAliasManagement({ accessToken }) {
             ) : (
               <List>
                 {aliases.map((alias) => (
-                  <ListItem key={alias.id} sx={{ py: 1.5, border: "1px solid #eee", mb: 1, borderRadius: 1 }}>
+                  <ListItem key={alias.id} sx={{ py: 1.5, border: "1px solid var(--imaa-dm-border, #eee)", mb: 1, borderRadius: 1 }}>
                     <ListItemText
                       primary={
                         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>

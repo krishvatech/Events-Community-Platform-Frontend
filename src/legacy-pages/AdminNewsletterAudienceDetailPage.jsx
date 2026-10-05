@@ -153,7 +153,7 @@ function ConfirmDialog({ open, title, children, confirmLabel, confirmColor = "pr
 
 function NewsletterAdminTabs({ onChange }) {
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", overflow: "hidden" }}>
       <Tabs
         value="audiences"
         onChange={(_, value) => onChange(value)}
@@ -164,7 +164,7 @@ function NewsletterAdminTabs({ onChange }) {
           minHeight: 52,
           px: { xs: 1, md: 2 },
           "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
-          "& .Mui-selected": { color: "#0f766e !important" },
+          "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0f766e) !important" },
           "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
         }}
       >
@@ -180,8 +180,8 @@ function AudienceForm({ value, errors, readOnly, onChange }) {
   const setField = (field, nextValue) => onChange({ ...value, [field]: nextValue });
   return (
     <Stack spacing={3}>
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: Object.keys(errors).length ? "error.main" : "#F0EEEB" }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 2 }}>Audience Details</Typography>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: Object.keys(errors).length ? "error.main" : "var(--imaa-dm-border, #F0EEEB)" }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "var(--imaa-dm-text-2, #2C3E5A)", mb: 2 }}>Audience Details</Typography>
         <Grid container spacing={2} sx={{ maxWidth: 920 }}>
           <Grid item xs={12} md={6}>
             <TextField
@@ -222,8 +222,8 @@ function AudienceForm({ value, errors, readOnly, onChange }) {
           </Grid>
         </Grid>
       </Paper>
-      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
-        <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A", mb: 1 }}>Rules</Typography>
+      <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "var(--imaa-dm-border, #F0EEEB)" }}>
+        <Typography variant="h6" sx={{ fontWeight: 700, color: "var(--imaa-dm-text-2, #2C3E5A)", mb: 1 }}>Rules</Typography>
         <Alert severity="info" variant="outlined">
           Advanced segmentation coming soon
         </Alert>
@@ -359,7 +359,7 @@ export default function AdminNewsletterAudienceDetailPage() {
   return (
     <Stack spacing={3}>
       <Box>
-        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
+        <Typography variant="h4" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 0.75 }}>
           Newsletter
         </Typography>
         <Typography color="text.secondary">
@@ -376,7 +376,7 @@ export default function AdminNewsletterAudienceDetailPage() {
           </IconButton>
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
-              <Typography variant="h4" sx={{ fontWeight: 800, color: "#1B2A4A" }}>{isNew ? "Create Audience" : audience?.name || "Newsletter Audience"}</Typography>
+              <Typography variant="h4" sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>{isNew ? "Create Audience" : audience?.name || "Newsletter Audience"}</Typography>
               {!isNew && audience?.status && <AudienceStatusChip status={audience.status} />}
             </Stack>
             <Typography color="text.secondary">{editing ? "Save this audience segment before adding future rules." : "Audience segment details are ready for future targeting phases."}</Typography>
@@ -410,16 +410,16 @@ export default function AdminNewsletterAudienceDetailPage() {
       {loading ? (
         <Stack spacing={2}>{Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} variant="rectangular" height={120} />)}</Stack>
       ) : !isNew && error && !audience ? (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "var(--imaa-dm-border, #F0EEEB)" }}>
           <Stack spacing={2} alignItems="flex-start">
-            <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>Audience could not be loaded.</Typography>
+            <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>Audience could not be loaded.</Typography>
             <Button variant="contained" onClick={loadAudience} sx={{ textTransform: "none" }}>Retry</Button>
           </Stack>
         </Paper>
       ) : (
         <Stack spacing={3}>
           {!isNew && audience && (
-            <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#F0EEEB" }}>
+            <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "var(--imaa-dm-border, #F0EEEB)" }}>
               <Stack direction={{ xs: "column", md: "row" }} divider={<Divider flexItem orientation="vertical" />} spacing={2}>
                 <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Status</Typography><Typography sx={{ fontWeight: 700 }}>{STATUS_LABELS[audience.status] || audience.status || "-"}</Typography></Box>
                 <Box sx={{ flex: 1 }}><Typography variant="body2" color="text.secondary">Audience Type</Typography><Typography sx={{ fontWeight: 700 }}>{TYPE_LABELS[audience.audience_type] || audience.audience_type || "-"}</Typography></Box>

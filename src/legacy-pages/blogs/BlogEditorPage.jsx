@@ -41,14 +41,14 @@ import {
 } from "../../utils/blogEditor";
 import { formatBlogDate } from "../../utils/blogContent";
 import { blogPrimaryButtonSx } from "../../components/blogs/blogTheme";
-import { colors, radii, shadows } from "../../styles/designTokens";
+import { colors, radii, shadows, semanticColors } from "../../styles/designTokens";
 
 const actionSx = { textTransform: "none", fontWeight: 700, borderRadius: `${radii.field}px`, minHeight: 40 };
 const fieldSx = { "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } };
 const surfaceSx = {
-  border: `1px solid ${colors.border}`,
+  border: `1px solid ${semanticColors.border}`,
   borderRadius: `${radii.card}px`,
-  bgcolor: colors.white,
+  bgcolor: semanticColors.surface,
   boxShadow: shadows.sm,
 };
 
@@ -186,13 +186,13 @@ function FeaturedImageField({ currentUrl, form, setForm, disabled, error, onErro
 
   return (
     <Box component="section" aria-labelledby="featured-image-heading" sx={{ minWidth: 0 }}>
-      <Typography id="featured-image-heading" component="h2" variant="subtitle1" sx={{ fontWeight: 750, mb: 1, color: colors.navy }}>Featured image</Typography>
+      <Typography id="featured-image-heading" component="h2" variant="subtitle1" sx={{ fontWeight: 750, mb: 1, color: semanticColors.text }}>Featured image</Typography>
       {shownUrl ? (
         <Box
           component="img"
           src={shownUrl}
           alt="Featured image preview"
-          sx={{ width: "100%", maxWidth: 480, aspectRatio: "16 / 9", objectFit: "cover", borderRadius: `${radii.card}px`, border: `1px solid ${colors.border}`, display: "block" }}
+          sx={{ width: "100%", maxWidth: 480, aspectRatio: "16 / 9", objectFit: "cover", borderRadius: `${radii.card}px`, border: `1px solid ${semanticColors.border}`, display: "block" }}
         />
       ) : (
         <Typography variant="body2" color="text.secondary">No featured image.</Typography>
@@ -459,7 +459,7 @@ export default function BlogEditorPage() {
 
       <Stack component="header" direction={{ xs: "column", md: "row" }} spacing={2} alignItems={{ md: "flex-start" }} justifyContent="space-between" sx={{ mb: 2.5 }}>
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h4" component="h1" sx={{ fontWeight: 800, color: colors.navy }}>
+          <Typography variant="h4" component="h1" sx={{ fontWeight: 800, color: semanticColors.text }}>
             {isEdit ? "Edit Blog" : "Create Blog"}
           </Typography>
           {isEdit && blog && (
@@ -680,7 +680,7 @@ export default function BlogEditorPage() {
         aria-labelledby="blog-preview-title"
         PaperProps={{ sx: { width: { xs: "calc(100% - 24px)", sm: "calc(100% - 64px)" }, maxHeight: "calc(100dvh - 32px)", borderRadius: `${radii.popup}px` } }}
       >
-        <DialogTitle id="blog-preview-title" sx={{ color: colors.navy, fontWeight: 750 }}>
+        <DialogTitle id="blog-preview-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>
           Preview{!isPublished && " — draft, not visible to members"}
         </DialogTitle>
         <DialogContent dividers sx={{ p: { xs: 1.5, sm: 2.5 }, overflowX: "hidden" }}>
@@ -692,7 +692,7 @@ export default function BlogEditorPage() {
       </Dialog>
 
       <Dialog open={confirmUnpublish} onClose={() => setConfirmUnpublish(false)} maxWidth="xs" fullWidth aria-labelledby="unpublish-blog-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
-        <DialogTitle id="unpublish-blog-title" sx={{ color: colors.navy, fontWeight: 750 }}>Unpublish blog?</DialogTitle>
+        <DialogTitle id="unpublish-blog-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>Unpublish blog?</DialogTitle>
         <DialogContent>
           <DialogContentText>
             It will be removed from Explore Blogs and moved back to drafts. Its original publication date is kept.

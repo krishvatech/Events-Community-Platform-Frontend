@@ -481,7 +481,7 @@ function TemplateEditorDialog({
                   width: "100%",
                   height: "100%",
                   border: 0,
-                  background: "white",
+                  background: "var(--imaa-dm-surface, white)",
                 }}
               />
             </Paper>
@@ -549,7 +549,7 @@ function TemplatePreviewDialog({ open, loading, template, error, onClose }) {
                   width: "100%",
                   height: "100%",
                   border: 0,
-                  background: "white",
+                  background: "var(--imaa-dm-surface, white)",
                 }}
               />
             </Paper>
@@ -1074,7 +1074,7 @@ export default function AdminNewsletterTemplatesPanel() {
           sx={{ ...surfaceSx, p: 3 }}
         >
           <Stack spacing={1.5} alignItems="flex-start">
-            <Typography sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+            <Typography sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>
               {search ? "No Templates match this search." : "No Newsletter Templates yet."}
             </Typography>
             <Typography color="text.secondary">

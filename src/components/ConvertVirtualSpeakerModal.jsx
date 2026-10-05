@@ -15,7 +15,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { convertVirtualSpeaker } from '../services/virtualSpeakerService';
-import { colors, radii } from '../styles/designTokens';
+import { colors, radii, semanticColors } from '../styles/designTokens';
 
 const ConvertVirtualSpeakerModal = ({
   open,
@@ -92,11 +92,11 @@ const ConvertVirtualSpeakerModal = ({
       aria-labelledby="convert-virtual-speaker-title"
       PaperProps={{ sx: { borderRadius: `${radii.popup}px`, m: 2 } }}
     >
-      <DialogTitle id="convert-virtual-speaker-title" sx={{ color: colors.navy, fontWeight: 700 }}>
+      <DialogTitle id="convert-virtual-speaker-title" sx={{ color: semanticColors.text, fontWeight: 700 }}>
         Convert Virtual Speaker to User Account
       </DialogTitle>
 
-      <DialogContent sx={{ bgcolor: colors.white }}>
+      <DialogContent sx={{ bgcolor: semanticColors.surface }}>
         <Box
           sx={{
             display: 'flex',
@@ -107,7 +107,7 @@ const ConvertVirtualSpeakerModal = ({
           }}
         >
           {/* Speaker Info */}
-          <Box sx={{ p: 2, border: `1px solid ${colors.border}`, borderRadius: `${radii.card}px`, bgcolor: colors.bgCool }}>
+          <Box sx={{ p: 2, border: `1px solid ${semanticColors.border}`, borderRadius: `${radii.card}px`, bgcolor: semanticColors.surfaceCool }}>
             <Typography variant="subtitle2" sx={{ mb: 0.5 }}>
               Speaker Name:
             </Typography>

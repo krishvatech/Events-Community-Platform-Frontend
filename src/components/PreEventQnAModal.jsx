@@ -76,7 +76,7 @@ function AiComparePanel({ original, improved, onKeepOriginal, onUseImproved }) {
             sx={{
               mt: 0.5,
               p: 1.5,
-              bgcolor: "grey.50",
+              bgcolor: "var(--imaa-dm-surface-alt, #fafafa)",
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 1.5,
@@ -424,7 +424,7 @@ export default function PreEventQnAModal({ open, onClose, event, onSuccess }) {
                 sx={{
                   textTransform: "none",
                   borderColor: "#6366f1",
-                  color: "#6366f1",
+                  color: "var(--imaa-dm-blue-text, #6366f1)",
                   "&:hover": { borderColor: "#4f46e5", bgcolor: "rgba(99,102,241,0.04)" },
                 }}
               >

@@ -30,16 +30,16 @@ export default function MarketingHubLayout({ children }) {
             display: "flex",
             alignItems: "center",
             gap: 1,
-            bgcolor: "#ffffff",
-            borderBottom: "1px solid #F0EEEB",
+            bgcolor: "var(--imaa-dm-surface, #ffffff)",
+            borderBottom: "1px solid var(--imaa-dm-border, #F0EEEB)",
           }}
         >
-          <IconButton aria-label="Open Marketing Hub navigation" onClick={() => setMobileOpen(true)} sx={{ minWidth: 44, minHeight: 44, bgcolor: "#fff", border: "1px solid var(--imaa-border)", "&:hover": { bgcolor: "var(--imaa-bg-cool)" } }}>
+          <IconButton aria-label="Open Marketing Hub navigation" onClick={() => setMobileOpen(true)} sx={{ minWidth: 44, minHeight: 44, bgcolor: "var(--imaa-dm-surface, #fff)", border: "1px solid var(--imaa-border)", "&:hover": { bgcolor: "var(--imaa-bg-cool)" } }}>
             <MenuRoundedIcon />
           </IconButton>
           <Stack spacing={0}>
-            <Typography sx={{ fontWeight: 800, color: "#1B2A4A", lineHeight: 1.1 }}>IMAA</Typography>
-            <Typography sx={{ fontWeight: 700, fontSize: 11, color: "#0A9396", letterSpacing: "0.12em" }}>MARKETING HUB</Typography>
+            <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)", lineHeight: 1.1 }}>IMAA</Typography>
+            <Typography sx={{ fontWeight: 700, fontSize: 11, color: "var(--imaa-dm-teal-text, #0A9396)", letterSpacing: "0.12em" }}>MARKETING HUB</Typography>
           </Stack>
         </Box>
       )}

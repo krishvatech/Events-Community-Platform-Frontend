@@ -112,11 +112,11 @@ const inputSx = {
     bgcolor: "var(--imaa-bg-member)",
     "& fieldset": { borderColor: "var(--imaa-border)" },
     "&:hover fieldset": { borderColor: "var(--imaa-border-hover)" },
-    "&.Mui-focused fieldset": { borderColor: "var(--imaa-navy)" },
+    "&.Mui-focused fieldset": { borderColor: "var(--imaa-dm-text-2, var(--imaa-navy))" },
     "@media (max-width: 599.95px)": { fontSize: 16 },
   },
   "& .MuiInputLabel-root": { fontSize: 14 },
-  "& .MuiInputLabel-root.Mui-focused": { color: "var(--imaa-navy)" },
+  "& .MuiInputLabel-root.Mui-focused": { color: "var(--imaa-dm-text, var(--imaa-navy))" },
 };
 
 // Primary auth action: navy with white text (existing treatment, token colours)
@@ -559,7 +559,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           <Box
             component="h1"
             id={AUTH_TITLE_ID}
-            sx={{ m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: 22, lineHeight: 1.3, color: "var(--imaa-navy)", mb: 0.5, textAlign: "center" }}
+            sx={{ m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: 22, lineHeight: 1.3, color: "var(--imaa-dm-text, var(--imaa-navy))", mb: 0.5, textAlign: "center" }}
           >
             {mode === "confirm" ? "Verify your email" : "Sign in or create an account"}
           </Box>
@@ -578,8 +578,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                     flex: 1, textAlign: "center", py: 0.75, borderRadius: 100,
                     border: 0, font: "inherit", fontFamily: "var(--imaa-font-sans)",
                     cursor: "pointer", fontSize: 14, fontWeight: mode === m ? 600 : 500,
-                    color: mode === m ? "var(--imaa-navy)" : "var(--imaa-ink-body)",
-                    bgcolor: mode === m ? "#FFFFFF" : "transparent",
+                    color: mode === m ? "var(--imaa-dm-text, var(--imaa-navy))" : "var(--imaa-ink-body)",
+                    bgcolor: mode === m ? "var(--imaa-dm-surface, #FFFFFF)" : "transparent",
                     boxShadow: mode === m ? "var(--imaa-shadow-sm)" : "none",
                     transition: "all .18s ease",
                     userSelect: "none",
@@ -631,7 +631,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                 <MuiLink
                   href="/forgot-password"
                   underline="hover"
-                  sx={{ fontSize: 13, color: "var(--imaa-navy)", fontWeight: 500 }}
+                  sx={{ fontSize: 13, color: "var(--imaa-dm-text, var(--imaa-navy))", fontWeight: 500 }}
                   onClick={handleClose}
                 >
                   Forgot password?
@@ -753,7 +753,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                   sx={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: resendTimer > 0 ? "var(--imaa-ink-hint)" : "var(--imaa-navy)",
+                    color: resendTimer > 0 ? "var(--imaa-ink-hint)" : "var(--imaa-dm-text, var(--imaa-navy))",
                     textTransform: "none",
                     "&:hover": { bgcolor: "transparent", textDecoration: "underline" }
                   }}
@@ -791,8 +791,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                     onClick={() => handleSocialLogin(IMAA_SSO_IDP_NAME)}
                     sx={{
                       textTransform: "none", fontWeight: 600, fontSize: 14,
-                      borderColor: "var(--imaa-navy)", color: "var(--imaa-navy)", borderRadius: 2, py: 1,
-                      "&:hover": { borderColor: "var(--imaa-navy)", bgcolor: "var(--imaa-bg-member)" },
+                      borderColor: "var(--imaa-dm-text-2, var(--imaa-navy))", color: "var(--imaa-dm-text, var(--imaa-navy))", borderRadius: 2, py: 1,
+                      "&:hover": { borderColor: "var(--imaa-dm-text-2, var(--imaa-navy))", bgcolor: "var(--imaa-bg-member)" },
                     }}
                   >
                     Continue with IMAA

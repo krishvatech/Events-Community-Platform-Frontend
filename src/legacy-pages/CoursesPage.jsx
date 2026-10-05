@@ -196,7 +196,7 @@ function CourseCard({ course, enrollment = null }) {
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12 }}>
                 Progress
               </Typography>
-              <Typography variant="caption" fontWeight={600} sx={{ fontSize: 12, color: "var(--imaa-teal-hover)" }}>
+              <Typography variant="caption" fontWeight={600} sx={{ fontSize: 12, color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))" }}>
                 {Math.round(progress)}%
               </Typography>
             </Box>

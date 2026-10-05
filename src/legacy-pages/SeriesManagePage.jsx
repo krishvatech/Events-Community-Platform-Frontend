@@ -558,7 +558,7 @@ const EventsTab = ({ series, events, onUpdate }) => {
       <TableContainer sx={{ border: '1px solid', borderColor: 'divider' }}>
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ bgcolor: 'grey.50' }}>
+            <TableRow sx={{ bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)' }}>
               <TableCell sx={{ fontWeight: 800 }}>Order</TableCell>
               <TableCell sx={{ fontWeight: 800 }}>Title</TableCell>
               <TableCell sx={{ fontWeight: 800 }}>Date</TableCell>
@@ -569,7 +569,7 @@ const EventsTab = ({ series, events, onUpdate }) => {
           <TableBody>
             {events.map((event, idx) => (
               <TableRow key={event.id} hover>
-                <TableCell><DragIcon sx={{ color: 'grey.400' }} /></TableCell>
+                <TableCell><DragIcon sx={{ color: 'var(--imaa-dm-text-faint, #bdbdbd)' }} /></TableCell>
                 <TableCell>{event.series_session_label || event.title}</TableCell>
                 <TableCell>
                   {event.start_time ? new Date(event.start_time).toLocaleDateString() : '—'}
@@ -756,7 +756,7 @@ const RegistrationsTab = ({ seriesId }) => {
     <TableContainer sx={{ border: '1px solid', borderColor: 'divider' }}>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ bgcolor: 'grey.50' }}>
+          <TableRow sx={{ bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)' }}>
             <TableCell sx={{ fontWeight: 800 }}>Name</TableCell>
             <TableCell sx={{ fontWeight: 800 }}>Email</TableCell>
             <TableCell align="center" sx={{ fontWeight: 800 }}>Attended</TableCell>
@@ -885,10 +885,10 @@ const AnalyticsTab = ({ seriesId }) => {
                           size="small"
                           sx={{
                             fontWeight: 600,
-                            backgroundColor: attendanceRate >= 75 ? '#d1fae5' :
-                                           attendanceRate >= 50 ? '#fef3c7' : '#fed7aa',
-                            color: attendanceRate >= 75 ? '#065f46' :
-                                  attendanceRate >= 50 ? '#92400e' : '#92400e'
+                            backgroundColor: attendanceRate >= 75 ? 'var(--imaa-dm-tint-green, #d1fae5)' :
+                                           attendanceRate >= 50 ? 'var(--imaa-dm-tint-amber, #fef3c7)' : 'var(--imaa-dm-tint-orange, #fed7aa)',
+                            color: attendanceRate >= 75 ? 'var(--imaa-dm-green-text, #065f46)' :
+                                  attendanceRate >= 50 ? 'var(--imaa-dm-orange-text, #92400e)' : 'var(--imaa-dm-orange-text, #92400e)'
                           }}
                         />
                       </td>

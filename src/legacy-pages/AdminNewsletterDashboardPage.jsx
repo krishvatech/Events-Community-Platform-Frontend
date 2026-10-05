@@ -32,6 +32,7 @@ import { getNewsletterDashboard } from "../services/newsletterService";
 const CARD_BORDER = "var(--imaa-border)";
 const TEXT = "var(--imaa-ink)";
 const TEAL = "var(--imaa-teal-hover)";
+const TEAL_TEXT = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))"; // as text: readable variant in dark mode
 const SR_ONLY = {
   position: "absolute",
   width: 1,
@@ -139,6 +140,7 @@ function ContactsCreatedChart({ section, loading }) {
         <Box sx={{ width: "100%", overflowX: "auto" }}>
           <Box
             component="svg"
+            className="imaa-chart"
             viewBox={`0 0 ${width} ${height}`}
             onMouseLeave={() => setActiveIndex(null)}
             sx={{ display: "block", width: "100%", minWidth: { xs: 640, md: 0 } }}
@@ -257,7 +259,7 @@ function RecentActivity({ section, loading }) {
                 }}
                 sx={{ px: 0.5, py: 0.85, borderRadius: 1.5 }}
               >
-                <Box sx={{ width: 34, height: 34, borderRadius: 2, bgcolor: "rgba(15, 118, 110, 0.1)", color: TEAL, display: "grid", placeItems: "center", mr: 1.25, flexShrink: 0 }}>
+                <Box sx={{ width: 34, height: 34, borderRadius: 2, bgcolor: "rgba(15, 118, 110, 0.1)", color: TEAL_TEXT, display: "grid", placeItems: "center", mr: 1.25, flexShrink: 0 }}>
                   <TaskAltRoundedIcon fontSize="small" />
                 </Box>
                 <ListItemText
@@ -348,7 +350,7 @@ function RecentCampaigns({ section, loading }) {
         <Stack spacing={1.25}>
           {rows.map((row) => (
             <ListItemButton key={row.id} onClick={() => navigate(`/admin/newsletter/builder/${row.id}`)} sx={{ px: 1.25, py: 1.25, border: `1px solid ${CARD_BORDER}`, borderRadius: 1.5 }}>
-              <CampaignRoundedIcon sx={{ color: TEAL, mr: 1.25 }} />
+              <CampaignRoundedIcon sx={{ color: TEAL_TEXT, mr: 1.25 }} />
               <ListItemText
                 primary={<Typography sx={{ fontWeight: 800, color: TEXT }} noWrap>{row.name || "Campaign"}</Typography>}
                 secondary={formatDateTime(row.dateModified)}
@@ -375,7 +377,7 @@ function RecentContacts({ section, loading }) {
         <Stack spacing={1.25}>
           {rows.map((row) => (
             <ListItemButton key={row.id} onClick={() => navigate(`/admin/newsletter/contacts/${row.id}`)} sx={{ px: 1.25, py: 1.25, border: `1px solid ${CARD_BORDER}`, borderRadius: 1.5 }}>
-              <ContactMailRoundedIcon sx={{ color: TEAL, mr: 1.25 }} />
+              <ContactMailRoundedIcon sx={{ color: TEAL_TEXT, mr: 1.25 }} />
               <ListItemText
                 primary={<Typography sx={{ fontWeight: 800, color: TEXT }} noWrap>{row.name || row.email || "Contact"}</Typography>}
                 secondary={`${row.email || "No email"} · ${row.stage || "No stage"} · ${formatDateTime(row.dateAdded)}`}

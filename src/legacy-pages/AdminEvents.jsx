@@ -1479,8 +1479,8 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                 p: 2,
                 mb: 2,
                 borderRadius: 2,
-                border: errors.platforms ? "1px solid #ef4444" : "1px solid #e2e8f0",
-                bgcolor: "#f8fafc",
+                border: errors.platforms ? "1px solid #ef4444" : "1px solid var(--imaa-dm-border, #e2e8f0)",
+                bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
               }}
             >
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
@@ -1499,7 +1499,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                   {eventPlatforms.map((platform) => {
                     const checked = selectedPlatformSlugs.includes(platform.slug);
                     return (
-                      <Paper key={platform.slug} variant="outlined" sx={{ p: 1.25, minWidth: 210, bgcolor: checked ? "#fff" : "transparent" }}>
+                      <Paper key={platform.slug} variant="outlined" sx={{ p: 1.25, minWidth: 210, bgcolor: checked ? "var(--imaa-dm-surface, #fff)" : "transparent" }}>
                         <FormControlLabel
                           control={
                             <Checkbox
@@ -1943,9 +1943,9 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             {!isFree ? (
               <Box sx={{
                 p: 2.5,
-                border: "1px solid #e3f2fd",
+                border: "1px solid var(--imaa-dm-border, #e3f2fd)",
                 borderRadius: 2,
-                bgcolor: "#f0f7ff",
+                bgcolor: "var(--imaa-dm-surface-alt, #f0f7ff)",
                 mb: 3,
                 display: "flex",
                 alignItems: "flex-start",
@@ -1953,10 +1953,10 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
               }}>
                 <Box sx={{ fontSize: 20, mt: 0.1 }}>💳</Box>
                 <Box>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1565c0", mb: 0.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "var(--imaa-dm-blue-text, #1565c0)", mb: 0.5 }}>
                     💳 Paid Event — Will be saved as Draft
                   </Typography>
-                  <Typography variant="body2" sx={{ color: "#1565c0" }}>
+                  <Typography variant="body2" sx={{ color: "var(--imaa-dm-blue-text, #1565c0)" }}>
                     This event will be created as a <strong>Draft</strong> (not publicly visible).
                     Once you set the price in the <strong>Product Management tab</strong>, you can publish it.
                   </Typography>
@@ -1976,7 +1976,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
             />
           </Box>
 
-          <Box sx={{ mb: 3, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fafafa" }}>
+          <Box sx={{ mb: 3, p: 2.5, border: "1px solid var(--imaa-dm-border, #e0e0e0)", borderRadius: 2, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
               CPD/CPE Credits
             </Typography>
@@ -2466,15 +2466,15 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                     <Box
                       sx={{
                         p: 1.5,
-                        backgroundColor: "#f3f4f6",
+                        backgroundColor: "var(--imaa-dm-surface-alt, #f3f4f6)",
                         borderRadius: 1,
-                        border: "1px solid #e5e7eb"
+                        border: "1px solid var(--imaa-dm-border, #e5e7eb)"
                       }}
                     >
-                      <Typography variant="caption" sx={{ fontWeight: 600, color: "#6b7280" }}>
+                      <Typography variant="caption" sx={{ fontWeight: 600, color: "var(--imaa-dm-text-meta, #6b7280)" }}>
                         User Time: {getBrowserTimezone()}
                       </Typography>
-                      <Typography variant="caption" sx={{ display: "block", color: "#9ca3af", mt: 0.5 }}>
+                      <Typography variant="caption" sx={{ display: "block", color: "var(--imaa-dm-text-hint, #9ca3af)", mt: 0.5 }}>
                         Sessions will also display in your local timezone
                       </Typography>
                     </Box>
@@ -2868,7 +2868,7 @@ function CreateEventDialog({ open, onClose, onCreated, communityId = "1" }) {
                             <Chip label={seed.attribution_label || "Event Team"} size="small"
                               sx={{ fontSize: 11, height: 20, bgcolor: "rgba(16,184,166,0.12)", color: "#10b8a6", border: "1px solid rgba(16,184,166,0.3)" }} />
                             <Chip label="SEED" size="small"
-                              sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.3)" }} />
+                              sx={{ fontSize: 10, height: 18, fontWeight: 700, bgcolor: "rgba(99,102,241,0.12)", color: "var(--imaa-dm-blue-text, #6366f1)", border: "1px solid rgba(99,102,241,0.3)" }} />
                           </Stack>
                           <Typography variant="body2" sx={{ wordBreak: "break-word" }}>{seed.content}</Typography>
                           {seed.speaker_note && (
@@ -3316,7 +3316,7 @@ function AdminEventCard({
             style={{
               position: "absolute",
               inset: 0,
-              background: "#E5E7EB",
+              background: "var(--imaa-dm-muted, #E5E7EB)",
             }}
           />
         )}
@@ -3542,9 +3542,9 @@ function AdminEventCard({
                       textTransform: "none",
                       minWidth: 0,
                       px: 1,
-                      borderColor: "#cbd5e1",
-                      color: "#475569",
-                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
+                      borderColor: "var(--imaa-dm-border-strong, #cbd5e1)",
+                      color: "var(--imaa-dm-text-body, #475569)",
+                      "&:hover": { borderColor: "var(--imaa-dm-border-strong, #94a3b8)", backgroundColor: "var(--imaa-dm-surface-hover, #f8fafc)" },
                     }}
                   >
                     Details
@@ -3584,7 +3584,7 @@ function AdminEventCard({
                       className="rounded-xl flex-1"
                       sx={{
                         textTransform: "none",
-                        backgroundColor: "#CBD5E1",
+                        backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
                         minWidth: 0,
                         px: 1,
                       }}
@@ -3609,9 +3609,9 @@ function AdminEventCard({
                       textTransform: "none",
                       minWidth: 0,
                       px: 1,
-                      borderColor: "#cbd5e1",
-                      color: "#475569",
-                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
+                      borderColor: "var(--imaa-dm-border-strong, #cbd5e1)",
+                      color: "var(--imaa-dm-text-body, #475569)",
+                      "&:hover": { borderColor: "var(--imaa-dm-border-strong, #94a3b8)", backgroundColor: "var(--imaa-dm-surface-hover, #f8fafc)" },
                     }}
                   >
                     Details
@@ -3627,9 +3627,9 @@ function AdminEventCard({
                       className="rounded-xl flex-1"
                       sx={{
                         textTransform: "none",
-                        backgroundColor: "#fef2f2 !important",
-                        color: "#b91c1c !important",
-                        borderColor: "#fecaca !important",
+                        backgroundColor: "var(--imaa-dm-surface-alt, #fef2f2) !important",
+                        color: "var(--imaa-dm-red-text, #b91c1c) !important",
+                        borderColor: "var(--imaa-dm-tint-red-border, #fecaca) !important",
                         minWidth: 0,
                         px: 1,
                       }}
@@ -3788,9 +3788,9 @@ function AdminEventCard({
                       textTransform: "none",
                       minWidth: 0,
                       px: 1,
-                      borderColor: "#cbd5e1",
-                      color: "#475569",
-                      "&:hover": { borderColor: "#94a3b8", backgroundColor: "#f8fafc" },
+                      borderColor: "var(--imaa-dm-border-strong, #cbd5e1)",
+                      color: "var(--imaa-dm-text-body, #475569)",
+                      "&:hover": { borderColor: "var(--imaa-dm-border-strong, #94a3b8)", backgroundColor: "var(--imaa-dm-surface-hover, #f8fafc)" },
                     }}
                   >
                     Details
@@ -3809,9 +3809,9 @@ function AdminEventCard({
                   fullWidth
                   sx={{
                     textTransform: "none",
-                    backgroundColor: "#fef2f2 !important",
-                    color: "#b91c1c !important",
-                    borderColor: "#fecaca !important",
+                    backgroundColor: "var(--imaa-dm-surface-alt, #fef2f2) !important",
+                    color: "var(--imaa-dm-red-text, #b91c1c) !important",
+                    borderColor: "var(--imaa-dm-tint-red-border, #fecaca) !important",
                   }}
                 >
                   <Box component="span" sx={{ display: { xs: "none", lg: "inline" }, whiteSpace: "nowrap" }}>
@@ -3900,7 +3900,7 @@ function AdminEventCard({
                   fullWidth
                   sx={{
                     textTransform: "none",
-                    backgroundColor: "#CBD5E1",
+                    backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
                   }}
                 >
                   <Box
@@ -3925,7 +3925,7 @@ function AdminEventCard({
                   fullWidth
                   sx={{
                     textTransform: "none",
-                    backgroundColor: "#CBD5E1",
+                    backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
                   }}
                 >
                   <Box
@@ -3954,7 +3954,7 @@ function AdminEventCard({
                   ev.is_pinned ? onUnpinEvent?.(ev) : onPinEvent?.(ev);
                 }}
                 sx={{
-                  color: ev.is_pinned ? "error.main" : "#94a3b8",
+                  color: ev.is_pinned ? "error.main" : "var(--imaa-dm-text-hint, #94a3b8)",
                   "&:hover": {
                     backgroundColor: ev.is_pinned ? "rgba(220, 38, 38, 0.08)" : "rgba(148, 163, 184, 0.08)",
                   },
@@ -3974,7 +3974,7 @@ function AdminEventCard({
                   ev.is_featured ? onRemoveFeaturedEvent?.(ev) : onSetFeaturedEvent?.(ev);
                 }}
                 sx={{
-                  color: ev.is_featured ? "#fbbf24" : "#cbd5e1",
+                  color: ev.is_featured ? "#fbbf24" : "var(--imaa-dm-text-faint, #cbd5e1)",
                   "&:hover": {
                     backgroundColor: ev.is_featured ? "rgba(251, 191, 36, 0.08)" : "rgba(203, 213, 225, 0.08)",
                   },

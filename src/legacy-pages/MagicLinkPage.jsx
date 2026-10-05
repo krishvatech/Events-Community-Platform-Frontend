@@ -218,7 +218,7 @@ export default function MagicLinkPage() {
             component="button"
             type="button"
             variant="body2"
-            sx={{ mt: 2, p: 0, border: 0, bgcolor: "transparent", color: "var(--imaa-navy)", textDecoration: "underline", cursor: "pointer" }}
+            sx={{ mt: 2, p: 0, border: 0, bgcolor: "transparent", color: "var(--imaa-dm-text, var(--imaa-navy))", textDecoration: "underline", cursor: "pointer" }}
             onClick={() => navigate("/events")}
           >
             ← Back to Events

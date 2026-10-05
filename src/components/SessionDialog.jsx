@@ -351,7 +351,7 @@ function SessionDialog({
             <Typography variant="body2" className="font-semibold" sx={{ mb: 1.5 }}>
               Session Image (optional)
             </Typography>
-            <Typography variant="caption" sx={{ color: "#6b7280", display: "block", mb: 1.5 }}>
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", display: "block", mb: 1.5 }}>
               Portrait orientation recommended. Max 5MB.
             </Typography>
 
@@ -361,16 +361,16 @@ function SessionDialog({
                 width: "100%",
                 maxWidth: 160,
                 aspectRatio: "9 / 16",
-                border: localSessionImagePreview || existingSessionImage ? "2px solid #d1d5db" : "2px dashed #d1d5db",
+                border: localSessionImagePreview || existingSessionImage ? "2px solid var(--imaa-dm-border-strong, #d1d5db)" : "2px dashed var(--imaa-dm-border-strong, #d1d5db)",
                 borderRadius: 1.5,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 mb: 1.5,
                 cursor: "pointer",
-                backgroundColor: "#fafafa",
+                backgroundColor: "var(--imaa-dm-surface-alt, #fafafa)",
                 transition: "all 0.2s",
-                "&:hover": { borderColor: "#10b8a6", backgroundColor: "#f0fdf9" },
+                "&:hover": { borderColor: "#10b8a6", backgroundColor: "var(--imaa-dm-surface-hover, #f0fdf9)" },
                 overflow: "hidden",
               }}
               onClick={() => document.getElementById("session-image-upload")?.click()}
@@ -393,8 +393,8 @@ function SessionDialog({
                 />
               ) : (
                 <Box sx={{ textAlign: "center" }}>
-                  <ImageRoundedIcon sx={{ fontSize: 32, color: "#9ca3af", mb: 0.5 }} />
-                  <Typography variant="caption" sx={{ color: "#6b7280", display: "block" }}>
+                  <ImageRoundedIcon sx={{ fontSize: 32, color: "var(--imaa-dm-text-hint, #9ca3af)", mb: 0.5 }} />
+                  <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", display: "block" }}>
                     Click to upload
                   </Typography>
                 </Box>
@@ -422,7 +422,7 @@ function SessionDialog({
               <Button
                 size="small"
                 variant="outlined"
-                sx={{ mt: 1, color: "#ef4444", borderColor: "#ef4444" }}
+                sx={{ mt: 1, color: "var(--imaa-dm-red-text, #ef4444)", borderColor: "#ef4444" }}
                 onClick={() => onPickSessionImage(null)}
               >
                 Clear Image
@@ -449,7 +449,7 @@ function SessionDialog({
               <Typography variant="body2" className="font-semibold">
                 Start Date &amp; Time
               </Typography>
-              <Typography variant="caption" sx={{ color: "#6b7280" }}>
+              <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
                 {timezone}
               </Typography>
             </Box>
@@ -511,7 +511,7 @@ function SessionDialog({
               <Typography variant="body2" className="font-semibold">
                 End Date &amp; Time
               </Typography>
-              <Typography variant="caption" sx={{ color: "#6b7280" }}>
+              <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
                 {timezone}
               </Typography>
             </Box>
@@ -565,12 +565,12 @@ function SessionDialog({
           <Box
             sx={{
               p: 1.5,
-              backgroundColor: "#f3f4f6",
+              backgroundColor: "var(--imaa-dm-surface-alt, #f3f4f6)",
               borderRadius: 1,
-              border: "1px solid #e5e7eb"
+              border: "1px solid var(--imaa-dm-border, #e5e7eb)"
             }}
           >
-            <Typography variant="caption" sx={{ fontWeight: 600, color: "#6b7280", display: "block", mb: 0.5 }}>
+            <Typography variant="caption" sx={{ fontWeight: 600, color: "var(--imaa-dm-text-meta, #6b7280)", display: "block", mb: 0.5 }}>
               Event Timezone: {timezone}
             </Typography>
             {(() => {
@@ -584,7 +584,7 @@ function SessionDialog({
                 const formatted = formatSessionTimeRange(startISO, endISO, timezone);
                 return formatted.secondary ? (
                   <>
-                    <Typography variant="caption" sx={{ color: "#9ca3af" }}>
+                    <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-hint, #9ca3af)" }}>
                       {formatted.secondary.label}
                     </Typography>
                   </>
@@ -625,7 +625,7 @@ function SessionDialog({
             </Typography>
 
             {breaks.length > 0 && (
-              <Box sx={{ mb: 2, p: 2, backgroundColor: "#f9fafb", borderRadius: 1 }}>
+              <Box sx={{ mb: 2, p: 2, backgroundColor: "var(--imaa-dm-surface-alt, #f9fafb)", borderRadius: 1 }}>
                 {breaks.map((brk, idx) => (
                   <Box key={idx} sx={{ display: "flex", gap: 1, alignItems: "center", mb: idx < breaks.length - 1 ? 1.5 : 0 }}>
                     <TextField
@@ -670,7 +670,7 @@ function SessionDialog({
                     <IconButton
                       size="small"
                       onClick={() => setBreaks(breaks.filter((_, i) => i !== idx))}
-                      sx={{ color: "#ef4444" }}
+                      sx={{ color: "var(--imaa-dm-red-text, #ef4444)" }}
                     >
                       <DeleteIcon fontSize="small" />
                     </IconButton>
@@ -690,7 +690,7 @@ function SessionDialog({
           </Box>
 
           {/* Live Duration Preview */}
-          <Box sx={{ p: 2, backgroundColor: "#f0f9ff", borderRadius: 1, borderLeft: "4px solid #0284c7" }}>
+          <Box sx={{ p: 2, backgroundColor: "var(--imaa-dm-surface-alt, #f0f9ff)", borderRadius: 1, borderLeft: "4px solid #0284c7" }}>
             {(() => {
               const start = startDate.hour(startTime.hour()).minute(startTime.minute());
               const end = endDate.hour(endTime.hour()).minute(endTime.minute());
@@ -710,16 +710,16 @@ function SessionDialog({
 
               return (
                 <Stack spacing={1}>
-                  <Typography variant="caption" sx={{ fontWeight: 600, color: "#1e40af" }}>
+                  <Typography variant="caption" sx={{ fontWeight: 600, color: "var(--imaa-dm-blue-text, #1e40af)" }}>
                     Duration Summary
                   </Typography>
-                  <Box sx={{ fontSize: 13, color: "#1e293b" }}>
+                  <Box sx={{ fontSize: 13, color: "var(--imaa-dm-text, #1e293b)" }}>
                     <div>Session: {formatTime(computedMinutes)}</div>
                     {hasDurationOverride && durationMinutesOverride && computedMinutes !== effectiveMinutes && (
                       <div sx={{ textDecoration: "line-through" }}>→ Override: {formatTime(effectiveMinutes)}</div>
                     )}
                     {totalBreakMinutes > 0 && <div>Breaks: -{formatTime(totalBreakMinutes)}</div>}
-                    <div sx={{ fontWeight: 600, color: "#065f46" }}>
+                    <div sx={{ fontWeight: 600, color: "var(--imaa-dm-green-text, #065f46)" }}>
                       Net: {formatTime(netMinutes)}
                     </div>
                   </Box>

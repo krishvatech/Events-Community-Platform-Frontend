@@ -2188,7 +2188,7 @@ function VerificationCard({ status, onVerify }) {
       sx={{
         mb: 2,
         borderColor: isVerified ? "primary.light" : isPending ? "#14b8a6" : "divider",
-        bgcolor: isVerified ? "primary.50" : isPending ? "#f0fdfa" : "background.paper"
+        bgcolor: isVerified ? "primary.50" : isPending ? "var(--imaa-dm-surface-alt, #f0fdfa)" : "background.paper"
       }}
     >
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", textAlign: "center", pb: 1 }}>
@@ -3492,8 +3492,8 @@ function AboutTab({
                   sx={{
                     width: 64,
                     height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                    color: "var(--imaa-dm-text-meta, #757575)",
                     mx: "auto",
                   }}
                 >
@@ -3558,7 +3558,7 @@ function AboutTab({
               </List>
             ) : (
               <Box sx={{ textAlign: "center", py: 4 }}>
-                <Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", mx: "auto" }}>
+                <Avatar sx={{ width: 64, height: 64, bgcolor: "var(--imaa-dm-muted, #eeeeee)", mx: "auto" }}>
                   <HistoryEduRoundedIcon />
                 </Avatar>
 
@@ -3654,8 +3654,8 @@ function AboutTab({
                   sx={{
                     width: 64,
                     height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                    color: "var(--imaa-dm-text-meta, #757575)",
                     mx: "auto",
                   }}
                 >
@@ -3747,8 +3747,8 @@ function AboutTab({
                   sx={{
                     width: 64,
                     height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                    color: "var(--imaa-dm-text-meta, #757575)",
                     mx: "auto",
                   }}
                 >
@@ -4041,8 +4041,8 @@ function AboutTab({
                   sx={{
                     width: 64,
                     height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                    color: "var(--imaa-dm-text-meta, #757575)",
                     mx: "auto",
                   }}
                 >
@@ -4137,8 +4137,8 @@ function AboutTab({
                   sx={{
                     width: 64,
                     height: 64,
-                    bgcolor: "grey.200",
-                    color: "grey.600",
+                    bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                    color: "var(--imaa-dm-text-meta, #757575)",
                     mx: "auto",
                   }}
                 >

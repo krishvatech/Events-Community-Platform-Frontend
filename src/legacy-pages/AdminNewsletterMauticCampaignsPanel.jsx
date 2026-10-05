@@ -396,7 +396,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
         spacing={2}
       >
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+          <Typography variant="h5" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>
             Native Mautic Campaigns
           </Typography>
           <Typography color="text.secondary">
@@ -430,7 +430,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
         broadcast Campaign model is not used here.
       </Alert>
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF" }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
         <Box
           component="form"
           onSubmit={submitSearch}
@@ -483,7 +483,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
 
       <Paper
         variant="outlined"
-        sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}
+        sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", overflow: "hidden" }}
       >
         {loading ? (
           <Box sx={{ p: 3 }}>
@@ -505,7 +505,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
           <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                   <TableCell>Campaign</TableCell>
                   <TableCell>Status</TableCell>
                   <TableCell>Sources</TableCell>
@@ -535,7 +535,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
                       onClick={() => openCampaign(campaign)}
                     >
                       <TableCell>
-                        <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+                        <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                           {campaign.name || "Untitled Campaign"}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
@@ -599,7 +599,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
           <Box
             sx={{
               p: 2,
-              borderTop: campaigns.length ? "1px solid #E7ECEF" : 0,
+              borderTop: campaigns.length ? "1px solid var(--imaa-dm-border, #E7ECEF)" : 0,
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",

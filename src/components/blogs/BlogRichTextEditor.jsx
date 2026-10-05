@@ -130,7 +130,7 @@ export default function BlogRichTextEditor({ value, onChange, disabled = false, 
   const linkInvalid = Boolean(linkHref) && !SAFE_LINK.test(linkHref);
 
   return (
-    <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, bgcolor: "#fff" }}>
+    <Box sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1, bgcolor: "var(--imaa-dm-surface, #fff)" }}>
       <Box
         role="toolbar"
         aria-label="Formatting"
@@ -163,7 +163,7 @@ export default function BlogRichTextEditor({ value, onChange, disabled = false, 
           "& .ProseMirror h2": { fontSize: 24, fontWeight: 800 },
           "& .ProseMirror h3": { fontSize: 20, fontWeight: 800 },
           "& .ProseMirror blockquote": { borderLeft: "4px solid #0A9396", m: 0, pl: 2, color: "text.secondary" },
-          "& .ProseMirror a": { color: "#0A9396", textDecoration: "underline" },
+          "& .ProseMirror a": { color: "var(--imaa-dm-teal-text, #0A9396)", textDecoration: "underline" },
           "& .ProseMirror ul, & .ProseMirror ol": { pl: 3 },
           "& .ProseMirror ul": { listStyleType: "disc" },
           "& .ProseMirror ol": { listStyleType: "decimal" },

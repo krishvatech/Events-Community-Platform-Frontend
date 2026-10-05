@@ -124,10 +124,10 @@ function PaidCartToast({ eventTitle, onGoToCart }) {
           alignSelf: { xs: "flex-start", sm: "center" },
           textTransform: "none",
           borderRadius: 999,
-          backgroundColor: "#fff",
-          color: "#047857",
+          backgroundColor: "var(--imaa-dm-surface, #fff)",
+          color: "var(--imaa-dm-green-text, #047857)",
           boxShadow: "none",
-          "&:hover": { backgroundColor: "#ecfdf5", boxShadow: "none" },
+          "&:hover": { backgroundColor: "var(--imaa-dm-surface-hover, #ecfdf5)", boxShadow: "none" },
         }}
       >
         Go to cart
@@ -1321,7 +1321,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                       py: 0.5,
                       px: 1.25,
                       borderRadius: 2,
-                      backgroundColor: "#CBD5E1",
+                      backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
                     }}
                   >
                     {effectiveJoinLabel}
@@ -1964,7 +1964,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             py: 0.5,
                             px: 1.25,
                             borderRadius: 2,
-                            backgroundColor: "#CBD5E1",
+                            backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
                           }}
                         >
                           {effectiveJoinLabel}
@@ -3282,10 +3282,10 @@ export default function EventsPage() {
   const selectSx = {
     height: 42,                       // 12 * 4px
     borderRadius: 1,                 // rounded-xl
-    bgcolor: "white",
+    bgcolor: "var(--imaa-dm-surface, white)",
     minWidth: { xs: 200, sm: 190, lg: 160 },
     "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
-    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "#CBD5E1" },
+    "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "var(--imaa-dm-border-strong, #CBD5E1)" },
     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
       borderColor: "primary.main",
       borderWidth: 2,
@@ -3321,8 +3321,8 @@ export default function EventsPage() {
         boxShadow: "0 12px 28px rgba(16,24,40,.12)",
         "& .MuiMenuItem-root": {
           py: 1.25, px: 2, borderRadius: 1, fontSize: 13,
-          "&.Mui-selected, &.Mui-selected:hover": { bgcolor: "grey.100" },
-          "&:hover": { bgcolor: "grey.100" },
+          "&.Mui-selected, &.Mui-selected:hover": { bgcolor: "var(--imaa-dm-surface-hover, #f5f5f5)" },
+          "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #f5f5f5)" },
         },
       },
     },
@@ -3941,8 +3941,8 @@ export default function EventsPage() {
                       min={0}
                       max={Math.max(0, Number(maxPrice) || 0)}
                       sx={{
-                        "& .MuiSlider-thumb": { bgcolor: "white" },
-                        "& .MuiSlider-track": { bgcolor: "white" },
+                        "& .MuiSlider-thumb": { bgcolor: "var(--imaa-dm-surface, white)" },
+                        "& .MuiSlider-track": { bgcolor: "var(--imaa-dm-surface, white)" },
                         "& .MuiSlider-rail": { opacity: 0.3 },
                       }}
                     />
@@ -4594,8 +4594,8 @@ export default function EventsPage() {
                   min={0}
                   max={Math.max(0, Number(maxPrice) || 0)}
                   sx={{
-                    '& .MuiSlider-thumb': { bgcolor: 'white' },
-                    '& .MuiSlider-track': { bgcolor: 'white' },
+                    '& .MuiSlider-thumb': { bgcolor: 'var(--imaa-dm-surface, white)' },
+                    '& .MuiSlider-track': { bgcolor: 'var(--imaa-dm-surface, white)' },
                     '& .MuiSlider-rail': { opacity: 0.3 },
                   }}
                 />

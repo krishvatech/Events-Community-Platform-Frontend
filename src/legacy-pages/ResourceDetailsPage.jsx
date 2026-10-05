@@ -266,12 +266,12 @@ function ResourcePreview({ resource }) {
               width: 44,
               height: 44,
               borderRadius: 1.5,
-              bgcolor: "grey.100",
+              bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontSize: 22,
-              color: "var(--imaa-teal-hover)",
+              color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))",
             }}
           >
             📎
@@ -461,7 +461,7 @@ export default function ResourceDetailsPage() {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f7f8fa", width: "100%", minWidth: 0, overflow: "hidden" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-dm-page, #f7f8fa)", width: "100%", minWidth: 0, overflow: "hidden" }}>
       <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">

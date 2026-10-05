@@ -178,7 +178,7 @@ const ReviewQueueStats = ({ eventId, filters, refreshKey }) => {
             borderRadius: '2px'
           }}
         />
-        <Typography variant="h5" sx={{ fontWeight: 700, color: '#212121' }}>
+        <Typography variant="h5" sx={{ fontWeight: 700, color: 'var(--imaa-dm-text, #212121)' }}>
           Review Queue Overview
         </Typography>
       </Box>

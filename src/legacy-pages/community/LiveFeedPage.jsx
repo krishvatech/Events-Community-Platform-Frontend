@@ -43,7 +43,7 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.extend(localizedFormat);
 
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 // LinkedIn-style reactions 
 const POST_REACTIONS = [
   { id: "like", emoji: "👍", label: "Like" },
@@ -706,7 +706,7 @@ function SuggestedGroups({ list = [], loading = false, onJoined }) {
                     borderRadius: 1.5,
                     overflow: "hidden",
                     mb: 1,
-                    bgcolor: "grey.100",
+                    bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)",
                     mx: "auto",
                   }}
                 >
@@ -1319,7 +1319,7 @@ function ClampedText({
 // ---- EVENT BLOCK ----
 function EventBlock({ post, onOpen }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ gap: 1 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
@@ -1391,7 +1391,7 @@ function ResourceBlock({ post, onOpenEvent }) {
   const iframeSrc = ytEmbed || vmEmbed;
 
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "#e2e8f0", bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #e2e8f0)", bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ gap: 1 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 700, flex: 1, minWidth: 0 }}>
           {r.title}
@@ -1446,7 +1446,7 @@ function ResourceBlock({ post, onOpenEvent }) {
               src={r.video_url}
               controls
               preload="metadata"
-              sx={{ width: "100%", maxHeight: 420, borderRadius: 1, border: "1px solid #e2e8f0", mt: 0.5 }}
+              sx={{ width: "100%", maxHeight: 420, borderRadius: 1, border: "1px solid var(--imaa-dm-border, #e2e8f0)", mt: 0.5 }}
             />
           )}
         </Box>
@@ -1459,7 +1459,7 @@ function ResourceBlock({ post, onOpenEvent }) {
             mt: 1,
             borderRadius: 1,
             overflow: "hidden",
-            border: "1px solid #e2e8f0",
+            border: "1px solid var(--imaa-dm-border, #e2e8f0)",
             bgcolor: "background.paper",
           }}
         >
@@ -1483,7 +1483,7 @@ function ResourceBlock({ post, onOpenEvent }) {
             mt: 1,
             borderRadius: 1,
             overflow: "hidden",
-            border: "1px solid #e2e8f0",
+            border: "1px solid var(--imaa-dm-border, #e2e8f0)",
             bgcolor: "background.paper",
           }}
         >
@@ -1503,7 +1503,7 @@ function ResourceBlock({ post, onOpenEvent }) {
             mt: 1,
             p: 1.25,
             borderRadius: 1,
-            borderColor: "#e2e8f0",
+            borderColor: "var(--imaa-dm-border, #e2e8f0)",
             bgcolor: "background.paper",
           }}
         >
@@ -1513,7 +1513,7 @@ function ResourceBlock({ post, onOpenEvent }) {
                 width: 44,
                 height: 44,
                 borderRadius: 1.5,
-                bgcolor: "grey.100",
+                bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
@@ -1637,7 +1637,7 @@ function CommentItem({
     <Box
       sx={{
         pl: depth ? 2 : 0,
-        borderLeft: depth ? "2px solid #e2e8f0" : "none",
+        borderLeft: depth ? "2px solid var(--imaa-dm-border, #e2e8f0)" : "none",
         ml: depth ? 1.5 : 0,
         mt: depth ? 1 : 0
       }}
@@ -2840,7 +2840,7 @@ function PostCard({ post, onReact, onOpenPost, onPollVote, onOpenEvent, viewerId
               )}
 
               {post.type === "link" && (
-                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+                <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                   {post.text && (
                     <Box sx={{ mb: 1 }}>
                       <ClampedText text={post.text} maxLines={5} />
@@ -3058,7 +3058,7 @@ function PostSkeleton() {
         p: 2,
         mb: 2,
         borderRadius: 3,
-        borderColor: "#e2e8f0",
+        borderColor: "var(--imaa-dm-border, #e2e8f0)",
         width: "100%", // ✅ Forces full width
         maxWidth: "100%", // ✅ Ensures it doesn't shrink on larger screens
         mx: "auto",

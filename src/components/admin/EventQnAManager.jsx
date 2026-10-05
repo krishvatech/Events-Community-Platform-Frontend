@@ -271,7 +271,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
     borderRadius: 4,
     border: "1px solid",
     borderColor: "rgba(15,23,42,0.14)",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "var(--imaa-dm-surface-alt, #f8fafc)",
     boxShadow: "0 2px 6px rgba(15,23,42,0.06)",
   };
 
@@ -323,7 +323,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
                 <Typography variant="body2" color="text.secondary">No pre-event questions for current filters.</Typography>
               )}
               {filteredQuestions.map((q) => (
-                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "#ffffff" }}>
+                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "var(--imaa-dm-surface, #ffffff)" }}>
                   <Stack direction="row" spacing={1} alignItems="center" mb={1} flexWrap="wrap">
                     <Chip
                       size="small"
@@ -567,7 +567,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
           ) : (
             <Stack spacing={1.5}>
               {unansweredPostEventQuestions.map((q) => (
-                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "#ffffff" }}>
+                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "var(--imaa-dm-surface, #ffffff)" }}>
                   <Typography variant="body2" sx={{ mb: 0.8, fontWeight: 500 }}>{q.content}</Typography>
                   <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mb: 1 }}>
                     <Typography variant="caption" color="text.secondary">
@@ -608,7 +608,7 @@ export default function EventQnAManager({ event, onEventUpdated }) {
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>Answered Questions</Typography>
             <Stack spacing={1.5}>
               {postEventAnswered.map((q) => (
-                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "#f0fdf4" }}>
+                <Paper key={q.id} variant="outlined" sx={{ p: 1.6, borderRadius: 2.5, backgroundColor: "var(--imaa-dm-surface-alt, #f0fdf4)" }}>
                   <Typography variant="body2" sx={{ mb: 0.8, fontWeight: 500 }}>{q.content}</Typography>
                   <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mb: 1 }}>
                     <Typography variant="caption" color="text.secondary">

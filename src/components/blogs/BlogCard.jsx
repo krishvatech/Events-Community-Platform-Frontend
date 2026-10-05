@@ -43,7 +43,7 @@ export default function BlogCard({
         height: "100%",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "#fff",
+        bgcolor: "var(--imaa-dm-surface, #fff)",
         border: `1px solid ${BLOG_BORDER}`,
         borderRadius: admin ? "14px" : "var(--imaa-radius-card)",
         overflow: "hidden",
@@ -75,7 +75,7 @@ export default function BlogCard({
                 label={category.name}
                 size="small"
                 onClick={onCategoryClick ? () => onCategoryClick(category) : undefined}
-                sx={{ bgcolor: "#E8F7F7", color: BLOG_TEAL, fontWeight: 700, fontSize: 11 }}
+                sx={{ bgcolor: "var(--imaa-dm-surface-alt, #E8F7F7)", color: BLOG_TEAL, fontWeight: 700, fontSize: 11 }}
               />
             ))}
           </Stack>
@@ -117,7 +117,7 @@ export default function BlogCard({
           <Typography
             sx={{
               fontSize: 14,
-              color: "#374151",
+              color: "var(--imaa-dm-text-2, #374151)",
               display: "-webkit-box",
               WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",

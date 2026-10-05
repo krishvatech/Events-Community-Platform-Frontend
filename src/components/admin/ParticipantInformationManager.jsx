@@ -315,7 +315,7 @@ export default function ParticipantInformationManager({ eventId }) {
           sx={{
             width: '100%',
             height: 8,
-            backgroundColor: '#e0e0e0',
+            backgroundColor: 'var(--imaa-dm-muted, #e0e0e0)',
             borderRadius: 4,
             overflow: 'hidden',
             mb: 3,
@@ -481,7 +481,7 @@ export default function ParticipantInformationManager({ eventId }) {
       <TableContainer component={Paper}>
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+            <TableRow sx={{ backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }}>
               <TableCell padding="checkbox">
                 <Checkbox
                   indeterminate={selectedAssignments.size > 0 && selectedAssignments.size < assignments.length}

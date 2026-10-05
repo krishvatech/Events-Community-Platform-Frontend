@@ -154,7 +154,7 @@ export default function AdminCarts() {
           elevation={0}
           sx={{
             borderRadius: 3,
-            border: "1px solid #e5e7eb",
+            border: "1px solid var(--imaa-dm-border, #e5e7eb)",
             p: 3,
           }}
         >
@@ -582,7 +582,7 @@ export default function AdminCarts() {
                       <span
                         style={{
                           fontWeight: 600,
-                          color: "var(--imaa-teal-hover)",
+                          color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))",
                         }}
                       >
                         −{fmt(discount)}

@@ -54,7 +54,7 @@ export function LeadGenModal({
         fontSize: '1.5rem',
         fontWeight: 700,
         textAlign: 'center',
-        color: '#1f2937',
+        color: 'var(--imaa-dm-text, #1f2937)',
         pb: 1,
       }}>
         Complete your profile to register
@@ -62,13 +62,13 @@ export function LeadGenModal({
 
       <DialogContent sx={{ pt: 3, pb: 2 }}>
         <Box sx={{
-          backgroundColor: '#f0f9ff',
-          border: '1px solid #bfdbfe',
+          backgroundColor: 'var(--imaa-dm-surface-alt, #f0f9ff)',
+          border: '1px solid var(--imaa-dm-border-strong, #bfdbfe)',
           borderRadius: '8px',
           p: 2.5,
           mb: 2,
         }}>
-          <Typography variant="body2" sx={{ color: '#1f2937', lineHeight: 1.6, mb: 2 }}>
+          <Typography variant="body2" sx={{ color: 'var(--imaa-dm-text, #1f2937)', lineHeight: 1.6, mb: 2 }}>
             Some required profile details are missing. Please update your profile before registering for this event.
           </Typography>
 
@@ -80,12 +80,12 @@ export function LeadGenModal({
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
-                  color: '#1f2937',
+                  color: 'var(--imaa-dm-text, #1f2937)',
                   mb: idx < getMissingFieldsList().length - 1 ? 0.8 : 0,
                   fontWeight: 500,
                 }}
               >
-                <Box sx={{ mr: 1.5, color: '#ef4444', fontWeight: 'bold' }}>•</Box>
+                <Box sx={{ mr: 1.5, color: 'var(--imaa-dm-red-text, #ef4444)', fontWeight: 'bold' }}>•</Box>
                 {fieldName} is missing
               </Typography>
             ))}
@@ -95,7 +95,7 @@ export function LeadGenModal({
 
       <DialogActions sx={{
         p: 2.5,
-        borderTop: '1px solid #e5e7eb',
+        borderTop: '1px solid var(--imaa-dm-border, #e5e7eb)',
         display: 'flex',
         justifyContent: 'center',
         gap: 1.5,

@@ -462,7 +462,7 @@ function SaleorStaffTab({ currentUserId }) {
             <TableContainer component={Paper} variant="outlined">
                 <Table aria-label="Saleor staff members" aria-busy={loading || undefined}>
                     <TableHead>
-                        <TableRow sx={{ backgroundColor: "#f3f4f6" }}>
+                        <TableRow sx={{ backgroundColor: "var(--imaa-dm-surface-alt, #f3f4f6)" }}>
                             <TableCell>Superuser</TableCell>
                             <TableCell>Email</TableCell>
                             <TableCell align="center">Saleor Status</TableCell>
@@ -833,7 +833,7 @@ function MarketingAccessTab({ currentUserId, navigate }) {
             <TableContainer component={Paper} variant="outlined">
                 <Table aria-label="Users with marketing access" aria-busy={loading || undefined}>
                     <TableHead>
-                        <TableRow sx={{ backgroundColor: "#f3f4f6" }}>
+                        <TableRow sx={{ backgroundColor: "var(--imaa-dm-surface-alt, #f3f4f6)" }}>
                             <TableCell>Superuser</TableCell>
                             <TableCell>Email</TableCell>
                             <TableCell align="center">Marketing Status</TableCell>
@@ -1462,7 +1462,7 @@ export default function AdminStaffPage() {
                                         label={`${totalCount} Registered users`}
                                         size="small"
                                         variant="outlined"
-                                        sx={{ borderColor: "var(--imaa-teal)", color: "var(--imaa-teal-hover)", fontWeight: 700 }}
+                                        sx={{ borderColor: "var(--imaa-teal)", color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))", fontWeight: 700 }}
                                     />
                                 )}
                             </Box>
@@ -1566,8 +1566,8 @@ export default function AdminStaffPage() {
                                     gap: 2,
                                     mb: 2,
                                     p: 2,
-                                    bgcolor: "#fef2f2",
-                                    border: "1px solid #fecaca",
+                                    bgcolor: "var(--imaa-dm-surface-alt, #fef2f2)",
+                                    border: "1px solid var(--imaa-dm-tint-red-border, #fecaca)",
                                     borderRadius: 1
                                 }}>
                                     <Chip
@@ -2076,13 +2076,13 @@ export default function AdminStaffPage() {
                                                 p: 2,
                                                 borderRadius: 1,
                                                 border: "2px solid",
-                                                borderColor: selectedPrimaryId === user.id ? "#10b981" : "#e5e7eb",
-                                                bgcolor: selectedPrimaryId === user.id ? "#f0fdf4" : "#ffffff",
+                                                borderColor: selectedPrimaryId === user.id ? "#10b981" : "var(--imaa-dm-border, #e5e7eb)",
+                                                bgcolor: selectedPrimaryId === user.id ? "var(--imaa-dm-surface-alt, #f0fdf4)" : "var(--imaa-dm-surface, #ffffff)",
                                                 cursor: "pointer",
                                                 transition: "all 0.2s",
                                                 "&:hover": {
                                                     borderColor: "#10b981",
-                                                    bgcolor: "#f9fafb",
+                                                    bgcolor: "var(--imaa-dm-surface-hover, #f9fafb)",
                                                 },
                                             }}
                                         >
@@ -2119,7 +2119,7 @@ export default function AdminStaffPage() {
 
                                     {/* Dry-run Preview */}
                                     {dryRunResult && (
-                                        <Box sx={{ p: 2, bgcolor: "#f3f4f6", borderRadius: 1 }}>
+                                        <Box sx={{ p: 2, bgcolor: "var(--imaa-dm-surface-alt, #f3f4f6)", borderRadius: 1 }}>
                                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                                                 Merge Preview:
                                             </Typography>

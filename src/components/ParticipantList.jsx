@@ -65,7 +65,7 @@ const SortableParticipantRow = ({ participant, index, onEdit, onRemove, onMoveUp
       </TableCell>
       <TableCell>
         <Stack direction="row" spacing={1} alignItems="center">
-          <Avatar src={participant.imageUrl} sx={{ width: 36, height: 36, bgcolor: "grey.100" }}>
+          <Avatar src={participant.imageUrl} sx={{ width: 36, height: 36, bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)" }}>
             {name.charAt(0).toUpperCase()}
           </Avatar>
           <Stack spacing={0} sx={{ flex: 1 }}>
@@ -151,7 +151,7 @@ const ParticipantList = ({ participants, onEdit, onRemove, onReorder }) => {
         sx={{
           p: 3,
           textAlign: "center",
-          backgroundColor: "rgba(0, 0, 0, 0.02)",
+          backgroundColor: "var(--imaa-dm-overlay, rgba(0, 0, 0, 0.02))",
           borderRadius: "12px",
           border: "1px dashed",
           borderColor: "divider",
@@ -195,7 +195,7 @@ const ParticipantList = ({ participants, onEdit, onRemove, onReorder }) => {
           <TableContainer component={Paper} sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
             <Table size="small">
               <TableHead>
-                <TableRow sx={{ bgcolor: "grey.50" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                   <TableCell align="center" sx={{ width: "40px" }}>
                     ≡
                   </TableCell>
@@ -265,7 +265,7 @@ const ParticipantList = ({ participants, onEdit, onRemove, onReorder }) => {
                       right: 8,
                       display: "flex",
                       gap: 0.5,
-                      backgroundColor: "rgba(255, 255, 255, 0.9)",
+                      backgroundColor: "var(--imaa-dm-glass, rgba(255, 255, 255, 0.9))",
                       borderRadius: "8px",
                       zIndex: 1,
                     }}

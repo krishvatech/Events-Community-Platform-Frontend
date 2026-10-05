@@ -199,7 +199,7 @@ function CapabilityGroup({ title, description, events, loading }) {
     <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2.5 }}>
       <Stack spacing={1.5}>
         <Box>
-          <Typography variant="h6" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+          <Typography variant="h6" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
             {title}
           </Typography>
           <Typography color="text.secondary">{description}</Typography>
@@ -288,7 +288,7 @@ function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading 
       <Stack spacing={2}>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "flex-start" }} justifyContent="space-between">
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+            <Typography variant="subtitle1" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
               Selected Event Configuration
             </Typography>
             <Typography color="text.secondary" sx={{ overflowWrap: "anywhere" }}>
@@ -489,7 +489,7 @@ function CanvasNodeConfigPanel({
               <Typography variant="caption" color="text.secondary">
                 Node Type
               </Typography>
-              <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+              <Typography variant="subtitle1" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
                 {canvasNodeTypeLabel(node.nodeType)}
               </Typography>
             </Box>
@@ -1506,7 +1506,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               <Stack direction="row" spacing={1.25} alignItems="center">
                 <AccountTreeRoundedIcon color="primary" />
                 <Box>
-                  <Typography variant="h6" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                  <Typography variant="h6" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
                     Campaign Settings
                   </Typography>
                   <Typography color="text.secondary">
@@ -1597,7 +1597,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2 }}>
                 <Stack spacing={2}>
                   <Box>
-                    <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                    <Typography variant="subtitle1" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
                       Campaign Preview
                     </Typography>
                     <Typography color="text.secondary">
@@ -1667,7 +1667,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               <Stack direction="row" spacing={1.25} alignItems="center">
                 <AccountTreeRoundedIcon color="primary" />
                 <Box>
-                  <Typography variant="h6" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                  <Typography variant="h6" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
                     Workflow Events
                   </Typography>
                   <Typography color="text.secondary">
@@ -1679,7 +1679,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2 }}>
                 <Stack spacing={2}>
                   <Box>
-                    <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                    <Typography variant="subtitle1" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
                       Add Workflow Event
                     </Typography>
                     <Typography color="text.secondary">
@@ -1762,7 +1762,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               <Paper variant="outlined" sx={{ ...builderSurfaceSx, p: 2 }}>
                 <Stack spacing={2}>
                   <Box>
-                    <Typography variant="subtitle1" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                    <Typography variant="subtitle1" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
                       Events Summary
                     </Typography>
                     <Typography color="text.secondary">
@@ -1824,7 +1824,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
           {builderTab === "canvas" && (
             <Stack spacing={2.5}>
               <Box>
-                <Typography variant="h6" sx={{ color: "#1B2A4A", fontWeight: 850 }}>
+                <Typography variant="h6" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>
                   Visual Workflow Canvas
                 </Typography>
                 <Typography color="text.secondary">

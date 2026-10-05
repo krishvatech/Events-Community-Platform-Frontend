@@ -1,4 +1,8 @@
-:root {
+/* `[data-imaa-color-mode="light"]` re-declares these values on an element that must stay light
+   inside a dark page (force-light routes put it on <body>; see src/theme/colorMode.js). Without
+   the attribute (dark mode disabled) only `:root` matches, as before. */
+:root,
+[data-imaa-color-mode="light"] {
   /* IMAA Brand palette (reference: imaa-connect-v3) */
   --imaa-orange: #E8532F;
   --imaa-orange-hover: #CC4422;
@@ -77,6 +81,235 @@
   --imaa-focus-color: var(--imaa-teal);
   --imaa-focus-width: 2px;
   --imaa-focus-offset: 2px;
+
+  /* ── Semantic colours added for dark mode (phase D2) ─────────────────────
+     Light values equal the fixed colours they replace, so light mode is unchanged. */
+  --imaa-bg-surface: #FFFFFF;        /* cards, panels, sidebar user strip */
+  --imaa-bg-surface-hover: #F9FAFB;
+  --imaa-bg-hover: rgba(27, 42, 74, 0.05); /* row / nav-item hover */
+  --imaa-nav-text: #2C3E5A;          /* sidebar navigation labels */
+  --imaa-body-text: #111827;         /* default page text (was Tailwind text-gray-900 on <body>) */
+  --imaa-input-outline: rgba(27, 42, 74, 0.3);  /* MUI outlined input, resting */
+  --imaa-chip-outline: rgba(27, 42, 74, 0.25);  /* MUI outlined default chip */
+  --imaa-tooltip-bg: #1B2A4A;
+  --imaa-scrollbar-thumb: rgba(0, 0, 0, 0.2);        /* custom thin scrollbars (member sidebar) */
+  --imaa-scrollbar-thumb-hover: rgba(0, 0, 0, 0.3);
+}
+
+/* Light mode set explicitly (dark mode enabled): native controls and scrollbars stay light,
+   including on force-light pages inside a dark preference. */
+[data-imaa-color-mode="light"],
+html:has(> body[data-imaa-color-mode="light"]) /* force-light page: the page scrollbar belongs to <html> */ {
+  color-scheme: light;
+}
+
+/* ── Dark mode (phase D2) ────────────────────────────────────────────────────────────────────
+   Only semantic grounds, text, lines and shadows change. Brand colours (navy, teal, orange,
+   coral, purple, gold, link) stay fixed; their light tints (used as backgrounds) become dark
+   tints. MUI's dark palette in src/muiTheme.js uses the same values; keep the two in sync.
+   Must follow the `:root` block above. */
+[data-imaa-color-mode="dark"] {
+  color-scheme: dark;
+
+  --surface: #16213A;
+  --surface-muted: #0E1626;
+  --surface-border: #24304A;
+  --surface-border-strong: #2A3651;
+
+  --text-primary: #E8ECF3;
+  --text-secondary: #A8B1C0;
+  --text-muted: #7D8798;
+
+  --sidebar-bg: #121D33;
+  --sidebar-border: #24304A;
+
+  --imaa-bg-cool: #121D33;
+  --imaa-bg-member: #0E1626;
+  --imaa-ink: #E8ECF3;
+  --imaa-ink-body: #B3BCCB;
+  --imaa-ink-meta: #9AA3B2;
+  --imaa-ink-hint: #6F7A8C;
+  --imaa-border: #2A3651;
+  --imaa-border-hover: #3A4867;
+  --imaa-hairline: rgba(226, 232, 240, 0.14);
+
+  /* Brand tints used as light backgrounds (chips, highlights): dark tinted grounds in dark mode,
+     so the text on them (which turns light) stays readable. The brand hues themselves are fixed. */
+  --imaa-teal-light: #163C4D;
+  --imaa-orange-light: #3F3034;
+
+  --imaa-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --imaa-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.45);
+  --imaa-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.55);
+
+  --imaa-bg-surface: #16213A;
+  --imaa-bg-surface-hover: #1E2A44;
+  --imaa-bg-hover: rgba(255, 255, 255, 0.06);
+  --imaa-nav-text: #C9D1DE;
+  --imaa-body-text: #E8ECF3;
+  --imaa-input-outline: rgba(226, 232, 240, 0.3);
+  --imaa-chip-outline: rgba(226, 232, 240, 0.25);
+  --imaa-tooltip-bg: #2C3E5A;
+  --imaa-scrollbar-thumb: rgba(255, 255, 255, 0.2);
+  --imaa-scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+}
+
+/* ── Dark-mode override tokens ──────────────────────────────────────────────────────────────
+   Components with hard-coded light colours write them as `var(--imaa-dm-ROLE, <light value>)`,
+   e.g. `bgcolor: "var(--imaa-dm-surface, #fff)"`. These tokens are set ONLY in dark mode; in
+   light mode (and on force-light pages inside a dark preference) they are reset, so the browser
+   uses the original light value. Light mode is therefore unchanged by construction.
+   `-rgb` variants hold space-separated channels for Tailwind (tailwind.config.js).
+   Status tints (`tint-*`, `*-text`) keep their meaning with dark-mode contrast. */
+:root,
+[data-imaa-color-mode="light"] {
+  --imaa-dm-page: initial;
+  --imaa-dm-page-rgb: initial;
+  --imaa-dm-surface: initial;
+  --imaa-dm-surface-rgb: initial;
+  --imaa-dm-surface-alt: initial;
+  --imaa-dm-surface-alt-rgb: initial;
+  --imaa-dm-surface-hover: initial;
+  --imaa-dm-surface-hover-rgb: initial;
+  --imaa-dm-muted: initial;
+  --imaa-dm-muted-rgb: initial;
+  --imaa-dm-muted-strong: initial;
+  --imaa-dm-muted-strong-rgb: initial;
+  --imaa-dm-text: initial;
+  --imaa-dm-text-rgb: initial;
+  --imaa-dm-text-2: initial;
+  --imaa-dm-text-2-rgb: initial;
+  --imaa-dm-text-body: initial;
+  --imaa-dm-text-body-rgb: initial;
+  --imaa-dm-text-meta: initial;
+  --imaa-dm-text-meta-rgb: initial;
+  --imaa-dm-text-hint: initial;
+  --imaa-dm-text-hint-rgb: initial;
+  --imaa-dm-text-faint: initial;
+  --imaa-dm-text-faint-rgb: initial;
+  --imaa-dm-border: initial;
+  --imaa-dm-border-rgb: initial;
+  --imaa-dm-border-strong: initial;
+  --imaa-dm-border-strong-rgb: initial;
+  --imaa-dm-overlay: initial;
+  --imaa-dm-glass: initial;
+  --imaa-dm-tint-red: initial;
+  --imaa-dm-tint-red-rgb: initial;
+  --imaa-dm-tint-red-border: initial;
+  --imaa-dm-tint-red-border-rgb: initial;
+  --imaa-dm-red-text: initial;
+  --imaa-dm-red-text-rgb: initial;
+  --imaa-dm-tint-orange: initial;
+  --imaa-dm-tint-orange-rgb: initial;
+  --imaa-dm-tint-orange-border: initial;
+  --imaa-dm-tint-orange-border-rgb: initial;
+  --imaa-dm-orange-text: initial;
+  --imaa-dm-orange-text-rgb: initial;
+  --imaa-dm-tint-amber: initial;
+  --imaa-dm-tint-amber-rgb: initial;
+  --imaa-dm-tint-amber-border: initial;
+  --imaa-dm-tint-amber-border-rgb: initial;
+  --imaa-dm-amber-text: initial;
+  --imaa-dm-amber-text-rgb: initial;
+  --imaa-dm-tint-green: initial;
+  --imaa-dm-tint-green-rgb: initial;
+  --imaa-dm-tint-green-border: initial;
+  --imaa-dm-tint-green-border-rgb: initial;
+  --imaa-dm-green-text: initial;
+  --imaa-dm-green-text-rgb: initial;
+  --imaa-dm-tint-teal: initial;
+  --imaa-dm-tint-teal-rgb: initial;
+  --imaa-dm-tint-teal-border: initial;
+  --imaa-dm-tint-teal-border-rgb: initial;
+  --imaa-dm-teal-text: initial;
+  --imaa-dm-teal-text-rgb: initial;
+  --imaa-dm-tint-blue: initial;
+  --imaa-dm-tint-blue-rgb: initial;
+  --imaa-dm-tint-blue-border: initial;
+  --imaa-dm-tint-blue-border-rgb: initial;
+  --imaa-dm-blue-text: initial;
+  --imaa-dm-blue-text-rgb: initial;
+  --imaa-dm-tint-purple: initial;
+  --imaa-dm-tint-purple-rgb: initial;
+  --imaa-dm-tint-purple-border: initial;
+  --imaa-dm-tint-purple-border-rgb: initial;
+  --imaa-dm-purple-text: initial;
+  --imaa-dm-purple-text-rgb: initial;
+}
+
+[data-imaa-color-mode="dark"] {
+  --imaa-dm-page: #0E1626; /* page background (member/cool grounds) */
+  --imaa-dm-page-rgb: 14 22 38;
+  --imaa-dm-surface: #16213A; /* cards, panels, dialogs, inputs (was white) */
+  --imaa-dm-surface-rgb: 22 33 58;
+  --imaa-dm-surface-alt: #121D33; /* inset / subtle panels, table heads (was #f9fafb-like) */
+  --imaa-dm-surface-alt-rgb: 18 29 51;
+  --imaa-dm-surface-hover: #1E2A44; /* hover / selected rows */
+  --imaa-dm-surface-hover-rgb: 30 42 68;
+  --imaa-dm-muted: #24304A; /* neutral fills: chips, skeletons, bubbles (was #e5e7eb-like) */
+  --imaa-dm-muted-rgb: 36 48 74;
+  --imaa-dm-muted-strong: #3A4867; /* stronger fills: tracks, placeholders (was #d1d5db-like) */
+  --imaa-dm-muted-strong-rgb: 58 72 103;
+  --imaa-dm-text: #E8ECF3; /* primary text (was #111827 / navy text) */
+  --imaa-dm-text-rgb: 232 236 243;
+  --imaa-dm-text-2: #C9D1DE; /* secondary strong text (was #374151) */
+  --imaa-dm-text-2-rgb: 201 209 222;
+  --imaa-dm-text-body: #B3BCCB; /* body text (was #4b5563) */
+  --imaa-dm-text-body-rgb: 179 188 203;
+  --imaa-dm-text-meta: #9AA3B2; /* metadata (was #6b7280) */
+  --imaa-dm-text-meta-rgb: 154 163 178;
+  --imaa-dm-text-hint: #8691A3; /* hints, placeholders (was #9ca3af) */
+  --imaa-dm-text-hint-rgb: 134 145 163;
+  --imaa-dm-text-faint: #56627A; /* decorative icons (was #cbd5e1 text) */
+  --imaa-dm-text-faint-rgb: 86 98 122;
+  --imaa-dm-border: #2A3651; /* borders, dividers (was #e5e7eb) */
+  --imaa-dm-border-rgb: 42 54 81;
+  --imaa-dm-border-strong: #3A4867; /* strong borders (was #d1d5db) */
+  --imaa-dm-border-strong-rgb: 58 72 103;
+  --imaa-dm-overlay: rgba(255, 255, 255, 0.06); /* state layer (was rgba(0,0,0,.04)-like) */
+  --imaa-dm-glass: rgba(22, 33, 58, 0.92); /* translucent surface (was rgba(255,255,255,.9)-like) */
+  --imaa-dm-tint-red: #3D273C;
+  --imaa-dm-tint-red-rgb: 61 39 60;
+  --imaa-dm-tint-red-border: #6D2F3E;
+  --imaa-dm-tint-red-border-rgb: 109 47 62;
+  --imaa-dm-red-text: #FCA5A5;
+  --imaa-dm-red-text-rgb: 252 165 165;
+  --imaa-dm-tint-orange: #3F3034;
+  --imaa-dm-tint-orange-rgb: 63 48 52;
+  --imaa-dm-tint-orange-border: #71422C;
+  --imaa-dm-tint-orange-border-rgb: 113 66 44;
+  --imaa-dm-orange-text: #FDBA74;
+  --imaa-dm-orange-text-rgb: 253 186 116;
+  --imaa-dm-tint-amber: #3E3832;
+  --imaa-dm-tint-amber-rgb: 62 56 50;
+  --imaa-dm-tint-amber-border: #6F5327;
+  --imaa-dm-tint-amber-border-rgb: 111 83 39;
+  --imaa-dm-amber-text: #FCD34D;
+  --imaa-dm-amber-text-rgb: 252 211 77;
+  --imaa-dm-tint-green: #183F40;
+  --imaa-dm-tint-green-rgb: 24 63 64;
+  --imaa-dm-tint-green-border: #1B6348;
+  --imaa-dm-tint-green-border-rgb: 27 99 72;
+  --imaa-dm-green-text: #86EFAC;
+  --imaa-dm-green-text-rgb: 134 239 172;
+  --imaa-dm-tint-teal: #163C4D;
+  --imaa-dm-tint-teal-rgb: 22 60 77;
+  --imaa-dm-tint-teal-border: #155D65;
+  --imaa-dm-tint-teal-border-rgb: 21 93 101;
+  --imaa-dm-teal-text: #5EEAD4;
+  --imaa-dm-teal-text-rgb: 94 234 212;
+  --imaa-dm-tint-blue: #1D325C;
+  --imaa-dm-tint-blue-rgb: 29 50 92;
+  --imaa-dm-tint-blue-border: #254885;
+  --imaa-dm-tint-blue-border-rgb: 37 72 133;
+  --imaa-dm-blue-text: #93C5FD;
+  --imaa-dm-blue-text-rgb: 147 197 253;
+  --imaa-dm-tint-purple: #302A5C;
+  --imaa-dm-tint-purple-rgb: 48 42 92;
+  --imaa-dm-tint-purple-border: #503686;
+  --imaa-dm-tint-purple-border-rgb: 80 54 134;
+  --imaa-dm-purple-text: #D8B4FE;
+  --imaa-dm-purple-text-rgb: 216 180 254;
 }
 
 /* Card interactions */
@@ -92,3 +325,35 @@
 }
 .btn-imaa:hover { transform: translateY(-1px); }
 .btn-imaa:active { transform: translateY(0); }
+
+/* The IMAA logo (navy and grey on transparent) has no light version, so in dark mode it sits on a
+   small white plate. Light mode: the class has no effect. Force-light pages are excluded. */
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-logo-plate {
+  background-color: #FFFFFF;
+  border-radius: var(--imaa-radius-field);
+  padding: 3px 6px;
+}
+
+/* Inline SVG charts (class "imaa-chart", Marketing Hub analytics) in dark mode: neutral grid lines,
+   axis labels and the white tooltip/marker fills follow the dark palette. Data-series colours are
+   unchanged. CSS overrides the SVG colour attributes only in dark mode; light mode is untouched. */
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart :is(line, rect, polyline)[stroke="#E7ECEF" i],
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart :is(line, rect, polyline)[stroke="#EEF2F4" i],
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart :is(line, rect, polyline)[stroke="#E2E8F0" i] {
+  stroke: var(--imaa-dm-border);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart :is(line, rect)[stroke="#CBD5E1" i],
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart :is(line, rect)[stroke="#94A3B8" i] {
+  stroke: var(--imaa-dm-border-strong);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart :is(rect, circle)[fill="#fff" i],
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart :is(rect, circle)[fill="#FFFFFF" i] {
+  fill: var(--imaa-dm-surface);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart text[fill="#1E293B" i] {
+  fill: var(--imaa-dm-text);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart text[fill="#64748B" i],
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .imaa-chart text[fill="#475569" i] {
+  fill: var(--imaa-dm-text-meta);
+}

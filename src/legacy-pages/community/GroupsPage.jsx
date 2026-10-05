@@ -32,9 +32,9 @@ import {
   CommunityGroupCardSkeleton,
 } from "../../components/CommunityGroupCard.jsx";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
-import { colors, layout, radii, shadows } from "../../styles/designTokens";
+import { colors, layout, radii, shadows, semanticColors } from "../../styles/designTokens";
 
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 const JOIN_POLICY_LABELS = {
   open: "Open",
   approval: "Request approval",
@@ -171,7 +171,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
                 }}
                 className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
                 sx={{
-                  backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
+                  backgroundColor: value === opt.value ? "var(--imaa-dm-muted, #e0f2f1)" : "transparent",
                   fontWeight: value === opt.value ? 600 : 400,
                   color: value === opt.value ? "#10b8a6" : "inherit"
                 }}
@@ -550,13 +550,13 @@ function TopicHeader({ title, groupCount, myGroupCount }) {
   const canCreate = isAdminUser();
   return (
     <Box sx={{ mb: { xs: 3, md: 4 }, pt: 1 }}>
-      <Typography sx={{ fontSize: 11, fontWeight: 800, color: colors.tealDark, textTransform: "uppercase", letterSpacing: "0.12em", mb: 0.75 }}>
+      <Typography sx={{ fontSize: 11, fontWeight: 800, color: semanticColors.tealText, textTransform: "uppercase", letterSpacing: "0.12em", mb: 0.75 }}>
         COMMUNITY
       </Typography>
-      <Typography component="h1" variant="h4" sx={{ fontWeight: 800, color: colors.ink, mb: 1, lineHeight: 1.2 }}>
+      <Typography component="h1" variant="h4" sx={{ fontWeight: 800, color: semanticColors.text, mb: 1, lineHeight: 1.2 }}>
         Explore Groups
       </Typography>
-      <Typography sx={{ fontSize: 14, color: colors.inkBody, mb: canCreate ? 2 : 0 }}>
+      <Typography sx={{ fontSize: 14, color: semanticColors.textBody, mb: canCreate ? 2 : 0 }}>
         Join groups organized by region, industry, practice area, and topic.
       </Typography>
       {canCreate && (
@@ -612,7 +612,7 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
             mb: 2,
             borderRadius: 2,
             overflow: "hidden",
-            bgcolor: "#f8fafc",
+            bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
             border: `1px solid ${BORDER}`,
             backgroundImage:
               group.cover_image || group.cover
@@ -634,8 +634,8 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
                 height: 56,
                 borderRadius: "50%",
                 overflow: "hidden",
-                border: "4px solid white",
-                backgroundColor: "white",
+                border: "4px solid var(--imaa-dm-surface, white)",
+                backgroundColor: "var(--imaa-dm-surface, white)",
                 zIndex: 2,
                 boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
               }}
@@ -661,7 +661,7 @@ function GroupQuickViewDialog({ open, group, onClose, onJoin }) {
           </Typography>
         </Stack>
         {group.short_description && (
-          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "#334155", mb: 1 }}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700, color: "var(--imaa-dm-text-2, #334155)", mb: 1 }}>
             {group.short_description}
           </Typography>
         )}
@@ -980,7 +980,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   };
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: colors.bgMember, minHeight: "100vh" }}>
+    <Box sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: semanticColors.page, minHeight: "100vh" }}>
       <Box
         sx={{
           display: "flex",
@@ -1007,8 +1007,8 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
               gap: 2,
               mb: 3,
               p: { xs: 1.5, sm: 2 },
-              bgcolor: colors.white,
-              border: `1px solid ${colors.border}`,
+              bgcolor: semanticColors.surface,
+              border: `1px solid ${semanticColors.border}`,
               borderRadius: `${radii.card}px`,
               boxShadow: shadows.sm,
             }}
@@ -1025,8 +1025,8 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   sx={{
                     px: 2, py: 0.75, minHeight: 40, borderRadius: `${radii.pill}px`,
                     fontSize: 13, fontWeight: tabIndex === i ? 700 : 500,
-                    color: tabIndex === i ? colors.ink : colors.inkBody,
-                    bgcolor: tabIndex === i ? colors.bgCool : "transparent",
+                    color: tabIndex === i ? semanticColors.text : semanticColors.textBody,
+                    bgcolor: tabIndex === i ? semanticColors.surfaceCool : "transparent",
                     display: "flex", alignItems: "center", gap: "6px",
                     textTransform: "none",
                   }}
@@ -1035,8 +1035,8 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
                   {tab.count > 0 && (
                     <Box component="span" sx={{
                       fontSize: 11, fontWeight: 700,
-                      bgcolor: tabIndex === i ? colors.tealDark : colors.border,
-                      color: tabIndex === i ? colors.white : colors.inkBody,
+                      bgcolor: tabIndex === i ? colors.tealDark : semanticColors.border,
+                      color: tabIndex === i ? colors.white : semanticColors.textBody,
                       px: "7px", py: "1px", borderRadius: "100px",
                     }}>
                       {tab.count}
@@ -1053,10 +1053,10 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon fontSize="small" sx={{ color: colors.inkBody }} />
+                    <SearchIcon fontSize="small" sx={{ color: semanticColors.textBody }} />
                   </InputAdornment>
                 ),
-                sx: { borderRadius: `${radii.field}px`, fontSize: 13, bgcolor: colors.white }
+                sx: { borderRadius: `${radii.field}px`, fontSize: 13, bgcolor: semanticColors.surface }
               }}
               sx={{ width: { xs: "100%", sm: 260 } }}
             />
@@ -1111,7 +1111,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
 
           {/* Showing count */}
           {!loading && (
-            <Typography sx={{ fontSize: 12, fontWeight: 700, color: colors.inkBody, textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
+            <Typography sx={{ fontSize: 12, fontWeight: 700, color: semanticColors.textBody, textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
               {tabIndex === 0 ? "ALL GROUPS" : "MY GROUPS"} {filtered.length}
             </Typography>
           )}
@@ -1194,12 +1194,12 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
           ) : (
             <Paper
               variant="outlined"
-              sx={{ textAlign: "center", py: { xs: 6, md: 8 }, px: 2, borderColor: colors.border, borderRadius: `${radii.card}px`, boxShadow: "none" }}
+              sx={{ textAlign: "center", py: { xs: 6, md: 8 }, px: 2, borderColor: semanticColors.border, borderRadius: `${radii.card}px`, boxShadow: "none" }}
             >
-              <Typography component="h2" sx={{ color: colors.ink, fontSize: 16, fontWeight: 700, mb: 0.5 }}>
+              <Typography component="h2" sx={{ color: semanticColors.text, fontSize: 16, fontWeight: 700, mb: 0.5 }}>
                 {tabIndex === 0 ? "No groups found." : "You haven't joined any groups yet."}
               </Typography>
-              <Typography variant="body2" sx={{ color: colors.inkBody }}>
+              <Typography variant="body2" sx={{ color: semanticColors.textBody }}>
                 {q || selectedRegions.length || selectedJoinPolicies.length || selectedVisibilities.length
                   ? "Try a different search term or filter selection."
                   : "Groups will appear here when they are available."}

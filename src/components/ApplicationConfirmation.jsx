@@ -44,7 +44,7 @@ const ApplicationConfirmation = ({
           '& li': { mb: 0.5 },
           '& strong': { fontWeight: 'bold' },
           '& em': { fontStyle: 'italic' },
-          '& a': { color: '#1976d2', textDecoration: 'none' },
+          '& a': { color: 'var(--imaa-dm-blue-text, #1976d2)', textDecoration: 'none' },
           '& a:hover': { textDecoration: 'underline' },
         }}
         dangerouslySetInnerHTML={{
@@ -161,7 +161,7 @@ const ApplicationConfirmation = ({
                 )}
 
                 {/* Track-specific next steps */}
-                <Box sx={{ mt: 2, p: 2, backgroundColor: 'rgba(0, 0, 0, 0.02)', borderRadius: 1 }}>
+                <Box sx={{ mt: 2, p: 2, backgroundColor: 'var(--imaa-dm-overlay, rgba(0, 0, 0, 0.02))', borderRadius: 1 }}>
                   <Typography variant="subtitle2" fontWeight={600} gutterBottom>
                     Next Steps
                   </Typography>

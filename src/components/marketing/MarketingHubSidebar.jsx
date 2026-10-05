@@ -35,10 +35,10 @@ import { apiClient } from "../../utils/api";
 import { logoutBrowserSession } from "../../utils/logoutSession";
 import { getAccessToken } from "../../utils/tokenStore";
 
-const ORANGE = "#E8532F";
-const TEXT = "#2C3E5A";
+const ORANGE = "var(--imaa-dm-orange-text, #E8532F)";
+const TEXT = "var(--imaa-dm-text-2, #2C3E5A)";
 const HOVER_BG = "rgba(232,83,47,0.07)";
-const CARD_BORDER = "#F0EEEB";
+const CARD_BORDER = "var(--imaa-dm-border, #F0EEEB)";
 const SIDEBAR_WIDTH = 280;
 
 function getAvatarUrl(user) {
@@ -87,7 +87,7 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
   };
 
   const content = (
-    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "#ffffff", borderRight: `1px solid ${CARD_BORDER}` }}>
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column", bgcolor: "var(--imaa-dm-surface, #ffffff)", borderRight: `1px solid ${CARD_BORDER}` }}>
       <Box
         onClick={() => {
           navigate(MARKETING_HOME_PATH);
@@ -113,15 +113,15 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
           </svg>
         </Box>
         <Box>
-          <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#1B2A4A", lineHeight: 1.2 }}>IMAA</Typography>
-          <Typography sx={{ fontWeight: 700, fontSize: 10, color: "#0A9396", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>MARKETING HUB</Typography>
+          <Typography sx={{ fontWeight: 800, fontSize: 14, color: "var(--imaa-dm-text, #1B2A4A)", lineHeight: 1.2 }}>IMAA</Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: 10, color: "var(--imaa-dm-teal-text, #0A9396)", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>MARKETING HUB</Typography>
         </Box>
       </Box>
 
       <Box sx={{ flex: 1, overflowY: "auto", py: 1 }}>
         {marketingNavigationGroups.map((group) => (
           <Box key={group.label} sx={{ mb: 1.5 }}>
-            <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: "block", color: "#C0BAB4", fontWeight: 800, fontSize: 10, letterSpacing: "0.1em" }}>
+            <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: "block", color: "var(--imaa-dm-text-hint, #C0BAB4)", fontWeight: 800, fontSize: 10, letterSpacing: "0.1em" }}>
               {group.label}
             </Typography>
             <List disablePadding>
@@ -149,7 +149,7 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
                       "&.Mui-selected:hover": { bgcolor: HOVER_BG },
                     }}
                   >
-                    <ListItemIcon sx={{ minWidth: 36, color: selected ? ORANGE : "#6b7280" }}>
+                    <ListItemIcon sx={{ minWidth: 36, color: selected ? ORANGE : "var(--imaa-dm-text-meta, #6b7280)" }}>
                       <Icon fontSize="small" />
                     </ListItemIcon>
                     <ListItemText primary={item.label} primaryTypographyProps={{ variant: "body2", fontWeight: selected ? 700 : 500 }} />
@@ -169,7 +169,7 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
           }}
           sx={{ borderRadius: 2, px: 1.5, mx: 1, color: TEXT, "&:hover": { bgcolor: HOVER_BG } }}
         >
-          <ListItemIcon sx={{ minWidth: 36, color: "#6b7280" }}>
+          <ListItemIcon sx={{ minWidth: 36, color: "var(--imaa-dm-text-meta, #6b7280)" }}>
             <ArrowBackRoundedIcon fontSize="small" />
           </ListItemIcon>
           <ListItemText primary="Back to IMAA Connect" primaryTypographyProps={{ variant: "body2", fontWeight: 700 }} />
@@ -194,7 +194,7 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
           role="link"
           tabIndex={0}
           aria-label="Open account profile"
-          sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0, flex: 1, cursor: "pointer", p: 0.5, borderRadius: 2, "&:hover": { bgcolor: "rgba(0, 0, 0, 0.04)" }, "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
+          sx={{ display: "flex", alignItems: "center", gap: 1.5, minWidth: 0, flex: 1, cursor: "pointer", p: 0.5, borderRadius: 2, "&:hover": { bgcolor: "var(--imaa-dm-overlay, rgba(0, 0, 0, 0.04))" }, "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
         >
           <Avatar src={getAvatarUrl(user)} alt={user ? `${user.first_name || ""} ${user.last_name || ""}`.trim() || user.username : "User"} sx={{ width: 40, height: 40 }}>
             {(user?.first_name || user?.username || "U")[0]?.toUpperCase()}

@@ -58,3 +58,21 @@ export const layout = { contentMax: 1200, proseMax: 700, sectionSpacing: 60 };
 
 // Keyboard focus ring. The mockup defines none. Teal is ≥3:1 against white, cream and navy grounds.
 export const focus = { color: colors.teal, width: 2, offset: 2 };
+
+// Dark-mode aware colours for CSS-in-JS (sx / style props). Each is the light value from `colors`
+// wrapped in its dark-mode override token (src/styles/brand.css), so it is identical in light mode
+// and readable in dark mode. Keep using `colors` for brand fills and anywhere a parsable hex is
+// required (alpha(), hex-alpha suffixes, Tailwind, the MUI palette).
+const darkAware = (role, hex) => `var(--imaa-dm-${role}, ${hex})`;
+export const semanticColors = {
+  surface: darkAware("surface", colors.white), // cards, panels, rings that match the card
+  surfaceCool: darkAware("surface-alt", colors.bgCool),
+  page: darkAware("page", colors.bgMember),
+  text: darkAware("text", colors.ink), // headings / primary text (also navy used as text)
+  textBody: darkAware("text-body", colors.inkBody),
+  textMeta: darkAware("text-meta", colors.inkMeta),
+  border: darkAware("border", colors.border),
+  borderHover: darkAware("border-strong", colors.borderHover),
+  tealText: darkAware("teal-text", colors.tealDark), // teal links / labels
+  coralText: darkAware("orange-text", colors.coral),
+};

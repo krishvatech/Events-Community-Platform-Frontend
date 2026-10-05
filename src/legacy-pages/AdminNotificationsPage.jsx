@@ -37,7 +37,7 @@ import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 // --- Config ---
 const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api").replace(/\/$/, "");
 const TEAL = "#14b8b1";
-const BORDER = "#e2e8f0"; // Matches your community theme
+const BORDER = "var(--imaa-dm-border, #e2e8f0)"; // Matches your community theme
 const getToken = () => getStoredAccessToken() || getStoredAccessToken() || "";
 const authHeader = () => {
   const t = getToken();
@@ -365,11 +365,11 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
     const s = n.status || (n.read_at ? "read" : "pending");
     const common = { size: "small", variant: "outlined", sx: { mt: 0.5, height: 24, borderRadius: "999px", fontWeight: 600, "& .MuiChip-label": { px: 0.5, pt: "1px" } } };
 
-    if (s === "approved") return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Approved" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
-    if (s === "rejected") return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
-    if (s === "pending") return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label="Pending" sx={{ ...common.sx, bgcolor: "#fff7ed", borderColor: "#ffedd5", color: "#c2410c", "& :hover": { bgcolor: "#fff7ed" }, "& .MuiChip-icon": { color: "#c2410c", mr: 0.5 } }} />;
-    if (s === "accepted") return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Accepted" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
-    if (s === "declined") return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Declined" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
+    if (s === "approved") return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Approved" sx={{ ...common.sx, bgcolor: "var(--imaa-dm-surface-alt, #e6f4ea)", borderColor: "var(--imaa-dm-border, #e6f4ea)", color: "var(--imaa-dm-green-text, #1a7f37)", "& .MuiChip-icon": { color: "var(--imaa-dm-green-text, #1a7f37)", mr: 0.5 } }} />;
+    if (s === "rejected") return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "var(--imaa-dm-muted, #fde7e9)", borderColor: "var(--imaa-dm-border, #fde7e9)", color: "var(--imaa-dm-red-text, #b42318)", "& .MuiChip-icon": { color: "var(--imaa-dm-red-text, #b42318)", mr: 0.5 } }} />;
+    if (s === "pending") return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label="Pending" sx={{ ...common.sx, bgcolor: "var(--imaa-dm-surface-alt, #fff7ed)", borderColor: "var(--imaa-dm-tint-orange-border, #ffedd5)", color: "var(--imaa-dm-orange-text, #c2410c)", "& :hover": { bgcolor: "var(--imaa-dm-surface-hover, #fff7ed)" }, "& .MuiChip-icon": { color: "var(--imaa-dm-orange-text, #c2410c)", mr: 0.5 } }} />;
+    if (s === "accepted") return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Accepted" sx={{ ...common.sx, bgcolor: "var(--imaa-dm-surface-alt, #e6f4ea)", borderColor: "var(--imaa-dm-border, #e6f4ea)", color: "var(--imaa-dm-green-text, #1a7f37)", "& .MuiChip-icon": { color: "var(--imaa-dm-green-text, #1a7f37)", mr: 0.5 } }} />;
+    if (s === "declined") return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Declined" sx={{ ...common.sx, bgcolor: "var(--imaa-dm-muted, #fde7e9)", borderColor: "var(--imaa-dm-border, #fde7e9)", color: "var(--imaa-dm-red-text, #b42318)", "& .MuiChip-icon": { color: "var(--imaa-dm-red-text, #b42318)", mr: 0.5 } }} />;
     return null;
   };
 
@@ -384,9 +384,9 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
         width: "100%",
         border: `1px solid ${BORDER}`,
         borderRadius: 2,
-        bgcolor: isRead ? "white" : "#f6fffe", // Light teal background for unread/pending
+        bgcolor: isRead ? "var(--imaa-dm-surface, white)" : "var(--imaa-dm-surface-alt, #f6fffe)", // Light teal background for unread/pending
         transition: 'all 0.2s',
-        '&:hover': { borderColor: '#cbd5e1', cursor: isModerationReport ? 'pointer' : 'default' },
+        '&:hover': { borderColor: 'var(--imaa-dm-border-strong, #cbd5e1)', cursor: isModerationReport ? 'pointer' : 'default' },
         textDecoration: 'none',
         color: 'inherit'
       }}
@@ -397,7 +397,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
           component={Link}
           to={profileHref(n)}
           src={n.actor_avatar || ""}
-          sx={{ width: 44, height: 44, border: `1px solid ${BORDER}`, bgcolor: 'grey.100', color: 'grey.600', fontWeight: 700 }}
+          sx={{ width: 44, height: 44, border: `1px solid ${BORDER}`, bgcolor: 'var(--imaa-dm-surface-alt, #f5f5f5)', color: 'var(--imaa-dm-text-meta, #757575)', fontWeight: 700 }}
         >
           {n.actor_name?.[0]?.toUpperCase()}
         </Avatar>
@@ -405,7 +405,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
         {/* Content */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {/* Main Text Logic */}
-          <Typography variant="body2" sx={{ lineHeight: 1.5, color: '#0f172a' }}>
+          <Typography variant="body2" sx={{ lineHeight: 1.5, color: 'var(--imaa-dm-text, #0f172a)' }}>
             {n.type === "name_change" ? (
               <>
                 <Box component={Link} to={profileHref(n)} sx={{ textDecoration: 'none', fontWeight: 700, color: 'inherit', '&:hover': { color: TEAL } }}>{n.actor_name}</Box> requested a name change from <b>{n.data.old_name}</b> to <b>{n.data.new_name}</b>.
@@ -507,7 +507,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
 
           {/* Show description for standard notifications */}
           {n.description && n._source === "standard_notif" && (
-            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#64748b' }}>
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'var(--imaa-dm-text-meta, #64748b)' }}>
               {n.description}
             </Typography>
           )}
@@ -521,7 +521,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
 
           {/* Special Data: Reason */}
           {(n.type === "name_change" || n.type === "verification_request") && n.data?.reason && (
-            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: '#64748b', fontStyle: 'italic' }}>
+            <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'var(--imaa-dm-text-meta, #64748b)', fontStyle: 'italic' }}>
               "{n.data.reason}"
             </Typography>
           )}
@@ -532,14 +532,14 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
                 <Chip
                   size="small"
                   label={`Invoice ${n.data.invoice_number}`}
-                  sx={{ height: 22, fontSize: 11, borderRadius: 99, bgcolor: '#ecfdf5', color: '#15803d', fontWeight: 700 }}
+                  sx={{ height: 22, fontSize: 11, borderRadius: 99, bgcolor: 'var(--imaa-dm-surface-alt, #ecfdf5)', color: 'var(--imaa-dm-green-text, #15803d)', fontWeight: 700 }}
                 />
               )}
               {n.data?.amount && (
                 <Chip
                   size="small"
                   label={`${n.data.currency || 'USD'} ${n.data.amount}`}
-                  sx={{ height: 22, fontSize: 11, borderRadius: 99, bgcolor: '#eff6ff', color: '#1d4ed8', fontWeight: 700 }}
+                  sx={{ height: 22, fontSize: 11, borderRadius: 99, bgcolor: 'var(--imaa-dm-surface-alt, #eff6ff)', color: 'var(--imaa-dm-blue-text, #1d4ed8)', fontWeight: 700 }}
                 />
               )}
               <Button
@@ -556,7 +556,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
                   borderColor: TEAL,
                   color: TEAL,
                   fontWeight: 700,
-                  '&:hover': { borderColor: TEAL, bgcolor: '#f0fdfa' },
+                  '&:hover': { borderColor: TEAL, bgcolor: 'var(--imaa-dm-surface-hover, #f0fdfa)' },
                 }}
               >
                 {n.data?.action_label || "View order"}
@@ -599,7 +599,7 @@ function AdminNotificationRow({ n, busy, onApprove, onReject, onDecideName, onDe
                         return onReject(n);
                       }}
                       startIcon={<HighlightOffIcon />}
-                      sx={{ textTransform: "none", borderRadius: 2, color: 'text.secondary', borderColor: BORDER, '&:hover': { bgcolor: 'grey.50', borderColor: 'grey.400' } }}
+                      sx={{ textTransform: "none", borderRadius: 2, color: 'text.secondary', borderColor: BORDER, '&:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #fafafa)', borderColor: 'var(--imaa-dm-border-strong, #bdbdbd)' } }}
                     >
                       {n.type === "friend_request" || n.type === "connection_request" ? "Decline" : "Reject"}
                     </Button>
@@ -1023,10 +1023,10 @@ export default function AdminNotificationsPage() {
           <Avatar sx={{ bgcolor: TEAL, width: 48, height: 48, fontSize: '1.25rem', fontWeight: 700 }}>{userInitial}</Avatar>
           <Box>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="h5" sx={{ fontWeight: 800, color: "#1e293b", letterSpacing: '-0.5px' }}>Admin Notifications</Typography>
-              {unreadCount > 0 && <Chip size="small" label={`${unreadCount} pending`} sx={{ borderRadius: 1, bgcolor: '#f1f5f9', fontWeight: 600, height: 24, fontSize: '0.75rem' }} />}
+              <Typography variant="h5" sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1e293b)", letterSpacing: '-0.5px' }}>Admin Notifications</Typography>
+              {unreadCount > 0 && <Chip size="small" label={`${unreadCount} pending`} sx={{ borderRadius: 1, bgcolor: 'var(--imaa-dm-surface-alt, #f1f5f9)', fontWeight: 600, height: 24, fontSize: '0.75rem' }} />}
             </Stack>
-            <Typography variant="body2" sx={{ color: "#64748b" }}>Manage system and group notifications.</Typography>
+            <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748b)" }}>Manage system and group notifications.</Typography>
           </Box>
         </Stack>
         {!isMobile && (
@@ -1035,7 +1035,7 @@ export default function AdminNotificationsPage() {
             startIcon={<DoneAllRoundedIcon />}
             onClick={handleMarkAllRead}
             disabled={initialLoading || unreadCount === 0}
-            sx={{ borderRadius: 99, textTransform: "uppercase", fontSize: 12, px: 2.5, borderColor: TEAL, color: TEAL, '&:hover': { bgcolor: '#f0fdfa', borderColor: TEAL } }}
+            sx={{ borderRadius: 99, textTransform: "uppercase", fontSize: 12, px: 2.5, borderColor: TEAL, color: TEAL, '&:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #f0fdfa)', borderColor: TEAL } }}
           >
             Mark all read
           </Button>
@@ -1047,12 +1047,12 @@ export default function AdminNotificationsPage() {
           <FormControlLabel
             sx={{ ml: 0 }}
             control={<Switch checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: TEAL }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: TEAL } }} />}
-            label={<Typography variant="body2" fontWeight={500} color="#475569">Pending / Unread</Typography>}
+            label={<Typography variant="body2" fontWeight={500} color="var(--imaa-dm-text-body, #475569)">Pending / Unread</Typography>}
           />
         </Stack>
         <Box sx={{ flexGrow: 1 }} />
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <Select value={tab} onChange={(e) => setTab(e.target.value)} sx={{ borderRadius: 2, bgcolor: 'white', '& .MuiSelect-select': { py: 1, fontSize: '0.9rem', fontWeight: 500 } }}>
+          <Select value={tab} onChange={(e) => setTab(e.target.value)} sx={{ borderRadius: 2, bgcolor: 'var(--imaa-dm-surface, white)', '& .MuiSelect-select': { py: 1, fontSize: '0.9rem', fontWeight: 500 } }}>
             <MenuItem value="all">All notifications</MenuItem>
             <MenuItem value="name_change">Identity Requests</MenuItem>
             <MenuItem value="verification_request">Verification Requests</MenuItem>
@@ -1083,7 +1083,7 @@ export default function AdminNotificationsPage() {
           </Stack>
         ) : items.length === 0 ? (
           // 2. EMPTY STATE
-          (<Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: '#f8fafc', borderStyle: 'dashed' }}>
+          (<Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: 'var(--imaa-dm-surface-alt, #f8fafc)', borderStyle: 'dashed' }}>
             <Typography color="text.secondary" fontWeight={500}>No notifications found.</Typography>
           </Paper>)
         ) : (

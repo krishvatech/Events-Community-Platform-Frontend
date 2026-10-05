@@ -44,10 +44,12 @@ const API_ORIGIN = (() => {
   }
 })();
 
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 const TEAL = "#0A9396";
-const ORANGE = "#E8532F";
-const NAVY = "#1B2A4A";
+// Teal as text: lighter variant in dark mode (plain teal is below 4.5:1 on dark cards); fills/borders keep TEAL.
+const TEAL_TEXT = "var(--imaa-dm-teal-text, #0A9396)";
+const ORANGE = "var(--imaa-dm-orange-text, #E8532F)";
+const NAVY = "var(--imaa-dm-text, #1B2A4A)";
 const ITEMS_PER_PAGE = 6;
 
 function authHeader() {
@@ -212,7 +214,7 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
         overflow: "hidden",
         display: "flex",
         flexDirection: "column",
-        bgcolor: "#fff",
+        bgcolor: "var(--imaa-dm-surface, #fff)",
         minWidth: 0,
         transition: "box-shadow .2s ease, border-color .2s ease",
         "&:hover": {
@@ -221,7 +223,7 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
         },
       }}
     >
-      <Box sx={{ position: "relative", height: 150, bgcolor: "#eef2f7", cursor: "pointer" }} onClick={() => onOpen(group)}>
+      <Box sx={{ position: "relative", height: 150, bgcolor: "var(--imaa-dm-surface-alt, #eef2f7)", cursor: "pointer" }} onClick={() => onOpen(group)}>
         {cover ? (
           <img
             src={bust(cover, group.updated_at)}
@@ -233,11 +235,11 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
           <Box
             sx={{
               height: "100%",
-              bgcolor: "#eef7f6",
+              bgcolor: "var(--imaa-dm-surface-alt, #eef7f6)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              color: TEAL,
+              color: TEAL_TEXT,
             }}
           >
             <ForumRoundedIcon sx={{ fontSize: 46 }} />
@@ -252,7 +254,7 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
             bottom: -24,
             width: 54,
             height: 54,
-            border: "3px solid #fff",
+            border: "3px solid var(--imaa-dm-surface, #fff)",
             bgcolor: TEAL,
             fontWeight: 800,
             boxShadow: "0 4px 14px rgba(15,23,42,.18)",
@@ -268,10 +270,10 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
             size="small"
             icon={visibility === "private" ? <LockRoundedIcon /> : <PublicRoundedIcon />}
             label={visibility === "private" ? "Private" : "Public"}
-            sx={{ bgcolor: visibility === "private" ? "#fff7ed" : "#ecfeff", color: visibility === "private" ? "#c2410c" : "#0f766e" }}
+            sx={{ bgcolor: visibility === "private" ? "var(--imaa-dm-surface-alt, #fff7ed)" : "var(--imaa-dm-surface-alt, #ecfeff)", color: visibility === "private" ? "var(--imaa-dm-orange-text, #c2410c)" : "var(--imaa-dm-teal-text, #0f766e)" }}
           />
-          {joined && <Chip size="small" label="Joined" sx={{ bgcolor: "#f0fdfa", color: "#0f766e", fontWeight: 700 }} />}
-          {pending && <Chip size="small" label="Pending" sx={{ bgcolor: "#fffbeb", color: "#b45309", fontWeight: 700 }} />}
+          {joined && <Chip size="small" label="Joined" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdfa)", color: "var(--imaa-dm-teal-text, #0f766e)", fontWeight: 700 }} />}
+          {pending && <Chip size="small" label="Pending" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fffbeb)", color: "var(--imaa-dm-orange-text, #b45309)", fontWeight: 700 }} />}
         </Stack>
 
         <Typography
@@ -292,7 +294,7 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
             fontWeight: 800,
             lineHeight: 1.25,
             mb: 0.75,
-            "&:hover": { color: TEAL },
+            "&:hover": { color: TEAL_TEXT },
             "&:focus-visible": { outline: "2px solid", outlineColor: "primary.main", outlineOffset: 2 },
           }}
         >
@@ -314,7 +316,7 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
           {group.description || "Join this forum-enabled group to follow discussions and participate in posts."}
         </Typography>
 
-        <Stack direction="row" spacing={2} sx={{ mt: 2, color: "#64748b" }}>
+        <Stack direction="row" spacing={2} sx={{ mt: 2, color: "var(--imaa-dm-text-meta, #64748b)" }}>
           <Stack direction="row" spacing={0.5} alignItems="center">
             <PeopleAltRoundedIcon sx={{ fontSize: 18 }} />
             <Typography sx={{ fontSize: 12, fontWeight: 700 }}>{members} members</Typography>
@@ -338,7 +340,7 @@ function ForumCard({ group, onOpen, onJoin, joiningId }) {
             fontWeight: 800,
             bgcolor: joined ? TEAL : "transparent",
             borderColor: TEAL,
-            color: joined ? "#fff" : TEAL,
+            color: joined ? "#fff" : TEAL_TEXT,
             "&:hover": { bgcolor: joined ? "#087f82" : "rgba(10,147,150,.08)", borderColor: TEAL },
           }}
         >
@@ -468,7 +470,7 @@ export default function ForumPage() {
   };
 
   return (
-    <Box sx={{ width: "100%", minWidth: 0, py: { xs: 2, md: 3 }, bgcolor: "#FAF9F7", minHeight: "100vh" }}>
+    <Box sx={{ width: "100%", minWidth: 0, py: { xs: 2, md: 3 }, bgcolor: "var(--imaa-dm-page, #FAF9F7)", minHeight: "100vh" }}>
       <Box sx={{ maxWidth: 1200, mx: "auto", px: { xs: 2, sm: 2.5, md: 3 } }}>
         <PageHeader
           eyebrow="Community discussions"
@@ -486,7 +488,7 @@ export default function ForumPage() {
             gap: 2,
             mb: 2.5,
             pb: 2,
-            borderBottom: "1px solid #EEECEA",
+            borderBottom: "1px solid var(--imaa-dm-border, #EEECEA)",
           }}
         >
           <Box sx={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -507,9 +509,9 @@ export default function ForumPage() {
                   cursor: "pointer",
                   fontSize: 13,
                   fontWeight: tab === item.key ? 800 : 600,
-                  color: tab === item.key ? NAVY : "#64748b",
-                  bgcolor: tab === item.key ? "#fff" : "transparent",
-                  border: tab === item.key ? "1.5px solid #EEECEA" : "1.5px solid transparent",
+                  color: tab === item.key ? NAVY : "var(--imaa-dm-text-meta, #64748b)",
+                  bgcolor: tab === item.key ? "var(--imaa-dm-surface, #fff)" : "transparent",
+                  border: tab === item.key ? "1.5px solid var(--imaa-dm-border, #EEECEA)" : "1.5px solid transparent",
                   boxShadow: tab === item.key ? "0 1px 4px rgba(0,0,0,.06)" : "none",
                   display: "flex",
                   alignItems: "center",
@@ -520,7 +522,7 @@ export default function ForumPage() {
               >
                 {item.key === "all" ? <ForumRoundedIcon sx={{ fontSize: 16 }} /> : <GroupsRoundedIcon sx={{ fontSize: 16 }} />}
                 {item.label}
-                <Box component="span" sx={{ fontSize: 11, fontWeight: 800, bgcolor: tab === item.key ? TEAL : "#e5e7eb", color: tab === item.key ? "#fff" : "#64748b", px: "7px", py: "1px", borderRadius: "100px" }}>
+                <Box component="span" sx={{ fontSize: 11, fontWeight: 800, bgcolor: tab === item.key ? TEAL : "var(--imaa-dm-muted, #e5e7eb)", color: tab === item.key ? "#fff" : "var(--imaa-dm-text-meta, #64748b)", px: "7px", py: "1px", borderRadius: "100px" }}>
                   {item.count}
                 </Box>
               </Box>
@@ -536,10 +538,10 @@ export default function ForumPage() {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon fontSize="small" sx={{ color: "#94a3b8" }} />
+                  <SearchIcon fontSize="small" sx={{ color: "var(--imaa-dm-text-hint, #94a3b8)" }} />
                 </InputAdornment>
               ),
-              sx: { borderRadius: "12px", bgcolor: "#fff", fontSize: 13 },
+              sx: { borderRadius: "12px", bgcolor: "var(--imaa-dm-surface, #fff)", fontSize: 13 },
             }}
             sx={{ width: { xs: "100%", sm: 280 } }}
           />
@@ -552,7 +554,7 @@ export default function ForumPage() {
         )}
 
         {!loading && !error && (
-          <Typography sx={{ fontSize: 11, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".08em", mb: 2 }}>
+          <Typography sx={{ fontSize: 11, fontWeight: 800, color: "var(--imaa-dm-text-hint, #94a3b8)", textTransform: "uppercase", letterSpacing: ".08em", mb: 2 }}>
             Showing {filteredForums.length} {tab === "mine" ? "joined" : "available"} forum{filteredForums.length === 1 ? "" : "s"}
           </Typography>
         )}
@@ -615,7 +617,7 @@ export default function ForumPage() {
                 variant="outlined"
                 startIcon={<GroupsRoundedIcon />}
                 onClick={() => navigate("/community?view=groups")}
-                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800, borderColor: TEAL, color: TEAL }}
+                sx={{ textTransform: "none", borderRadius: 2, fontWeight: 800, borderColor: TEAL, color: TEAL_TEXT }}
               >
                 Explore Groups
               </Button>

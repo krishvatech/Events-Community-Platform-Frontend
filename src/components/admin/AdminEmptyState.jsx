@@ -1,6 +1,6 @@
 import React, { useId } from "react";
 import { Box, Paper, Stack, Typography } from "@mui/material";
-import { colors, radii } from "../../styles/designTokens";
+import { colors, radii, semanticColors } from "../../styles/designTokens";
 
 const AdminEmptyState = ({
   title,
@@ -22,19 +22,19 @@ const AdminEmptyState = ({
       variant="outlined"
       sx={{
         p: compact ? 2.5 : 4,
-        borderColor: colors.border,
+        borderColor: semanticColors.border,
         borderRadius: `${radii.card}px`,
-        bgcolor: colors.white,
+        bgcolor: semanticColors.surface,
         ...sx,
       }}
     >
       <Stack spacing={1.5} alignItems="flex-start">
         {icon ? (
-          <Box aria-hidden="true" sx={{ display: "inline-flex", color: colors.tealDark }}>
+          <Box aria-hidden="true" sx={{ display: "inline-flex", color: semanticColors.tealText }}>
             {icon}
           </Box>
         ) : null}
-        <Typography id={titleId} component={titleComponent} variant="h6" sx={{ color: colors.navy, fontWeight: 750 }}>
+        <Typography id={titleId} component={titleComponent} variant="h6" sx={{ color: semanticColors.text, fontWeight: 750 }}>
           {title}
         </Typography>
         {description ? (

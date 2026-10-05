@@ -47,7 +47,7 @@ import {
 
 const UI_BORDER = "var(--imaa-border)";
 const UI_TEXT = "var(--imaa-ink)";
-const UI_TEAL = "var(--imaa-teal-hover)";
+const UI_TEAL = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))";
 const surfaceSx = {
   borderRadius: "var(--imaa-radius-card)",
   borderColor: UI_BORDER,
@@ -376,7 +376,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
         <TableContainer component={Paper} variant="outlined" sx={{ ...surfaceSx, overflowX: "auto", maxWidth: "100%" }}>
           <Table aria-label="Subscription lists" sx={{ minWidth: 860 }}>
             <TableHead>
-              <TableRow sx={{ bgcolor: "#f3f4f6" }}>
+              <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f3f4f6)" }}>
                 <TableCell sx={{ fontWeight: 700 }}>List Name</TableCell>
                 <TableCell sx={{ fontWeight: 700 }}>Slug</TableCell>
                 <TableCell sx={{ fontWeight: 700 }} align="center">ECP Status</TableCell>
@@ -392,7 +392,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                 const deactivating = actionKey === `deactivate:${category.slug}`;
 
                 return (
-                  <TableRow key={category.slug} sx={{ "&:hover": { bgcolor: "#fafafa" } }}>
+                  <TableRow key={category.slug} sx={{ "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #fafafa)" } }}>
                     <TableCell sx={{ minWidth: 220, maxWidth: 360 }}>
                       <Typography
                         role="button"
@@ -415,7 +415,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                       )}
                     </TableCell>
                     <TableCell>
-                      <code style={{ fontSize: "12px", color: "#5A6070", overflowWrap: "anywhere" }}>{category.slug}</code>
+                      <code style={{ fontSize: "12px", color: "var(--imaa-dm-text-body, #5A6070)", overflowWrap: "anywhere" }}>{category.slug}</code>
                     </TableCell>
                     <TableCell align="center">
                       <Chip
@@ -446,7 +446,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                             size="small"
                             onClick={() => navigate(`/admin/newsletter/lists/${category.slug}`)}
                             disabled={saving || Boolean(actionKey)}
-                            sx={{ color: "#475569" }}
+                            sx={{ color: "var(--imaa-dm-text-body, #475569)" }}
                           >
                             <PeopleAltRoundedIcon fontSize="small" />
                           </IconButton>
@@ -474,7 +474,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                             size="small"
                             onClick={() => handleSync(category)}
                             disabled={saving || Boolean(actionKey)}
-                            sx={{ color: "#2563eb" }}
+                            sx={{ color: "var(--imaa-dm-blue-text, #2563eb)" }}
                           >
                             {syncing ? <CircularProgress size={18} /> : <SyncRoundedIcon fontSize="small" />}
                           </IconButton>
@@ -489,7 +489,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                               size="small"
                               onClick={() => handleOpenConnect(category)}
                               disabled={saving || Boolean(actionKey)}
-                              sx={{ color: "#7c3aed" }}
+                              sx={{ color: "var(--imaa-dm-purple-text, #7c3aed)" }}
                             >
                               <LinkRoundedIcon fontSize="small" />
                             </IconButton>
@@ -505,7 +505,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                               size="small"
                               onClick={() => setDeactivateConfirm(category)}
                               disabled={saving || Boolean(actionKey)}
-                              sx={{ color: "#dc2626" }}
+                              sx={{ color: "var(--imaa-dm-red-text, #dc2626)" }}
                             >
                               {deactivating ? <CircularProgress size={18} /> : <PowerSettingsNewRoundedIcon fontSize="small" />}
                             </IconButton>
@@ -536,7 +536,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
       )}
 
       <Dialog open={open} onClose={() => !saving && setOpen(false)} maxWidth="sm" fullWidth PaperProps={dialogPaperProps} aria-busy={saving}>
-        <DialogTitle sx={{ fontWeight: 700, color: "#1B2A4A" }}>
+        <DialogTitle sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>
           {editing ? "Edit List" : "Create New List"}
         </DialogTitle>
         <DialogContent dividers sx={{ pt: 3 }}>
@@ -623,7 +623,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
       </Dialog>
 
       <Dialog open={Boolean(connectCategory)} onClose={handleCloseConnect} maxWidth="sm" fullWidth PaperProps={dialogPaperProps} aria-busy={segmentsLoading || connectBusy}>
-        <DialogTitle sx={{ fontWeight: 700, color: "#1B2A4A" }}>
+        <DialogTitle sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>
           Connect Mautic Segment
         </DialogTitle>
         <DialogContent dividers>

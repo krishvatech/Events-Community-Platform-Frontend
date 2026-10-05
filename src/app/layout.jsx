@@ -3,7 +3,16 @@
 // Do not import browser-only modules here (fetchInterceptor, sentry, setupPolyfills,
 // auth/session utilities); they touch window/document at import time.
 
+import InitColorSchemeScript from "@mui/material/InitColorSchemeScript";
 import AppProviders from "../providers/AppProviders";
+import {
+  COLOR_MODE_ATTRIBUTE,
+  COLOR_MODE_STORAGE_KEY,
+  COLOR_SCHEME_STORAGE_KEY,
+  DARK_MODE_ENABLED,
+  DEFAULT_COLOR_MODE,
+  FORCE_LIGHT_INIT_SCRIPT,
+} from "../theme/colorMode";
 
 // Same global stylesheets, in the same order, as src/main.jsx
 import "../index.css";
@@ -15,8 +24,10 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  // suppressHydrationWarning: with dark mode enabled, the start-up scripts below set the
+  // colour-mode attribute on <html>/<body> before React hydrates.
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning={DARK_MODE_ENABLED}>
       <head>
         {/* Same font loading as index.html. One request: Inter (body/UI, variable weight 400–900)
             and Source Serif 4 (design headings, 400–700 plus italic). */}
@@ -27,7 +38,20 @@ export default function RootLayout({ children }) {
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen antialiased text-gray-900">
+      <body className="min-h-screen antialiased imaa-body-text" suppressHydrationWarning={DARK_MODE_ENABLED}>
+        {/* Dark mode only (flag on): apply the saved light/dark mode, and keep force-light
+            routes light, before the first paint. See src/theme/colorMode.js. */}
+        {DARK_MODE_ENABLED && (
+          <>
+            <InitColorSchemeScript
+              attribute={COLOR_MODE_ATTRIBUTE}
+              defaultMode={DEFAULT_COLOR_MODE}
+              modeStorageKey={COLOR_MODE_STORAGE_KEY}
+              colorSchemeStorageKey={COLOR_SCHEME_STORAGE_KEY}
+            />
+            <script dangerouslySetInnerHTML={{ __html: FORCE_LIGHT_INIT_SCRIPT }} />
+          </>
+        )}
         {/* index.css styles `html, body, #root`; keep the same mount element */}
         <div id="root">
           <AppProviders>{children}</AppProviders>

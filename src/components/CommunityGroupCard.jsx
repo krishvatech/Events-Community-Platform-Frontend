@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
-import { colors, focus, radii, shadows } from "../styles/designTokens";
+import { colors, focus, radii, shadows, semanticColors } from "../styles/designTokens";
 
 const clamp = {
   display: "-webkit-box",
@@ -108,13 +108,13 @@ export function CommunityGroupCard({
         display: "flex",
         flexDirection: "column",
         overflow: "hidden",
-        bgcolor: colors.white,
-        border: `1px solid ${colors.border}`,
+        bgcolor: semanticColors.surface,
+        border: `1px solid ${semanticColors.border}`,
         borderRadius: `${radii.card}px`,
         boxShadow: shadows.sm,
         transition: "border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease",
         "&:hover": {
-          borderColor: colors.borderHover,
+          borderColor: semanticColors.borderHover,
           boxShadow: shadows.md,
           transform: "translateY(-1px)",
         },
@@ -129,7 +129,7 @@ export function CommunityGroupCard({
           aspectRatio: "16 / 9",
           display: "block",
           overflow: "hidden",
-          bgcolor: colors.bgCool,
+          bgcolor: semanticColors.surfaceCool,
           "&.Mui-focusVisible": focusVisible,
         }}
       >
@@ -149,7 +149,7 @@ export function CommunityGroupCard({
               inset: 0,
               display: "grid",
               placeItems: "center",
-              color: colors.inkMeta,
+              color: semanticColors.textMeta,
               fontFamily: "serif",
               fontSize: 48,
               fontWeight: 700,
@@ -168,8 +168,8 @@ export function CommunityGroupCard({
               width: 48,
               height: 48,
               overflow: "hidden",
-              bgcolor: colors.white,
-              border: `3px solid ${colors.white}`,
+              bgcolor: semanticColors.surface,
+              border: `3px solid ${semanticColors.surface}`,
               borderRadius: "50%",
               boxShadow: shadows.md,
             }}
@@ -208,7 +208,7 @@ export function CommunityGroupCard({
         </Box>
 
         {(category || subcategory) && (
-          <Typography variant="caption" sx={{ color: colors.tealDark, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+          <Typography variant="caption" sx={{ color: semanticColors.tealText, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
             {[category, subcategory].filter(Boolean).join(" · ")}
           </Typography>
         )}
@@ -219,45 +219,45 @@ export function CommunityGroupCard({
         >
           <Typography
             component="h3"
-            sx={{ minWidth: 0, color: colors.ink, fontSize: 17, fontWeight: 800, lineHeight: 1.3, overflowWrap: "anywhere", ...clamp, WebkitLineClamp: 2 }}
+            sx={{ minWidth: 0, color: semanticColors.text, fontSize: 17, fontWeight: 800, lineHeight: 1.3, overflowWrap: "anywhere", ...clamp, WebkitLineClamp: 2 }}
           >
             {groupName}
           </Typography>
         </ButtonBase>
 
-        {owner && <Typography variant="caption" sx={{ color: colors.inkBody }}>by {owner}</Typography>}
+        {owner && <Typography variant="caption" sx={{ color: semanticColors.textBody }}>by {owner}</Typography>}
         {headline && (
-          <Typography variant="body2" sx={{ color: colors.ink, fontWeight: 600, lineHeight: 1.5, ...clamp, WebkitLineClamp: 2 }}>
+          <Typography variant="body2" sx={{ color: semanticColors.text, fontWeight: 600, lineHeight: 1.5, ...clamp, WebkitLineClamp: 2 }}>
             {headline}
           </Typography>
         )}
         {description && (
-          <Typography variant="body2" sx={{ color: colors.inkBody, lineHeight: 1.55, ...clamp, WebkitLineClamp: 2 }}>
+          <Typography variant="body2" sx={{ color: semanticColors.textBody, lineHeight: 1.55, ...clamp, WebkitLineClamp: 2 }}>
             {description}
           </Typography>
         )}
 
-        <Typography variant="caption" sx={{ mt: "auto", pt: 0.5, color: colors.inkBody }}>
+        <Typography variant="caption" sx={{ mt: "auto", pt: 0.5, color: semanticColors.textBody }}>
           {members} {members === 1 ? "member" : "members"}
           {posts > 0 ? ` · ${posts} ${posts === 1 ? "post" : "posts"}` : ""}
           {activity != null ? ` · ${activity}/week` : ""}
         </Typography>
 
         {group?.parent_group && (
-          <Typography variant="caption" sx={{ color: colors.inkBody }}>
+          <Typography variant="caption" sx={{ color: semanticColors.textBody }}>
             Subgroup of <strong>{group.parent_group.name}</strong>
           </Typography>
         )}
       </Box>
 
-      <Box sx={{ minHeight: 56, px: 2, py: 1, display: "flex", gap: 1, alignItems: "center", borderTop: `1px solid ${colors.border}` }}>
+      <Box sx={{ minHeight: 56, px: 2, py: 1, display: "flex", gap: 1, alignItems: "center", borderTop: `1px solid ${semanticColors.border}` }}>
         {canEdit && (
           <Tooltip title="Edit group">
             <IconButton
               size="small"
               aria-label={`Edit ${groupName}`}
               onClick={() => onEdit?.(group)}
-              sx={{ minWidth: 40, minHeight: 40, color: colors.inkBody }}
+              sx={{ minWidth: 40, minHeight: 40, color: semanticColors.textBody }}
             >
               <EditNoteRoundedIcon fontSize="small" />
             </IconButton>
@@ -288,7 +288,7 @@ export function CommunityGroupCardSkeleton() {
   return (
     <Box
       aria-hidden="true"
-      sx={{ height: "100%", overflow: "hidden", bgcolor: colors.white, border: `1px solid ${colors.border}`, borderRadius: `${radii.card}px`, boxShadow: shadows.sm }}
+      sx={{ height: "100%", overflow: "hidden", bgcolor: semanticColors.surface, border: `1px solid ${semanticColors.border}`, borderRadius: `${radii.card}px`, boxShadow: shadows.sm }}
     >
       <Skeleton variant="rectangular" sx={{ width: "100%", aspectRatio: "16 / 9" }} />
       <Box sx={{ p: 2 }}>
@@ -302,7 +302,7 @@ export function CommunityGroupCardSkeleton() {
         <Skeleton variant="text" width="82%" />
         <Skeleton variant="text" width="35%" sx={{ mt: 1 }} />
       </Box>
-      <Box sx={{ px: 2, py: 1.5, borderTop: `1px solid ${colors.border}` }}>
+      <Box sx={{ px: 2, py: 1.5, borderTop: `1px solid ${semanticColors.border}` }}>
         <Skeleton variant="rounded" width={104} height={32} sx={{ ml: "auto" }} />
       </Box>
     </Box>

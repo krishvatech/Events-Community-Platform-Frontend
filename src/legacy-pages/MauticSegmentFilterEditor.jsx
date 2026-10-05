@@ -116,7 +116,7 @@ export default function MauticSegmentFilterEditor({
           <Stack
             key={`${row.field}-${position}`}
             spacing={1}
-            sx={{ p: 1.5, border: "1px solid", borderColor: rowIssue ? "#FCA5A5" : "#E7ECEF", borderRadius: 2 }}
+            sx={{ p: 1.5, border: "1px solid", borderColor: rowIssue ? "#FCA5A5" : "var(--imaa-dm-border, #E7ECEF)", borderRadius: 2 }}
           >
             {/* One row, laid out so every control keeps its own room: join and
                 remove stay small, the value gets what is left. At narrower

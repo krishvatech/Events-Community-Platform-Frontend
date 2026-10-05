@@ -107,8 +107,8 @@ export default function KYCNotification() {
 
   // Style Config: Orange/Red for Action Required, Blue for Info
   const themeStyles = isPending
-    ? { bg: "#ffffffff", color: "#239191ff", icon: <InfoOutlinedIcon fontSize="small" /> }
-    : { bg: "#ffffffff", color: "#239191ff", icon: <WarningAmberRoundedIcon fontSize="small" /> };
+    ? { bg: "var(--imaa-dm-surface, #ffffffff)", color: "var(--imaa-dm-teal-text, #239191ff)", icon: <InfoOutlinedIcon fontSize="small" /> }
+    : { bg: "var(--imaa-dm-surface, #ffffffff)", color: "var(--imaa-dm-teal-text, #239191ff)", icon: <WarningAmberRoundedIcon fontSize="small" /> };
 
   const message = isPending
     ? "Your identity verification is currently under review."
@@ -121,7 +121,7 @@ export default function KYCNotification() {
         bgcolor: themeStyles.bg,
         color: themeStyles.color,
         borderBottom: "1px solid",
-        borderColor: "rgba(0,0,0,0.05)",
+        borderColor: "var(--imaa-dm-border, rgba(0,0,0,0.05))",
         py: 1.5,
         position: "relative",
         zIndex: 1000 // Ensures it sits above some page content but below modals

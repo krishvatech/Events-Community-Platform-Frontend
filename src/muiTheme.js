@@ -4,6 +4,7 @@
 // Not yet changed (later phases): button shape/casing, shape.borderRadius, serif headings, typography scale.
 import { alpha, createTheme, responsiveFontSizes } from '@mui/material/styles';
 import { colors, fonts, hairline, radii } from './styles/designTokens';
+import { COLOR_MODE_ATTRIBUTE, DARK_MODE_ENABLED, colorModeProviderProps } from './theme/colorMode';
 
 // MUI's default elevation scale with the black shadow colour replaced by a softer navy tint.
 // Offsets, blur and spread are unchanged, so elevation never changes layout.
@@ -103,3 +104,93 @@ theme = createTheme(theme, {
 
 theme = responsiveFontSizes(theme);
 export default theme;
+
+// ── Colour-scheme theme (dark mode, phase D2) ───────────────────────────────────────────────
+// Used instead of the theme above only when VITE_ENABLE_DARK_MODE is "true" (see
+// src/theme/colorMode.js). With the flag off nothing below is used.
+// The light scheme repeats the palette above value for value; the dark scheme changes only
+// grounds, text and lines. Brand colours (primary, navy, coral, teal focus ring) are fixed.
+// MUI writes the active scheme to <html data-imaa-color-mode="light|dark">; the semantic
+// --imaa-* variables in src/styles/brand.css key off the same attribute.
+
+// Dark values: keep in sync with the [data-imaa-color-mode="dark"] block in brand.css.
+const darkPalette = {
+  primary: { main: '#1bbbb3' },
+  // Light secondary (#111827) disappears on dark grounds; a light grey keeps it visible.
+  secondary: { main: '#D5DBE5' },
+  background: { default: '#0E1626', paper: '#16213A', cool: '#121D33', member: '#0E1626' },
+  text: { primary: '#E8ECF3', secondary: '#B3BCCB' },
+  divider: 'rgba(226, 232, 240, 0.14)',
+};
+
+export const colorModeTheme = responsiveFontSizes(
+  createTheme({
+    cssVariables: { colorSchemeSelector: COLOR_MODE_ATTRIBUTE },
+    colorSchemes: {
+      light: {
+        palette: {
+          primary: { main: '#1bbbb3' },
+          secondary: { main: '#111827' },
+          background: { default: '#ffffff', paper: '#ffffff', cool: colors.bgCool, member: colors.bgMember },
+          text: { primary: colors.ink, secondary: colors.inkBody },
+          divider: hairline,
+          navy: theme.palette.navy,
+          coral: theme.palette.coral,
+        },
+      },
+      dark: { palette: { ...darkPalette, navy: theme.palette.navy, coral: theme.palette.coral } },
+    },
+    shape: { borderRadius: 12 },
+    shadows: navyShadows,
+    typography: { fontFamily: fonts.sans, fontFamilySerif: fonts.serif },
+    // Same overrides as above. Fixed light colours become CSS variables from brand.css (with the
+    // light value as fallback) or MUI palette variables, so they follow the active scheme.
+    components: {
+      MuiOutlinedInput: {
+        styleOverrides: {
+          notchedOutline: { borderColor: 'var(--imaa-input-outline, rgba(27, 42, 74, 0.3))' },
+          root: ({ theme: t }) => ({
+            '&.Mui-focused': { boxShadow: `0 0 0 3px ${alpha(t.palette.primary.main, 0.15)}` },
+            '&.Mui-focused.Mui-error': {
+              boxShadow: `0 0 0 3px rgba(${t.vars.palette.error.mainChannel} / 0.15)`,
+            },
+          }),
+        },
+      },
+      MuiChip: {
+        styleOverrides: {
+          root: { fontWeight: 500 },
+          outlined: ({ ownerState }) =>
+            ownerState.color === 'default' || !ownerState.color
+              ? { borderColor: 'var(--imaa-chip-outline, rgba(27, 42, 74, 0.25))' }
+              : {},
+        },
+      },
+      MuiAlert: {
+        styleOverrides: {
+          root: ({ ownerState, theme: t }) => {
+            if ((ownerState.variant || 'standard') !== 'standard') return {};
+            const palette = t.vars.palette[ownerState.color || ownerState.severity || 'success'];
+            return palette?.main ? { borderLeft: `3px solid ${palette.main}` } : {};
+          },
+        },
+      },
+      MuiTooltip: {
+        styleOverrides: {
+          tooltip: { backgroundColor: 'var(--imaa-tooltip-bg, #1B2A4A)' },
+          arrow: { color: 'var(--imaa-tooltip-bg, #1B2A4A)' },
+        },
+      },
+      MuiPopover: {
+        styleOverrides: {
+          paper: ({ theme: t }) => ({ border: `1px solid ${t.vars.palette.divider}`, borderRadius: radii.card }),
+        },
+      },
+    },
+  })
+);
+
+// What both entry points (src/main.jsx, src/providers/AppProviders.jsx) give MUI's ThemeProvider.
+// Dark mode disabled: the original theme above with no extra props, exactly as before D2.
+export const appTheme = DARK_MODE_ENABLED ? colorModeTheme : theme;
+export const appThemeProviderProps = DARK_MODE_ENABLED ? colorModeProviderProps : {};

@@ -34,7 +34,7 @@ import VirtualSpeakerForm from '../components/VirtualSpeakerForm';
 import ConvertVirtualSpeakerModal from '../components/ConvertVirtualSpeakerModal';
 import AdminTableShell from '../components/admin/AdminTableShell';
 import AdminStatusChip from '../components/admin/AdminStatusChip';
-import { colors, radii } from '../styles/designTokens';
+import { colors, radii, semanticColors } from '../styles/designTokens';
 
 const VirtualSpeakersPage = () => {
   const navigate = useNavigate();
@@ -183,7 +183,7 @@ const VirtualSpeakersPage = () => {
             {(user?.first_name || 'A')[0].toUpperCase()}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography component="h1" variant="h5" sx={{ color: colors.navy, fontWeight: 700 }}>
+            <Typography component="h1" variant="h5" sx={{ color: semanticColors.text, fontWeight: 700 }}>
               Virtual Speakers
             </Typography>
             <Typography color="text.secondary">

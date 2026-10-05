@@ -1732,7 +1732,7 @@ function ProfileCommentsDialog({ open, onClose, postId }) {
             <Box
               mt={2}
               p={1.5}
-              sx={{ bgcolor: "grey.100", borderRadius: 1 }}
+              sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)", borderRadius: 1 }}
             >
               <Typography
                 variant="body2"
@@ -3553,7 +3553,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                       fontWeight: 600,
                       minWidth: "auto",
                       px: 1,
-                      "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                      "&:hover": { bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.04))" }
                     }}
                   >
                     {viewAsPublic ? "Exit Public View" : "Back to Explore Members"}
@@ -3862,7 +3862,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                                 Email:
                               </Typography>
                               {emailBlockedByVerified ? (
-                                <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "#f8fafc", borderColor: "#e2e8f0", flex: 1 }}>
+                                <Paper variant="outlined" sx={{ p: 1.25, bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", borderColor: "var(--imaa-dm-border, #e2e8f0)", flex: 1 }}>
                                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                                     This member only shares their email with Verified Professionals.
                                   </Typography>
@@ -4392,11 +4392,11 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                               sx={{
                                 py: 1.5,
                                 px: 0,
-                                borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                                borderBottom: "1px solid var(--imaa-dm-border, rgba(0, 0, 0, 0.08))",
                                 "&:last-child": { borderBottom: "none" },
                                 cursor: !visitor.is_anonymous ? "pointer" : "default",
                                 "&:hover": !visitor.is_anonymous ? {
-                                  backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                  backgroundColor: "var(--imaa-dm-overlay, rgba(0, 0, 0, 0.04))",
                                 } : {},
                                 transition: "background-color 0.2s",
                               }}
@@ -4647,7 +4647,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
           sx: {
             borderRadius: 4,
             overflow: "hidden",
-            background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+            background: "linear-gradient(180deg, var(--imaa-dm-surface-alt, #f8fbff) 0%, var(--imaa-dm-surface, #ffffff) 100%)",
             boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
           },
         }}
@@ -4667,11 +4667,11 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
             sx={{
               mb: 1.5,
               bgcolor: "rgba(8,145,178,0.12)",
-              color: "#0f766e",
+              color: "var(--imaa-dm-teal-text, #0f766e)",
               fontWeight: 700,
             }}
           />
-          <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+          <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "var(--imaa-dm-text, #0f172a)" }}>
             Remove contact?
           </DialogTitle>
         </Box>
@@ -4681,10 +4681,10 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
               {!profileAvatarUrl ? (fullName || "?").slice(0, 1).toUpperCase() : null}
             </Avatar>
             <Box>
-              <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+              <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #0f172a)" }}>
                 {fullName || "This member"}
               </Typography>
-              <Typography variant="body2" sx={{ color: "#475569" }}>
+              <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-body, #475569)" }}>
                 This removes them from your contacts list. You can send a new request later.
               </Typography>
             </Box>

@@ -239,7 +239,7 @@ function AddContactDialog({ open, companyId, onClose, onAdded }) {
                 <Paper
                   key={contact.mautic_contact_id}
                   variant="outlined"
-                  sx={{ p: 1.5, borderRadius: 2, borderColor: "#E7ECEF" }}
+                  sx={{ p: 1.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}
                 >
                   <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                     <Box sx={{ minWidth: 0 }}>
@@ -438,12 +438,12 @@ export default function AdminNewsletterCompanyDetailPage() {
               width: 52,
               height: 52,
               borderRadius: 2,
-              bgcolor: "#E6F4F1",
+              bgcolor: "var(--imaa-dm-surface-alt, #E6F4F1)",
               display: "grid",
               placeItems: "center",
             }}
           >
-            <ApartmentRoundedIcon sx={{ color: "#0f766e" }} />
+            <ApartmentRoundedIcon sx={{ color: "var(--imaa-dm-teal-text, #0f766e)" }} />
           </Box>
           <Box>
             <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, overflowWrap: "anywhere" }}>
@@ -485,7 +485,7 @@ export default function AdminNewsletterCompanyDetailPage() {
           sx={{
             px: 2,
             "& .MuiTab-root": { textTransform: "none", fontWeight: 750 },
-            "& .Mui-selected": { color: "#0f766e !important" },
+            "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0f766e) !important" },
             "& .MuiTabs-indicator": { backgroundColor: "#0f766e" },
           }}
         >
@@ -510,7 +510,7 @@ export default function AdminNewsletterCompanyDetailPage() {
                   <Typography variant="caption" color="text.secondary">
                     {label}
                   </Typography>
-                  <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>
+                  <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                     {formatValue(value)}
                   </Typography>
                 </Grid>
@@ -576,7 +576,7 @@ export default function AdminNewsletterCompanyDetailPage() {
             <TableContainer sx={{ overflowX: "auto" }}>
               <Table aria-label="Contacts associated with this company" sx={{ minWidth: 720 }}>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                  <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                     <TableCell>Contact</TableCell>
                     <TableCell>Email</TableCell>
                     <TableCell>Stage</TableCell>
@@ -597,7 +597,7 @@ export default function AdminNewsletterCompanyDetailPage() {
                     <TableRow>
                       <TableCell colSpan={5}>
                         <Stack spacing={1} alignItems="center" sx={{ py: 4 }}>
-                          <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>
+                          <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                             No contacts associated yet
                           </Typography>
                           <Typography color="text.secondary" variant="body2">
@@ -613,7 +613,7 @@ export default function AdminNewsletterCompanyDetailPage() {
                           <Typography
                             component="button"
                             type="button"
-                            sx={{ p: 0, border: 0, bgcolor: "transparent", font: "inherit", textAlign: "left", fontWeight: 700, color: "var(--imaa-teal-hover)", cursor: "pointer", overflowWrap: "anywhere", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
+                            sx={{ p: 0, border: 0, bgcolor: "transparent", font: "inherit", textAlign: "left", fontWeight: 700, color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))", cursor: "pointer", overflowWrap: "anywhere", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
                             onClick={() =>
                               navigate(`/admin/newsletter/contacts/${contact.mautic_contact_id}`)
                             }

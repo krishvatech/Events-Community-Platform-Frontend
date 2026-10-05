@@ -254,7 +254,7 @@ function FieldDialog({ open, fieldObject, field, fieldTypes, onClose, onSaved })
           {editsOptions ? (
             <Box>
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>Options</Typography>
+                <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>Options</Typography>
                 <Button
                   size="small"
                   startIcon={<AddRoundedIcon />}
@@ -474,7 +474,7 @@ export default function AdminNewsletterCustomFieldsPanel() {
         spacing={2}
       >
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+          <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>
             Custom Fields
           </Typography>
           <Typography color="text.secondary" variant="body2">
@@ -504,14 +504,14 @@ export default function AdminNewsletterCustomFieldsPanel() {
 
       {typesError ? <Alert severity="warning">{typesError}</Alert> : null}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", overflow: "hidden" }}>
         <Tabs
           value={fieldObject}
           onChange={(_, value) => setFieldObject(value)}
           sx={{
             px: 2,
             "& .MuiTab-root": { textTransform: "none", fontWeight: 750 },
-            "& .Mui-selected": { color: "#0f766e !important" },
+            "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0f766e) !important" },
             "& .MuiTabs-indicator": { backgroundColor: "#0f766e" },
           }}
         >
@@ -530,11 +530,11 @@ export default function AdminNewsletterCustomFieldsPanel() {
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", overflow: "hidden" }}>
         <TableContainer sx={{ overflowX: "auto" }}>
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+              <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                 <TableCell>Label</TableCell>
                 <TableCell>Alias</TableCell>
                 <TableCell>Type</TableCell>
@@ -558,7 +558,7 @@ export default function AdminNewsletterCustomFieldsPanel() {
                 <TableRow>
                   <TableCell colSpan={8}>
                     <Stack spacing={1} alignItems="center" sx={{ py: 4 }}>
-                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>
+                      <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                         No fields match
                       </Typography>
                     </Stack>
@@ -569,12 +569,12 @@ export default function AdminNewsletterCustomFieldsPanel() {
                   <TableRow key={field.id} hover>
                     <TableCell>
                       <Stack direction="row" spacing={0.75} alignItems="center">
-                        <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>
+                        <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                           {field.label}
                         </Typography>
                         {field.is_system ? (
                           <Tooltip title="Built-in Mautic field — protected">
-                            <LockRoundedIcon sx={{ fontSize: 15, color: "#94A3B8" }} />
+                            <LockRoundedIcon sx={{ fontSize: 15, color: "var(--imaa-dm-text-hint, #94A3B8)" }} />
                           </Tooltip>
                         ) : null}
                       </Stack>

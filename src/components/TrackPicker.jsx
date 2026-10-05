@@ -108,7 +108,7 @@ const TrackPicker = ({ eventId, onTracksSelected, onCancel, multiple = true }) =
                   mb: 1,
                   border: selectedTracks.includes(track.id)
                     ? '2px solid #1976d2'
-                    : '1px solid #e0e0e0',
+                    : '1px solid var(--imaa-dm-border, #e0e0e0)',
                   borderRadius: 1,
                   backgroundColor: selectedTracks.includes(track.id)
                     ? 'rgba(25, 118, 210, 0.04)'
@@ -116,7 +116,7 @@ const TrackPicker = ({ eventId, onTracksSelected, onCancel, multiple = true }) =
                   cursor: 'pointer',
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                    backgroundColor: 'var(--imaa-dm-overlay, rgba(0, 0, 0, 0.02))',
                   },
                 }}
                 onClick={() => handleTrackToggle(track.id)}
@@ -142,8 +142,8 @@ const TrackPicker = ({ eventId, onTracksSelected, onCancel, multiple = true }) =
                       )}
 
                       {track.role_mappings_on_acceptance && track.role_mappings_on_acceptance.length > 0 && (
-                        <Box sx={{ mt: 0.5, mb: 1, p: 1, backgroundColor: '#e3f2fd', borderRadius: 0.5 }}>
-                          <Typography variant="caption" sx={{ fontWeight: 600, color: '#1976d2' }}>
+                        <Box sx={{ mt: 0.5, mb: 1, p: 1, backgroundColor: 'var(--imaa-dm-surface-alt, #e3f2fd)', borderRadius: 0.5 }}>
+                          <Typography variant="caption" sx={{ fontWeight: 600, color: 'var(--imaa-dm-blue-text, #1976d2)' }}>
                             {getAcceptanceMessage(track.role_mappings_on_acceptance)}
                           </Typography>
                         </Box>

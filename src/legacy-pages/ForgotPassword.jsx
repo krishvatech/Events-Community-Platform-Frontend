@@ -220,7 +220,7 @@ const ForgotPassword = ({ authedMode = false }) => {
                                 borderRadius: 'var(--imaa-radius-card)',
                                 p: { xs: 2.5, md: 3 },
                                 border: '1px solid var(--imaa-border)',
-                                bgcolor: '#ffffff',
+                                bgcolor: 'var(--imaa-dm-surface, #ffffff)',
                             }}
                         >
                             <Box component="form" noValidate onSubmit={handleSubmit}>
@@ -352,7 +352,7 @@ const ForgotPassword = ({ authedMode = false }) => {
                                             minWidth: 'auto',
                                             textTransform: 'none',
                                             fontSize: 13,
-                                            color: 'var(--imaa-navy)',
+                                            color: 'var(--imaa-dm-text, var(--imaa-navy))',
                                             fontWeight: 600,
                                         }}
                                     >

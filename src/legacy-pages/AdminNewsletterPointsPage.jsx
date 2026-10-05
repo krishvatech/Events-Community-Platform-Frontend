@@ -400,7 +400,7 @@ function PointActionDialog({
           {form.type === "url.hit" && (
             <Paper variant="outlined" sx={{ ...surfaceSx, p: 2 }}>
               <Stack spacing={2}>
-                <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>Specific URL rules</Typography>
+                <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>Specific URL rules</Typography>
                 <TextField
                   label="URL"
                   value={form.page_url}
@@ -655,7 +655,7 @@ export default function AdminNewsletterPointsPage() {
             px: 2,
             minHeight: 48,
             "& .MuiTab-root": { minHeight: 48, textTransform: "none", fontWeight: 800 },
-            "& .Mui-selected": { color: "#0f766e !important" },
+            "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0f766e) !important" },
             "& .MuiTabs-indicator": { backgroundColor: "#0f766e" },
           }}
         >
@@ -680,7 +680,7 @@ export default function AdminNewsletterPointsPage() {
       >
         <Box>
           <Stack direction="row" spacing={1} alignItems="center">
-            <StarsRoundedIcon sx={{ color: "#0f766e" }} />
+            <StarsRoundedIcon sx={{ color: "var(--imaa-dm-teal-text, #0f766e)" }} />
             <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>
               Point Actions
             </Typography>
@@ -729,7 +729,7 @@ export default function AdminNewsletterPointsPage() {
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
           justifyContent="space-between"
-          sx={{ p: 2, borderBottom: "1px solid #E7ECEF" }}
+          sx={{ p: 2, borderBottom: "1px solid var(--imaa-dm-border, #E7ECEF)" }}
         >
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
@@ -782,7 +782,7 @@ export default function AdminNewsletterPointsPage() {
           <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
             <Table aria-label="Mautic point actions" sx={{ minWidth: 920 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                   <TableCell>Name</TableCell>
                   <TableCell>Action Type</TableCell>
                   <TableCell>Points</TableCell>

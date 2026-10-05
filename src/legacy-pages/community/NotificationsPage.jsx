@@ -28,7 +28,7 @@ import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 import PageHeader from "../../components/page/PageHeader.jsx";
 import EmptyState from "../../components/page/EmptyState.jsx";
 
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.endsWith("/") ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -421,7 +421,7 @@ function NotificationRow({
       if (title.includes("reset")) {
         return (
           <Typography variant="body2">
-            Your identity verification process has been <span style={{ color: '#b42318', fontWeight: 700 }}>reset</span>. You may start a new verification, please retry KYC
+            Your identity verification process has been <span style={{ color: 'var(--imaa-dm-red-text, #b42318)', fontWeight: 700 }}>reset</span>. You may start a new verification, please retry KYC
           </Typography>
         );
       }
@@ -430,7 +430,7 @@ function NotificationRow({
       if (s === "approved" || s === "accepted") {
         return (
           <Typography variant="body2">
-            Your profile is <span style={{ color: '#1a7f37', fontWeight: 700 }}>verified</span> ✅
+            Your profile is <span style={{ color: 'var(--imaa-dm-green-text, #1a7f37)', fontWeight: 700 }}>verified</span> ✅
           </Typography>
         );
       }
@@ -448,7 +448,7 @@ function NotificationRow({
       if (s === "declined" || s === "rejected") {
         return (
           <Typography variant="body2">
-            Your identity verification status has been updated to: <span style={{ color: '#b42318', fontWeight: 700 }}>declined. Not Accepted</span>
+            Your identity verification status has been updated to: <span style={{ color: 'var(--imaa-dm-red-text, #b42318)', fontWeight: 700 }}>declined. Not Accepted</span>
           </Typography>
         );
       }
@@ -467,7 +467,7 @@ function NotificationRow({
         return (
           <>
             <Typography variant="body2">
-              Your name change to <b>{newName}</b> has been <span style={{ color: '#1a7f37', fontWeight: 600 }}>approved</span>.
+              Your name change to <b>{newName}</b> has been <span style={{ color: 'var(--imaa-dm-green-text, #1a7f37)', fontWeight: 600 }}>approved</span>.
             </Typography>
           </>
         );
@@ -475,7 +475,7 @@ function NotificationRow({
         return (
           <>
             <Typography variant="body2">
-              Your name change to <b>{newName}</b> was <span style={{ color: '#b42318', fontWeight: 600 }}>rejected</span>.
+              Your name change to <b>{newName}</b> was <span style={{ color: 'var(--imaa-dm-red-text, #b42318)', fontWeight: 600 }}>rejected</span>.
             </Typography>
           </>
         );
@@ -590,7 +590,7 @@ function NotificationRow({
       return (
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
           <Typography variant="body2">
-            Forum has been <span style={{ fontWeight: 700, color: '#b42318' }}>disabled</span> for
+            Forum has been <span style={{ fontWeight: 700, color: 'var(--imaa-dm-red-text, #b42318)' }}>disabled</span> for
           </Typography>
           {item.data?.group_name && (
             <Chip size="small" label={item.data.group_name} variant="outlined" />
@@ -623,10 +623,10 @@ function NotificationRow({
                 href={targetId && target === 'post' ? `/feed/post/${targetId}` : undefined}
                 icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />}
                 sx={{
-                  bgcolor: "#e6f4ea",
-                  color: "#1a7f37",
-                  borderColor: "#e6f4ea",
-                  "& .MuiChip-icon": { color: "#1a7f37", ml: 0.5 },
+                  bgcolor: "var(--imaa-dm-surface-alt, #e6f4ea)",
+                  color: "var(--imaa-dm-green-text, #1a7f37)",
+                  borderColor: "var(--imaa-dm-border, #e6f4ea)",
+                  "& .MuiChip-icon": { color: "var(--imaa-dm-green-text, #1a7f37)", ml: 0.5 },
                   textDecoration: "none"
                 }}
               />
@@ -635,7 +635,7 @@ function NotificationRow({
                 size="small"
                 label="Removed"
                 icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />}
-                sx={{ bgcolor: "#fde7e9", color: "#b42318", borderColor: "#fde7e9", "& .MuiChip-icon": { color: "#b42318", ml: 0.5 } }}
+                sx={{ bgcolor: "var(--imaa-dm-muted, #fde7e9)", color: "var(--imaa-dm-red-text, #b42318)", borderColor: "var(--imaa-dm-border, #fde7e9)", "& .MuiChip-icon": { color: "var(--imaa-dm-red-text, #b42318)", ml: 0.5 } }}
               />
             )}
           </Stack>
@@ -752,17 +752,17 @@ function NotificationRow({
         return (
           <Stack direction="column" spacing={0.5}>
             <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
-              <ReceiptLongRoundedIcon sx={{ fontSize: 17, color: "#0f766e" }} />
-              <Typography variant="body2" sx={{ fontWeight: 800, color: "#0f172a" }}>
+              <ReceiptLongRoundedIcon sx={{ fontSize: 17, color: "var(--imaa-dm-teal-text, #0f766e)" }} />
+              <Typography variant="body2" sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #0f172a)" }}>
                 {item.title || `Payment confirmed${orderLabel ? ` for order #${orderLabel}` : ""}`}
               </Typography>
             </Stack>
-            <Typography variant="caption" sx={{ color: "#64748b", display: "block" }}>
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #64748b)", display: "block" }}>
               {item.description || `Your manual payment has been confirmed${invoiceNumber ? `. Invoice ${invoiceNumber} is ready to download.` : "."}`}
             </Typography>
             <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap">
-              {invoiceNumber && <Chip size="small" label={invoiceNumber} sx={{ height: 22, bgcolor: "#ecfeff", color: "#0f766e", fontWeight: 700 }} />}
-              {amount && <Chip size="small" label={amount} sx={{ height: 22, bgcolor: "#f0fdf4", color: "#166534", fontWeight: 700 }} />}
+              {invoiceNumber && <Chip size="small" label={invoiceNumber} sx={{ height: 22, bgcolor: "var(--imaa-dm-surface-alt, #ecfeff)", color: "var(--imaa-dm-teal-text, #0f766e)", fontWeight: 700 }} />}
+              {amount && <Chip size="small" label={amount} sx={{ height: 22, bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "var(--imaa-dm-green-text, #166534)", fontWeight: 700 }} />}
             </Stack>
           </Stack>
         );
@@ -847,7 +847,7 @@ function NotificationRow({
             onOpen?.(item);
           }}
           startIcon={<ReceiptLongRoundedIcon />}
-          sx={{ textTransform: "none", borderRadius: 2, mt: 1, borderColor: "#99f6e4", color: "#0f766e", fontWeight: 700 }}
+          sx={{ textTransform: "none", borderRadius: 2, mt: 1, borderColor: "var(--imaa-dm-tint-teal-border, #99f6e4)", color: "var(--imaa-dm-teal-text, #0f766e)", fontWeight: 700 }}
         >
           View order
         </Button>
@@ -1038,7 +1038,7 @@ function NotificationRow({
       <Stack direction="row" spacing={1.25} alignItems="flex-start">
         <ListItemAvatar sx={{ minWidth: 48 }}>
           {isPaymentNotification(item) ? (
-            <Avatar sx={{ bgcolor: "#ecfeff", color: "#0f766e" }}>
+            <Avatar sx={{ bgcolor: "var(--imaa-dm-surface-alt, #ecfeff)", color: "var(--imaa-dm-teal-text, #0f766e)" }}>
               <ReceiptLongRoundedIcon />
             </Avatar>
           ) : isKycNotification(item) ? (
@@ -1051,7 +1051,7 @@ function NotificationRow({
             </Avatar>
 
           ) : item.kind === 'system' ? (
-            <Avatar sx={{ bgcolor: '#f3f4f6', color: '#1f2937' }}>
+            <Avatar sx={{ bgcolor: 'var(--imaa-dm-surface-alt, #f3f4f6)', color: 'var(--imaa-dm-text, #1f2937)' }}>
               <InfoRoundedIcon />
             </Avatar>
           ) : (
@@ -1068,7 +1068,7 @@ function NotificationRow({
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
           {unread && (
-            <Typography variant="caption" sx={{ display: "block", mb: 0.5, color: "var(--imaa-teal-hover)", fontWeight: 800 }}>
+            <Typography variant="caption" sx={{ display: "block", mb: 0.5, color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))", fontWeight: 800 }}>
               Unread
             </Typography>
           )}
@@ -1096,7 +1096,7 @@ function NotificationRow({
               const isPayment = isPaymentNotification(item);
               const isNameChange = item.kind === "name_change" || String(item?.data?.type || "").toLowerCase() === "name_change" || item.source === "identity";
               const label = isPayment ? "Payments" : isKyc ? "KYC" : isNameChange ? "Name Change" : kindChip(item.kind);
-              return <Chip size="small" label={label} sx={isPayment ? { bgcolor: "#ecfeff", color: "#0f766e", fontWeight: 700 } : undefined} />;
+              return <Chip size="small" label={label} sx={isPayment ? { bgcolor: "var(--imaa-dm-surface-alt, #ecfeff)", color: "var(--imaa-dm-teal-text, #0f766e)", fontWeight: 700 } : undefined} />;
             })()}
             <Typography variant="caption" color="text.secondary">
               {formatWhen(item.created_at)}
@@ -1166,15 +1166,15 @@ function NotificationRow({
             };
 
             if (s === "accepted" || s === "approved") {
-              return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Approved" sx={{ ...common.sx, bgcolor: "#e6f4ea", borderColor: "#e6f4ea", color: "#1a7f37", "& .MuiChip-icon": { color: "#1a7f37", mr: 0.5 } }} />;
+              return <Chip {...common} icon={<CheckCircleRoundedIcon sx={{ fontSize: 16 }} />} label="Approved" sx={{ ...common.sx, bgcolor: "var(--imaa-dm-surface-alt, #e6f4ea)", borderColor: "var(--imaa-dm-border, #e6f4ea)", color: "var(--imaa-dm-green-text, #1a7f37)", "& .MuiChip-icon": { color: "var(--imaa-dm-green-text, #1a7f37)", mr: 0.5 } }} />;
             }
             if (s === "declined" || s === "rejected") {
-              return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "#fde7e9", borderColor: "#fde7e9", color: "#b42318", "& .MuiChip-icon": { color: "#b42318", mr: 0.5 } }} />;
+              return <Chip {...common} icon={<CancelRoundedIcon sx={{ fontSize: 16 }} />} label="Rejected" sx={{ ...common.sx, bgcolor: "var(--imaa-dm-muted, #fde7e9)", borderColor: "var(--imaa-dm-border, #fde7e9)", color: "var(--imaa-dm-red-text, #b42318)", "& .MuiChip-icon": { color: "var(--imaa-dm-red-text, #b42318)", mr: 0.5 } }} />;
             }
             if (s === "pending" || s === "review" || s === "under_review" || s === "requested" || s === "waiting" || s === "sent") {
-              return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"} sx={{ ...common.sx, bgcolor: "#eef2f6", borderColor: "#eef2f6", color: "#374151", "& .MuiChip-icon": { color: "#374151", mr: 0.5 } }} />;
+              return <Chip {...common} icon={<HourglassBottomRoundedIcon sx={{ fontSize: 16 }} />} label={s === "sent" ? "Sent" : "Pending"} sx={{ ...common.sx, bgcolor: "var(--imaa-dm-surface-alt, #eef2f6)", borderColor: "var(--imaa-dm-border, #eef2f6)", color: "var(--imaa-dm-text-2, #374151)", "& .MuiChip-icon": { color: "var(--imaa-dm-text-2, #374151)", mr: 0.5 } }} />;
             }
-            return <Chip {...common} icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />} label={item.state} sx={{ ...common.sx, bgcolor: "#f3f4f6", borderColor: "#f3f4f6", color: "#111827", "& .MuiChip-icon": { color: "#6b7280", mr: 0.5 } }} />;
+            return <Chip {...common} icon={<InfoRoundedIcon sx={{ fontSize: 16 }} />} label={item.state} sx={{ ...common.sx, bgcolor: "var(--imaa-dm-surface-alt, #f3f4f6)", borderColor: "var(--imaa-dm-border, #f3f4f6)", color: "var(--imaa-dm-text, #111827)", "& .MuiChip-icon": { color: "var(--imaa-dm-text-meta, #6b7280)", mr: 0.5 } }} />;
           })()}
         </Stack>
       </Stack>

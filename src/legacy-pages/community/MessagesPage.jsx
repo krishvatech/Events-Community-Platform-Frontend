@@ -64,7 +64,7 @@ import { connectToConversation } from "../../utils/websocketMessaging.js";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 
 
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 const PANEL_H = "calc(100vh - 130px)";
 const TIME_W = 56;   // px reserved on the right for time
 const TIME_H = 16;   // px reserved at the bottom for time
@@ -78,7 +78,7 @@ const bubbleSx = (mine) => (theme) => ({
   paddingBottom: `calc(${theme.spacing(0.75)} + ${TIME_H}px)`,
   borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
   bgcolor: mine ? "rgb(189, 189, 189, 0.25)" : theme.palette.background.paper,
-  color: mine ? theme.palette.common.black : "inherit",
+  color: mine ? "var(--imaa-dm-text, #000)" : "inherit", // common.black in light mode
   border: `1px solid ${mine ? "rgba(87, 87, 87, 0.15)" : BORDER}`,
   boxShadow: mine ? "0 2px 6px rgba(114, 113, 113, 0.15)" : "none",
   overflowWrap: "anywhere",
@@ -381,7 +381,7 @@ function SharePreview({ attachment, mine }) {
           mt: 0.75,
           borderRadius: 2,
           border: `1px solid ${BORDER}`,
-          bgcolor: mine ? "#ffffff" : "#f8fafc",
+          bgcolor: mine ? "var(--imaa-dm-surface, #ffffff)" : "var(--imaa-dm-surface-alt, #f8fafc)",
           overflow: "hidden",
           cursor: "pointer",
           transition: "transform 0.15s ease, box-shadow 0.15s ease",
@@ -488,7 +488,7 @@ function SharePreview({ attachment, mine }) {
         mt: 0.75,
         borderRadius: 2,
         border: `1px solid ${BORDER}`,
-        bgcolor: mine ? "#ffffff" : "#f8fafc",
+        bgcolor: mine ? "var(--imaa-dm-surface, #ffffff)" : "var(--imaa-dm-surface-alt, #f8fafc)",
         overflow: "hidden",
         cursor: "pointer",
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
@@ -1018,10 +1018,10 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
         py: 1,
         borderRadius: 2,
         cursor: "pointer",
-        bgcolor: thread.is_pinned ? "#f8fafc" : "transparent", // Slight background for pinned
+        bgcolor: thread.is_pinned ? "var(--imaa-dm-surface-alt, #f8fafc)" : "transparent", // Slight background for pinned
         ...(active
-          ? { bgcolor: "#f6fffe", border: `1px solid ${BORDER}` }
-          : { "&:hover": { bgcolor: "#fafafa" } }),
+          ? { bgcolor: "var(--imaa-dm-surface-alt, #f6fffe)", border: `1px solid ${BORDER}` }
+          : { "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #fafafa)" } }),
       }}
     >
       <ListItemAvatar sx={{ minWidth: 48 }}>
@@ -1041,7 +1041,7 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
             <Box
               sx={{
                 position: "absolute", left: 2, top: 2, width: 10, height: 10,
-                borderRadius: "50%", bgcolor: "success.main", border: "2px solid #fff",
+                borderRadius: "50%", bgcolor: "success.main", border: "2px solid var(--imaa-dm-surface, #fff)",
               }}
             />
           )}
@@ -1279,7 +1279,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                       cursor: "pointer",
                       display: "flex",
                       position: "relative",
-                      bgcolor: "rgba(0,0,0,0.05)",
+                      bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.05))",
                     }}
                   >
                     <img
@@ -1321,7 +1321,7 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                     sx={{
                       ...fullWidthSx,
                       height: 260,
-                      bgcolor: "rgba(0,0,0,0.05)",
+                      bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.05))",
                       display: "flex",
                     }}
                   >
@@ -1345,17 +1345,17 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                       maxWidth: "100%",
                       borderRadius: 2,
                       overflow: "hidden",
-                      bgcolor: mine ? "rgba(0,0,0,0.05)" : "#f0f2f5",
+                      bgcolor: mine ? "var(--imaa-dm-overlay, rgba(0,0,0,0.05))" : "var(--imaa-dm-surface-alt, #f0f2f5)",
                       cursor: "pointer",
                       mb: 0.5,
-                      border: "1px solid rgba(0,0,0,0.08)"
+                      border: "1px solid var(--imaa-dm-border, rgba(0,0,0,0.08))"
                     }}
                   >
-                    <Box sx={{ height: 120, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-                      <PictureAsPdfRoundedIcon sx={{ fontSize: 50, color: "#e0e0e0" }} />
+                    <Box sx={{ height: 120, bgcolor: "var(--imaa-dm-surface, #fff)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid var(--imaa-dm-border, rgba(0,0,0,0.08))" }}>
+                      <PictureAsPdfRoundedIcon sx={{ fontSize: 50, color: "var(--imaa-dm-text-faint, #e0e0e0)" }} />
                     </Box>
                     <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5 }}>
-                      <PictureAsPdfRoundedIcon sx={{ color: "#d32f2f", fontSize: 28 }} />
+                      <PictureAsPdfRoundedIcon sx={{ color: "var(--imaa-dm-red-text, #d32f2f)", fontSize: 28 }} />
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
                         <Typography variant="caption" color="text.secondary">{formatSize(att.size)} • PDF</Typography>
@@ -1382,10 +1382,10 @@ function Bubble({ m, showSender, onBubbleClick, onBubbleContextMenu, isPinned, c
                   spacing={1.5}
                   onClick={() => window.open(url, "_blank")}
                   sx={{
-                    p: 1.5, borderRadius: 2, bgcolor: "rgba(0,0,0,0.06)", cursor: "pointer", mb: 0.5
+                    p: 1.5, borderRadius: 2, bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.06))", cursor: "pointer", mb: 0.5
                   }}
                 >
-                  <InsertDriveFileRoundedIcon sx={{ color: "#54656f", fontSize: 28 }} />
+                  <InsertDriveFileRoundedIcon sx={{ color: "var(--imaa-dm-text-body, #54656f)", fontSize: 28 }} />
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
                     <Typography variant="caption" sx={{ opacity: 0.7 }}>{formatSize(att.size)} • {type.split('/').pop().toUpperCase()}</Typography>
@@ -1747,7 +1747,7 @@ function NewChatDialog({ open, onClose, onOpened }) {
               <ListItem
                 key={`tab${tab}-${x.id}`}
                 disableGutters
-                sx={{ px: 1, py: 1, borderRadius: 2, cursor: "pointer", "&:hover": { bgcolor: "#fafafa" } }}
+                sx={{ px: 1, py: 1, borderRadius: 2, cursor: "pointer", "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #fafafa)" } }}
                 onClick={async () => {
                   try {
                     if (tab === 0) {
@@ -3978,7 +3978,7 @@ export default function MessagesPage() {
                         right: 0,
                         bottom: 0,
                         zIndex: 20,
-                        bgcolor: "#e9edef",
+                        bgcolor: "var(--imaa-dm-muted, #e9edef)",
                         display: "flex",
                         flexDirection: "column",
                         borderRadius: 3,
@@ -4003,7 +4003,7 @@ export default function MessagesPage() {
                           display: "flex",
                           justifyContent: "center",
                           alignItems: "center",
-                          bgcolor: "#d1d7db",
+                          bgcolor: "var(--imaa-dm-muted-strong, #d1d7db)",
                           overflow: "hidden"
                         }}
                       >
@@ -4016,8 +4016,8 @@ export default function MessagesPage() {
                             sx={{
                               position: "absolute",
                               left: 10,
-                              bgcolor: "rgba(255,255,255,0.6)",
-                              "&:hover": { bgcolor: "white" },
+                              bgcolor: "var(--imaa-dm-glass, rgba(255,255,255,0.6))",
+                              "&:hover": { bgcolor: "var(--imaa-dm-surface, white)" },
                               zIndex: 10,
                               display: activePreviewIndex === 0 ? "none" : "flex"
                             }}
@@ -4041,8 +4041,8 @@ export default function MessagesPage() {
                               }}
                             />
                           ) : (
-                            <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "white", borderRadius: 4 }}>
-                              <DescriptionOutlinedIcon sx={{ fontSize: 60, color: "#54656f" }} />
+                            <Stack alignItems="center" spacing={2} sx={{ p: 4, bgcolor: "var(--imaa-dm-surface, white)", borderRadius: 4 }}>
+                              <DescriptionOutlinedIcon sx={{ fontSize: 60, color: "var(--imaa-dm-text-body, #54656f)" }} />
                               <Typography variant="h6">{draftAttachments[activePreviewIndex].name}</Typography>
                               <Typography variant="body2" color="text.secondary">
                                 {(draftAttachments[activePreviewIndex].size / 1024).toFixed(1)} KB
@@ -4060,8 +4060,8 @@ export default function MessagesPage() {
                             sx={{
                               position: "absolute",
                               right: 10,
-                              bgcolor: "rgba(255,255,255,0.6)",
-                              "&:hover": { bgcolor: "white" },
+                              bgcolor: "var(--imaa-dm-glass, rgba(255,255,255,0.6))",
+                              "&:hover": { bgcolor: "var(--imaa-dm-surface, white)" },
                               zIndex: 10,
                               display: activePreviewIndex === draftAttachments.length - 1 ? "none" : "flex"
                             }}
@@ -4079,7 +4079,7 @@ export default function MessagesPage() {
                           spacing={1}
                           sx={{
                             p: 1,
-                            bgcolor: "rgba(255,255,255,0.5)",
+                            bgcolor: "var(--imaa-dm-overlay, rgba(255,255,255,0.5))",
                             justifyContent: "center",
                             overflowX: "auto"
                           }}
@@ -4104,7 +4104,7 @@ export default function MessagesPage() {
                                   style={{ width: "100%", height: "100%", objectFit: "cover" }}
                                 />
                               ) : (
-                                <Box sx={{ width: "100%", height: "100%", bgcolor: "white", display: "flex", justifyContent: "center", alignItems: "center" }}>
+                                <Box sx={{ width: "100%", height: "100%", bgcolor: "var(--imaa-dm-surface, white)", display: "flex", justifyContent: "center", alignItems: "center" }}>
                                   <DescriptionOutlinedIcon fontSize="small" />
                                 </Box>
                               )}
@@ -4118,7 +4118,7 @@ export default function MessagesPage() {
                         direction="row"
                         spacing={1}
                         alignItems="center"
-                        sx={{ p: 2, bgcolor: "#f0f2f5" }}
+                        sx={{ p: 2, bgcolor: "var(--imaa-dm-surface-alt, #f0f2f5)" }}
                       >
                         <TextField
                           size="small"
@@ -4127,7 +4127,7 @@ export default function MessagesPage() {
                           onChange={(e) => setDraft(e.target.value)}
                           fullWidth
                           autoFocus
-                          sx={{ bgcolor: "white", borderRadius: 1 }}
+                          sx={{ bgcolor: "var(--imaa-dm-surface, white)", borderRadius: 1 }}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" && !e.shiftKey) {
                               e.preventDefault();
@@ -4190,7 +4190,7 @@ export default function MessagesPage() {
                           px: 1,
                           py: 0.75,
                           borderRadius: 2,
-                          bgcolor: "#f8fafc",
+                          bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
                           border: `1px solid ${BORDER}`,
                           boxShadow: pinnedMessages.length > 1 ? "0 2px 4px rgba(0,0,0,0.03)" : "none",
                         }}
@@ -4266,7 +4266,7 @@ export default function MessagesPage() {
                                   cursor: "pointer",
                                   borderRadius: 1,
                                   p: 0.5,
-                                  "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
+                                  "&:hover": { bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.04))" },
                                 }}
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -4315,7 +4315,7 @@ export default function MessagesPage() {
                                     py: 0.5,
                                     borderRadius: 999,
                                     border: "1px solid rgba(148,163,184,0.45)",
-                                    bgcolor: "#f8fafc",
+                                    bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
                                     color: "text.secondary",
                                   }}
                                 >
@@ -4361,7 +4361,7 @@ export default function MessagesPage() {
                         py: 1,
                         borderRadius: 1.5,
                         border: `1px dashed ${BORDER}`,
-                        bgcolor: "#f9fafb",
+                        bgcolor: "var(--imaa-dm-surface-alt, #f9fafb)",
                         color: "text.secondary",
                         fontSize: 13,
                         textAlign: "center",
@@ -4394,7 +4394,7 @@ export default function MessagesPage() {
                           size="small"
                           aria-label="Add attachment"
                           sx={{
-                            bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.08)" : "transparent",
+                            bgcolor: isAttachMenuOpen ? "var(--imaa-dm-overlay, rgba(0,0,0,0.08))" : "transparent",
                             transition: "transform 0.2s",
                             transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)"
                           }}
@@ -4420,14 +4420,14 @@ export default function MessagesPage() {
                       >
                         <MenuItem onClick={handleTriggerFileUpload} sx={{ py: 1.5, pr: 3 }}>
                           <ListItemIcon>
-                            <UploadFileRoundedIcon fontSize="small" sx={{ color: "#7F66FF" }} />
+                            <UploadFileRoundedIcon fontSize="small" sx={{ color: "var(--imaa-dm-purple-text, #7F66FF)" }} />
                           </ListItemIcon>
                           <Typography variant="body2" fontWeight={600}>File Upload</Typography>
                         </MenuItem>
 
                         <MenuItem onClick={handleTriggerCamera} sx={{ py: 1.5, pr: 3 }}>
                           <ListItemIcon>
-                            <CameraAltRoundedIcon fontSize="small" sx={{ color: "#D93025" }} />
+                            <CameraAltRoundedIcon fontSize="small" sx={{ color: "var(--imaa-dm-red-text, #D93025)" }} />
                           </ListItemIcon>
                           <Typography variant="body2" fontWeight={600}>Camera</Typography>
                         </MenuItem>

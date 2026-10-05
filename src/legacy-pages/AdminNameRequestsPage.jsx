@@ -510,7 +510,7 @@ export default function AdminNameRequestsPage() {
           )}
         >
             <Table sx={{ minWidth: 800 }} aria-label="Name change requests" aria-busy={loadingRequests || undefined}>
-              <TableHead sx={{ bgcolor: "grey.50" }}>
+              <TableHead sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                 <TableRow>
                   <TableCell>User</TableCell>
                   <TableCell>Current Name</TableCell>
@@ -734,7 +734,7 @@ export default function AdminNameRequestsPage() {
           )}
         >
             <Table sx={{ minWidth: 800 }} aria-label="KYC verifications" aria-busy={loadingKyc || undefined}>
-              <TableHead sx={{ bgcolor: "grey.50" }}>
+              <TableHead sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                 <TableRow>
                   <TableCell>User</TableCell>
                   <TableCell>Full Name</TableCell>
@@ -964,7 +964,7 @@ export default function AdminNameRequestsPage() {
           )}
         >
             <Table aria-label="Verification renewal requests" aria-busy={loadingRenewals || undefined}>
-              <TableHead sx={{ bgcolor: "grey.50" }}>
+              <TableHead sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                 <TableRow>
                   <TableCell>User</TableCell>
                   <TableCell>Reason</TableCell>
@@ -1190,7 +1190,7 @@ export default function AdminNameRequestsPage() {
               </Stack>
               <Box>
                 <Typography variant="subtitle2">Match Debug (for admin)</Typography>
-                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "grey.50", overflow: "auto" }}>
+                <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)", overflow: "auto" }}>
                   <pre style={{ margin: 0, fontSize: 12 }}>
                     {JSON.stringify(detailsDialog.request.name_match_debug || {}, null, 2)}
                   </pre>

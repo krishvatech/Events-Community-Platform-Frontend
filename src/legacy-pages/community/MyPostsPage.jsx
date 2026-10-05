@@ -878,7 +878,7 @@ function PostCard({
                         <Typography variant="body2" fontWeight={500}>{u.name}</Typography>
                         {u.kycStatus === "approved" && (
                           <Tooltip title="KYC Verified">
-                            <VerifiedIcon sx={{ fontSize: "1rem", color: "#1976d2" }} />
+                            <VerifiedIcon sx={{ fontSize: "1rem", color: "var(--imaa-dm-blue-text, #1976d2)" }} />
                           </Tooltip>
                         )}
                       </Stack>

@@ -315,7 +315,7 @@ export default function MyResourcesPage() {
 
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#f7f8fa", width: "100%", minWidth: 0, overflow: "hidden" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-dm-page, #f7f8fa)", width: "100%", minWidth: 0, overflow: "hidden" }}>
       <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">
@@ -417,7 +417,7 @@ export default function MyResourcesPage() {
                   title="Refresh resources"
                   aria-label="Refresh resources"
                   sx={{
-                    color: 'var(--imaa-teal-hover)',
+                    color: 'var(--imaa-dm-teal-text, var(--imaa-teal-hover))',
                     minWidth: 40,
                     minHeight: 40,
                     '&:hover': {
@@ -523,7 +523,7 @@ export default function MyResourcesPage() {
                                 mr: 1.5,
                                 borderRadius: "var(--imaa-radius-card)",
                                 bgcolor: "var(--imaa-teal-light)",
-                                color: "var(--imaa-teal-hover)",
+                                color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))",
                                 display: "grid",
                                 placeItems: "center",
                               }}
@@ -544,7 +544,7 @@ export default function MyResourcesPage() {
                                     color: 'var(--imaa-ink)',
                                     textDecoration: "none",
                                     overflowWrap: "anywhere",
-                                    '&:hover': { color: "var(--imaa-teal-hover)", textDecoration: 'underline' },
+                                    '&:hover': { color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))", textDecoration: 'underline' },
                                     '&:focus-visible': { outline: 'var(--imaa-focus-width) solid var(--imaa-focus-color)', outlineOffset: 'var(--imaa-focus-offset)' },
                                   }}
                                 >

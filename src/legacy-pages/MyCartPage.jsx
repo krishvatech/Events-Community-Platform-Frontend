@@ -1135,7 +1135,7 @@ export default function MyCartPage() {
                                 aria-label={`View order #${o.number}`}
                                 sx={{
                                   p: 0, border: "none", bgcolor: "transparent", font: "inherit", cursor: "pointer",
-                                  color: "var(--imaa-teal-hover)", fontWeight: 600, textDecoration: "underline",
+                                  color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))", fontWeight: 600, textDecoration: "underline",
                                 }}
                               >
                                 #{o.number}
@@ -1570,7 +1570,7 @@ export default function MyCartPage() {
                       sx={{
                         textTransform: "none",
                         borderColor: "var(--imaa-teal)",
-                        color: "var(--imaa-teal-hover)",
+                        color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))",
                         alignSelf: "flex-start",
                       }}
                     >
@@ -1604,7 +1604,7 @@ export default function MyCartPage() {
                 </Typography>
                 <Typography
                   variant="h6"
-                  sx={{ fontWeight: 800, color: "var(--imaa-teal-hover)" }}
+                  sx={{ fontWeight: 800, color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))" }}
                 >
                   {fmt(selectedOrder.total)}
                 </Typography>

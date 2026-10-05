@@ -172,10 +172,10 @@ const SocialLogin = () => {
           onClick={handleGoogle}
           sx={{
             textTransform: 'none',
-            bgcolor: '#fff',
-            color: 'black',
+            bgcolor: 'var(--imaa-dm-surface, #fff)',
+            color: 'var(--imaa-dm-text, black)',
             borderColor: 'divider',
-            '&:hover': { bgcolor: 'grey.50' },
+            '&:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #fafafa)' },
           }}
         >
           Google
@@ -188,10 +188,10 @@ const SocialLogin = () => {
           onClick={handleLinkedIn}
           sx={{
             textTransform: 'none',
-            bgcolor: '#fff',
-            color: 'black',
+            bgcolor: 'var(--imaa-dm-surface, #fff)',
+            color: 'var(--imaa-dm-text, black)',
             borderColor: 'divider',
-            '&:hover': { bgcolor: 'grey.50' },
+            '&:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #fafafa)' },
           }}
         >
           LinkedIn

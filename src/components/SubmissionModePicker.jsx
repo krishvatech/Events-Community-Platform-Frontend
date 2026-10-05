@@ -81,14 +81,14 @@ const SubmissionModePicker = ({ track, onModeSelected, onCancel }) => {
               sx={{
                 p: 2,
                 mb: 1,
-                border: selectedMode === mode ? '2px solid #1976d2' : '1px solid #e0e0e0',
+                border: selectedMode === mode ? '2px solid #1976d2' : '1px solid var(--imaa-dm-border, #e0e0e0)',
                 borderRadius: 1,
                 backgroundColor:
                   selectedMode === mode ? 'rgba(25, 118, 210, 0.04)' : 'transparent',
                 cursor: 'pointer',
                 transition: 'all 0.2s ease',
                 '&:hover': {
-                  backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                  backgroundColor: 'var(--imaa-dm-overlay, rgba(0, 0, 0, 0.02))',
                 },
               }}
               onClick={() => setSelectedMode(mode)}

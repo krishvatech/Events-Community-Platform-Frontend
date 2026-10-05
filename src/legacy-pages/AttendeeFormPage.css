@@ -16,14 +16,14 @@
 }
 
 .form-page.error {
-  background: #fee;
-  color: #c33;
+  background: var(--imaa-dm-tint-red, #fee);
+  color: var(--imaa-dm-red-text, #c33);
 }
 
 .form-container {
   max-width: 700px;
   margin: 0 auto;
-  background: white;
+  background: var(--imaa-dm-surface, white);
   border: 1px solid var(--imaa-border);
   border-radius: var(--imaa-radius-card);
   box-shadow: var(--imaa-shadow-sm);
@@ -52,7 +52,7 @@
 
 .form-header .deadline {
   font-size: 14px;
-  color: #c0392b;
+  color: var(--imaa-dm-red-text, #c0392b);
   font-weight: 500;
   margin: 10px 0 0 0;
 }
@@ -111,13 +111,13 @@
 }
 
 .restricted-notice {
-  background: #fff3cd;
-  border: 1px solid #ffeeba;
+  background: var(--imaa-dm-tint-amber, #fff3cd);
+  border: 1px solid var(--imaa-dm-tint-amber-border, #ffeeba);
   border-radius: 4px;
   padding: 12px 15px;
   margin-bottom: 20px;
   font-size: 13px;
-  color: #856404;
+  color: var(--imaa-dm-amber-text, #856404);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -144,8 +144,8 @@
 }
 
 .draft-saved-message {
-  background: #d4edda;
-  color: #155724;
+  background: var(--imaa-dm-tint-green, #d4edda);
+  color: var(--imaa-dm-green-text, #155724);
   padding: 12px 15px;
   border-radius: 6px;
   margin-bottom: 20px;
@@ -243,7 +243,7 @@
 }
 
 .field-error {
-  color: #c0392b;
+  color: var(--imaa-dm-red-text, #c0392b);
   font-size: 13px;
   margin-top: 5px;
   display: block;
@@ -317,17 +317,17 @@
 }
 
 .multi-select-item input:checked + span {
-  color: #047857;
+  color: var(--imaa-dm-green-text, #047857);
   font-weight: 600;
 }
 
 .multi-select-item input:checked ~ * {
-  color: #047857;
+  color: var(--imaa-dm-green-text, #047857);
 }
 
 .multi-select-item:has(input:checked) {
   border-color: #047857;
-  background: #f0fff4;
+  background: var(--imaa-dm-tint-green, #f0fff4);
   box-shadow: 0 2px 8px rgba(39, 174, 96, 0.15);
 }
 
@@ -445,7 +445,7 @@
 }
 
 .file-name {
-  color: #047857;
+  color: var(--imaa-dm-green-text, #047857);
   font-weight: 600;
   word-break: break-word;
 }
@@ -463,11 +463,11 @@
   min-height: 36px;
   padding: 0;
   border: 1px solid #c0392b;
-  background: #fee;
+  background: var(--imaa-dm-tint-red, #fee);
   border-radius: var(--imaa-radius-field);
   cursor: pointer;
   font-size: 16px;
-  color: #c0392b;
+  color: var(--imaa-dm-red-text, #c0392b);
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
@@ -565,11 +565,11 @@
   min-height: 28px;
   padding: 0;
   border: 1px solid #c0392b;
-  background: #fee;
+  background: var(--imaa-dm-tint-red, #fee);
   border-radius: 4px;
   cursor: pointer;
   font-size: 14px;
-  color: #c0392b;
+  color: var(--imaa-dm-red-text, #c0392b);
   transition: all 0.2s ease;
   display: flex;
   align-items: center;

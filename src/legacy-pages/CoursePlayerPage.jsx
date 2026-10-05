@@ -77,11 +77,11 @@ const BORDER = "var(--imaa-border)";
 const SURFACE_MUTED = "var(--imaa-bg-member)";
 const SURFACE_HOVER = "var(--imaa-bg-cool)";
 const TEAL = "var(--imaa-teal)";
-const TEAL_TEXT = "var(--imaa-teal-hover)"; // darker teal: AA contrast for text
+const TEAL_TEXT = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))"; // darker teal: AA contrast for text
 const TEAL_TINT = "var(--imaa-teal-light)";
 const CARD_RADIUS = "var(--imaa-radius-card)";
 // Completion stays green (its meaning); this shade meets contrast as text and icon.
-const DONE_GREEN = "#047857";
+const DONE_GREEN = "var(--imaa-dm-green-text, #047857)";
 const DONE_CHIP_SX = { bgcolor: "#04785714", color: DONE_GREEN, border: "1px solid #04785744", height: 26, fontSize: 11 };
 // Reset for clickable rows rendered as real <button>s (keyboard reachable)
 const ROW_BUTTON_RESET = { border: "none", width: "100%", font: "inherit", textAlign: "left", m: 0, color: "inherit" };
@@ -121,7 +121,7 @@ function PlayerTopBar({ course, progress, completed, refreshing, onRefresh }) {
         gap: 1.5,
         px: 2,
         py: 1.25,
-        bgcolor: "#ffffff",
+        bgcolor: "var(--imaa-dm-surface, #ffffff)",
         color: INK,
         borderBottom: `1px solid ${BORDER}`,
         boxShadow: "var(--imaa-shadow-sm)",
@@ -373,24 +373,24 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
   const fmtDate = (ts) => ts ? new Date(ts * 1000).toLocaleDateString(undefined, { dateStyle: "medium" }) : null;
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "#f9fafb" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", bgcolor: "var(--imaa-dm-surface-alt, #f9fafb)" }}>
       {/* Header bar */}
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1, bgcolor: "#ffffff", borderBottom: "1px solid #e5e7eb", flexShrink: 0 }}>
+      <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, px: 2, py: 1, bgcolor: "var(--imaa-dm-surface, #ffffff)", borderBottom: "1px solid var(--imaa-dm-border, #e5e7eb)", flexShrink: 0 }}>
         <Box sx={{ width: 32, height: 32, borderRadius: 1.5, bgcolor: `${color}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           <ModuleIcon modtype={modtype} mimetype={content_mimetype} sx={{ fontSize: 18, color }} />
         </Box>
-        <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1, minWidth: 0, color: "#111827" }} noWrap>
+        <Typography variant="subtitle2" fontWeight={600} sx={{ flex: 1, minWidth: 0, color: "var(--imaa-dm-text, #111827)" }} noWrap>
           {decodeEntities(name)}
         </Typography>
         {module_url && (
           <Tooltip title="Open in LMS">
-            <IconButton component="a" href={module_url} target="_blank" rel="noopener noreferrer" size="small" sx={{ color: "#9ca3af", "&:hover": { color: "#111827" } }}>
+            <IconButton component="a" href={module_url} target="_blank" rel="noopener noreferrer" size="small" sx={{ color: "var(--imaa-dm-text-hint, #9ca3af)", "&:hover": { color: "var(--imaa-dm-text, #111827)" } }}>
               <OpenInNewRoundedIcon fontSize="small" />
             </IconButton>
           </Tooltip>
         )}
         <Tooltip title="Close">
-          <IconButton size="small" onClick={onClose} sx={{ color: "#9ca3af", "&:hover": { color: "#111827" } }}>
+          <IconButton size="small" onClick={onClose} sx={{ color: "var(--imaa-dm-text-hint, #9ca3af)", "&:hover": { color: "var(--imaa-dm-text, #111827)" } }}>
             <CloseRoundedIcon fontSize="small" />
           </IconButton>
         </Tooltip>
@@ -407,7 +407,7 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
 
           {!loading && (error || !detail) && (
             <Box sx={{ textAlign: "center", pt: 6 }}>
-              <Typography sx={{ color: "#6b7280", mb: 2 }}>Could not load content.</Typography>
+              <Typography sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", mb: 2 }}>Could not load content.</Typography>
               {module_url && (
                 <Button variant="outlined" endIcon={<OpenInNewRoundedIcon />} href={module_url} target="_blank" rel="noopener noreferrer" sx={{ textTransform: "none" }}>
                   Open in LMS
@@ -421,20 +421,20 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
               {/* Assignment */}
               {modtype === "assign" && (
                 <Box>
-                  <Typography variant="h6" fontWeight={700} sx={{ color: "#111827", mb: 2, pb: 1.5, borderBottom: "1px solid #e5e7eb" }}>
+                  <Typography variant="h6" fontWeight={700} sx={{ color: "var(--imaa-dm-text, #111827)", mb: 2, pb: 1.5, borderBottom: "1px solid var(--imaa-dm-border, #e5e7eb)" }}>
                     {decodeEntities(detail.name)}
                   </Typography>
 
                   {/* Meta row */}
                   <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2.5 }}>
                     {detail.allowsubmissionsfromdate > 0 && (
-                      <Chip label={`Opens: ${fmtDate(detail.allowsubmissionsfromdate)}`} size="small" sx={{ bgcolor: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0" }} />
+                      <Chip label={`Opens: ${fmtDate(detail.allowsubmissionsfromdate)}`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "var(--imaa-dm-green-text, #15803d)", border: "1px solid var(--imaa-dm-tint-green-border, #bbf7d0)" }} />
                     )}
                     {detail.duedate > 0 && (
-                      <Chip label={`Due: ${fmtDate(detail.duedate)}`} size="small" sx={{ bgcolor: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }} />
+                      <Chip label={`Due: ${fmtDate(detail.duedate)}`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fef2f2)", color: "var(--imaa-dm-red-text, #b91c1c)", border: "1px solid var(--imaa-dm-tint-red-border, #fecaca)" }} />
                     )}
                     {detail.nosubmissions === 1 && (
-                      <Chip label="No submission required" size="small" sx={{ bgcolor: "#f0f9ff", color: "#0369a1", border: "1px solid #bae6fd" }} />
+                      <Chip label="No submission required" size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0f9ff)", color: "var(--imaa-dm-blue-text, #0369a1)", border: "1px solid var(--imaa-dm-border, #bae6fd)" }} />
                     )}
                   </Box>
 
@@ -442,8 +442,8 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
                   {detail.intro && (
                     <Box
                       sx={{
-                        bgcolor: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 2, p: 3,
-                        fontSize: 14, color: "#374151", lineHeight: 1.8,
+                        bgcolor: "var(--imaa-dm-surface, #ffffff)", border: "1px solid var(--imaa-dm-border, #e5e7eb)", borderRadius: 2, p: 3,
+                        fontSize: 14, color: "var(--imaa-dm-text-2, #374151)", lineHeight: 1.8,
                         "& img": { maxWidth: "100%", height: "auto", borderRadius: 1, my: 1 },
                         "& p": { margin: "0 0 10px 0" },
                         "& ol, & ul": { pl: 3, mb: 1 },
@@ -474,16 +474,16 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
               {/* Quiz */}
               {modtype === "quiz" && (
                 <Box>
-                  <Typography variant="h6" fontWeight={700} sx={{ color: "#111827", mb: 2, pb: 1.5, borderBottom: "1px solid #e5e7eb" }}>
+                  <Typography variant="h6" fontWeight={700} sx={{ color: "var(--imaa-dm-text, #111827)", mb: 2, pb: 1.5, borderBottom: "1px solid var(--imaa-dm-border, #e5e7eb)" }}>
                     {decodeEntities(detail.name)}
                   </Typography>
                   <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", mb: 2.5 }}>
-                    {detail.timelimit > 0 && <Chip label={`Time limit: ${Math.round(detail.timelimit / 60)} min`} size="small" sx={{ bgcolor: "#faf5ff", color: "#7c3aed", border: "1px solid #e9d5ff" }} />}
-                    {detail.timeopen > 0 && <Chip label={`Opens: ${fmtDate(detail.timeopen)}`} size="small" sx={{ bgcolor: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0" }} />}
-                    {detail.timeclose > 0 && <Chip label={`Closes: ${fmtDate(detail.timeclose)}`} size="small" sx={{ bgcolor: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }} />}
+                    {detail.timelimit > 0 && <Chip label={`Time limit: ${Math.round(detail.timelimit / 60)} min`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #faf5ff)", color: "var(--imaa-dm-purple-text, #7c3aed)", border: "1px solid var(--imaa-dm-tint-purple-border, #e9d5ff)" }} />}
+                    {detail.timeopen > 0 && <Chip label={`Opens: ${fmtDate(detail.timeopen)}`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "var(--imaa-dm-green-text, #15803d)", border: "1px solid var(--imaa-dm-tint-green-border, #bbf7d0)" }} />}
+                    {detail.timeclose > 0 && <Chip label={`Closes: ${fmtDate(detail.timeclose)}`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fef2f2)", color: "var(--imaa-dm-red-text, #b91c1c)", border: "1px solid var(--imaa-dm-tint-red-border, #fecaca)" }} />}
                   </Box>
                   {detail.intro && (
-                    <Box sx={{ bgcolor: "#ffffff", border: "1px solid #e5e7eb", borderRadius: 2, p: 3, fontSize: 14, color: "#374151", lineHeight: 1.8, "& img": { maxWidth: "100%" }, "& p": { margin: "0 0 10px 0" } }}
+                    <Box sx={{ bgcolor: "var(--imaa-dm-surface, #ffffff)", border: "1px solid var(--imaa-dm-border, #e5e7eb)", borderRadius: 2, p: 3, fontSize: 14, color: "var(--imaa-dm-text-2, #374151)", lineHeight: 1.8, "& img": { maxWidth: "100%" }, "& p": { margin: "0 0 10px 0" } }}
                       dangerouslySetInnerHTML={{ __html: detail.intro }}
                     />
                   )}
@@ -500,7 +500,7 @@ function ModuleLaunchModal({ courseId, module, onClose }) {
               {/* URL / Folder / Other — show name + open button */}
               {!["assign", "quiz"].includes(modtype) && (
                 <Box sx={{ textAlign: "center", pt: 4 }}>
-                  <Typography variant="h6" fontWeight={600} sx={{ color: "#111827", mb: 3 }}>{decodeEntities(detail.name)}</Typography>
+                  <Typography variant="h6" fontWeight={600} sx={{ color: "var(--imaa-dm-text, #111827)", mb: 3 }}>{decodeEntities(detail.name)}</Typography>
                   {module_url && (
                     <Button variant="contained" endIcon={<OpenInNewRoundedIcon />} href={module_url} target="_blank" rel="noopener noreferrer"
                       sx={{ bgcolor: color, "&:hover": { filter: "brightness(0.9)" }, textTransform: "none" }}>
@@ -577,13 +577,13 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center", mb: 2.5 }}>
               <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
                 {detail.allowsubmissionsfromdate > 0 && (
-                  <Chip label={`Opens: ${fmtDate(detail.allowsubmissionsfromdate)}`} size="small" sx={{ bgcolor: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0" }} />
+                  <Chip label={`Opens: ${fmtDate(detail.allowsubmissionsfromdate)}`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "var(--imaa-dm-green-text, #15803d)", border: "1px solid var(--imaa-dm-tint-green-border, #bbf7d0)" }} />
                 )}
                 {detail.duedate > 0 && (
-                  <Chip label={`Due: ${fmtDate(detail.duedate)}`} size="small" sx={{ bgcolor: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }} />
+                  <Chip label={`Due: ${fmtDate(detail.duedate)}`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fef2f2)", color: "var(--imaa-dm-red-text, #b91c1c)", border: "1px solid var(--imaa-dm-tint-red-border, #fecaca)" }} />
                 )}
                 {detail.nosubmissions === 1 && (
-                  <Chip label="No submission required" size="small" sx={{ bgcolor: "#f0f9ff", color: "#0369a1", border: "1px solid #bae6fd" }} />
+                  <Chip label="No submission required" size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0f9ff)", color: "var(--imaa-dm-blue-text, #0369a1)", border: "1px solid var(--imaa-dm-border, #bae6fd)" }} />
                 )}
               </Box>
 
@@ -658,9 +658,9 @@ function ModuleDetailContent({ courseId, module, onMarkDone, onOpenInPlatform })
           {(detail.timelimit > 0 || detail.timeopen > 0 || detail.timeclose > 0 || completion === 1) && (
             <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", alignItems: "center", mb: 2.5 }}>
               <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap" }}>
-                {detail.timelimit > 0 && <Chip label={`Time limit: ${Math.round(detail.timelimit / 60)} min`} size="small" sx={{ bgcolor: "#faf5ff", color: "#7c3aed", border: "1px solid #e9d5ff" }} />}
-                {detail.timeopen > 0 && <Chip label={`Opens: ${fmtDate(detail.timeopen)}`} size="small" sx={{ bgcolor: "#f0fdf4", color: "#15803d", border: "1px solid #bbf7d0" }} />}
-                {detail.timeclose > 0 && <Chip label={`Closes: ${fmtDate(detail.timeclose)}`} size="small" sx={{ bgcolor: "#fef2f2", color: "#b91c1c", border: "1px solid #fecaca" }} />}
+                {detail.timelimit > 0 && <Chip label={`Time limit: ${Math.round(detail.timelimit / 60)} min`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #faf5ff)", color: "var(--imaa-dm-purple-text, #7c3aed)", border: "1px solid var(--imaa-dm-tint-purple-border, #e9d5ff)" }} />}
+                {detail.timeopen > 0 && <Chip label={`Opens: ${fmtDate(detail.timeopen)}`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "var(--imaa-dm-green-text, #15803d)", border: "1px solid var(--imaa-dm-tint-green-border, #bbf7d0)" }} />}
+                {detail.timeclose > 0 && <Chip label={`Closes: ${fmtDate(detail.timeclose)}`} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fef2f2)", color: "var(--imaa-dm-red-text, #b91c1c)", border: "1px solid var(--imaa-dm-tint-red-border, #fecaca)" }} />}
               </Box>
 
               {/* Mark as done button on the right */}
@@ -747,7 +747,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
         mb: 2,
         borderRadius: CARD_RADIUS,
         border: `1px solid ${BORDER}`,
-        bgcolor: "#ffffff",
+        bgcolor: "var(--imaa-dm-surface, #ffffff)",
         boxShadow: "var(--imaa-shadow-sm)",
         overflow: "hidden",
       }}
@@ -768,7 +768,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
             </Box>
           ) : (
             <Box component="button" type="button" onClick={() => onSelectModule?.(module)} sx={{ ...ROW_BUTTON_RESET, bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}`, cursor: "pointer", "&:hover": { bgcolor: SURFACE_HOVER }, "&:focus-visible": { outlineOffset: "-2px" }, transition: "background-color 0.2s ease" }}>
-              <OndemandVideoRoundedIcon sx={{ fontSize: 40, color: "#0A9396" }} />
+              <OndemandVideoRoundedIcon sx={{ fontSize: 40, color: "var(--imaa-dm-teal-text, #0A9396)" }} />
               <Box component="span" sx={{ flex: 1, minWidth: 0, display: "block" }}>
                 <Typography variant="body2" component="span" sx={{ color: INK, fontWeight: 600, mb: 0.5, display: "block" }}>{decodeEntities(name)}</Typography>
               </Box>
@@ -781,10 +781,10 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
       {modtype === "resource" && is_pdf && content_url && (
         <>
           {showPreview ? (
-            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "#ffffff", borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column", height: { xs: "70vh", md: "800px" }, cursor: "pointer" }}>
+            <Box onClick={() => onSelectModule?.(module)} sx={{ bgcolor: "var(--imaa-dm-surface, #ffffff)", borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, overflow: "hidden", display: "flex", flexDirection: "column", height: { xs: "70vh", md: "800px" }, cursor: "pointer" }}>
               {/* Header with title and controls */}
               <Box sx={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: `1px solid ${BORDER}`, bgcolor: SURFACE_MUTED, flexShrink: 0 }}>
-                <PictureAsPdfRoundedIcon sx={{ fontSize: 28, color: "#ef4444", flexShrink: 0 }} />
+                <PictureAsPdfRoundedIcon sx={{ fontSize: 28, color: "var(--imaa-dm-red-text, #ef4444)", flexShrink: 0 }} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body2" sx={{ color: INK, fontWeight: 600 }}>
                     {decodeEntities(name)}
@@ -807,7 +807,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
               {/* PDF Viewer Container */}
               <Box sx={{ flex: 1, display: "flex", overflow: "hidden", bgcolor: SURFACE_HOVER }}>
                 {/* Embedded PDF with controls */}
-                <Box sx={{ flex: 1, bgcolor: "#fff", position: "relative" }}>
+                <Box sx={{ flex: 1, bgcolor: "var(--imaa-dm-surface, #fff)", position: "relative" }}>
                   <embed
                     title={decodeEntities(name)}
                     src={`${content_url}#toolbar=1&navpanes=0&scrollbar=1`}
@@ -819,7 +819,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
             </Box>
           ) : (
             <Box component="button" type="button" onClick={() => onSelectModule?.(module)} sx={{ ...ROW_BUTTON_RESET, bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}`, cursor: "pointer", "&:hover": { bgcolor: SURFACE_HOVER }, "&:focus-visible": { outlineOffset: "-2px" }, transition: "background-color 0.2s ease" }}>
-              <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: "#ef4444" }} />
+              <PictureAsPdfRoundedIcon sx={{ fontSize: 40, color: "var(--imaa-dm-red-text, #ef4444)" }} />
               <Box component="span" sx={{ flex: 1, minWidth: 0, display: "block" }}>
                 <Typography variant="body2" component="span" sx={{ color: INK, fontWeight: 600, mb: 0.5, display: "block" }}>{decodeEntities(name)}</Typography>
               </Box>
@@ -831,7 +831,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
       {/* ── External URL ── */}
       {modtype === "url" && (
         <Box sx={{ bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}` }}>
-          <LinkRoundedIcon sx={{ fontSize: 40, color: "#3b82f6" }} />
+          <LinkRoundedIcon sx={{ fontSize: 40, color: "var(--imaa-dm-blue-text, #3b82f6)" }} />
           <Box>
             <Typography variant="body2" sx={{ color: INK, fontWeight: 600, mb: 0.5 }}>{decodeEntities(name)}</Typography>
             {openBtn("Open Link", "#3b82f6")}
@@ -842,7 +842,7 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
       {/* ── Quiz ── */}
       {modtype === "quiz" && (
         <Box sx={{ bgcolor: SURFACE_MUTED, p: { xs: 2, sm: 3 }, display: "flex", alignItems: "center", gap: 2, borderBottom: `1px solid ${BORDER}` }}>
-          <QuizRoundedIcon sx={{ fontSize: 40, color: "#8b5cf6" }} />
+          <QuizRoundedIcon sx={{ fontSize: 40, color: "var(--imaa-dm-purple-text, #8b5cf6)" }} />
           <Box component="button" type="button" sx={{ ...ROW_BUTTON_RESET, width: "auto", p: 0, bgcolor: "transparent", flex: 1, minWidth: 0, cursor: "pointer" }} onClick={() => onSelectModule?.(module)}>
             <Typography variant="body2" component="span" sx={{ display: "block", color: TEAL_TEXT, fontWeight: 600, mb: 0.5, "&:hover": { textDecoration: "underline" } }}>{decodeEntities(name)}</Typography>
           </Box>
@@ -883,9 +883,9 @@ function ModuleCard({ module, moduleRef, onMarkDone, onOpenInPlatform, showPrevi
 
       {/* ── Lock restriction notice ── */}
       {!visible && (
-        <Box sx={{ px: 3, py: 1.5, display: "flex", alignItems: "center", gap: 1, bgcolor: "#fff7ed", borderTop: is_video || is_pdf ? "1px solid #fed7aa" : "none" }}>
+        <Box sx={{ px: 3, py: 1.5, display: "flex", alignItems: "center", gap: 1, bgcolor: "var(--imaa-dm-surface-alt, #fff7ed)", borderTop: is_video || is_pdf ? "1px solid var(--imaa-dm-tint-orange-border, #fed7aa)" : "none" }}>
           <LockRoundedIcon sx={{ fontSize: 16, color: "#f97316" }} />
-          <Typography variant="caption" sx={{ color: "#9a3412" }}>
+          <Typography variant="caption" sx={{ color: "var(--imaa-dm-orange-text, #9a3412)" }}>
             Not available — requires enrollment in a specific group or completing prerequisites.
           </Typography>
         </Box>
@@ -1008,7 +1008,7 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
             </Typography>
 
             {/* Module details container */}
-            <Box sx={{ bgcolor: "#ffffff", borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, boxShadow: "var(--imaa-shadow-sm)", overflow: "hidden" }}>
+            <Box sx={{ bgcolor: "var(--imaa-dm-surface, #ffffff)", borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, boxShadow: "var(--imaa-shadow-sm)", overflow: "hidden" }}>
               {/* Header with icon and title */}
               <Box sx={{ display: "flex", alignItems: "center", gap: 2, px: { xs: 2, sm: 3 }, py: 2, borderBottom: `1px solid ${BORDER}` }}>
                 <Box sx={{ width: 40, height: 40, borderRadius: 1.5, bgcolor: `${moduleColor(activeModule.modtype, activeModule.content_mimetype)}22`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -1056,7 +1056,7 @@ function SectionView({ courseId, sections, sectionRefs, activeModule, moduleRefs
             key={section.id}
             ref={(el) => { if (el) sectionRefs.current[section.id] = el; }}
             data-section-id={section.id}
-            sx={{ mb: 3, borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, bgcolor: "#ffffff", boxShadow: "var(--imaa-shadow-sm)", overflow: "hidden" }}
+            sx={{ mb: 3, borderRadius: CARD_RADIUS, border: `1px solid ${BORDER}`, bgcolor: "var(--imaa-dm-surface, #ffffff)", boxShadow: "var(--imaa-shadow-sm)", overflow: "hidden" }}
           >
             {/* Section heading with expand/collapse: an h2 containing a real toggle button */}
             <Box component="h2" sx={{ m: 0 }}>
@@ -1290,10 +1290,10 @@ function MergersAIWidget({ courseId, courseName }) {
 
   // Render widget (even if no courses available, still allow search)
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", bgcolor: "#ffffff" }}>
+    <Box sx={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden", bgcolor: "var(--imaa-dm-surface, #ffffff)" }}>
       {/* Header */}
-      <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid #e5e7eb", bgcolor: "#f9fafb", flexShrink: 0 }}>
-        <Typography variant="caption" fontWeight={700} sx={{ color: "#374151", textTransform: "uppercase", letterSpacing: "0.08em", display: "block" }}>
+      <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid var(--imaa-dm-border, #e5e7eb)", bgcolor: "var(--imaa-dm-surface-alt, #f9fafb)", flexShrink: 0 }}>
+        <Typography variant="caption" fontWeight={700} sx={{ color: "var(--imaa-dm-text-2, #374151)", textTransform: "uppercase", letterSpacing: "0.08em", display: "block" }}>
           🤖 Ask AI
         </Typography>
         <Typography variant="caption" color="text.disabled" sx={{ fontSize: "11px", display: "block", mt: 0.5 }}>
@@ -1303,8 +1303,8 @@ function MergersAIWidget({ courseId, courseName }) {
 
       {/* Course selector or indicator */}
       {(courses.length > 1 || selectedCourse) && (
-        <Box sx={{ px: 2, py: 1, borderBottom: "1px solid #e5e7eb", bgcolor: "#ffffff", flexShrink: 0 }}>
-          <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", fontWeight: 600, display: "block", mb: 0.5 }}>
+        <Box sx={{ px: 2, py: 1, borderBottom: "1px solid var(--imaa-dm-border, #e5e7eb)", bgcolor: "var(--imaa-dm-surface, #ffffff)", flexShrink: 0 }}>
+          <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", fontSize: "11px", fontWeight: 600, display: "block", mb: 0.5 }}>
             Course:
           </Typography>
           {courses.length > 1 ? (
@@ -1320,7 +1320,7 @@ function MergersAIWidget({ courseId, courseName }) {
                 width: "100%",
                 padding: "6px 8px",
                 fontSize: "13px",
-                border: "1px solid #d1d5db",
+                border: "1px solid var(--imaa-dm-border-strong, #d1d5db)",
                 borderRadius: "4px",
                 fontFamily: "inherit",
               }}
@@ -1332,7 +1332,7 @@ function MergersAIWidget({ courseId, courseName }) {
               ))}
             </select>
           ) : (
-            <Typography variant="caption" sx={{ color: "#374151", fontSize: "12px", display: "block" }}>
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-2, #374151)", fontSize: "12px", display: "block" }}>
               {selectedCourse?.name || selectedCourse?.slug || "Current course"}
             </Typography>
           )}
@@ -1340,7 +1340,7 @@ function MergersAIWidget({ courseId, courseName }) {
       )}
 
       {/* Search box */}
-      <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid #e5e7eb", bgcolor: "#ffffff", flexShrink: 0 }}>
+      <Box sx={{ px: 2, py: 1.5, borderBottom: "1px solid var(--imaa-dm-border, #e5e7eb)", bgcolor: "var(--imaa-dm-surface, #ffffff)", flexShrink: 0 }}>
         <form onSubmit={handleSearch} style={{ display: "flex", gap: "8px" }}>
           <input
             type="text"
@@ -1352,7 +1352,7 @@ function MergersAIWidget({ courseId, courseName }) {
               flex: 1,
               padding: "8px 12px",
               fontSize: "13px",
-              border: "1px solid #d1d5db",
+              border: "1px solid var(--imaa-dm-border-strong, #d1d5db)",
               borderRadius: "4px",
               fontFamily: "inherit",
             }}
@@ -1368,7 +1368,7 @@ function MergersAIWidget({ courseId, courseName }) {
               fontSize: "13px",
               px: 1.5,
               "&:hover": { bgcolor: "#1aa19a" },
-              "&:disabled": { bgcolor: "#d1d5db", color: "#9ca3af" },
+              "&:disabled": { bgcolor: "var(--imaa-dm-muted-strong, #d1d5db)", color: "var(--imaa-dm-text-hint, #9ca3af)" },
             }}
           >
             {searching ? <CircularProgress size={16} sx={{ color: "inherit", mr: 0.5 }} /> : "Search"}
@@ -1396,21 +1396,21 @@ function MergersAIWidget({ courseId, courseName }) {
                 onClick={() => setSelectedResult(result)}
                 sx={{
                   p: 1.5,
-                  border: "1px solid #e5e7eb",
+                  border: "1px solid var(--imaa-dm-border, #e5e7eb)",
                   borderRadius: "6px",
                   cursor: "pointer",
                   transition: "all 0.2s",
                   "&:hover": {
-                    bgcolor: "#f3f4f6",
+                    bgcolor: "var(--imaa-dm-surface-hover, #f3f4f6)",
                     borderColor: "#1bbbb3",
                     transform: "translateX(2px)",
                   },
                 }}
               >
-                <Typography variant="caption" fontWeight={600} sx={{ color: "#111827", fontSize: "12px", display: "block", mb: 0.5 }}>
+                <Typography variant="caption" fontWeight={600} sx={{ color: "var(--imaa-dm-text, #111827)", fontSize: "12px", display: "block", mb: 0.5 }}>
                   {result.title}
                 </Typography>
-                <Typography variant="caption" sx={{ color: "#9ca3af", fontSize: "11px", display: "block", mb: 0.5 }}>
+                <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-hint, #9ca3af)", fontSize: "11px", display: "block", mb: 0.5 }}>
                   {result.course_name}
                 </Typography>
                 {result.video_id && (
@@ -1419,11 +1419,11 @@ function MergersAIWidget({ courseId, courseName }) {
                   </Typography>
                 )}
                 {result.confidence_score && (
-                  <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", display: "block", mb: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", fontSize: "11px", display: "block", mb: 0.5 }}>
                     Match: {Math.round(result.confidence_score * 100)}%
                   </Typography>
                 )}
-                <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", display: "block", mb: 0.5, fontStyle: "italic" }}>
+                <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", fontSize: "11px", display: "block", mb: 0.5, fontStyle: "italic" }}>
                   {result.transcript_segment?.substring(0, 60)}...
                 </Typography>
                 <Button
@@ -1458,19 +1458,19 @@ function MergersAIWidget({ courseId, courseName }) {
               sx={{
                 textTransform: "none",
                 fontSize: "12px",
-                color: "#6b7280",
+                color: "var(--imaa-dm-text-meta, #6b7280)",
                 p: 0,
                 mb: 1,
-                "&:hover": { color: "#111827" },
+                "&:hover": { color: "var(--imaa-dm-text, #111827)" },
               }}
             >
               ← Back to results
             </Button>
 
-            <Typography variant="caption" fontWeight={600} sx={{ color: "#111827", fontSize: "13px", display: "block", mb: 0.5 }}>
+            <Typography variant="caption" fontWeight={600} sx={{ color: "var(--imaa-dm-text, #111827)", fontSize: "13px", display: "block", mb: 0.5 }}>
               {selectedResult.title}
             </Typography>
-            <Typography variant="caption" sx={{ color: "#9ca3af", fontSize: "11px", display: "block", mb: 0.5 }}>
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-hint, #9ca3af)", fontSize: "11px", display: "block", mb: 0.5 }}>
               {selectedResult.course_name}
             </Typography>
             {selectedResult.video_id && (
@@ -1493,8 +1493,8 @@ function MergersAIWidget({ courseId, courseName }) {
             )}
 
             {selectedResult.transcript_segment && (
-              <Box sx={{ p: 1, bgcolor: "#f9fafb", borderRadius: "4px", flex: 0 }}>
-                <Typography variant="caption" sx={{ color: "#6b7280", fontSize: "11px", fontStyle: "italic", display: "block" }}>
+              <Box sx={{ p: 1, bgcolor: "var(--imaa-dm-surface-alt, #f9fafb)", borderRadius: "4px", flex: 0 }}>
+                <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", fontSize: "11px", fontStyle: "italic", display: "block" }}>
                   "{selectedResult.transcript_segment.substring(0, 200)}"
                 </Typography>
               </Box>
@@ -1710,8 +1710,8 @@ export default function CoursePlayerPage() {
   // ── Loading / error states ──────────────────────────────────────────────────
   if (loading) {
     return (
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "#ffffff" }}>
-        <Box sx={{ px: 2, py: 1.5, bgcolor: "#ffffff", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 2 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", height: "100vh", bgcolor: "var(--imaa-dm-surface, #ffffff)" }}>
+        <Box sx={{ px: 2, py: 1.5, bgcolor: "var(--imaa-dm-surface, #ffffff)", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 2 }}>
           <Skeleton variant="circular" width={32} height={32} sx={{ bgcolor: SURFACE_HOVER }} />
           <Skeleton variant="text" width={260} height={24} sx={{ bgcolor: SURFACE_HOVER, maxWidth: "50%" }} />
           <Box sx={{ flex: 1 }} />
@@ -1758,7 +1758,7 @@ export default function CoursePlayerPage() {
             width: { xs: "100%", lg: 280 },
             maxHeight: { xs: "40vh", lg: "none" },
             flexShrink: 0,
-            bgcolor: "#ffffff",
+            bgcolor: "var(--imaa-dm-surface, #ffffff)",
             borderRight: { lg: `1px solid ${BORDER}` },
             borderBottom: { xs: `1px solid ${BORDER}`, lg: "none" },
             display: "flex",
@@ -1833,7 +1833,7 @@ export default function CoursePlayerPage() {
               width: { xs: "100%", lg: 340 },
               height: { xs: 520, lg: "auto" },
               flexShrink: 0,
-              bgcolor: "#ffffff",
+              bgcolor: "var(--imaa-dm-surface, #ffffff)",
               borderLeft: { lg: `1px solid ${BORDER}` },
               borderTop: { xs: `1px solid ${BORDER}`, lg: "none" },
               display: "flex",

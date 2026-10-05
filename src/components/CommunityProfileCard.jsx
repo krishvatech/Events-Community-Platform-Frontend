@@ -28,8 +28,8 @@ import { logoutBrowserSession } from "../utils/logoutSession";
 import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { getAccessToken as readAccessToken } from "../utils/tokenStore";
 
-const BORDER = "#e2e8f0";
-const SLATE_700 = "#334155";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
+const SLATE_700 = "var(--imaa-dm-text-2, #334155)";
 
 function initials(name = "") {
   const parts = name.trim().split(/\s+/);
@@ -192,7 +192,7 @@ export default function CommunityProfileCard({
         id: g.id || g.pk || `${name}-${Math.random().toString(36).slice(2, 7)}`,
         name,
         code: (g.slug && g.slug.slice(0, 2).toUpperCase()) || initials(name),
-        color: g.color || "#F1F5F9",
+        color: g.color || "var(--imaa-dm-surface-alt, #F1F5F9)",
         subscribed: !!(g.subscribed || g.is_member || g.member_status === "active"),
         cover_image: resolveMediaUrl(g.cover_image || g.coverImage || g.icon || g.image || ""),
       };
@@ -414,8 +414,8 @@ export default function CommunityProfileCard({
                 label={userDisplay.status}
                 variant="filled"
                 sx={{
-                  bgcolor: "#E6F9EE",
-                  color: "#198754",
+                  bgcolor: "var(--imaa-dm-surface-alt, #E6F9EE)",
+                  color: "var(--imaa-dm-green-text, #198754)",
                   fontWeight: 600,
                   height: 22,
                   "& .MuiChip-label": { px: 1.25, pt: "1px" },
@@ -461,8 +461,8 @@ export default function CommunityProfileCard({
                     width: 28,
                     height: 28,
                     borderRadius: 1.5,
-                    bgcolor: c.cover_image ? undefined : (c.color || "#F1F5F9"),
-                    color: "#111827",
+                    bgcolor: c.cover_image ? undefined : (c.color || "var(--imaa-dm-surface-alt, #F1F5F9)"),
+                    color: "var(--imaa-dm-text, #111827)",
                     fontSize: 12,
                     fontWeight: 700,
                   }}
@@ -488,7 +488,7 @@ export default function CommunityProfileCard({
                         p: 0,
                         minWidth: 0,
                         justifyContent: "flex-start",
-                        color: "#2E7D32",
+                        color: "var(--imaa-dm-green-text, #2E7D32)",
                         textTransform: "none",
                         fontSize: 12,
                       }}
@@ -564,8 +564,8 @@ export default function CommunityProfileCard({
                         width: 36,
                         height: 36,
                         borderRadius: 1.5,
-                        bgcolor: c.color || "#F1F5F9",
-                        color: "#111827",
+                        bgcolor: c.color || "var(--imaa-dm-surface-alt, #F1F5F9)",
+                        color: "var(--imaa-dm-text, #111827)",
                         fontSize: 13,
                         fontWeight: 800,
                       }}

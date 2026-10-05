@@ -50,6 +50,7 @@ import AdminTableShell from "../components/admin/AdminTableShell.jsx";
 import AdminStatusChip from "../components/admin/AdminStatusChip.jsx";
 
 const ORANGE = "var(--imaa-teal-hover)";
+const ORANGE_TEXT = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))"; // as text: readable variant in dark mode
 const TEXT = "var(--imaa-ink)";
 const INVOICE_SETTINGS_TAB = 6;
 const SALEOR_PERMISSION_OPTIONS = [
@@ -1104,7 +1105,7 @@ export default function SaleorManager() {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4, mt: 0.5 }}>
       {/* General Information */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           General Information
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1123,7 +1124,7 @@ export default function SaleorManager() {
 
       {/* Address Information */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           Address Information
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1165,7 +1166,7 @@ export default function SaleorManager() {
 
       {/* Settings */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           Settings
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1213,7 +1214,7 @@ export default function SaleorManager() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 4, mt: 0.5 }}>
       {/* General Information */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           General Information
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1244,7 +1245,7 @@ export default function SaleorManager() {
 
       {/* Countries */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           Countries
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1263,7 +1264,7 @@ export default function SaleorManager() {
               label="Default / Rest of World"
             />
             {formData.is_default && (
-              <Typography variant="caption" sx={{ display: "block", color: "#6b7280", mt: 0.5 }}>
+              <Typography variant="caption" sx={{ display: "block", color: "var(--imaa-dm-text-meta, #6b7280)", mt: 0.5 }}>
                 Default / Rest of World zone covers countries not assigned to another shipping zone.
               </Typography>
             )}
@@ -1297,7 +1298,7 @@ export default function SaleorManager() {
 
       {/* Assignments */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           Assignments
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1367,7 +1368,7 @@ export default function SaleorManager() {
     <Box sx={{ display: "flex", flexDirection: "column", gap: 4, mt: 0.5 }}>
       {/* General Information */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           General Information
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1398,7 +1399,7 @@ export default function SaleorManager() {
 
       {/* Type */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           Type
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1424,7 +1425,7 @@ export default function SaleorManager() {
 
       {/* Shipping */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           Shipping
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1436,7 +1437,7 @@ export default function SaleorManager() {
 
       {/* Taxes */}
       <Box>
-        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
+        <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 800, color: ORANGE_TEXT, textTransform: "uppercase", fontSize: "0.8rem", letterSpacing: "1.5px" }}>
           Taxes
         </Typography>
         <Divider sx={{ mb: 3 }} />
@@ -1479,7 +1480,7 @@ export default function SaleorManager() {
       <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 } }}>
         <Container maxWidth="sm">
           <Paper role="status" aria-live="polite" sx={{ p: 4, textAlign: "center", borderRadius: "var(--imaa-radius-card)", border: "1px solid var(--imaa-border)" }}>
-            <CircularProgress sx={{ color: ORANGE, mb: 2 }} />
+            <CircularProgress sx={{ color: ORANGE_TEXT, mb: 2 }} />
             <Typography component="h1" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: TEXT }}>
               Checking Saleor SSO status
             </Typography>
@@ -1494,11 +1495,11 @@ export default function SaleorManager() {
       <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 } }}>
         <Container maxWidth="sm">
           <Paper sx={{ p: { xs: 3, sm: 4 }, textAlign: "center", borderRadius: "var(--imaa-radius-card)", border: "1px solid var(--imaa-border)" }}>
-            <ShoppingCartIcon sx={{ fontSize: 42, color: ORANGE, mb: 2 }} />
+            <ShoppingCartIcon sx={{ fontSize: 42, color: ORANGE_TEXT, mb: 2 }} />
             <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: TEXT, mb: 1 }}>
               Saleor SSO connection required
             </Typography>
-            <Typography sx={{ color: "#6b7280", mb: 3 }}>
+            <Typography sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", mb: 3 }}>
               Connect your Saleor staff account before managing channels, warehouses, shipping zones, product types, staff users, and permission groups.
             </Typography>
             {error && (
@@ -1566,7 +1567,7 @@ export default function SaleorManager() {
             p: { xs: 2, sm: 2.5 },
             mb: 3,
             borderRadius: "var(--imaa-radius-card)",
-            background: "white",
+            background: "var(--imaa-dm-surface, white)",
             border: "1px solid var(--imaa-border)",
             display: "flex",
             alignItems: "center",
@@ -1587,19 +1588,19 @@ export default function SaleorManager() {
                 justifyContent: "center",
               }}
             >
-              <ShoppingCartIcon sx={{ fontSize: 24, color: ORANGE }} />
+              <ShoppingCartIcon sx={{ fontSize: 24, color: ORANGE_TEXT }} />
             </Box>
             <Box sx={{ minWidth: 0 }}>
               <Typography component="h1" variant="h5" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: TEXT, letterSpacing: "-0.5px" }}>
                 Saleor Manager
               </Typography>
-              <Typography variant="caption" sx={{ color: "#6b7280", display: "block" }}>
+              <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", display: "block" }}>
                 Configuration & Synchronization Control Center
               </Typography>
             </Box>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", width: { xs: "100%", md: "auto" } }}>
-            <Typography variant="caption" sx={{ color: "#6b7280" }}>
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
               Connected as: {saleorStatus.saleor_email}
             </Typography>
             {tab !== INVOICE_SETTINGS_TAB && (
@@ -1631,7 +1632,7 @@ export default function SaleorManager() {
                 borderRadius: "var(--imaa-radius-field)",
                 minHeight: 40,
                 textTransform: "none",
-                borderColor: "#e5e7eb",
+                borderColor: "var(--imaa-dm-border, #e5e7eb)",
                 color: TEXT,
                 fontWeight: 600,
               }}
@@ -1645,7 +1646,7 @@ export default function SaleorManager() {
                 borderRadius: "var(--imaa-radius-field)",
                 minHeight: 40,
                 textTransform: "none",
-                color: "#b91c1c",
+                color: "var(--imaa-dm-red-text, #b91c1c)",
                 fontWeight: 600,
               }}
             >
@@ -1661,7 +1662,7 @@ export default function SaleorManager() {
         )}
 
         {/* Content Area */}
-        <Paper elevation={0} sx={{ borderRadius: "var(--imaa-radius-card)", overflow: "visible", border: "1px solid var(--imaa-border)", bgcolor: "white", minWidth: 0, boxShadow: "var(--imaa-shadow-sm)" }}>
+        <Paper elevation={0} sx={{ borderRadius: "var(--imaa-radius-card)", overflow: "visible", border: "1px solid var(--imaa-border)", bgcolor: "var(--imaa-dm-surface, white)", minWidth: 0, boxShadow: "var(--imaa-shadow-sm)" }}>
           <Tabs
             value={tab}
             onChange={handleTabChange}
@@ -1672,7 +1673,7 @@ export default function SaleorManager() {
             sx={{
               px: 2,
               pt: 2,
-              borderBottom: `1px solid #e5e7eb`,
+              borderBottom: `1px solid var(--imaa-dm-border, #e5e7eb)`,
               "& .MuiTab-root": {
                 fontWeight: 600,
                 textTransform: "none",
@@ -1680,7 +1681,7 @@ export default function SaleorManager() {
                 pb: 2,
               },
               "& .Mui-selected": {
-                color: ORANGE,
+                color: ORANGE_TEXT,
               },
               "& .MuiTabs-indicator": {
                 backgroundColor: ORANGE,
@@ -1741,27 +1742,27 @@ export default function SaleorManager() {
             >
               <Table aria-label={`${tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : tab === 2 ? "Shipping zones" : tab === 3 ? "Product types" : tab === 4 ? "Staff users" : "Permission groups"} table`}>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: "#f9fafb" }}>
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                  <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f9fafb)" }}>
+                    <TableCell sx={{ fontWeight: 700, color: "var(--imaa-dm-text-body, #4b5563)" }}>
                       {tab === 3 ? "Type Name" : tab === 4 ? "First Name" : tab === 5 ? "Group Name" : "Name"}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                    <TableCell sx={{ fontWeight: 700, color: "var(--imaa-dm-text-body, #4b5563)" }}>
                       {tab === 0 ? "Slug / Currency" : tab === 1 ? "Location" : tab === 2 ? "Info" : tab === 3 ? "Slug" : tab === 4 ? "Last Name" : "Permissions"}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                    <TableCell sx={{ fontWeight: 700, color: "var(--imaa-dm-text-body, #4b5563)" }}>
                       {tab === 4 ? "Email" : tab === 5 ? "Users" : tab === 0 ? "Status" : tab === 1 ? "Status" : tab === 2 ? "Status" : ""}
                     </TableCell>
                     {tab !== 3 && tab !== 4 && tab !== 5 && (
-                      <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                      <TableCell sx={{ fontWeight: 700, color: "var(--imaa-dm-text-body, #4b5563)" }}>
                         Status
                       </TableCell>
                     )}
                     {tab !== 5 && (
-                      <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                      <TableCell sx={{ fontWeight: 700, color: "var(--imaa-dm-text-body, #4b5563)" }}>
                         {tab === 3 ? "Shippable" : tab === 4 ? "Status" : "Linked Entities"}
                       </TableCell>
                     )}
-                    {tab === 3 && <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>Tax Class</TableCell>}
+                    {tab === 3 && <TableCell sx={{ fontWeight: 700, color: "var(--imaa-dm-text-body, #4b5563)" }}>Tax Class</TableCell>}
                     {/* TODO: Hide Actions column header - uncomment when action buttons are re-enabled
                     <TableCell align="right" sx={{ fontWeight: 700, color: "#4b5563" }}>
                       Actions
@@ -1805,7 +1806,7 @@ export default function SaleorManager() {
                             label={`${(item.permissions || []).length} Permission${(item.permissions || []).length !== 1 ? "s" : ""}`}
                             size="small"
                             variant="outlined"
-                            sx={{ bgcolor: "#eff6ff", color: "#2563eb", borderColor: "#bfdbfe" }}
+                            sx={{ bgcolor: "var(--imaa-dm-surface-alt, #eff6ff)", color: "var(--imaa-dm-blue-text, #2563eb)", borderColor: "var(--imaa-dm-border-strong, #bfdbfe)" }}
                           />
                         )}
                       </TableCell>
@@ -1817,7 +1818,7 @@ export default function SaleorManager() {
                             label={`${item.user_count || 0} User${item.user_count !== 1 ? "s" : ""}`}
                             size="small"
                             variant="outlined"
-                            sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }}
+                            sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "#16a34a", borderColor: "var(--imaa-dm-tint-green-border, #bbf7d0)" }}
                           />
                         ) : tab !== 3 ? (
                           <AdminStatusChip status={item.is_active ? "active" : "inactive"} />
@@ -1862,7 +1863,7 @@ export default function SaleorManager() {
                               <>
                                 {(item.countries || []).length > 0 && (
                                   <Tooltip title="Countries">
-                                    <Chip label={`${item.countries.length} Countries`} size="small" variant="outlined" sx={{ bgcolor: "#eff6ff", color: "#2563eb", borderColor: "#bfdbfe" }} />
+                                    <Chip label={`${item.countries.length} Countries`} size="small" variant="outlined" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #eff6ff)", color: "var(--imaa-dm-blue-text, #2563eb)", borderColor: "var(--imaa-dm-border-strong, #bfdbfe)" }} />
                                   </Tooltip>
                                 )}
                                 {(item.channel_ids || []).length > 0 && (
@@ -1872,7 +1873,7 @@ export default function SaleorManager() {
                                 )}
                                 {(item.warehouse_ids || []).length > 0 && (
                                   <Tooltip title="Linked Warehouses">
-                                    <Chip label={`${item.warehouse_ids.length} Warehouse${item.warehouse_ids.length > 1 ? "s" : ""}`} size="small" variant="outlined" sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }} />
+                                    <Chip label={`${item.warehouse_ids.length} Warehouse${item.warehouse_ids.length > 1 ? "s" : ""}`} size="small" variant="outlined" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "#16a34a", borderColor: "var(--imaa-dm-tint-green-border, #bbf7d0)" }} />
                                   </Tooltip>
                                 )}
                                 {(item.shipping_methods || []).length > 0 && (
@@ -1962,7 +1963,7 @@ export default function SaleorManager() {
                   {(tab === 0 ? channels : tab === 1 ? warehouses : tab === 2 ? shippingZones : tab === 3 ? productTypes : tab === 4 ? staffUsers : permissionGroups).length === 0 && (
                     <TableRow>
                       <TableCell colSpan={tab === 3 ? 4 : tab === 4 ? 4 : tab === 5 ? 3 : 4} align="center" sx={{ py: 6 }}>
-                        <Typography variant="body1" sx={{ color: "#9ca3af" }}>
+                        <Typography variant="body1" sx={{ color: "var(--imaa-dm-text-hint, #9ca3af)" }}>
                           No records found. Try syncing from Saleor.
                         </Typography>
                       </TableCell>
@@ -1977,7 +1978,7 @@ export default function SaleorManager() {
         </Paper>
 
         <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
-          <Typography variant="caption" sx={{ color: "#9ca3af" }}>
+          <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-hint, #9ca3af)" }}>
             {tab === INVOICE_SETTINGS_TAB
               ? "Invoice settings are stored securely in ECP and are not synchronized from Saleor."
               : `Last Synced: ${new Date().toLocaleString()} • ECP-Saleor Bridge v2.0`}
@@ -2015,8 +2016,8 @@ export default function SaleorManager() {
           {dialogType === "productType" && renderProductTypeForm()}
 
           {editItem && (
-            <Box sx={{ mt: 3, p: 2, bgcolor: "#f9fafb", borderRadius: 2 }}>
-              <Typography variant="caption" sx={{ display: "block", color: "#6b7280", mb: 1 }}>
+            <Box sx={{ mt: 3, p: 2, bgcolor: "var(--imaa-dm-surface-alt, #f9fafb)", borderRadius: 2 }}>
+              <Typography variant="caption" sx={{ display: "block", color: "var(--imaa-dm-text-meta, #6b7280)", mb: 1 }}>
                 System Information
               </Typography>
 
@@ -2026,11 +2027,11 @@ export default function SaleorManager() {
             </Box>
           )}
         </DialogContent>
-        <DialogActions sx={{ p: 3, px: 4, borderTop: "1px solid #e5e7eb", gap: 2 }}>
+        <DialogActions sx={{ p: 3, px: 4, borderTop: "1px solid var(--imaa-dm-border, #e5e7eb)", gap: 2 }}>
           <Button 
             onClick={handleCloseDialog} 
             sx={{ 
-              color: "#6b7280", 
+              color: "var(--imaa-dm-text-meta, #6b7280)", 
               textTransform: "none", 
               fontWeight: 600,
               px: 3 
@@ -2074,10 +2075,10 @@ export default function SaleorManager() {
           Confirm Delete
         </DialogTitle>
         <DialogContent sx={{ py: 3 }}>
-          <Typography variant="body1" sx={{ color: "#4b5563" }}>
+          <Typography variant="body1" sx={{ color: "var(--imaa-dm-text-body, #4b5563)" }}>
             Are you sure you want to delete <strong>{deleteConfirmDialog.itemName}</strong> from Saleor?
           </Typography>
-          <Typography variant="body2" sx={{ mt: 2, color: "#6b7280" }}>
+          <Typography variant="body2" sx={{ mt: 2, color: "var(--imaa-dm-text-meta, #6b7280)" }}>
             This action cannot be undone. The {tab === 0 ? "channel" : tab === 1 ? "warehouse" : tab === 2 ? "shipping zone" : "product type"} will be permanently removed.
           </Typography>
         </DialogContent>
@@ -2109,7 +2110,7 @@ export default function SaleorManager() {
       <Dialog open={deleteDestDialog.open} onClose={() => setDeleteDestDialog({ open: false, channelId: null })} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700 }}>Select Destination Channel</DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body2" sx={{ mb: 2, color: "#6b7280" }}>
+          <Typography variant="body2" sx={{ mb: 2, color: "var(--imaa-dm-text-meta, #6b7280)" }}>
             This channel has orders. Select a destination channel to move them to.
           </Typography>
           <TextField
@@ -2129,7 +2130,7 @@ export default function SaleorManager() {
           </TextField>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={() => setDeleteDestDialog({ open: false, channelId: null })} sx={{ color: "#6b7280" }}>
+          <Button onClick={() => setDeleteDestDialog({ open: false, channelId: null })} sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
             Cancel
           </Button>
           <Button
@@ -2192,7 +2193,7 @@ export default function SaleorManager() {
         <DialogActions sx={{ p: 3, gap: 1 }}>
           <Button
             onClick={handleClosePermissionGroupDialog}
-            sx={{ color: "#6b7280", textTransform: "none", fontWeight: 600 }}
+            sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", textTransform: "none", fontWeight: 600 }}
           >
             Cancel
           </Button>
@@ -2245,7 +2246,7 @@ export default function SaleorManager() {
                   display: "grid",
                   placeItems: "center",
                   bgcolor: "rgba(239, 68, 68, 0.1)",
-                  color: "#dc2626",
+                  color: "var(--imaa-dm-red-text, #dc2626)",
                   flexShrink: 0,
                 }}
               >
@@ -2255,7 +2256,7 @@ export default function SaleorManager() {
                 <Typography variant="h6" sx={{ color: TEXT, fontWeight: 800, lineHeight: 1.2 }}>
                   Delete permission group?
                 </Typography>
-                <Typography variant="body2" sx={{ mt: 1, color: "#64748b", lineHeight: 1.65 }}>
+                <Typography variant="body2" sx={{ mt: 1, color: "var(--imaa-dm-text-meta, #64748b)", lineHeight: 1.65 }}>
                   <strong>{permissionGroupDeleteDialog.item?.name}</strong> will be removed from Saleor.
                   Staff assigned to this group may lose those permissions immediately.
                 </Typography>
@@ -2268,11 +2269,11 @@ export default function SaleorManager() {
               mb: 2,
               p: 1.5,
               borderRadius: "12px",
-              bgcolor: "#f8fafc",
-              border: "1px solid #e2e8f0",
+              bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
+              border: "1px solid var(--imaa-dm-border, #e2e8f0)",
             }}
           >
-            <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 600 }}>
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #64748b)", fontWeight: 600 }}>
               This action cannot be undone.
             </Typography>
           </Box>
@@ -2282,7 +2283,7 @@ export default function SaleorManager() {
             onClick={handleClosePermissionGroupDeleteDialog}
             disabled={syncing}
             sx={{
-              color: "#475569",
+              color: "var(--imaa-dm-text-body, #475569)",
               borderRadius: "10px",
               textTransform: "none",
               fontWeight: 700,
@@ -2322,7 +2323,7 @@ export default function SaleorManager() {
       >
         <DialogTitle sx={{ fontWeight: 700 }}>Manage Permission Groups</DialogTitle>
         <DialogContent dividers>
-          <Typography variant="body2" sx={{ mb: 2, color: "#6b7280" }}>
+          <Typography variant="body2" sx={{ mb: 2, color: "var(--imaa-dm-text-meta, #6b7280)" }}>
             {permissionDialog.staffUser?.email}
           </Typography>
           {permissionDialogError && (
@@ -2352,7 +2353,7 @@ export default function SaleorManager() {
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>
                     {option.name}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                  <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
                     {(option.permissions || []).length} permissions
                   </Typography>
                 </Box>
@@ -2363,7 +2364,7 @@ export default function SaleorManager() {
         <DialogActions sx={{ p: 3, gap: 1 }}>
           <Button
             onClick={() => setPermissionDialog({ open: false, staffUser: null })}
-            sx={{ color: "#6b7280", textTransform: "none", fontWeight: 600 }}
+            sx={{ color: "var(--imaa-dm-text-meta, #6b7280)", textTransform: "none", fontWeight: 600 }}
           >
             Cancel
           </Button>

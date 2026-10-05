@@ -21,7 +21,7 @@ export default function BlogFeaturedImage({ src, alt, ratio = "16 / 9", sx, load
         position: "relative",
         width: "100%",
         aspectRatio: ratio,
-        bgcolor: "#EEF2F6",
+        bgcolor: "var(--imaa-dm-surface-alt, #EEF2F6)",
         overflow: "hidden",
         ...sx,
       }}
@@ -47,7 +47,7 @@ export default function BlogFeaturedImage({ src, alt, ratio = "16 / 9", sx, load
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            color: "#9AA8B8",
+            color: "var(--imaa-dm-text-hint, #9AA8B8)",
           }}
         >
           <ArticleRoundedIcon sx={{ fontSize: 48 }} />

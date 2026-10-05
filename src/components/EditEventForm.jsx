@@ -1642,8 +1642,8 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                         p: 2,
                         mb: 2,
                         borderRadius: 2,
-                        border: errors.platforms ? "1px solid #ef4444" : "1px solid #e2e8f0",
-                        bgcolor: "#f8fafc",
+                        border: errors.platforms ? "1px solid #ef4444" : "1px solid var(--imaa-dm-border, #e2e8f0)",
+                        bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
                     }}
                 >
                     <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
@@ -1668,7 +1668,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 const checked = selectedPlatformSlugs.includes(platform.slug);
                                 const locked = isPlatformLocked(platform.slug);
                                 return (
-                                    <Paper key={platform.slug} variant="outlined" sx={{ p: 1.25, minWidth: 210, bgcolor: checked ? "#fff" : "transparent" }}>
+                                    <Paper key={platform.slug} variant="outlined" sx={{ p: 1.25, minWidth: 210, bgcolor: checked ? "var(--imaa-dm-surface, #fff)" : "transparent" }}>
                                         <FormControlLabel
                                             control={
                                                 <Checkbox
@@ -1829,7 +1829,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                         </Stack>
 
                         {/* Post-event replay access */}
-                        <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid #e2e8f0" }}>
+                        <Box sx={{ mt: 2, pt: 2, borderTop: "1px solid var(--imaa-dm-border, #e2e8f0)" }}>
                             <Typography variant="subtitle2" className="font-semibold mb-2 text-slate-700">
                                 Replay Access (After Event)
                             </Typography>
@@ -2139,9 +2139,9 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             {!isFree ? (
                                 <Box sx={{
                                     p: 2.5,
-                                    border: "1px solid #e3f2fd",
+                                    border: "1px solid var(--imaa-dm-border, #e3f2fd)",
                                     borderRadius: 2,
-                                    bgcolor: "#f0f7ff",
+                                    bgcolor: "var(--imaa-dm-surface-alt, #f0f7ff)",
                                     mt: 2,
                                     display: "flex",
                                     alignItems: "flex-start",
@@ -2149,10 +2149,10 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 }}>
                                     <Box sx={{ fontSize: 20, mt: 0.1 }}>💳</Box>
                                     <Box>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#1565c0", mb: 0.5 }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "var(--imaa-dm-blue-text, #1565c0)", mb: 0.5 }}>
                                             💳 Paid Event — Saved as Draft
                                         </Typography>
-                                        <Typography variant="body2" sx={{ color: "#1565c0" }}>
+                                        <Typography variant="body2" sx={{ color: "var(--imaa-dm-blue-text, #1565c0)" }}>
                                             This event will remain Draft until the actual Saleor checkout price, channel, and stock are configured in
                                             <strong> Product Management</strong>.
                                             The field below is for public display text only and does not set the checkout price.
@@ -2205,8 +2205,8 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                 <MenuItem value="apply">Application Required (Users apply, host approves)</MenuItem>
                             </TextField>
                             {registrationType === 'apply' && (
-                                <Box sx={{ mt: 1, p: 1.5, bgcolor: '#e3f2fd', border: '1px solid #90caf9', borderRadius: 1 }}>
-                                    <Typography variant="caption" sx={{ color: '#1565c0', fontWeight: 500 }}>
+                                <Box sx={{ mt: 1, p: 1.5, bgcolor: 'var(--imaa-dm-surface-alt, #e3f2fd)', border: '1px solid var(--imaa-dm-tint-blue-border, #90caf9)', borderRadius: 1 }}>
+                                    <Typography variant="caption" sx={{ color: 'var(--imaa-dm-blue-text, #1565c0)', fontWeight: 500 }}>
                                         💡 This event will remain in Draft until at least one application track is created.
                                     </Typography>
                                 </Box>
@@ -2248,7 +2248,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                             )}
                         </Box>
 
-                        <Box sx={{ mt: 3, mb: 2, p: 2.5, border: "1px solid #e0e0e0", borderRadius: 2, bgcolor: "#fafafa" }}>
+                        <Box sx={{ mt: 3, mb: 2, p: 2.5, border: "1px solid var(--imaa-dm-border, #e0e0e0)", borderRadius: 2, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
                                 CPD/CPE Credits
                             </Typography>
@@ -2674,15 +2674,15 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                         <Box
                                             sx={{
                                                 p: 1.5,
-                                                backgroundColor: "#f3f4f6",
+                                                backgroundColor: "var(--imaa-dm-surface-alt, #f3f4f6)",
                                                 borderRadius: 1,
-                                                border: "1px solid #e5e7eb"
+                                                border: "1px solid var(--imaa-dm-border, #e5e7eb)"
                                             }}
                                         >
-                                            <Typography variant="caption" sx={{ fontWeight: 600, color: "#6b7280" }}>
+                                            <Typography variant="caption" sx={{ fontWeight: 600, color: "var(--imaa-dm-text-meta, #6b7280)" }}>
                                                 User Time: {getBrowserTimezone()}
                                             </Typography>
-                                            <Typography variant="caption" sx={{ display: "block", color: "#9ca3af", mt: 0.5 }}>
+                                            <Typography variant="caption" sx={{ display: "block", color: "var(--imaa-dm-text-hint, #9ca3af)", mt: 0.5 }}>
                                                 Sessions will also display in your local timezone
                                             </Typography>
                                         </Box>
@@ -2802,7 +2802,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                                     </Typography>
                                 )}
 
-                                <Box sx={{ mt: 3, pt: 3, borderTop: "1px solid #e5e7eb" }}>
+                                <Box sx={{ mt: 3, pt: 3, borderTop: "1px solid var(--imaa-dm-border, #e5e7eb)" }}>
                                     <FormControlLabel
                                         control={
                                             <Switch

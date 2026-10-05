@@ -413,7 +413,7 @@ function PollResultsBlock({ post, onVote }) {
                                 sx={{
                                     p: 1,
                                     borderRadius: 2,
-                                    borderColor: "#e2e8f0",
+                                    borderColor: "var(--imaa-dm-border, #e2e8f0)",
                                     bgcolor: chosen ? "action.selected" : "background.paper",
                                     cursor: canVote && !chosen ? "pointer" : "default",
                                     "&:hover": canVote && !chosen ? { borderColor: "primary.main" } : undefined,
@@ -528,7 +528,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
                                 }}
                                 className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
                                 sx={{
-                                    backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
+                                    backgroundColor: value === opt.value ? "var(--imaa-dm-muted, #e0f2f1)" : "transparent",
                                     fontWeight: value === opt.value ? 600 : 400,
                                     color: value === opt.value ? "#10b8a6" : "inherit"
                                 }}
@@ -1095,9 +1095,9 @@ function GroupImageDialog({ open, group, onClose, type = "cover", onUpdated }) {
                             height: isLogo ? 120 : 200,
                             borderRadius: isLogo ? "50%" : 2,
                             overflow: "hidden",
-                            border: "1px solid #e2e8f0",
+                            border: "1px solid var(--imaa-dm-border, #e2e8f0)",
                             position: "relative",
-                            bgcolor: "#f1f5f9",
+                            bgcolor: "var(--imaa-dm-surface-alt, #f1f5f9)",
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center"
@@ -1110,7 +1110,7 @@ function GroupImageDialog({ open, group, onClose, type = "cover", onUpdated }) {
                                 style={{ width: "100%", height: "100%", objectFit: "cover" }}
                             />
                         ) : (
-                            <ImageRoundedIcon sx={{ fontSize: 40, color: "#cbd5e1" }} />
+                            <ImageRoundedIcon sx={{ fontSize: 40, color: "var(--imaa-dm-text-faint, #cbd5e1)" }} />
                         )}
                     </Box>
 
@@ -1265,7 +1265,7 @@ function AddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, onAdded, 
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ position: 'sticky', bottom: 0, background: 'white' }} className="px-6 py-4">
+            <DialogActions sx={{ position: 'sticky', bottom: 0, background: 'var(--imaa-dm-surface, white)' }} className="px-6 py-4">
                 <Typography sx={{ flex: 1 }} className="text-slate-600">
                     {selected.size} selected
                 </Typography>
@@ -1459,7 +1459,7 @@ function RequestAddMembersDialog({ open, onClose, groupIdOrSlug, existingIds, on
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ position: 'sticky', bottom: 0, background: 'white' }} className="px-6 py-4">
+            <DialogActions sx={{ position: 'sticky', bottom: 0, background: 'var(--imaa-dm-surface, white)' }} className="px-6 py-4">
                 <Typography sx={{ flex: 1 }} className="text-slate-600">
                     {selected.size} selected
                 </Typography>
@@ -2281,7 +2281,7 @@ function GroupCommentsDialog({
     const CommentItem = ({ c, depth = 0 }) => (
         <Box sx={{
             pl: depth ? 2 : 0,
-            borderLeft: depth ? "2px solid #e2e8f0" : "none",
+            borderLeft: depth ? "2px solid var(--imaa-dm-border, #e2e8f0)" : "none",
             ml: depth ? 1.5 : 0,
             mt: depth ? 1 : 0
         }}>
@@ -2779,8 +2779,8 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post, onNotify = () =
                             "& .MuiAvatar-root": {
                                 width: 24,
                                 height: 24,
-                                bgcolor: "#d1d5db",
-                                border: "2px solid #fff",
+                                bgcolor: "var(--imaa-dm-muted-strong, #d1d5db)",
+                                border: "2px solid var(--imaa-dm-surface, #fff)",
                             }
                         }}
                     >
@@ -2789,7 +2789,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post, onNotify = () =
                             .map(rid => {
                                 const def = POST_REACTIONS.find(r => r.id === rid) || POST_REACTIONS[0];
                                 return (
-                                    <Avatar key={rid} sx={{ bgcolor: "#d1d5db" }}>
+                                    <Avatar key={rid} sx={{ bgcolor: "var(--imaa-dm-muted-strong, #d1d5db)" }}>
                                         <span style={{ fontSize: 22, lineHeight: 1 }}>{def.emoji}</span>
                                     </Avatar>
                                 );
@@ -2876,7 +2876,7 @@ function GroupPostSocialBar({ groupIdOrSlug, groupOwnerId, post, onNotify = () =
                                     borderRadius: "50%",
                                     transition: "transform 120ms ease",
                                     "&:hover": {
-                                        backgroundColor: "#f1f5f9",
+                                        backgroundColor: "var(--imaa-dm-surface-hover, #f1f5f9)",
                                         transform: "scale(1.2)",
                                     },
                                 }}
@@ -3239,7 +3239,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                     display: { xs: mobileView === "list" ? "block" : "none", md: "block" },
                 }}
             >
-                <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0" }}>
+                <Box sx={{ p: 2, borderBottom: "1px solid var(--imaa-dm-border, #e2e8f0)" }}>
                     <Typography variant="subtitle1" className="font-semibold">
                         Chats
                     </Typography>
@@ -3314,7 +3314,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                     maxHeight: 520,
                 }}
             >
-                <Box sx={{ p: 2, borderBottom: "1px solid #e2e8f0" }}>
+                <Box sx={{ p: 2, borderBottom: "1px solid var(--imaa-dm-border, #e2e8f0)" }}>
                     <Stack
                         direction="row"
                         alignItems="center"
@@ -3398,7 +3398,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                                             px: 1.5,
                                             py: 1,
                                             borderRadius: 2,
-                                            bgcolor: mine ? "#10b8a6" : "#e2e8f0",
+                                            bgcolor: mine ? "#10b8a6" : "var(--imaa-dm-muted, #e2e8f0)",
                                             color: mine ? "white" : "inherit",
                                         }}
                                     >
@@ -3429,7 +3429,7 @@ function GroupChatTab({ group, membersWithOwner, currentUserId, chatOn, myRole }
                 </Box>
 
                 {/* Composer */}
-                <Box sx={{ p: 1.5, borderTop: "1px solid #e2e8f0" }}>
+                <Box sx={{ p: 1.5, borderTop: "1px solid var(--imaa-dm-border, #e2e8f0)" }}>
                     <Stack
                         direction="row"
                         spacing={1}
@@ -5138,7 +5138,7 @@ export default function GroupManagePage() {
                 <main className="col-span-12 min-w-0">
                     {/* ↓↓↓ PASTE everything that was inside your <Container> here ↓↓↓ */}
                     <Container maxWidth="lg" disableGutters className="py-0">
-                        <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#e2e8f0", overflow: "hidden", mb: 2 }}>
+                        <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #e2e8f0)", overflow: "hidden", mb: 2 }}>
                         {group?.cover_image && (
                             <Box
                                 component="img"
@@ -5167,7 +5167,7 @@ export default function GroupManagePage() {
                                                 width: 64,
                                                 height: 64,
                                                 bgcolor: "#10b8a6",
-                                                border: "3px solid white",
+                                                border: "3px solid var(--imaa-dm-surface, white)",
                                             }}
                                             src={group?.logo ? bust(group.logo, group.updated_at || group._cache) : undefined}
                                             alt={group?.name || "Group"}
@@ -5184,10 +5184,10 @@ export default function GroupManagePage() {
                                                         position: "absolute",
                                                         right: -6,
                                                         bottom: -6,
-                                                        bgcolor: "white",
-                                                        border: "1px solid #e2e8f0",
+                                                        bgcolor: "var(--imaa-dm-surface, white)",
+                                                        border: "1px solid var(--imaa-dm-border, #e2e8f0)",
                                                         boxShadow: 1,
-                                                        "&:hover": { bgcolor: "#f8fafc" },
+                                                        "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #f8fafc)" },
                                                     }}
                                                 >
                                                     <PhotoCameraRoundedIcon fontSize="inherit" />
@@ -5288,7 +5288,7 @@ export default function GroupManagePage() {
                         <Paper
                              elevation={0}
                              variant="outlined"
-                             sx={{ display: { xs: "none", sm: "block" }, borderRadius: 2, borderColor: "#e2e8f0", overflow: "hidden" }}
+                             sx={{ display: { xs: "none", sm: "block" }, borderRadius: 2, borderColor: "var(--imaa-dm-border, #e2e8f0)", overflow: "hidden" }}
                          >
                             <Tabs
                                 value={tab}
@@ -5348,7 +5348,7 @@ export default function GroupManagePage() {
                                 justifyContent: "space-between",
                                 px: 2,
                                 py: 1,
-                                borderBottom: "1px solid #e2e8f0",
+                                borderBottom: "1px solid var(--imaa-dm-border, #e2e8f0)",
                                 bgcolor: "background.paper",
                             }}
                         >
@@ -5386,7 +5386,7 @@ export default function GroupManagePage() {
                                                 <ClampedText
                                                     text={group.description || "No description"}
                                                     lines={10}
-                                                    sx={{ color: "#475569" }}
+                                                    sx={{ color: "var(--imaa-dm-text-body, #475569)" }}
                                                 />
                                             </Paper>
                                         </Grid>
@@ -5532,12 +5532,12 @@ export default function GroupManagePage() {
                                                                         boxSizing: "border-box",
                                                                         transition: "background-color .15s ease, border-color .15s ease, box-shadow .15s ease",
                                                                         "&:hover": {
-                                                                            bgcolor: "#f3f4f6",
-                                                                            borderColor: "#99f6e4",
+                                                                            bgcolor: "var(--imaa-dm-surface-hover, #f3f4f6)",
+                                                                            borderColor: "var(--imaa-dm-tint-teal-border, #99f6e4)",
                                                                         },
                                                                         "&:focus-visible": {
-                                                                            bgcolor: "#f3f4f6",
-                                                                            borderColor: "#99f6e4",
+                                                                            bgcolor: "var(--imaa-dm-surface-hover, #f3f4f6)",
+                                                                            borderColor: "var(--imaa-dm-tint-teal-border, #99f6e4)",
                                                                             boxShadow: "0 0 0 1px #99f6e4",
                                                                             outline: "none",
                                                                         },
@@ -5702,7 +5702,7 @@ export default function GroupManagePage() {
                                                                 size="small"
                                                                 onClick={handleOpenPromoteDialog}
                                                                 disabled={isPromoting}
-                                                                sx={{ textTransform: "none", borderColor: "#ef4444", color: "#ef4444" }}
+                                                                sx={{ textTransform: "none", borderColor: "#ef4444", color: "var(--imaa-dm-red-text, #ef4444)" }}
                                                             >
                                                                 {isPromoting ? "Promoting..." : "Make Independent"}
                                                             </Button>
@@ -6000,10 +6000,10 @@ export default function GroupManagePage() {
                                             <Grid item xs={12}>
                                                 <Box
                                                     sx={{
-                                                        border: "1px solid #e2e8f0",
+                                                        border: "1px solid var(--imaa-dm-border, #e2e8f0)",
                                                         borderRadius: 2,
                                                         p: 2,
-                                                        bgcolor: "#f8fafc",
+                                                        bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
                                                     }}
                                                 >
                                                     <Stack
@@ -6538,13 +6538,13 @@ export default function GroupManagePage() {
                                             {canReviewRequests ? (
                                                 <>
                                                     {/* Filter Tabs */}
-                                                    <Box sx={{ display: "flex", gap: 1, mb: 2, pb: 1, borderBottom: "2px solid #e2e8f0" }}>
+                                                    <Box sx={{ display: "flex", gap: 1, mb: 2, pb: 1, borderBottom: "2px solid var(--imaa-dm-border, #e2e8f0)" }}>
                                                         <Button
                                                             onClick={() => setNotifTab(0)}
                                                             sx={{
                                                                 textTransform: "none",
                                                                 fontWeight: notifTab === 0 ? 600 : 400,
-                                                                color: notifTab === 0 ? "#10b8a6" : "#64748b",
+                                                                color: notifTab === 0 ? "#10b8a6" : "var(--imaa-dm-text-meta, #64748b)",
                                                                 borderBottom: notifTab === 0 ? "3px solid #10b8a6" : "none",
                                                                 paddingBottom: "8px",
                                                                 marginBottom: "-2px",
@@ -6566,7 +6566,7 @@ export default function GroupManagePage() {
                                                             sx={{
                                                                 textTransform: "none",
                                                                 fontWeight: notifTab === 1 ? 600 : 400,
-                                                                color: notifTab === 1 ? "#10b8a6" : "#64748b",
+                                                                color: notifTab === 1 ? "#10b8a6" : "var(--imaa-dm-text-meta, #64748b)",
                                                                 borderBottom: notifTab === 1 ? "3px solid #10b8a6" : "none",
                                                                 paddingBottom: "8px",
                                                                 marginBottom: "-2px",
@@ -6588,7 +6588,7 @@ export default function GroupManagePage() {
                                                             sx={{
                                                                 textTransform: "none",
                                                                 fontWeight: notifTab === 2 ? 600 : 400,
-                                                                color: notifTab === 2 ? "#10b8a6" : "#64748b",
+                                                                color: notifTab === 2 ? "#10b8a6" : "var(--imaa-dm-text-meta, #64748b)",
                                                                 borderBottom: notifTab === 2 ? "3px solid #10b8a6" : "none",
                                                                 paddingBottom: "8px",
                                                                 marginBottom: "-2px",
@@ -6829,10 +6829,10 @@ export default function GroupManagePage() {
                                                     fontSize: 14,
                                                     fontWeight: index === tab ? 700 : 500,
                                                     backgroundColor:
-                                                        index === tab ? "#E6F7F6" : "transparent",
+                                                        index === tab ? "var(--imaa-dm-surface-alt, #E6F7F6)" : "transparent",
                                                     "&:hover": {
                                                         backgroundColor:
-                                                            index === tab ? "#E6F7F6" : "#F3F4F6",
+                                                            index === tab ? "var(--imaa-dm-surface-hover, #E6F7F6)" : "var(--imaa-dm-surface-hover, #F3F4F6)",
                                                     },
                                                 }}
                                                 onClick={() => {

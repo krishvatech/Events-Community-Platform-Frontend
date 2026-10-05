@@ -366,7 +366,7 @@ export default function AdminProfileModerationPage({ embedded = false }) {
 
                 {/* Sample metadata */}
                 {item.sample_metadata && (
-                  <Box sx={{ bgcolor: "grey.50", p: 1.5, borderRadius: 1 }}>
+                  <Box sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fafafa)", p: 1.5, borderRadius: 1 }}>
                     <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
                       Additional Details:
                     </Typography>

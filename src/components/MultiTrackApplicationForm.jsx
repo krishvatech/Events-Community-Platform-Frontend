@@ -947,7 +947,7 @@ const MultiTrackApplicationForm = ({
       const isEmailPreapproved = trackPreapprovalState[trackId]?.emailPreapproved || false;
 
       return (
-        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#fff3e0', borderRadius: 1, border: '1px solid #ff9800' }}>
+        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: 'var(--imaa-dm-tint-orange, #fff3e0)', borderRadius: 1, border: '1px solid #ff9800' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
             Confirmed {trackLabel} Application
           </Typography>
@@ -1004,7 +1004,7 @@ const MultiTrackApplicationForm = ({
 
     if (mode === 'third_party_nomination') {
       return (
-        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+        <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)', borderRadius: 1 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
             Third-party Nomination
           </Typography>
@@ -1237,11 +1237,11 @@ const MultiTrackApplicationForm = ({
               {currentTrackId && tracks[currentTrackId] && (
                 <>
                   {/* Track Info Section - User Friendly Display */}
-                  <Box sx={{ mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+                  <Box sx={{ mb: 3, p: 2, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)', borderRadius: 1, border: '1px solid var(--imaa-dm-border, #e0e0e0)' }}>
                     <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>
                       APPLICATION TRACK
                     </Typography>
-                    <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1976d2' }}>
+                    <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: 'var(--imaa-dm-blue-text, #1976d2)' }}>
                       {getApplicationIntroText(tracks[currentTrackId])}
                     </Typography>
 
@@ -1254,7 +1254,7 @@ const MultiTrackApplicationForm = ({
 
                     {/* Show what role they'll receive */}
                     {tracks[currentTrackId]?.role_mappings_on_acceptance && tracks[currentTrackId].role_mappings_on_acceptance.length > 0 && (
-                      <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#fff3e0', borderRadius: 0.5, borderLeft: '4px solid #ff9800' }}>
+                      <Box sx={{ mb: 2, p: 1.5, backgroundColor: 'var(--imaa-dm-tint-orange, #fff3e0)', borderRadius: 0.5, borderLeft: '4px solid #ff9800' }}>
                         <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
                           {getAcceptanceMessage(tracks[currentTrackId].role_mappings_on_acceptance)}
                         </Typography>
@@ -1271,7 +1271,7 @@ const MultiTrackApplicationForm = ({
 
                   {/* Tier Selection - if track has pricing tiers */}
                   {pricingTiers[currentTrackId] && pricingTiers[currentTrackId].length > 0 && (
-                    <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                    <Box sx={{ mt: 2, mb: 3, p: 2, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)', borderRadius: 1 }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
                         Pricing Tier Selection
                       </Typography>
@@ -1358,7 +1358,7 @@ const MultiTrackApplicationForm = ({
                   const mode = submissionModes[trackId] || 'self_submission';
                   const isPreapproved = trackState && (trackState.codePreapproved || trackState.emailPreapproved);
                   return (
-                    <Box key={trackId} sx={{ mb: 2, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+                    <Box key={trackId} sx={{ mb: 2, p: 2, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)', borderRadius: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                         <Box sx={{ flex: 1 }}>
                           <Typography variant="body2" fontWeight={600}>

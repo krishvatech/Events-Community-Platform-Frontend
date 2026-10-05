@@ -1,6 +1,6 @@
 import React from "react";
 import { Box, Paper, Skeleton, Stack, TableContainer, Typography } from "@mui/material";
-import { colors, radii } from "../../styles/designTokens";
+import { colors, radii, semanticColors } from "../../styles/designTokens";
 
 const DefaultLoadingState = ({ label, rows }) => (
   <Stack role="status" aria-label={label} spacing={1} sx={{ p: 2 }}>
@@ -12,7 +12,7 @@ const DefaultLoadingState = ({ label, rows }) => (
 
 const DefaultEmptyState = ({ title, description }) => (
   <Box sx={{ px: 3, py: 5, textAlign: "center" }}>
-    <Typography sx={{ color: colors.navy, fontWeight: 700 }}>{title}</Typography>
+    <Typography sx={{ color: semanticColors.text, fontWeight: 700 }}>{title}</Typography>
     {description ? <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>{description}</Typography> : null}
   </Box>
 );
@@ -35,9 +35,9 @@ const AdminTableShell = ({
     variant="outlined"
     aria-busy={loading || undefined}
     sx={{
-      borderColor: colors.border,
+      borderColor: semanticColors.border,
       borderRadius: `${radii.card}px`,
-      bgcolor: colors.white,
+      bgcolor: semanticColors.surface,
       overflow: "visible",
       ...sx,
     }}
@@ -50,14 +50,14 @@ const AdminTableShell = ({
         borderRadius: `${radii.card}px`,
         "& .MuiTable-root": minWidth ? { minWidth } : undefined,
         "& .MuiTableHead-root .MuiTableCell-root": {
-          bgcolor: colors.bgCool,
-          color: colors.navy,
+          bgcolor: semanticColors.surfaceCool,
+          color: semanticColors.text,
           fontWeight: 700,
           whiteSpace: "nowrap",
-          borderBottomColor: colors.border,
+          borderBottomColor: semanticColors.border,
         },
         "& .MuiTableBody-root .MuiTableCell-root": {
-          borderBottomColor: colors.border,
+          borderBottomColor: semanticColors.border,
         },
         "& .MuiTableBody-root .MuiTableRow-root:last-of-type .MuiTableCell-root": {
           borderBottom: pagination ? undefined : 0,
@@ -72,7 +72,7 @@ const AdminTableShell = ({
     </TableContainer>
 
     {pagination ? (
-      <Box sx={{ borderTop: `1px solid ${colors.border}` }}>
+      <Box sx={{ borderTop: `1px solid ${semanticColors.border}` }}>
         {pagination}
       </Box>
     ) : null}

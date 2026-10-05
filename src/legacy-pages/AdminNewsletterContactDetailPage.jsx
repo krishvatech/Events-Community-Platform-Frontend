@@ -189,7 +189,7 @@ function AddCompanyDialog({ open, busy, onClose, onSelect }) {
           ) : results.length ? (
             <Stack spacing={1}>
               {results.map((company) => (
-                <Paper key={company.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                <Paper key={company.id} variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
                     <Box sx={{ minWidth: 0 }}>
                       <Typography sx={{ fontWeight: 700, color: UI_TEXT, overflowWrap: "anywhere" }}>
@@ -251,7 +251,7 @@ function EngagementChart({ series = [] }) {
 
   return (
     <Box sx={{ width: "100%", overflowX: "auto" }} onMouseLeave={() => setHoveredIndex(null)}>
-      <Box component="svg" viewBox={`0 0 ${width} ${height}`} sx={{ display: "block", width: "100%", minWidth: 700 }}>
+      <Box component="svg" className="imaa-chart" viewBox={`0 0 ${width} ${height}`} sx={{ display: "block", width: "100%", minWidth: 700 }}>
         {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
           const value = Math.round(maxValue * ratio);
           const y = yFor(value);
@@ -971,9 +971,9 @@ export default function AdminNewsletterContactDetailPage() {
         <Grid item xs={12}>
           <Stack spacing={2.5}>
             <Paper component="section" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden" }}>
-              <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2} sx={{ p: 2.25, borderBottom: "1px solid #E7ECEF" }}>
+              <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2} sx={{ p: 2.25, borderBottom: "1px solid var(--imaa-dm-border, #E7ECEF)" }}>
                 <Box>
-                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Engagements</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>Engagements</Typography>
                   <Typography variant="body2" color="text.secondary">Cumulative Mautic contact activity in the selected period.</Typography>
                 </Box>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -989,9 +989,9 @@ export default function AdminNewsletterContactDetailPage() {
             </Paper>
 
             <Paper component="section" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}>
-              <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2} sx={{ p: 2.25, borderBottom: "1px solid #E7ECEF" }}>
+              <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" spacing={2} sx={{ p: 2.25, borderBottom: "1px solid var(--imaa-dm-border, #E7ECEF)" }}>
                 <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>History</Typography>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>History</Typography>
                   {!activityLoading && <Chip size="small" label={activity?.count || 0} />}
                 </Stack>
                 <Typography variant="body2" color="text.secondary">
@@ -1005,7 +1005,7 @@ export default function AdminNewsletterContactDetailPage() {
                 <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
                   <Table aria-label="Contact activity history" sx={{ minWidth: 680 }}>
                     <TableHead>
-                      <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                      <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                         <TableCell>Event Name</TableCell>
                         <TableCell>Event Type</TableCell>
                         <TableCell>Event Timestamp</TableCell>
@@ -1014,7 +1014,7 @@ export default function AdminNewsletterContactDetailPage() {
                     <TableBody>
                       {history.map((event) => (
                         <TableRow hover key={event.id}>
-                          <TableCell><Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>{event.label}</Typography></TableCell>
+                          <TableCell><Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>{event.label}</Typography></TableCell>
                           <TableCell>{event.event_type || event.event || "Activity"}</TableCell>
                           <TableCell>{formatDateTime(event.timestamp)}</TableCell>
                         </TableRow>
@@ -1046,8 +1046,8 @@ export default function AdminNewsletterContactDetailPage() {
             ) : contact ? (
               <>
                 {contactDetailTab === "scoring" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF", textAlign: "center" }}>
-                  <Typography variant="h3" sx={{ fontWeight: 850, color: "#1B2A4A" }}>{Number(contact.points || 0)}</Typography>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", textAlign: "center" }}>
+                  <Typography variant="h3" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>{Number(contact.points || 0)}</Typography>
                   <Typography color="text.secondary">points</Typography>
                   <Stack spacing={0.75} sx={{ mt: 2, textAlign: "left" }}>
                     <Typography variant="body2"><strong>Mautic:</strong> #{contact.mautic_contact_id}</Typography>
@@ -1104,12 +1104,12 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "scoring" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
                   <Stack spacing={1.75}>
                     <Box>
                       <Stack direction="row" spacing={1} alignItems="center">
-                        <StarsRoundedIcon fontSize="small" sx={{ color: "#0f766e" }} />
-                        <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Point Group Scores</Typography>
+                        <StarsRoundedIcon fontSize="small" sx={{ color: "var(--imaa-dm-teal-text, #0f766e)" }} />
+                        <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>Point Group Scores</Typography>
                       </Stack>
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                         Separate provider-backed Mautic scores for each Point Group.
@@ -1144,10 +1144,10 @@ export default function AdminNewsletterContactDetailPage() {
                                 spacing={1}
                                 justifyContent="space-between"
                                 alignItems="center"
-                                sx={{ py: 0.75, borderBottom: "1px solid #EEF2F6" }}
+                                sx={{ py: 0.75, borderBottom: "1px solid var(--imaa-dm-border, #EEF2F6)" }}
                               >
                                 <Box sx={{ minWidth: 0 }}>
-                                  <Typography variant="body2" sx={{ fontWeight: 750, color: "#1B2A4A" }}>
+                                  <Typography variant="body2" sx={{ fontWeight: 750, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                                     {group.name || `Point Group #${group.id}`}
                                   </Typography>
                                   {group.description && (
@@ -1248,12 +1248,12 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "overview" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
                   <Stack spacing={1.75}>
                     <Box>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <FlagRoundedIcon fontSize="small" color="action" />
-                        <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Lifecycle Stage</Typography>
+                        <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>Lifecycle Stage</Typography>
                       </Stack>
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                         Mautic is the source of truth for this contact's current stage.
@@ -1343,8 +1343,8 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "profile" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 2 }}>Contact</Typography>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 2 }}>Contact</Typography>
                   {editMessage && <Alert severity={editMessage.severity} sx={{ mb: 2 }}>{editMessage.text}</Alert>}
                   <Stack spacing={1}>
                     {[
@@ -1377,8 +1377,8 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "communication" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Tags</Typography>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 1.5 }}>Tags</Typography>
                   {tagError && <Alert severity="error" sx={{ mb: 1.5 }}>{tagError}</Alert>}
                   <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
                     {(contact.tags || []).length ? contact.tags.map((tag) => (
@@ -1399,12 +1399,12 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "communication" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Notes</Typography>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 1.5 }}>Notes</Typography>
                   {noteError && <Alert severity="error" sx={{ mb: 1.5 }}>{noteError}</Alert>}
                   <Stack spacing={1.25} sx={{ mb: 2 }}>
                     {notesLoading ? <Skeleton height={80} /> : notes.length ? notes.map((note) => (
-                      <Box key={note.id} sx={{ borderBottom: "1px solid #EEF2F6", pb: 1 }}>
+                      <Box key={note.id} sx={{ borderBottom: "1px solid var(--imaa-dm-border, #EEF2F6)", pb: 1 }}>
                         <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{note.text || "—"}</Typography>
                         <Typography variant="caption" color="text.secondary">
                           {[note.type, note.createdByUser, formatDateTime(note.dateAdded)].filter(Boolean).join(" · ")}
@@ -1428,8 +1428,8 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "communication" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Communication Restrictions</Typography>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 1.5 }}>Communication Restrictions</Typography>
                   {dncError && <Alert severity="error" sx={{ mb: 1.5 }}>{dncError}</Alert>}
                   <Stack spacing={1.25}>
                     {(contact.communication_restrictions || []).length ? contact.communication_restrictions.map((rule) => (
@@ -1449,8 +1449,8 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "profile" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Custom Fields</Typography>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 1.5 }}>Custom Fields</Typography>
                   {customMessage ? (
                     <Alert severity={customMessage.severity} sx={{ mb: 1.5 }}>{customMessage.text}</Alert>
                   ) : null}
@@ -1497,9 +1497,9 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "overview" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1.5 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Companies</Typography>
+                    <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>Companies</Typography>
                     <Button
                       size="small"
                       startIcon={<AddRoundedIcon />}
@@ -1519,14 +1519,14 @@ export default function AdminNewsletterContactDetailPage() {
                         justifyContent="space-between"
                         alignItems="center"
                         spacing={1}
-                        sx={{ borderBottom: "1px solid #EEF2F6", pb: 1 }}
+                        sx={{ borderBottom: "1px solid var(--imaa-dm-border, #EEF2F6)", pb: 1 }}
                       >
                         <Box sx={{ minWidth: 0 }}>
                           <Typography
                             component="button"
                             type="button"
                             variant="body2"
-                            sx={{ p: 0, border: 0, bgcolor: "transparent", font: "inherit", textAlign: "left", fontWeight: 750, color: "var(--imaa-teal-hover)", cursor: "pointer", overflowWrap: "anywhere", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
+                            sx={{ p: 0, border: 0, bgcolor: "transparent", font: "inherit", textAlign: "left", fontWeight: 750, color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))", cursor: "pointer", overflowWrap: "anywhere", "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" } }}
                             onClick={() => navigate(`/admin/newsletter/companies/${company.id}`)}
                           >
                             {company.name || `Company #${company.id}`}
@@ -1555,8 +1555,8 @@ export default function AdminNewsletterContactDetailPage() {
                 )}
 
                 {contactDetailTab === "overview" && (
-                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
-                  <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Segments</Typography>
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
+                  <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 1.5 }}>Segments</Typography>
                   {contact.mapped_in_ecp ? (
                     subscribedSegments.length ? (
                       <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>

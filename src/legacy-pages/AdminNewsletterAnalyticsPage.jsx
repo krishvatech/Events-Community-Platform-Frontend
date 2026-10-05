@@ -147,7 +147,7 @@ function DataTable({ columns, rows, loading, empty, label, minWidth = 760 }) {
     <TableContainer component={Paper} variant="outlined" sx={{ ...surfaceSx, overflowX: "auto", maxWidth: "100%" }}>
       <Table aria-label={label} sx={{ minWidth }}>
         <TableHead>
-          <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+          <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
             {columns.map((column) => <TableCell key={column.key}>{column.label}</TableCell>)}
           </TableRow>
         </TableHead>
@@ -257,7 +257,7 @@ export default function AdminNewsletterAnalyticsPage() {
       />
 
       <Paper variant="outlined" sx={{ ...surfaceSx, overflow: "hidden" }}>
-        <Tabs value={tab} onChange={switchTab} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile aria-label="Analytics sections" sx={{ px: 2, "& .MuiTab-root": { textTransform: "none", fontWeight: 800 }, "& .Mui-selected": { color: "var(--imaa-teal-hover) !important" }, "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal-hover)" } }}>
+        <Tabs value={tab} onChange={switchTab} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile aria-label="Analytics sections" sx={{ px: 2, "& .MuiTab-root": { textTransform: "none", fontWeight: 800 }, "& .Mui-selected": { color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover)) !important" }, "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal-hover)" } }}>
           <Tab label="Overview" value="overview" />
           <Tab label="Campaigns" value="campaigns" />
           <Tab label="Emails" value="emails" />

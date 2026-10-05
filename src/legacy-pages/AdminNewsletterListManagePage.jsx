@@ -236,6 +236,7 @@ function ContactTimelineChart({ series = [] }) {
     <Box sx={{ width: "100%", overflowX: "auto" }} onMouseLeave={() => setHoveredIndex(null)}>
       <Box
         component="svg"
+        className="imaa-chart"
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label="Contacts in time chart showing added, removed, and total subscribers"
@@ -885,7 +886,7 @@ export default function AdminNewsletterListManagePage() {
           <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
             <Table aria-label="Subscription list subscribers" sx={{ minWidth: 820 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                   <TableCell>Name</TableCell>
                   <TableCell>Email</TableCell>
                   <TableCell>Mautic Contact</TableCell>
@@ -899,7 +900,7 @@ export default function AdminNewsletterListManagePage() {
                   return (
                     <TableRow hover key={String(contact.user_id)}>
                       <TableCell>
-                        <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{contact.name || "—"}</Typography>
+                        <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>{contact.name || "—"}</Typography>
                         <Typography variant="caption" color="text.secondary">ECP User #{contact.user_id}</Typography>
                       </TableCell>
                       <TableCell>{contact.email || "—"}</TableCell>

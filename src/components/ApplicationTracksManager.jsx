@@ -764,7 +764,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
         <TableContainer component={Card}>
           <Table>
             <TableHead>
-              <TableRow sx={{ backgroundColor: "#f5f5f5" }}>
+              <TableRow sx={{ backgroundColor: "var(--imaa-dm-surface-alt, #f5f5f5)" }}>
                 <TableCell>Label</TableCell>
                 <TableCell>Key</TableCell>
                 <TableCell>Status</TableCell>
@@ -781,7 +781,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                     <Stack>
                       <strong>{track.label}</strong>
                       {track.short_description && (
-                        <small style={{ color: "#666" }}>
+                        <small style={{ color: "var(--imaa-dm-text-body, #666)" }}>
                           {track.short_description}
                         </small>
                       )}
@@ -976,7 +976,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                   />
                 ))
               ) : (
-                <small style={{ color: "#999" }}>No roles available for this event</small>
+                <small style={{ color: "var(--imaa-dm-text-hint, #999)" }}>No roles available for this event</small>
               )}
             </Box>
           </Stack>
@@ -1001,10 +1001,10 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                             justifyContent: "space-between",
                             alignItems: "center",
                             p: 2,
-                            border: "1px solid #ddd",
+                            border: "1px solid var(--imaa-dm-border, #ddd)",
                             borderRadius: 1,
                             mb: 1,
-                            backgroundColor: tier.is_active ? "#fff" : "#f9f9f9",
+                            backgroundColor: tier.is_active ? "var(--imaa-dm-surface, #fff)" : "var(--imaa-dm-surface-alt, #f9f9f9)",
                             opacity: tier.is_active ? 1 : 0.7,
                           }}
                         >
@@ -1018,7 +1018,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                                 <Chip label="INACTIVE" size="small" variant="outlined" />
                               )}
                             </Box>
-                            <Box sx={{ fontSize: "0.875rem", color: "#666" }}>
+                            <Box sx={{ fontSize: "0.875rem", color: "var(--imaa-dm-text-body, #666)" }}>
                               <span>{tier.key}</span>
                               {tier.price && (
                                 <span> • ${parseFloat(tier.price).toFixed(2)} {tier.currency || "USD"}</span>
@@ -1124,7 +1124,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                           <Typography variant="body2">
                             Enable Pre-Approval Codes
                             {eventSettings.preapproval_code_enabled && (
-                              <Typography variant="caption" sx={{ display: "block", color: "#666" }}>
+                              <Typography variant="caption" sx={{ display: "block", color: "var(--imaa-dm-text-body, #666)" }}>
                                 Users can apply with pre-approval codes
                               </Typography>
                             )}
@@ -1148,7 +1148,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                           <Typography variant="body2">
                             Enable Email Allowlist
                             {eventSettings.preapproval_allowlist_enabled && (
-                              <Typography variant="caption" sx={{ display: "block", color: "#666" }}>
+                              <Typography variant="caption" sx={{ display: "block", color: "var(--imaa-dm-text-body, #666)" }}>
                                 Emails in the allowlist will be auto-approved
                               </Typography>
                             )}
@@ -1163,7 +1163,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                     </Stack>
                   </Alert>
                   {/* Submission Mode Tabs */}
-                  <Box sx={{ display: "flex", gap: 1, borderBottom: "1px solid #ddd", mb: 2 }}>
+                  <Box sx={{ display: "flex", gap: 1, borderBottom: "1px solid var(--imaa-dm-border, #ddd)", mb: 2 }}>
                     <Button
                       variant={preapprovalTab === "codes" ? "contained" : "text"}
                       size="small"
@@ -1227,9 +1227,9 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                           <CircularProgress size={24} />
                         </Box>
                       ) : preapprovalCodes.length > 0 ? (
-                        <TableContainer sx={{ border: "1px solid #ddd", borderRadius: 1 }}>
+                        <TableContainer sx={{ border: "1px solid var(--imaa-dm-border, #ddd)", borderRadius: 1 }}>
                           <Table size="small">
-                            <TableHead sx={{ backgroundColor: "#f5f5f5" }}>
+                            <TableHead sx={{ backgroundColor: "var(--imaa-dm-surface-alt, #f5f5f5)" }}>
                               <TableRow>
                                 <TableCell sx={{ fontWeight: 600 }}>Code</TableCell>
                                 <TableCell sx={{ fontWeight: 600 }}>Track</TableCell>
@@ -1399,7 +1399,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                           <CircularProgress size={24} />
                         </Box>
                       ) : preapprovalAllowlist.length > 0 ? (
-                        <Box sx={{ maxHeight: 300, overflowY: "auto", border: "1px solid #ddd", borderRadius: 1, p: 1 }}>
+                        <Box sx={{ maxHeight: 300, overflowY: "auto", border: "1px solid var(--imaa-dm-border, #ddd)", borderRadius: 1, p: 1 }}>
                           {preapprovalAllowlist
                             .filter(
                               (entry) =>
@@ -1415,7 +1415,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
                                   justifyContent: "space-between",
                                   alignItems: "center",
                                   p: 1.5,
-                                  borderBottom: "1px solid #eee",
+                                  borderBottom: "1px solid var(--imaa-dm-border, #eee)",
                                   "&:last-child": { borderBottom: "none" },
                                 }}
                               >
@@ -1513,7 +1513,7 @@ export default function ApplicationTracksManager({ eventId, token, event, onEven
           {confirmDialog.title}
         </DialogTitle>
         <DialogContent>
-          <Typography sx={{ mt: 2, mb: 1, color: "#666" }}>
+          <Typography sx={{ mt: 2, mb: 1, color: "var(--imaa-dm-text-body, #666)" }}>
             {confirmDialog.message}
           </Typography>
         </DialogContent>

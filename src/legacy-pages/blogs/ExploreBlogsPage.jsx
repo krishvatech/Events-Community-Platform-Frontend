@@ -24,7 +24,7 @@ import EmptyState from "../../components/page/EmptyState.jsx";
 
 function BlogCardSkeleton() {
   return (
-    <Box sx={{ border: `1px solid ${BLOG_BORDER}`, borderRadius: 2, overflow: "hidden", bgcolor: "#fff" }}>
+    <Box sx={{ border: `1px solid ${BLOG_BORDER}`, borderRadius: 2, overflow: "hidden", bgcolor: "var(--imaa-dm-surface, #fff)" }}>
       <Skeleton variant="rectangular" sx={{ aspectRatio: "16 / 9", height: "auto" }} />
       <Box sx={{ p: 2 }}>
         <Skeleton variant="text" height={28} width="85%" />
@@ -153,7 +153,7 @@ export default function ExploreBlogsPage() {
             label="Search blogs"
             placeholder="Search blogs"
             inputProps={{ "aria-label": "Search blogs" }}
-            sx={{ bgcolor: "#fff", minWidth: { sm: 320 } }}
+            sx={{ bgcolor: "var(--imaa-dm-surface, #fff)", minWidth: { sm: 320 } }}
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">

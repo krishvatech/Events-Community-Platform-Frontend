@@ -2564,7 +2564,7 @@ export default function EventManagePage() {
                 width: "100%",
                 aspectRatio: "16 / 9",
                 "@supports not (aspect-ratio: 1 / 1)": { height: 240 },
-                bgcolor: "grey.200",
+                bgcolor: "var(--imaa-dm-muted, #eeeeee)",
                 overflow: "hidden",
               }}
             >
@@ -2743,7 +2743,7 @@ export default function EventManagePage() {
                 <Paper
                   elevation={0}
                   sx={{
-                    bgcolor: '#e3f2fd',
+                    bgcolor: 'var(--imaa-dm-surface-alt, #e3f2fd)',
                     border: '2px solid #1976d2',
                     borderRadius: 2,
                     p: 2,
@@ -2751,15 +2751,15 @@ export default function EventManagePage() {
                   }}
                 >
                   <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                    <InfoRoundedIcon sx={{ color: '#1565c0', mt: 0.5, flexShrink: 0 }} />
+                    <InfoRoundedIcon sx={{ color: 'var(--imaa-dm-blue-text, #1565c0)', mt: 0.5, flexShrink: 0 }} />
                     <Box>
-                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: '#1565c0', mb: 0.5 }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'var(--imaa-dm-blue-text, #1565c0)', mb: 0.5 }}>
                         Application Tracks Required
                       </Typography>
-                      <Typography variant="body2" sx={{ color: '#1565c0', mb: 1 }}>
+                      <Typography variant="body2" sx={{ color: 'var(--imaa-dm-blue-text, #1565c0)', mb: 1 }}>
                         This event requires at least one valid application track before publishing. Go to the "Application Tracks" tab to create one.
                       </Typography>
-                      <Typography variant="caption" sx={{ color: '#0d47a1', fontStyle: 'italic' }}>
+                      <Typography variant="caption" sx={{ color: 'var(--imaa-dm-blue-text, #0d47a1)', fontStyle: 'italic' }}>
                         Each track needs: label, submission mode(s), pricing tier(s), and role mapping(s).
                       </Typography>
                     </Box>
@@ -2818,15 +2818,15 @@ export default function EventManagePage() {
                         sx={{
                           borderRadius: 2,
                           textTransform: "none",
-                          bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "#CBD5E1" : "#10b8a6",
+                          bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "var(--imaa-dm-muted-strong, #CBD5E1)" : "#10b8a6",
                           py: 1,
                           fontSize: 15,
                           fontWeight: 600,
-                          "&:hover": { bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "#CBD5E1" : "#0ea5a4" },
+                          "&:hover": { bgcolor: (isEventEnded || isLiveLifecycleBlocked) ? "var(--imaa-dm-muted-strong, #CBD5E1)" : "#0ea5a4" },
                           ...(status === "cancelled" && {
                             "&.Mui-disabled": {
-                              bgcolor: "#fef2f2",
-                              color: "#b91c1c"
+                              bgcolor: "var(--imaa-dm-surface-alt, #fef2f2)",
+                              color: "var(--imaa-dm-red-text, #b91c1c)"
                             }
                           })
                         }}
@@ -3227,7 +3227,7 @@ export default function EventManagePage() {
                       px: 3,
                       bgcolor: "#10b8a6",
                       "&:hover": { bgcolor: "#0ea5a4" },
-                      "&.Mui-disabled": { bgcolor: "grey.300", color: "grey.500" },
+                      "&.Mui-disabled": { bgcolor: "var(--imaa-dm-muted, #e0e0e0)", color: "var(--imaa-dm-text-hint, #9e9e9e)" },
                     }}
                   >
                     {visibilitySettingsSaving ? "Saving..." : "Save Settings"}
@@ -3315,27 +3315,27 @@ export default function EventManagePage() {
               sx={{
                 borderRadius: 3,
                 border: "1px solid",
-                borderColor: "#fecaca",
+                borderColor: "var(--imaa-dm-tint-red-border, #fecaca)",
                 p: { xs: 2, sm: 3 },
-                bgcolor: "#fef2f2",
+                bgcolor: "var(--imaa-dm-surface-alt, #fef2f2)",
               }}
             >
               <Box mb={2}>
-                <Typography variant="h6" sx={{ fontWeight: 700, color: "#991b1b", display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, color: "var(--imaa-dm-red-text, #991b1b)", display: 'flex', alignItems: 'center', gap: 1 }}>
                   Event Cancelled
                 </Typography>
                 {event.cancelled_at && (
-                  <Typography variant="body2" sx={{ color: "#b91c1c", mt: 0.5, fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ color: "var(--imaa-dm-red-text, #b91c1c)", mt: 0.5, fontWeight: 500 }}>
                     Cancelled on: {new Date(event.cancelled_at).toLocaleDateString()} at {new Date(event.cancelled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Typography>
                 )}
               </Box>
 
-              <Box sx={{ bgcolor: "rgba(255,255,255,0.6)", p: 2, borderRadius: 2, border: "1px solid #fee2e2" }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "#7f1d1d", mb: 0.5 }}>
+              <Box sx={{ bgcolor: "var(--imaa-dm-glass, rgba(255,255,255,0.6))", p: 2, borderRadius: 2, border: "1px solid var(--imaa-dm-border, #fee2e2)" }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, color: "var(--imaa-dm-red-text, #7f1d1d)", mb: 0.5 }}>
                   Cancellation Reason / Message
                 </Typography>
-                <Typography variant="body2" sx={{ color: "#991b1b", whiteSpace: "pre-wrap" }}>
+                <Typography variant="body2" sx={{ color: "var(--imaa-dm-red-text, #991b1b)", whiteSpace: "pre-wrap" }}>
                   {event.cancellation_message || "No reason provided."}
                 </Typography>
               </Box>
@@ -3419,7 +3419,7 @@ export default function EventManagePage() {
         >
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ bgcolor: "grey.50" }}>
+              <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                 <TableCell>Logo</TableCell>
                 <TableCell>Name</TableCell>
                 <TableCell>Seats</TableCell>
@@ -3448,7 +3448,7 @@ export default function EventManagePage() {
                       <Avatar
                         src={t.icon_url || ""}
                         variant="rounded"
-                        sx={{ width: 32, height: 32, bgcolor: "grey.100" }}
+                        sx={{ width: 32, height: 32, bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)" }}
                       >
                         {(t.name || "T")[0]}
                       </Avatar>
@@ -3969,7 +3969,7 @@ export default function EventManagePage() {
           </Stack>
 
           {selectedAppIds.size > 0 && (
-            <Box sx={{ p: 2, backgroundColor: '#f0f0f0', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Box sx={{ p: 2, backgroundColor: 'var(--imaa-dm-surface-alt, #f0f0f0)', borderRadius: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <Typography variant="body2" sx={{ fontWeight: 500 }}>
                 {selectedAppIds.size} application(s) selected
               </Typography>
@@ -4015,7 +4015,7 @@ export default function EventManagePage() {
             <Typography variant="body2" sx={{ color: 'text.secondary', py: 2 }}>No applications found.</Typography>
           ) : (
             <Box sx={{ overflowX: 'auto' }}>
-              <Table sx={{ minWidth: 650, '& thead th': { fontWeight: 600, backgroundColor: '#f5f5f5' } }}>
+              <Table sx={{ minWidth: 650, '& thead th': { fontWeight: 600, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)' } }}>
                 <TableHead>
                   <TableRow>
                     <TableCell sx={{ fontWeight: 600, width: 50 }}>
@@ -4041,7 +4041,7 @@ export default function EventManagePage() {
                 </TableHead>
                 <TableBody>
                   {filteredApps.map(app => (
-                    <TableRow key={app.id} sx={{ '&:hover': { backgroundColor: '#fafafa' } }}>
+                    <TableRow key={app.id} sx={{ '&:hover': { backgroundColor: 'var(--imaa-dm-surface-hover, #fafafa)' } }}>
                       <TableCell sx={{ width: 50 }}>
                         {app.status === 'pending' && (
                           <Checkbox
@@ -4256,7 +4256,7 @@ export default function EventManagePage() {
             <Chip
               size="small"
               label={totalMembersCount}
-              sx={{ bgcolor: "grey.100", color: "text.secondary" }}
+              sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)", color: "text.secondary" }}
             />
             <Button
               variant="outlined"
@@ -4381,7 +4381,7 @@ export default function EventManagePage() {
                 <TableHead>
                   <TableRow
                     sx={{
-                      bgcolor: "grey.50",
+                      bgcolor: "var(--imaa-dm-surface-alt, #fafafa)",
                       "& th": { fontSize: 13, color: "text.secondary" },
                     }}
                   >
@@ -4631,7 +4631,7 @@ export default function EventManagePage() {
           <Chip
             size="small"
             label={`${filteredGuestAuditRows.length} guests`}
-            sx={{ bgcolor: "grey.100", color: "text.secondary" }}
+            sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)", color: "text.secondary" }}
           />
         </Stack>
 
@@ -4688,7 +4688,7 @@ export default function EventManagePage() {
           >
             <Table size="small" sx={{ minWidth: 1150 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "grey.50", "& th": { fontSize: 13, color: "text.secondary", whiteSpace: "nowrap", verticalAlign: "top" } }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fafafa)", "& th": { fontSize: 13, color: "text.secondary", whiteSpace: "nowrap", verticalAlign: "top" } }}>
                   <TableCell>Guest</TableCell>
                   <TableCell>Guest Email</TableCell>
                   <TableCell>Registered Account</TableCell>
@@ -4749,7 +4749,7 @@ export default function EventManagePage() {
                       {row.changes?.length ? (
                         <Stack spacing={0.75}>
                           {row.changes.map((change) => (
-                            <Box key={change.id} sx={{ p: 1, borderRadius: 1.5, bgcolor: "grey.50", border: "1px solid", borderColor: "divider" }}>
+                            <Box key={change.id} sx={{ p: 1, borderRadius: 1.5, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)", border: "1px solid", borderColor: "divider" }}>
                               <Stack direction="row" spacing={0.75} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
                                 <Chip size="small" label={change.field_label} variant="outlined" />
                                 <Chip size="small" label={change.source_label} variant="outlined" />
@@ -5040,7 +5040,7 @@ export default function EventManagePage() {
             <Chip
               size="small"
               label={sessions.length}
-              sx={{ bgcolor: "grey.100", color: "text.secondary" }}
+              sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)", color: "text.secondary" }}
             />
             <Button
               variant="contained"
@@ -5071,7 +5071,7 @@ export default function EventManagePage() {
               <TableHead>
                 <TableRow
                   sx={{
-                    bgcolor: "grey.50",
+                    bgcolor: "var(--imaa-dm-surface-alt, #fafafa)",
                     "& th": { fontSize: 13, color: "text.secondary" },
                   }}
                 >
@@ -5238,7 +5238,7 @@ export default function EventManagePage() {
         <Chip
           size="small"
           label={resources.length}
-          sx={{ bgcolor: "grey.100", color: "text.secondary" }}
+          sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)", color: "text.secondary" }}
         />
       </Stack>
 
@@ -5316,7 +5316,7 @@ export default function EventManagePage() {
           <TableHead>
             <TableRow
               sx={{
-                bgcolor: "grey.50",
+                bgcolor: "var(--imaa-dm-surface-alt, #fafafa)",
                 "& th": { fontSize: 13, color: "text.secondary" },
               }}
             >
@@ -5384,7 +5384,7 @@ export default function EventManagePage() {
                       </Stack>
                     </TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
-                      <Chip size="small" label={typeLabel} sx={{ bgcolor: "grey.100", fontSize: 11 }} />
+                      <Chip size="small" label={typeLabel} sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)", fontSize: 11 }} />
                     </TableCell>
                     <TableCell sx={{ display: { xs: "none", sm: "table-cell" } }}>
                       <Typography variant="body2">
@@ -5489,12 +5489,12 @@ export default function EventManagePage() {
           ) : (
             <Stack spacing={1.5} sx={{ mb: 2 }}>
               {postEventQnaQuestions.map((q) => (
-                <Box key={q.id} sx={{ p: 2, border: "1px solid #e5e7eb", borderRadius: 2, bgcolor: "#fff" }}>
+                <Box key={q.id} sx={{ p: 2, border: "1px solid var(--imaa-dm-border, #e5e7eb)", borderRadius: 2, bgcolor: "var(--imaa-dm-surface, #fff)" }}>
                   <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
                     <Chip
                       label="Pending"
                       size="small"
-                      sx={{ bgcolor: "#fff7ed", color: "#c2410c", border: "1px solid #fed7aa", fontWeight: 600 }}
+                      sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fff7ed)", color: "var(--imaa-dm-orange-text, #c2410c)", border: "1px solid var(--imaa-dm-tint-orange-border, #fed7aa)", fontWeight: 600 }}
                     />
                     <Typography variant="caption" color="text.secondary">
                       Upvotes: {q.upvote_count || 0}
@@ -5532,21 +5532,21 @@ export default function EventManagePage() {
               </Typography>
               <Stack spacing={1.5}>
                 {postEventAnsweredQuestions.map(q => (
-                  <Box key={q.id} sx={{ p: 2, bgcolor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 2 }}>
+                  <Box key={q.id} sx={{ p: 2, bgcolor: 'var(--imaa-dm-surface-alt, #f0fdf4)', border: '1px solid var(--imaa-dm-tint-green-border, #bbf7d0)', borderRadius: 2 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.75 }}>
                       <Stack direction="row" spacing={1} alignItems="center">
                         <Chip
                           size="small"
                           label="Answered"
-                          sx={{ bgcolor: '#dcfce7', color: '#166534', border: '1px solid #86efac', fontWeight: 700 }}
+                          sx={{ bgcolor: 'var(--imaa-dm-tint-green, #dcfce7)', color: 'var(--imaa-dm-green-text, #166534)', border: '1px solid var(--imaa-dm-tint-green-border, #86efac)', fontWeight: 700 }}
                         />
                         <Chip
                           size="small"
                           label={q.answered_phase === "live" ? "Live Answer" : "Post-Event Answer"}
                           sx={{
-                            bgcolor: q.answered_phase === "live" ? "#ecfeff" : "#eff6ff",
-                            color: q.answered_phase === "live" ? "#0e7490" : "#1d4ed8",
-                            border: q.answered_phase === "live" ? "1px solid #67e8f9" : "1px solid #bfdbfe",
+                            bgcolor: q.answered_phase === "live" ? "var(--imaa-dm-surface-alt, #ecfeff)" : "var(--imaa-dm-surface-alt, #eff6ff)",
+                            color: q.answered_phase === "live" ? "var(--imaa-dm-teal-text, #0e7490)" : "var(--imaa-dm-blue-text, #1d4ed8)",
+                            border: q.answered_phase === "live" ? "1px solid var(--imaa-dm-tint-teal-border, #67e8f9)" : "1px solid var(--imaa-dm-border-strong, #bfdbfe)",
                             fontWeight: 600
                           }}
                         />
@@ -5563,11 +5563,11 @@ export default function EventManagePage() {
                     <Typography variant="body2" fontWeight={500} sx={{ mb: 0.5 }}>
                       {q.content}
                     </Typography>
-                    <Box sx={{ p: 1.5, bgcolor: '#dcfce7', borderRadius: 1, mt: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 700, color: '#15803d', display: 'block', mb: 0.5 }}>
+                    <Box sx={{ p: 1.5, bgcolor: 'var(--imaa-dm-tint-green, #dcfce7)', borderRadius: 1, mt: 1 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 700, color: 'var(--imaa-dm-green-text, #15803d)', display: 'block', mb: 0.5 }}>
                         {q.answered_phase === "live" ? "Live Answer:" : "Post-Event Answer:"}
                       </Typography>
-                      <Typography variant="body2" sx={{ color: '#166534', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                      <Typography variant="body2" sx={{ color: 'var(--imaa-dm-green-text, #166534)', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                         {q.answer_text}
                       </Typography>
                     </Box>
@@ -5666,7 +5666,7 @@ export default function EventManagePage() {
             <TableHead>
               <TableRow
                 sx={{
-                  bgcolor: "grey.50",
+                  bgcolor: "var(--imaa-dm-surface-alt, #fafafa)",
                   "& th": { fontSize: 13, color: "text.secondary" },
                 }}
               >
@@ -6513,7 +6513,7 @@ export default function EventManagePage() {
         <Paper elevation={0} sx={{ p: 3, borderRadius: 3, border: "1px solid", borderColor: "divider" }}>
           <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ xs: "flex-start", md: "center" }} spacing={2}>
             <Box>
-              <Typography variant="h5" sx={{ fontWeight: 900, color: "#071d49" }}>Orders & Invoices</Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: "var(--imaa-dm-blue-text, #071d49)" }}>Orders & Invoices</Typography>
               <Typography variant="body2" sx={{ color: "text.secondary", mt: 0.5, maxWidth: 720 }}>
                 Track manual-payment orders, verify bank/manual payments, and download the final invoice PDF for each customer.
               </Typography>
@@ -6705,7 +6705,7 @@ export default function EventManagePage() {
                                 lineHeight: 1.2,
                                 whiteSpace: "nowrap",
                                 borderColor: "#18b8b0",
-                                color: "#0f766e",
+                                color: "var(--imaa-dm-teal-text, #0f766e)",
                                 bgcolor: "rgba(24, 184, 176, 0.06)",
                                 boxShadow: "none",
                                 "&:hover": {
@@ -7009,7 +7009,7 @@ export default function EventManagePage() {
 
                 <Box sx={{
                   p: 1.5,
-                  bgcolor: 'grey.50',
+                  bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)',
                   borderRadius: 3,
                   border: '1px solid',
                   borderColor: 'divider',
@@ -7049,7 +7049,7 @@ export default function EventManagePage() {
               <TableContainer>
                 <Table>
                   <TableHead>
-                    <TableRow sx={{ bgcolor: 'grey.50' }}>
+                    <TableRow sx={{ bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)' }}>
                       <TableCell sx={{ py: 2, fontWeight: 700 }}>Channel Name</TableCell>
                       <TableCell sx={{ py: 2, fontWeight: 700 }}>Slug</TableCell>
                       <TableCell sx={{ py: 2, fontWeight: 700 }}>Currency</TableCell>
@@ -7065,7 +7065,7 @@ export default function EventManagePage() {
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>{channel.name}</Typography>
                         </TableCell>
                         <TableCell sx={{ py: 2 }}>
-                          <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 1, py: 0.5, borderRadius: 1 }}>
+                          <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'var(--imaa-dm-surface-alt, #f5f5f5)', px: 1, py: 0.5, borderRadius: 1 }}>
                             {channel.slug}
                           </Typography>
                         </TableCell>
@@ -7115,7 +7115,7 @@ export default function EventManagePage() {
               <TableContainer>
                 <Table>
                   <TableHead>
-                    <TableRow sx={{ bgcolor: 'grey.50' }}>
+                    <TableRow sx={{ bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)' }}>
                       <TableCell sx={{ py: 2, fontWeight: 700 }}>Warehouse Name</TableCell>
                       <TableCell sx={{ py: 2, fontWeight: 700 }}>Slug</TableCell>
                       <TableCell sx={{ py: 2, fontWeight: 700 }} align="right">Available Stock</TableCell>
@@ -7128,7 +7128,7 @@ export default function EventManagePage() {
                           <Typography variant="body2" sx={{ fontWeight: 600 }}>{warehouse.name}</Typography>
                         </TableCell>
                         <TableCell sx={{ py: 2 }}>
-                          <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'grey.100', px: 1, py: 0.5, borderRadius: 1 }}>
+                          <Typography variant="caption" sx={{ fontFamily: 'monospace', bgcolor: 'var(--imaa-dm-surface-alt, #f5f5f5)', px: 1, py: 0.5, borderRadius: 1 }}>
                             {warehouse.slug}
                           </Typography>
                         </TableCell>
@@ -7197,7 +7197,7 @@ export default function EventManagePage() {
               <TableContainer>
                 <Table>
                   <TableHead>
-                    <TableRow sx={{ bgcolor: 'grey.50' }}>
+                    <TableRow sx={{ bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)' }}>
                       <TableCell sx={{ py: 2, fontWeight: 700 }}>Name</TableCell>
                       <TableCell sx={{ py: 2, fontWeight: 700 }}>Badge</TableCell>
                       <TableCell sx={{ py: 2, fontWeight: 700 }}>Channel</TableCell>
@@ -8125,7 +8125,7 @@ export default function EventManagePage() {
                       ) : (
                         networkingAllowedWindows.map((window, idx) => (
                           <Box key={idx}>
-                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: networkingWindowErrors[idx] ? "error.50" : "grey.50", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
+                            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ p: 2, bgcolor: networkingWindowErrors[idx] ? "error.50" : "var(--imaa-dm-surface-alt, #fafafa)", borderRadius: 1, alignItems: { xs: "stretch", sm: "center" } }}>
                               <TextField
                                 size="small"
                                 label="Date"
@@ -8270,7 +8270,7 @@ export default function EventManagePage() {
                     key={table.id}
                     elevation={0}
                     sx={{
-                      bgcolor: table.is_active ? "primary.50" : "grey.100",
+                      bgcolor: table.is_active ? "primary.50" : "var(--imaa-dm-surface-alt, #f5f5f5)",
                       border: `1px solid ${table.is_active ? "primary.200" : "divider"}`,
                       p: 2,
                       borderRadius: 2,
@@ -8347,7 +8347,7 @@ export default function EventManagePage() {
             <TextField size="small" label="Label name" value={companionNewName} onChange={e => setCompanionNewName(e.target.value)} sx={{ flex: 1 }} inputProps={{ maxLength: 100 }} onKeyDown={e => { if (e.key === "Enter" && companionNewName.trim()) createLabel(companionNewName.trim(), companionNewColor); }} />
             <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
               <Typography variant="body2" sx={{ color: "text.secondary", whiteSpace: "nowrap" }}>Color:</Typography>
-              <Box component="input" type="color" value={companionNewColor} onChange={e => setCompanionNewColor(e.target.value)} style={{ width: 40, height: 36, border: "1px solid #e0e0e0", borderRadius: 6, cursor: "pointer", padding: 2 }} />
+              <Box component="input" type="color" value={companionNewColor} onChange={e => setCompanionNewColor(e.target.value)} style={{ width: 40, height: 36, border: "1px solid var(--imaa-dm-border, #e0e0e0)", borderRadius: 6, cursor: "pointer", padding: 2 }} />
               <Typography variant="caption" sx={{ color: "text.secondary" }}>{companionNewColor}</Typography>
             </Box>
             <Button variant="contained" size="small" startIcon={companionLabelSaving ? <CircularProgress size={14} /> : <AddIcon />} disabled={!companionNewName.trim() || companionLabelSaving} onClick={() => createLabel(companionNewName.trim(), companionNewColor)} sx={{ textTransform: "none", borderRadius: 999, whiteSpace: "nowrap" }}>
@@ -8363,7 +8363,7 @@ export default function EventManagePage() {
               {PREDEFINED_ROLES.map(role => {
                 const alreadyExists = companionLabels.some(l => l.name.toLowerCase() === role.name.toLowerCase());
                 return (
-                  <Chip key={role.name} label={role.name} size="small" disabled={alreadyExists || companionLabelSaving} onClick={() => !alreadyExists && createLabel(role.name, role.color)} sx={{ bgcolor: alreadyExists ? "grey.100" : role.color + "22", color: alreadyExists ? "text.disabled" : role.color, border: `1px solid ${alreadyExists ? "#e0e0e0" : role.color + "66"}`, fontWeight: 600, cursor: alreadyExists ? "default" : "pointer", "&:hover": { bgcolor: alreadyExists ? "grey.100" : role.color + "33" } }} />
+                  <Chip key={role.name} label={role.name} size="small" disabled={alreadyExists || companionLabelSaving} onClick={() => !alreadyExists && createLabel(role.name, role.color)} sx={{ bgcolor: alreadyExists ? "var(--imaa-dm-surface-alt, #f5f5f5)" : role.color + "22", color: alreadyExists ? "text.disabled" : role.color, border: `1px solid ${alreadyExists ? "var(--imaa-dm-border, #e0e0e0)" : role.color + "66"}`, fontWeight: 600, cursor: alreadyExists ? "default" : "pointer", "&:hover": { bgcolor: alreadyExists ? "var(--imaa-dm-surface-hover, #f5f5f5)" : role.color + "33" } }} />
                 );
               })}
             </Stack>
@@ -8419,7 +8419,7 @@ export default function EventManagePage() {
             <TableContainer sx={{ borderRadius: 2, border: "1px solid", borderColor: "divider", overflow: "hidden" }}>
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ bgcolor: "grey.50", "& th": { fontSize: 13, color: "text.secondary" } }}>
+                  <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #fafafa)", "& th": { fontSize: 13, color: "text.secondary" } }}>
                     <TableCell padding="checkbox">
                       <Checkbox size="small" checked={allBulkSelected} indeterminate={companionBulkSelected.length > 0 && !allBulkSelected} onChange={e => {
                         if (e.target.checked) setCompanionBulkSelected(filteredCompanionRegs.map(r => r.id));
@@ -8489,7 +8489,7 @@ export default function EventManagePage() {
               <TextField size="small" label="Label name" value={companionEditName} onChange={e => setCompanionEditName(e.target.value)} inputProps={{ maxLength: 100 }} />
               <Stack direction="row" alignItems="center" spacing={1}>
                 <Typography variant="body2">Color:</Typography>
-                <Box component="input" type="color" value={companionEditColor} onChange={e => setCompanionEditColor(e.target.value)} style={{ width: 40, height: 36, border: "1px solid #e0e0e0", borderRadius: 6, cursor: "pointer", padding: 2 }} />
+                <Box component="input" type="color" value={companionEditColor} onChange={e => setCompanionEditColor(e.target.value)} style={{ width: 40, height: 36, border: "1px solid var(--imaa-dm-border, #e0e0e0)", borderRadius: 6, cursor: "pointer", padding: 2 }} />
                 <Typography variant="caption" sx={{ color: "text.secondary" }}>{companionEditColor}</Typography>
               </Stack>
             </Stack>
@@ -9007,7 +9007,7 @@ export default function EventManagePage() {
 
   // ---- render ----
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "grey.50" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
       <Container
         maxWidth="xl"
         sx={{
@@ -9082,9 +9082,9 @@ export default function EventManagePage() {
                   borderRadius: 999,
                   textTransform: "none",
                   px: 2.5,
-                  backgroundColor: "#fef2f2 !important",
-                  color: "#b91c1c !important",
-                  borderColor: "#fecaca !important",
+                  backgroundColor: "var(--imaa-dm-surface-alt, #fef2f2) !important",
+                  color: "var(--imaa-dm-red-text, #b91c1c) !important",
+                  borderColor: "var(--imaa-dm-tint-red-border, #fecaca) !important",
                 }}
               >Cancelled
               </Button>) : (<Tooltip title={event?.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
@@ -9096,8 +9096,8 @@ export default function EventManagePage() {
                     borderRadius: 999,
                     textTransform: "none",
                     px: 2.5,
-                    bgcolor: isPast ? "#CBD5E1" : "#10b8a6",
-                    "&:hover": { bgcolor: isPast ? "#CBD5E1" : "#0ea5a4" },
+                    bgcolor: isPast ? "var(--imaa-dm-muted-strong, #CBD5E1)" : "#10b8a6",
+                    "&:hover": { bgcolor: isPast ? "var(--imaa-dm-muted-strong, #CBD5E1)" : "#0ea5a4" },
                   }}
                   disabled={!!hostingId || isPast || (event?.is_hidden && !isOwner)}
                 >
@@ -9326,7 +9326,7 @@ export default function EventManagePage() {
                       textTransform: "none",
                       borderRadius: 2,
                       mb: 1,
-                      bgcolor: tab === idx ? "grey.100" : "transparent",
+                      bgcolor: tab === idx ? "var(--imaa-dm-surface-alt, #f5f5f5)" : "transparent",
                     }}
                   >
                     {label}
@@ -9445,7 +9445,7 @@ export default function EventManagePage() {
                       <Avatar
                         src={loungeCreatePreview}
                         variant="rounded"
-                        sx={{ width: 40, height: 40, bgcolor: "grey.100" }}
+                        sx={{ width: 40, height: 40, bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)" }}
                       />
                     )}
                     {loungeCreateIcon && (
@@ -9540,7 +9540,7 @@ export default function EventManagePage() {
                       <Avatar
                         src={loungeEditPreview || loungeEditTarget?.icon_url || ""}
                         variant="rounded"
-                        sx={{ width: 40, height: 40, bgcolor: "grey.100" }}
+                        sx={{ width: 40, height: 40, bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)" }}
                       />
                     )}
                     {loungeEditIcon && (
@@ -10340,7 +10340,7 @@ export default function EventManagePage() {
           <DialogContent>
             {answeringQuestion && (
               <Box>
-                <Typography variant="body2" sx={{ mb: 2, p: 1.5, bgcolor: "#f9fafb", borderRadius: 1 }}>
+                <Typography variant="body2" sx={{ mb: 2, p: 1.5, bgcolor: "var(--imaa-dm-surface-alt, #f9fafb)", borderRadius: 1 }}>
                   <strong>Q:</strong> {answeringQuestion.content}
                 </Typography>
 

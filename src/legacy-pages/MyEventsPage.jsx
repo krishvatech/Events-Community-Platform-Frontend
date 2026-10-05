@@ -246,7 +246,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             style={{
               position: "absolute",
               inset: 0,
-              background: "#E5E7EB",              // same grey placeholder
+              background: "var(--imaa-dm-muted, #E5E7EB)",              // same grey placeholder
             }}
           />
         )}
@@ -423,9 +423,9 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                     py: 0.5,
                     px: 1.25,
                     borderRadius: 2,
-                    backgroundColor: "#fef2f2 !important",
-                    color: "#b91c1c !important",
-                    borderColor: "#fecaca !important",
+                    backgroundColor: "var(--imaa-dm-surface-alt, #fef2f2) !important",
+                    color: "var(--imaa-dm-red-text, #b91c1c) !important",
+                    borderColor: "var(--imaa-dm-tint-red-border, #fecaca) !important",
                   }}
                 >
                   Cancelled
@@ -484,7 +484,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                       py: 0.5,
                       px: 1.25,
                       borderRadius: 2,
-                      backgroundColor: "#CBD5E1",
+                      backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
                     }}
                   >
                     {buttonText}
@@ -540,7 +540,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                     py: 0.5,
                     px: 1.25,
                     borderRadius: 2,
-                    backgroundColor: "#CBD5E1",
+                    backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
                   }}
                 >
                   Event Ended
@@ -559,7 +559,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
                   py: 0.5,
                   px: 1.25,
                   borderRadius: 2,
-                  backgroundColor: "#CBD5E1",
+                  backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
                 }}
               >
                 Join (Not Live Yet)

@@ -55,7 +55,7 @@ import InviteGroupUsersDialog from "../../components/InviteGroupUsersDialog";
 // 1. CONSTANTS & API HELPERS
 // -----------------------------------------------------------------------------
 
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 const POST_REACTIONS = [
   { id: "like", emoji: "\u{1F44D}", label: "Like" },
   { id: "intriguing", emoji: "\u{1F914}", label: "Intriguing" },
@@ -88,12 +88,12 @@ const RoleBadge = ({ role }) => {
       size="small"
       label={cfg.label}
       sx={{
-        bgcolor: cfg.className.includes("bg-slate-200") ? "#e2e8f0" :
-          cfg.className.includes("bg-teal-50") ? "#f0fdfa" :
-            cfg.className.includes("bg-sky-50") ? "#f0f9ff" : "#f1f5f9",
-        color: cfg.className.includes("text-slate-700") ? "#334155" :
-          cfg.className.includes("text-teal-700") ? "#0f766e" :
-            cfg.className.includes("text-sky-700") ? "#0369a1" : "#334155",
+        bgcolor: cfg.className.includes("bg-slate-200") ? "var(--imaa-dm-muted, #e2e8f0)" :
+          cfg.className.includes("bg-teal-50") ? "var(--imaa-dm-surface-alt, #f0fdfa)" :
+            cfg.className.includes("bg-sky-50") ? "var(--imaa-dm-surface-alt, #f0f9ff)" : "var(--imaa-dm-surface-alt, #f1f5f9)",
+        color: cfg.className.includes("text-slate-700") ? "var(--imaa-dm-text-2, #334155)" :
+          cfg.className.includes("text-teal-700") ? "var(--imaa-dm-teal-text, #0f766e)" :
+            cfg.className.includes("text-sky-700") ? "var(--imaa-dm-blue-text, #0369a1)" : "var(--imaa-dm-text-2, #334155)",
         fontWeight: 500
       }}
     />
@@ -511,7 +511,7 @@ function PollBlock({ post, onVote }) {
 
 function EventBlock({ post, onOpen }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{post.event?.title}</Typography>
       <Typography variant="caption" color="text.secondary">
         {post.event?.when ? new Date(post.event.when).toLocaleString() : ""} Â· {post.event?.where}
@@ -536,7 +536,7 @@ function ResourceBlock({ post }) {
   const iframeSrc = ytId ? `https://www.youtube.com/embed/${ytId}` : vmId ? `https://player.vimeo.com/video/${vmId}` : null;
 
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>{r.title}</Typography>
       {post.text && <ExpandableText text={post.text} maxLines={5} wrapperSx={{ mt: 1 }} />}
 
@@ -736,11 +736,11 @@ function CommentsDialog({ open, onClose, postId, target, inline = false, initial
   const CommentItem = ({ c, depth = 0 }) => {
     const isMe = me && c.author?.id && String(c.author.id) === String(me.id);
     return (
-      <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid #e2e8f0" : "none", ml: depth ? 1.5 : 0, mt: 1 }}>
+      <Box sx={{ pl: depth ? 2 : 0, borderLeft: depth ? "2px solid var(--imaa-dm-border, #e2e8f0)" : "none", ml: depth ? 1.5 : 0, mt: 1 }}>
         <Stack direction="row" spacing={1}>
           <Avatar src={c.author.avatar} sx={{ width: 24, height: 24 }}>{(c.author.name || "U")[0]}</Avatar>
           <Box sx={{ flex: 1 }}>
-            <Box sx={{ bgcolor: "#f1f5f9", p: 1, borderRadius: 2 }}>
+            <Box sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f1f5f9)", p: 1, borderRadius: 2 }}>
               <Typography variant="subtitle2">
                 {c.author.name}
                 {c.author.kyc_status === "approved" && (
@@ -1437,7 +1437,7 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
             {local.type === "event" && <EventBlock post={local} onOpen={() => onOpenEvent?.(local.event?.id || local.id)} />}
 
             {local.type === "link" && (
-              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "#fafafa" }}>
+              <Paper variant="outlined" sx={{ p: 1.5, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                 <ExpandableText text={local.text} maxLines={5} wrapperSx={{ mb: 0.5 }} />
                 <Link href={local.url} target="_blank" fontWeight={600} sx={{ overflowWrap: "anywhere" }}>
                   {local.url_title || local.url}
@@ -1479,8 +1479,8 @@ function PostCard({ post, onReact, onPollVote, onOpenEvent, onReport, onEdit, on
                           width: 24,
                           height: 24,
                           borderRadius: "50%",
-                          bgcolor: "#e5e7eb", // gray-200 background
-                          border: "2px solid #fff",
+                          bgcolor: "var(--imaa-dm-muted, #e5e7eb)", // gray-200 background
+                          border: "2px solid var(--imaa-dm-surface, #fff)",
                           ml: index > 0 ? -1 : 0, // Negative margin for overlap
                           zIndex: 3 - index, // Keep first items on top
                           boxShadow: "0 1px 2px rgba(0,0,0,0.1)", // Subtle shadow for depth
@@ -3345,14 +3345,14 @@ function MembersTab({ groupId, group, me, canManageMembers, canAssignAdmin, onMe
             <ListItem
               key={u.id}
               sx={{
-                border: "1px solid #eee",
+                border: "1px solid var(--imaa-dm-border, #eee)",
                 borderRadius: 2,
                 mb: 1,
                 pr: showMenu ? 10 : 5,
                 alignItems: "center",
                 transition: "border-color .15s ease, box-shadow .15s ease",
                 "&:hover": {
-                  borderColor: "#99f6e4",
+                  borderColor: "var(--imaa-dm-tint-teal-border, #99f6e4)",
                   boxShadow: "0 8px 22px rgba(15, 118, 110, 0.08)",
                 },
               }}
@@ -3614,7 +3614,7 @@ function RequestsTab({ groupId, canApprove, onApproved }) {
         const u = req.user || req;
         const uid = u.id || req.user_id || req.id;
         return (
-          <ListItem key={req.id || u.id} sx={{ border: "1px solid #eee", borderRadius: 2, mb: 1 }}>
+          <ListItem key={req.id || u.id} sx={{ border: "1px solid var(--imaa-dm-border, #eee)", borderRadius: 2, mb: 1 }}>
             <ListItemAvatar><Avatar src={toMediaUrl(u.avatar || u.user_image)} /></ListItemAvatar>
             <ListItemText
               primary={u.name || u.full_name || u.username || u.email || "User"}
@@ -4156,13 +4156,13 @@ function SettingsTab({ group, onUpdate }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                bgcolor: "grey.100",
+                bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)",
               }}
             >
               {logoPreview ? (
                 <Box component="img" src={logoPreview} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                <ImageRoundedIcon sx={{ color: "grey.400", fontSize: 40 }} />
+                <ImageRoundedIcon sx={{ color: "var(--imaa-dm-text-faint, #bdbdbd)", fontSize: 40 }} />
               )}
             </Box>
             <Box>
@@ -4211,7 +4211,7 @@ function SettingsTab({ group, onUpdate }) {
                 borderRadius: 2,
                 overflow: "hidden",
                 border: `1px solid ${BORDER}`,
-                bgcolor: "grey.100",
+                bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)",
                 position: "relative",
                 display: "flex",
                 alignItems: "center",
@@ -4221,7 +4221,7 @@ function SettingsTab({ group, onUpdate }) {
               {coverPreview ? (
                 <Box component="img" src={coverPreview} sx={{ width: "100%", height: "100%", objectFit: "cover" }} />
               ) : (
-                <ImageRoundedIcon sx={{ color: "grey.400", fontSize: 60 }} />
+                <ImageRoundedIcon sx={{ color: "var(--imaa-dm-text-faint, #bdbdbd)", fontSize: 60 }} />
               )}
             </Box>
             <Stack direction="row" spacing={2}>
@@ -4280,7 +4280,7 @@ function SettingsTab({ group, onUpdate }) {
 
 function PostSkeleton() {
   return (
-    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, borderColor: "#e2e8f0" }}>
+    <Paper variant="outlined" sx={{ p: 2, mb: 2, borderRadius: 2, borderColor: "var(--imaa-dm-border, #e2e8f0)" }}>
       {/* Header Skeleton */}
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
         <Skeleton variant="circular" width={40} height={40} />
@@ -4778,7 +4778,7 @@ export default function GroupDetailsPage() {
                 fontWeight: 600,
                 minWidth: "auto",
                 px: 1,
-                "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                "&:hover": { bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.04))" }
               }}
             >
               {backLabel}

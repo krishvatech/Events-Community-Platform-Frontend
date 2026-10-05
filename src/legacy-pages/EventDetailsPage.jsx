@@ -499,7 +499,7 @@ function EventDetailsSkeleton() {
           <main className="col-span-12">
             <div className="flex flex-col gap-6">
               <Breadcrumbs sx={{ mb: 2 }}>
-                <Link to="/account/events" style={{ textDecoration: "none", color: "#666" }}>
+                <Link to="/account/events" style={{ textDecoration: "none", color: "var(--imaa-dm-text-body, #666)" }}>
                   My Events
                 </Link>
                 <Skeleton variant="text" width={220} />
@@ -665,7 +665,7 @@ export default function EventDetailsPage() {
     return (
       <Link
         to={`/community/rich-profile/${userId}`}
-        style={{ color: '#2563eb', fontWeight: 600, textDecoration: 'none' }}
+        style={{ color: 'var(--imaa-dm-blue-text, #2563eb)', fontWeight: 600, textDecoration: 'none' }}
         className="hover:underline"
         onClick={(e) => e.stopPropagation()}
       >
@@ -1767,13 +1767,13 @@ export default function EventDetailsPage() {
                       fontWeight: 600,
                       minWidth: "auto",
                       px: 1,
-                      "&:hover": { bgcolor: "rgba(0,0,0,0.04)" }
+                      "&:hover": { bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.04))" }
                     }}
                   >
                     Back
                   </Button>
                   <Breadcrumbs separator="›">
-                    <Link to={backPath} style={{ textDecoration: "none", color: "#666" }}>
+                    <Link to={backPath} style={{ textDecoration: "none", color: "var(--imaa-dm-text-body, #666)" }}>
                       {backLabel}
                     </Link>
                     <Typography color="text.primary">
@@ -1808,7 +1808,7 @@ export default function EventDetailsPage() {
                       {/* LEFT: Event Image */}
                       <Box
                         sx={{
-                          backgroundColor: "#e5e7eb",
+                          backgroundColor: "var(--imaa-dm-muted, #e5e7eb)",
                           padding: 2,
                           borderRadius: 2,
                           display: "flex",
@@ -1837,7 +1837,7 @@ export default function EventDetailsPage() {
                             sx={{
                               width: "100%",
                               aspectRatio: "16/9",
-                              bgcolor: "grey.200",
+                              bgcolor: "var(--imaa-dm-muted, #eeeeee)",
                               borderRadius: 2,
                             }}
                           />
@@ -1906,11 +1906,11 @@ export default function EventDetailsPage() {
                                         return (
                                           <>
                                             <Typography variant="body2" fontWeight={500} sx={{ color: 'text.primary' }}>
-                                              {orgStartTime} – {orgEndTime} <span style={{ color: '#9ca3af' }}>({event.timezone || 'UTC'})</span>
+                                              {orgStartTime} – {orgEndTime} <span style={{ color: 'var(--imaa-dm-text-hint, #9ca3af)' }}>({event.timezone || 'UTC'})</span>
                                             </Typography>
                                             {isVirtualOrHybrid && timesDiffer && (
                                               <Typography variant="caption" sx={{ display: 'block', mt: 0.5, color: 'text.secondary' }}>
-                                                <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span> {localStartTime} – {localEndTime} <span style={{ color: '#9ca3af' }}>({dayjs.tz.guess()})</span>
+                                                <span style={{ fontWeight: 600, color: '#10b8a6' }}>Your Time:</span> {localStartTime} – {localEndTime} <span style={{ color: 'var(--imaa-dm-text-hint, #9ca3af)' }}>({dayjs.tz.guess()})</span>
                                               </Typography>
                                             )}
                                           </>
@@ -2042,12 +2042,12 @@ export default function EventDetailsPage() {
                                 sx={{
                                   p: 1.5,
                                   border: '1px solid',
-                                  borderColor: 'grey.200',
+                                  borderColor: 'var(--imaa-dm-border, #eeeeee)',
                                   borderRadius: 2,
                                   cursor: totalRegisteredCount > 0 ? 'pointer' : 'default',
                                   transition: 'all 0.2s',
                                   '&:hover': totalRegisteredCount > 0 ? {
-                                    bgcolor: 'grey.50',
+                                    bgcolor: 'var(--imaa-dm-surface-hover, #fafafa)',
                                     borderColor: 'primary.main',
                                   } : {}
                                 }}
@@ -2062,7 +2062,7 @@ export default function EventDetailsPage() {
                                             width: 32,
                                             height: 32,
                                             fontSize: '0.875rem',
-                                            border: '2px solid #fff'
+                                            border: '2px solid var(--imaa-dm-surface, #fff)'
                                           }
                                         }}
                                       >
@@ -2119,9 +2119,9 @@ export default function EventDetailsPage() {
                           <Stack spacing={1.5} sx={{
                             p: 1.5,
                             border: '1px solid',
-                            borderColor: 'grey.200',
+                            borderColor: 'var(--imaa-dm-border, #eeeeee)',
                             borderRadius: 2,
-                            bgcolor: 'grey.50'
+                            bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)'
                           }}>
                             <Typography variant="body2" fontWeight={600} color="text.primary">
                               Session Breakdown
@@ -2230,7 +2230,7 @@ export default function EventDetailsPage() {
                           <Button
                             disabled
                             variant="outlined"
-                            sx={{ textTransform: "none", backgroundColor: "#fef2f2", color: "#b91c1c", borderColor: "#fecaca" }}
+                            sx={{ textTransform: "none", backgroundColor: "var(--imaa-dm-surface-alt, #fef2f2)", color: "var(--imaa-dm-red-text, #b91c1c)", borderColor: "var(--imaa-dm-tint-red-border, #fecaca)" }}
                             className="rounded-xl"
                           >
                             Event Cancelled
@@ -2277,7 +2277,7 @@ export default function EventDetailsPage() {
                           <Button
                             disabled
                             variant="contained"
-                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            sx={{ textTransform: "none", backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)" }}
                             className="rounded-xl"
                           >
                             {multiDayJoinLabel}
@@ -2309,7 +2309,7 @@ export default function EventDetailsPage() {
                                         : (token ? 'Apply Now' : 'Apply as Guest')}
                                   </Button>
                                   {applicationStatus === 'declined' && (
-                                    <Typography variant="caption" sx={{ color: "#666" }}>
+                                    <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-body, #666)" }}>
                                       Your previous application was declined. You can apply again.
                                     </Typography>
                                   )}
@@ -2328,7 +2328,7 @@ export default function EventDetailsPage() {
                                         fontWeight: 600
                                       }}
                                     />
-                                    <Typography variant="caption" sx={{ color: "#666", mt: 1, display: 'block' }}>
+                                    <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-body, #666)", mt: 1, display: 'block' }}>
                                       Your application is currently on the waitlist. The event team will notify you if a place becomes available.
                                     </Typography>
                                   </>
@@ -2438,7 +2438,7 @@ export default function EventDetailsPage() {
                                           >
                                             {token ? "Apply Now" : "Apply as Guest"}
                                           </Button>
-                                          <Typography variant="caption" sx={{ color: "#666", mt: 1 }}>
+                                          <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-body, #666)", mt: 1 }}>
                                             You previously cancelled this application
                                           </Typography>
                                         </>
@@ -2487,7 +2487,7 @@ export default function EventDetailsPage() {
                                 textTransform: "none",
                                 backgroundColor: "#10b8a6",
                                 "&:hover": { backgroundColor: "#0ea5a4" },
-                                "&.Mui-disabled": { backgroundColor: "#9adbd3", color: "#ffffff" },
+                                "&.Mui-disabled": { backgroundColor: "var(--imaa-dm-tint-teal, #9adbd3)", color: "#ffffff" },
                               }}
                               className="rounded-xl"
                             >
@@ -2527,10 +2527,10 @@ export default function EventDetailsPage() {
                                   </Stack>
                                 }
                               >
-                                <Typography variant="body2" sx={{ fontWeight: 700, color: "#064e3b" }}>
+                                <Typography variant="body2" sx={{ fontWeight: 700, color: "var(--imaa-dm-green-text, #064e3b)" }}>
                                   Added to cart
                                 </Typography>
-                                <Typography variant="caption" sx={{ display: "block", color: "#0f766e" }}>
+                                <Typography variant="caption" sx={{ display: "block", color: "var(--imaa-dm-teal-text, #0f766e)" }}>
                                   {paidCartNotice.message}
                                 </Typography>
                               </Alert>
@@ -2576,7 +2576,7 @@ export default function EventDetailsPage() {
                           <Button
                             disabled
                             variant="contained"
-                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            sx={{ textTransform: "none", backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)" }}
                             className="rounded-xl"
                           >
                             Replay Coming Soon
@@ -2610,7 +2610,7 @@ export default function EventDetailsPage() {
                           <Button
                             disabled
                             variant="contained"
-                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            sx={{ textTransform: "none", backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)" }}
                             className="rounded-xl"
                           >
                             Event Ended
@@ -2619,7 +2619,7 @@ export default function EventDetailsPage() {
                           <Button
                             disabled
                             variant="contained"
-                            sx={{ textTransform: "none", backgroundColor: "#CBD5E1" }}
+                            sx={{ textTransform: "none", backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)" }}
                             className="rounded-xl"
                           >
                             Join (Not Live Yet)
@@ -2660,8 +2660,8 @@ export default function EventDetailsPage() {
 
                         {/* Required Forms Section - Only show after acceptance, not for waitlisted */}
                         {postAcceptanceForms.length > 0 && (confirmedRegistered || applicationStatus === 'accepted') && applicationStatus !== 'waitlisted' && (
-                          <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid #e5e7eb' }}>
-                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2, color: '#1f2937' }}>
+                          <Box sx={{ mt: 3, pt: 3, borderTop: '1px solid var(--imaa-dm-border, #e5e7eb)' }}>
+                            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 2, color: 'var(--imaa-dm-text, #1f2937)' }}>
                               📋 Required Forms
                             </Typography>
                             <Stack spacing={1.5}>
@@ -2675,7 +2675,7 @@ export default function EventDetailsPage() {
                                     elevation={0}
                                     sx={{
                                       p: 2,
-                                      border: '1px solid #e5e7eb',
+                                      border: '1px solid var(--imaa-dm-border, #e5e7eb)',
                                       borderRadius: 1.5,
                                       display: 'flex',
                                       alignItems: 'center',
@@ -2828,11 +2828,11 @@ export default function EventDetailsPage() {
                               variant="subtitle2"
                               sx={{
                                 fontWeight: 700,
-                                color: "#0284c7",
+                                color: "var(--imaa-dm-blue-text, #0284c7)",
                                 mb: 1.5,
                                 mt: dateIdx > 0 ? 2 : 0,
                                 pb: 1,
-                                borderBottom: "2px solid #f0f9ff",
+                                borderBottom: "2px solid var(--imaa-dm-border, #f0f9ff)",
                               }}
                             >
                               Day {dateIdx + 1} — {new Date(dateKey).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
@@ -2845,7 +2845,7 @@ export default function EventDetailsPage() {
                         const isExpanded = Boolean(expandedSessionDescriptions[sessionKey]);
                         const isLongDescription = sessionDescription.length > 180;
                         return (
-                          <Paper key={session.id || sessionIdx} elevation={0} sx={{ p: 2, bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider' }}>
+                          <Paper key={session.id || sessionIdx} elevation={0} sx={{ p: 2, bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)', border: '1px solid', borderColor: 'divider' }}>
                             <Stack spacing={1.5}>
                               <Stack direction="row" justifyContent="space-between" alignItems="start">
                                 <Box>
@@ -2872,7 +2872,7 @@ export default function EventDetailsPage() {
                                     })()}
                                   </Typography>
                                   {session.session_breaks && session.session_breaks.length > 0 && (
-                                    <Typography variant="body2" sx={{ color: '#6b7280' }}>
+                                    <Typography variant="body2" sx={{ color: 'var(--imaa-dm-text-meta, #6b7280)' }}>
                                       (includes {session.session_breaks.map(b => b.label || b.break_type).join(", ")} – {session.session_breaks.reduce((sum, b) => sum + b.duration_minutes, 0)}m break)
                                     </Typography>
                                   )}
@@ -2892,12 +2892,12 @@ export default function EventDetailsPage() {
                                     <Typography variant="body2">
                                       {event.timezone ? dayjs(session.start_time).tz(normalizeTimezoneName(event.timezone)).format("h:mm A") : dayjs(session.start_time).format("h:mm A")} – {event.timezone ? dayjs(session.end_time).tz(normalizeTimezoneName(event.timezone)).format("h:mm A") : dayjs(session.end_time).format("h:mm A")}
                                       {event.timezone && (
-                                        <span style={{ color: '#9ca3af' }}>({normalizeTimezoneName(event.timezone)})</span>
+                                        <span style={{ color: 'var(--imaa-dm-text-hint, #9ca3af)' }}>({normalizeTimezoneName(event.timezone)})</span>
                                       )}
                                     </Typography>
                                   </Stack>
                                   {((event?.event_format === 'virtual' || event?.event_format === 'hybrid') || (event?.format === 'virtual' || event?.format === 'hybrid')) && (
-                                    <Typography variant="caption" sx={{ color: '#6b7280', fontWeight: 500, ml: 3.5 }}>
+                                    <Typography variant="caption" sx={{ color: 'var(--imaa-dm-text-meta, #6b7280)', fontWeight: 500, ml: 3.5 }}>
                                       Your Time: {dayjs(session.start_time).tz(getBrowserTimezone()).format("h:mm A")} – {dayjs(session.end_time).tz(getBrowserTimezone()).format("h:mm A")} ({getBrowserTimezone()})
                                     </Typography>
                                   )}
@@ -2969,7 +2969,7 @@ export default function EventDetailsPage() {
                         />
                       </Box>
                       <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', flexShrink: 0 }}>
-                        <Typography variant="caption" sx={{ color: '#6b7280', whiteSpace: 'nowrap' }}>
+                        <Typography variant="caption" sx={{ color: 'var(--imaa-dm-text-meta, #6b7280)', whiteSpace: 'nowrap' }}>
                           Filter by:
                         </Typography>
                         <Box
@@ -2980,13 +2980,13 @@ export default function EventDetailsPage() {
                             px: 1.5,
                             py: 0.75,
                             borderRadius: 1,
-                            border: '1px solid #e5e7eb',
-                            bgcolor: '#ffffff',
-                            color: '#111827',
+                            border: '1px solid var(--imaa-dm-border, #e5e7eb)',
+                            bgcolor: 'var(--imaa-dm-surface, #ffffff)',
+                            color: 'var(--imaa-dm-text, #111827)',
                             fontSize: '0.875rem',
                             fontWeight: 500,
                             cursor: 'pointer',
-                            '&:hover': { borderColor: '#d1d5db' },
+                            '&:hover': { borderColor: 'var(--imaa-dm-border-strong, #d1d5db)' },
                             '&:focus': { outline: 'none', borderColor: '#3b82f6', boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)' }
                           }}
                         >
@@ -3044,23 +3044,23 @@ export default function EventDetailsPage() {
                         const renderQuestion = (q, isSubQuestion = false) => {
                           const isExpanded = expandedQaItems[q.id] === true;
                           const statusChip = !q.is_answered
-                            ? { label: 'Pending', bgcolor: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }
+                            ? { label: 'Pending', bgcolor: 'var(--imaa-dm-tint-amber, #fef9c3)', color: 'var(--imaa-dm-amber-text, #854d0e)', border: '1px solid var(--imaa-dm-tint-amber-border, #fef08a)' }
                             : q.answered_phase === 'live'
-                              ? { label: 'Answered Live', bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
-                              : { label: 'Answered Post-Event', bgcolor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
+                              ? { label: 'Answered Live', bgcolor: 'var(--imaa-dm-tint-green, #ecfdf5)', color: 'var(--imaa-dm-green-text, #059669)', border: '1px solid var(--imaa-dm-tint-green-border, #a7f3d0)' }
+                              : { label: 'Answered Post-Event', bgcolor: 'var(--imaa-dm-tint-blue, #dbeafe)', color: 'var(--imaa-dm-blue-text, #1e40af)', border: '1px solid var(--imaa-dm-tint-blue-border, #bfdbfe)' };
 
                           return (
                             <Box
                               key={q.id}
                               sx={{
-                                bgcolor: isSubQuestion ? 'transparent' : '#f8fafb',
-                                border: isSubQuestion ? 'none' : '1px solid #e5e7eb',
-                                borderTop: isSubQuestion ? '1px solid rgba(0,0,0,0.05)' : '1px solid #e5e7eb',
+                                bgcolor: isSubQuestion ? 'transparent' : 'var(--imaa-dm-surface-alt, #f8fafb)',
+                                border: isSubQuestion ? 'none' : '1px solid var(--imaa-dm-border, #e5e7eb)',
+                                borderTop: isSubQuestion ? '1px solid var(--imaa-dm-border, rgba(0,0,0,0.05))' : '1px solid var(--imaa-dm-border, #e5e7eb)',
                                 borderRadius: isSubQuestion ? 0 : 2,
                                 transition: 'all 0.2s ease',
                                 '&:hover': {
-                                  bgcolor: isSubQuestion ? 'rgba(0,0,0,0.01)' : '#ffffff',
-                                  borderColor: isSubQuestion ? 'none' : '#d1d5db',
+                                  bgcolor: isSubQuestion ? 'var(--imaa-dm-overlay, rgba(0,0,0,0.01))' : 'var(--imaa-dm-surface, #ffffff)',
+                                  borderColor: isSubQuestion ? 'none' : 'var(--imaa-dm-border-strong, #d1d5db)',
                                   boxShadow: isSubQuestion ? 'none' : '0 1px 3px rgba(0,0,0,0.1)'
                                 }
                               }}
@@ -3076,11 +3076,11 @@ export default function EventDetailsPage() {
                                   gap: 2,
                                   cursor: 'pointer',
                                   userSelect: 'none',
-                                  '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }
+                                  '&:hover': { bgcolor: 'var(--imaa-dm-overlay, rgba(0,0,0,0.02))' }
                                 }}
                               >
                                 <Box sx={{ flex: 1, pr: 1 }}>
-                                  <Typography variant={isSubQuestion ? "body2" : "subtitle2"} fontWeight={isSubQuestion ? 500 : 700} sx={{ mb: 0.5, color: '#111827' }}>
+                                  <Typography variant={isSubQuestion ? "body2" : "subtitle2"} fontWeight={isSubQuestion ? 500 : 700} sx={{ mb: 0.5, color: 'var(--imaa-dm-text, #111827)' }}>
                                     {isSubQuestion ? "" : "Q: "}{q.content}
                                   </Typography>
                                   <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
@@ -3124,7 +3124,7 @@ export default function EventDetailsPage() {
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        color: '#6b7280',
+                                        color: 'var(--imaa-dm-text-meta, #6b7280)',
                                         fontSize: 14
                                       }}
                                     >
@@ -3140,17 +3140,17 @@ export default function EventDetailsPage() {
                                   <Box sx={{
                                     p: { xs: 2, sm: 2.5 },
                                     pt: 0,
-                                    borderTop: isSubQuestion ? 'none' : '1px solid #e5e7eb'
+                                    borderTop: isSubQuestion ? 'none' : '1px solid var(--imaa-dm-border, #e5e7eb)'
                                   }}>
                                     <Box sx={{
                                       p: 2,
-                                      bgcolor: q.answered_phase === 'live' ? '#ecfdf5' : '#eff6ff',
-                                      border: q.answered_phase === 'live' ? '1px solid #a7f3d0' : '1px solid #bfdbfe',
+                                      bgcolor: q.answered_phase === 'live' ? 'var(--imaa-dm-surface-alt, #ecfdf5)' : 'var(--imaa-dm-surface-alt, #eff6ff)',
+                                      border: q.answered_phase === 'live' ? '1px solid var(--imaa-dm-tint-green-border, #a7f3d0)' : '1px solid var(--imaa-dm-border-strong, #bfdbfe)',
                                       borderRadius: 1.5
                                     }}>
                                       <Typography variant="caption" sx={{
                                         fontWeight: 700,
-                                        color: q.answered_phase === 'live' ? '#059669' : '#1d4ed8',
+                                        color: q.answered_phase === 'live' ? 'var(--imaa-dm-green-text, #059669)' : 'var(--imaa-dm-blue-text, #1d4ed8)',
                                         display: 'block',
                                         mb: 0.75,
                                         textTransform: 'uppercase',
@@ -3162,7 +3162,7 @@ export default function EventDetailsPage() {
                                       <Typography variant="body2" sx={{
                                         whiteSpace: 'pre-wrap',
                                         wordBreak: 'break-word',
-                                        color: q.answered_phase === 'live' ? '#065f46' : '#1e3a5f',
+                                        color: q.answered_phase === 'live' ? 'var(--imaa-dm-green-text, #065f46)' : 'var(--imaa-dm-text-2, #1e3a5f)',
                                         lineHeight: 1.6
                                       }}>
                                         {q.answer_text}
@@ -3194,22 +3194,22 @@ export default function EventDetailsPage() {
                           const answeredPhase = members.find(q => q.is_answered)?.answered_phase || 'post_event';
 
                           const statusChip = !anyAnswered
-                            ? { label: 'Pending', bgcolor: '#fef9c3', color: '#854d0e', border: '1px solid #fef08a' }
+                            ? { label: 'Pending', bgcolor: 'var(--imaa-dm-tint-amber, #fef9c3)', color: 'var(--imaa-dm-amber-text, #854d0e)', border: '1px solid var(--imaa-dm-tint-amber-border, #fef08a)' }
                             : answeredPhase === 'live'
-                              ? { label: 'Answered Live', bgcolor: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }
-                              : { label: 'Answered Post-Event', bgcolor: '#dbeafe', color: '#1e40af', border: '1px solid #bfdbfe' };
+                              ? { label: 'Answered Live', bgcolor: 'var(--imaa-dm-tint-green, #ecfdf5)', color: 'var(--imaa-dm-green-text, #059669)', border: '1px solid var(--imaa-dm-tint-green-border, #a7f3d0)' }
+                              : { label: 'Answered Post-Event', bgcolor: 'var(--imaa-dm-tint-blue, #dbeafe)', color: 'var(--imaa-dm-blue-text, #1e40af)', border: '1px solid var(--imaa-dm-tint-blue-border, #bfdbfe)' };
 
                           return (
                             <Box
                               key={`group_${g.id}`}
                               sx={{
-                                bgcolor: '#f0f4ff',
-                                border: '1.5px solid #dbeafe',
+                                bgcolor: 'var(--imaa-dm-surface-alt, #f0f4ff)',
+                                border: '1.5px solid var(--imaa-dm-border, #dbeafe)',
                                 borderRadius: 3,
                                 overflow: 'hidden',
                                 transition: 'all 0.2s ease',
                                 '&:hover': {
-                                  borderColor: '#bfdbfe',
+                                  borderColor: 'var(--imaa-dm-border-strong, #bfdbfe)',
                                   boxShadow: '0 4px 12px rgba(59, 130, 246, 0.08)'
                                 }
                               }}
@@ -3222,7 +3222,7 @@ export default function EventDetailsPage() {
                                     label={`${members.length} combined`}
                                     sx={{
                                       bgcolor: 'rgba(59, 130, 246, 0.1)',
-                                      color: '#1d4ed8',
+                                      color: 'var(--imaa-dm-blue-text, #1d4ed8)',
                                       fontWeight: 600,
                                       fontSize: '0.65rem',
                                       height: 20
@@ -3256,14 +3256,14 @@ export default function EventDetailsPage() {
                                   />
                                 </Stack>
 
-                                <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1, color: '#1e3a8a', lineHeight: 1.4 }}>
+                                <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1, color: 'var(--imaa-dm-blue-text, #1e3a8a)', lineHeight: 1.4 }}>
                                   {summaryText}
                                 </Typography>
 
                                 {authorNames.length > 0 && (
                                   <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
-                                    <PeopleOutlineIcon sx={{ fontSize: 16, color: '#64748b' }} />
-                                    <Typography variant="caption" sx={{ color: '#64748b' }}>
+                                    <PeopleOutlineIcon sx={{ fontSize: 16, color: 'var(--imaa-dm-text-meta, #64748b)' }} />
+                                    <Typography variant="caption" sx={{ color: 'var(--imaa-dm-text-meta, #64748b)' }}>
                                       Asked by {authorNames.map((auth, idx) => (
                                         <React.Fragment key={auth.id || idx}>
                                           <ClickableAsker userId={auth.id} name={auth.name} />
@@ -3284,9 +3284,9 @@ export default function EventDetailsPage() {
                                     textTransform: 'none',
                                     fontSize: '0.75rem',
                                     fontWeight: 700,
-                                    color: '#3b82f6',
+                                    color: 'var(--imaa-dm-blue-text, #3b82f6)',
                                     p: 0,
-                                    '&:hover': { bgcolor: 'transparent', color: '#2563eb' }
+                                    '&:hover': { bgcolor: 'transparent', color: 'var(--imaa-dm-blue-text, #2563eb)' }
                                   }}
                                 >
                                   {isExpanded ? "Hide original questions" : `View ${members.length} original questions`}
@@ -3295,7 +3295,7 @@ export default function EventDetailsPage() {
 
                               {/* Collapsible Sub-questions */}
                               <Collapse in={isExpanded}>
-                                <Box sx={{ bgcolor: 'rgba(255,255,255,0.5)', borderTop: '1px solid #dbeafe' }}>
+                                <Box sx={{ bgcolor: 'var(--imaa-dm-overlay, rgba(255,255,255,0.5))', borderTop: '1px solid var(--imaa-dm-border, #dbeafe)' }}>
                                   {members.map(member => renderQuestion(member, true))}
                                 </Box>
                               </Collapse>

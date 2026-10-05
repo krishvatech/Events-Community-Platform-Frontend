@@ -191,7 +191,7 @@ export default function AdminNewsletterTagsPanel() {
         spacing={2}
       >
         <Box>
-          <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+          <Typography variant="h6" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>
             Tags
           </Typography>
           <Typography color="text.secondary" variant="body2">
@@ -246,11 +246,11 @@ export default function AdminNewsletterTagsPanel() {
 
       {error ? <Alert severity="error">{error}</Alert> : null}
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", overflow: "hidden" }}>
         <TableContainer sx={{ overflowX: "auto" }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+              <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                 <TableCell>Tag</TableCell>
                 <TableCell>Mautic ID</TableCell>
                 <TableCell align="right">Actions</TableCell>
@@ -269,8 +269,8 @@ export default function AdminNewsletterTagsPanel() {
                 <TableRow>
                   <TableCell colSpan={3}>
                     <Stack spacing={1} alignItems="center" sx={{ py: 4 }}>
-                      <SellRoundedIcon sx={{ fontSize: 36, color: "#94A3B8" }} />
-                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>
+                      <SellRoundedIcon sx={{ fontSize: 36, color: "var(--imaa-dm-text-hint, #94A3B8)" }} />
+                      <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                         {search ? "No tags match that search" : "No tags in Mautic yet"}
                       </Typography>
                     </Stack>
@@ -280,7 +280,7 @@ export default function AdminNewsletterTagsPanel() {
                 tags.map((tag) => (
                   <TableRow key={tag.id} hover>
                     <TableCell>
-                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>{tag.tag}</Typography>
+                      <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>{tag.tag}</Typography>
                     </TableCell>
                     <TableCell>{tag.id}</TableCell>
                     <TableCell align="right">

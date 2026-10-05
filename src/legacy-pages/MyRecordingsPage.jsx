@@ -140,7 +140,7 @@ function RecordingCardSkeleton() {
           position: "relative",
           width: "100%",
           aspectRatio: "16/9",
-          background: "#E5E7EB",
+          background: "var(--imaa-dm-muted, #E5E7EB)",
         }}
       >
         <Skeleton

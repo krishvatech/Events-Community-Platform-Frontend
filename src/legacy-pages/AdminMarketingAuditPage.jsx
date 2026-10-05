@@ -295,7 +295,7 @@ export default function AdminMarketingAuditPage() {
     <TableContainer sx={{ border: `1px solid ${UI_BORDER}`, borderRadius: "var(--imaa-radius-card)", boxShadow: "var(--imaa-shadow-sm)", bgcolor: "background.paper", overflowX: "auto", maxWidth: "100%" }} aria-busy={loading ? "true" : undefined}>
       <Table aria-label="Marketing activity" sx={{ minWidth: 940 }}>
         <TableHead>
-          <TableRow sx={{ bgcolor: "#F8FAFC" }}>
+          <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F8FAFC)" }}>
             <TableCell>Time</TableCell>
             <TableCell>ECP Actor</TableCell>
             <TableCell>Mautic Identity</TableCell>

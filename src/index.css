@@ -16,6 +16,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Default page text colour, set as a class on <body> (src/app/layout.jsx, index.html). It replaces
+   Tailwind's `text-gray-900` with the same precedence over the `body` rules above and in
+   CssBaseline, and the same light colour (#111827); dark mode changes the variable. */
+.imaa-body-text {
+  color: var(--imaa-body-text);
+}
+
 @layer base {
   html { font-family: var(--imaa-font-sans); }
   h1, h2, h3, h4, h5, h6 { color: var(--text-primary); font-family: var(--imaa-font-sans); }
@@ -120,4 +127,77 @@ body.qna-open rtk-controlbar-button[label="Q&A"] {
   justify-content: center;
   font-weight: 700;
   font-size: 14px;
+}
+
+/* ── Dark mode: third-party widgets ─────────────────────────────────────────────────────────
+   Only inside a dark page (html dark, body not force-light); light mode and force-light pages
+   keep each library's own styles. Uses the libraries' CSS variables / class names only. */
+
+/* react-toastify (light theme toasts) */
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) {
+  --toastify-color-light: var(--imaa-dm-surface);
+  --toastify-text-color-light: var(--imaa-dm-text-2);
+}
+
+/* react-phone-input-2 (material theme): Profile and Admin phone fields */
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .form-control {
+  background: var(--imaa-dm-surface);
+  border-color: var(--imaa-dm-border-strong);
+  color: var(--imaa-dm-text);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .form-control:hover {
+  border-color: var(--imaa-dm-text-meta);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .special-label,
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .invalid-number-message {
+  background: var(--imaa-dm-surface);
+  color: var(--imaa-dm-text-meta);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .country-list,
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .country-list .search {
+  background-color: var(--imaa-dm-surface);
+  color: var(--imaa-dm-text);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .country-list .country:hover,
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .country-list .country.highlight {
+  background-color: var(--imaa-dm-surface-hover);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .country-list .country .dial-code {
+  color: var(--imaa-dm-text-meta);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .country-list .search-box {
+  background: var(--imaa-dm-surface-alt);
+  border-color: var(--imaa-dm-border-strong);
+  color: var(--imaa-dm-text);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .country-list .divider {
+  border-bottom-color: var(--imaa-dm-border);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .selected-flag .arrow {
+  border-top-color: var(--imaa-dm-text-meta);
+}
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-tel-input .selected-flag .arrow.up {
+  border-bottom-color: var(--imaa-dm-text-meta);
+}
+
+/* @xyflow/react (Marketing Hub workflow canvas): the library's own variables */
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .react-flow {
+  --xy-background-color: var(--imaa-dm-page);
+  --xy-background-pattern-dots-color: #3A4867;
+  --xy-edge-stroke: #6F7A8C;
+  --xy-edge-stroke-selected: #9AA3B2;
+  --xy-connectionline-stroke: #6F7A8C;
+  --xy-edge-label-background-color: var(--imaa-dm-surface);
+  --xy-edge-label-color: var(--imaa-dm-text-2);
+  --xy-handle-background-color: #9AA3B2;
+  --xy-handle-border-color: var(--imaa-dm-surface);
+  --xy-controls-button-background-color: var(--imaa-dm-surface);
+  --xy-controls-button-background-color-hover: var(--imaa-dm-surface-hover);
+  --xy-controls-button-color: var(--imaa-dm-text-2);
+  --xy-controls-button-color-hover: var(--imaa-dm-text);
+  --xy-controls-button-border-color: var(--imaa-dm-border);
+  --xy-minimap-background-color: var(--imaa-dm-surface);
+  --xy-minimap-mask-background-color: rgba(14, 22, 38, 0.6);
+  --xy-minimap-node-background-color: #3A4867;
+  --xy-attribution-background-color: rgba(22, 33, 58, 0.6);
 }

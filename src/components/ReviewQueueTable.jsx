@@ -108,7 +108,7 @@ const ReviewQueueTable = ({
   return (
     <Box>
       {selectedIds.length > 0 && (
-        <Box sx={{ mb: 2, p: 1, backgroundColor: '#e3f2fd', borderRadius: 1 }}>
+        <Box sx={{ mb: 2, p: 1, backgroundColor: 'var(--imaa-dm-surface-alt, #e3f2fd)', borderRadius: 1 }}>
           <Typography variant="body2">
             {selectedIds.length} application(s) selected
           </Typography>
@@ -117,7 +117,7 @@ const ReviewQueueTable = ({
 
       <TableContainer component={Paper}>
         <Table size="small">
-          <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+          <TableHead sx={{ backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }}>
             <TableRow>
               <TableCell padding="checkbox">
                 <Checkbox

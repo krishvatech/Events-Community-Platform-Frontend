@@ -916,7 +916,7 @@ function VerificationCard({ status, onVerify }) {
       sx={{
         mb: 2,
         borderColor: isVerified ? "primary.light" : isPending ? "#14b8a6" : "divider",
-        bgcolor: isVerified ? "primary.50" : isPending ? "#f0fdfa" : "background.paper"
+        bgcolor: isVerified ? "primary.50" : isPending ? "var(--imaa-dm-surface-alt, #f0fdfa)" : "background.paper"
       }}
     >
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", textAlign: "center", pb: 1 }}>
@@ -2953,7 +2953,7 @@ export default function AdminSettings() {
                   <Grid container spacing={{ xs: 3, md: 4 }} alignItems="flex-start">
                     <Grid item xs={12} md={4}>
                       <Stack spacing={2} alignItems="center" sx={{ width: "100%" }}>
-                        <Box sx={{ position: "relative", width: 112, height: 112, borderRadius: "50%", border: "3px solid", borderColor: "primary.light", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "grey.50" }}>
+                        <Box sx={{ position: "relative", width: 112, height: 112, borderRadius: "50%", border: "3px solid", borderColor: "primary.light", display: "flex", alignItems: "center", justifyContent: "center", bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                           <Avatar src={avatarUrl || undefined} alt={profile.full_name || "Admin profile"} sx={{ width: 104, height: 104, fontSize: 34, bgcolor: "primary.main" }}>{(profile.full_name || "A").charAt(0).toUpperCase()}</Avatar>
                         </Box>
                         <input ref={fileRef} hidden type="file" accept="image/*" onChange={onFileChange} />
@@ -3028,8 +3028,8 @@ export default function AdminSettings() {
               <Card variant="outlined" sx={{ mb: 2.5, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", boxShadow: "var(--imaa-shadow-sm)" }}>
                 <Box sx={{ display: "flex", flexDirection: { xs: "column", sm: "row" }, alignItems: { xs: "flex-start", sm: "center" }, gap: { xs: 1.5, sm: 0 }, px: { xs: 2, md: 3 }, py: { xs: 1.5, md: 2 } }}>
                   <Box sx={{ position: "relative", display: "inline-flex", mr: 2 }}>
-                    <Avatar src={avatarUrl || undefined} alt={displayName || "Profile"} sx={{ width: 56, height: 56, bgcolor: "grey.300", fontSize: 24 }}>{displayName.charAt(0).toUpperCase()}</Avatar>
-                    <IconButton size="small" onClick={openAvatarDialog} aria-label={`Change photo for ${displayName}`} sx={{ position: "absolute", bottom: -4, right: -4, width: 40, height: 40, bgcolor: "background.paper", borderRadius: "50%", border: "1px solid", borderColor: "divider", boxShadow: 1, "&:hover": { bgcolor: "grey.100" } }}>
+                    <Avatar src={avatarUrl || undefined} alt={displayName || "Profile"} sx={{ width: 56, height: 56, bgcolor: "var(--imaa-dm-muted, #e0e0e0)", fontSize: 24 }}>{displayName.charAt(0).toUpperCase()}</Avatar>
+                    <IconButton size="small" onClick={openAvatarDialog} aria-label={`Change photo for ${displayName}`} sx={{ position: "absolute", bottom: -4, right: -4, width: 40, height: 40, bgcolor: "background.paper", borderRadius: "50%", border: "1px solid", borderColor: "divider", boxShadow: 1, "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #f5f5f5)" } }}>
                       {avatarUrl ? <EditOutlinedIcon sx={{ fontSize: 16 }} /> : <PhotoCameraRoundedIcon sx={{ fontSize: 16 }} />}
                     </IconButton>
                   </Box>
@@ -3189,7 +3189,7 @@ export default function AdminSettings() {
                         )}
                       />
                     ) : (
-                      <Box sx={{ textAlign: "center", py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", mx: "auto" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an experience to your profile</Typography><Box><Button variant="contained" size="small" sx={{ mt: 1.5 }} onClick={openAddExperience}>Create</Button></Box></Box>
+                      <Box sx={{ textAlign: "center", py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: "var(--imaa-dm-muted, #eeeeee)", mx: "auto" }} /><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an experience to your profile</Typography><Box><Button variant="contained" size="small" sx={{ mt: 1.5 }} onClick={openAddExperience}>Create</Button></Box></Box>
                     )}
                   </SectionCard>
 
@@ -3240,7 +3240,7 @@ export default function AdminSettings() {
                         ))}
                       </List>
                     ) : (
-                      <Box sx={{ textAlign: "center", py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", mx: "auto" }}><HistoryEduRoundedIcon /></Avatar><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an education to your profile</Typography><Box><Button variant="contained" size="small" sx={{ mt: 1.5 }} onClick={() => setEduOpen(true)}>Create</Button></Box></Box>
+                      <Box sx={{ textAlign: "center", py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: "var(--imaa-dm-muted, #eeeeee)", mx: "auto" }}><HistoryEduRoundedIcon /></Avatar><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an education to your profile</Typography><Box><Button variant="contained" size="small" sx={{ mt: 1.5 }} onClick={() => setEduOpen(true)}>Create</Button></Box></Box>
                     )}
                   </SectionCard>
 
@@ -3322,8 +3322,8 @@ export default function AdminSettings() {
                           sx={{
                             width: 64,
                             height: 64,
-                            bgcolor: "grey.200",
-                            color: "grey.600",
+                            bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                            color: "var(--imaa-dm-text-meta, #757575)",
                             mx: "auto",
                           }}
                         >
@@ -3422,8 +3422,8 @@ export default function AdminSettings() {
                           sx={{
                             width: 64,
                             height: 64,
-                            bgcolor: "grey.200",
-                            color: "grey.600",
+                            bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                            color: "var(--imaa-dm-text-meta, #757575)",
                             mx: "auto",
                           }}
                         >
@@ -3767,8 +3767,8 @@ export default function AdminSettings() {
                           sx={{
                             width: 64,
                             height: 64,
-                            bgcolor: "grey.200",
-                            color: "grey.600",
+                            bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                            color: "var(--imaa-dm-text-meta, #757575)",
                             mx: "auto",
                           }}
                         >
@@ -3871,8 +3871,8 @@ export default function AdminSettings() {
                           sx={{
                             width: 64,
                             height: 64,
-                            bgcolor: "grey.200",
-                            color: "grey.600",
+                            bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                            color: "var(--imaa-dm-text-meta, #757575)",
                             mx: "auto",
                           }}
                         >
@@ -4064,7 +4064,7 @@ export default function AdminSettings() {
       <Dialog open={avatarDialogOpen} onClose={closeAvatarDialog} fullWidth maxWidth="xs">
         <DialogTitle sx={{ fontWeight: 700 }}>Update profile photo</DialogTitle>
         <DialogContent sx={{ pt: 3, pb: 2, display: "flex", flexDirection: "column", alignItems: "center", textAlign: "center" }}>
-          <Avatar src={avatarPreview || avatarUrl || undefined} sx={{ width: 96, height: 96, mb: 2, bgcolor: "grey.300", fontSize: 32 }}>{displayName.charAt(0).toUpperCase()}</Avatar>
+          <Avatar src={avatarPreview || avatarUrl || undefined} sx={{ width: 96, height: 96, mb: 2, bgcolor: "var(--imaa-dm-muted, #e0e0e0)", fontSize: 32 }}>{displayName.charAt(0).toUpperCase()}</Avatar>
           <input ref={avatarFileRef} hidden type="file" accept="image/*" onChange={onAvatarFileChange} />
           <Button variant="outlined" startIcon={<UploadRoundedIcon />} onClick={() => avatarFileRef.current?.click()} sx={{ borderRadius: 999, px: 3, mb: 1 }} disabled={saving}>Choose image</Button>
           <Typography variant="caption" color="text.secondary">JPG/PNG, recommended square image</Typography>
@@ -4177,7 +4177,7 @@ export default function AdminSettings() {
                     </Typography>
                   </Box>
                   {contactForm.require_verified && !isUserVerified && !integrityPromptDismissed && (
-                    <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, bgcolor: "#f8fafc", borderColor: "#e2e8f0" }}>
+                    <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", borderColor: "var(--imaa-dm-border, #e2e8f0)" }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                         Great choice.
                       </Typography>

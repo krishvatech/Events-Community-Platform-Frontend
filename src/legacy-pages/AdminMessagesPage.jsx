@@ -51,7 +51,7 @@ const API_ROOT = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/ap
   /\/$/,
   ""
 );
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 
 const getToken = () =>
   localStorage.getItem("access") ||
@@ -425,11 +425,11 @@ function SharePreview({ attachment, mine }) {
         mt: 0.75,
         borderRadius: 1.5,
         border: `1px solid ${BORDER}`,
-        bgcolor: mine ? "rgba(255,255,255,0.9)" : "#f8fafc",
+        bgcolor: mine ? "var(--imaa-dm-glass, rgba(255,255,255,0.9))" : "var(--imaa-dm-surface-alt, #f8fafc)",
         overflow: "hidden",
         cursor: "pointer",
         "&:hover": {
-          bgcolor: mine ? "rgba(255,255,255,1)" : "#eef2ff",
+          bgcolor: mine ? "var(--imaa-dm-surface, rgba(255,255,255,1))" : "var(--imaa-dm-surface-hover, #eef2ff)",
         },
       }}
     >
@@ -657,7 +657,7 @@ function AdminNewChatDialog({
                     px: 1,
                     py: 1,
                     borderRadius: 2,
-                    "&:hover": { bgcolor: "#fafafa" },
+                    "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #fafafa)" },
                   }}
                 >
                   <ListItemAvatar sx={{ minWidth: 44 }}>
@@ -1936,7 +1936,7 @@ export default function AdminMessagesPage() {
           <Box
             sx={{
               width: { xs: "100%", md: "40%" },
-              borderRight: { md: "1px solid #e2e8f0" }, // vertical divider
+              borderRight: { md: "1px solid var(--imaa-dm-border, #e2e8f0)" }, // vertical divider
               pr: { md: 3 },
               mb: { xs: 2, md: 0 },
               display: { xs: hasActiveChat ? "none" : "flex", md: "flex" },
@@ -2033,12 +2033,12 @@ export default function AdminMessagesPage() {
                           alignItems: "flex-start",
                           ...(active
                             ? {
-                              bgcolor: "#f6fffe",
-                              border: "1px solid #e2e8f0",
+                              bgcolor: "var(--imaa-dm-surface-alt, #f6fffe)",
+                              border: "1px solid var(--imaa-dm-border, #e2e8f0)",
                             }
                             : {
                               "&:hover": {
-                                bgcolor: "#fafafa",
+                                bgcolor: "var(--imaa-dm-surface-hover, #fafafa)",
                               },
                             }),
                         }}
@@ -2064,7 +2064,7 @@ export default function AdminMessagesPage() {
                                   height: 10,
                                   borderRadius: "50%",
                                   bgcolor: "success.main",
-                                  border: "2px solid #fff",
+                                  border: "2px solid var(--imaa-dm-surface, #fff)",
                                 }}
                               />
                             )}
@@ -2292,7 +2292,7 @@ export default function AdminMessagesPage() {
                             height: 10,
                             borderRadius: "50%",
                             bgcolor: "success.main",
-                            border: "2px solid #fff",
+                            border: "2px solid var(--imaa-dm-surface, #fff)",
                           }}
                         />
                       )}
@@ -2323,8 +2323,8 @@ export default function AdminMessagesPage() {
                       px: 1.25,
                       py: 0.75,
                       borderRadius: 2,
-                      bgcolor: "#f8fafc",
-                      border: "1px solid #e2e8f0",
+                      bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
+                      border: "1px solid var(--imaa-dm-border, #e2e8f0)",
                     }}
                   >
                     {/* Header row */}
@@ -2402,7 +2402,7 @@ export default function AdminMessagesPage() {
                               cursor: "pointer",
                               borderRadius: 1,
                               p: 0.5,
-                              "&:hover": { bgcolor: "rgba(0,0,0,0.04)" },
+                              "&:hover": { bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.04))" },
                             }}
                             onClick={() => {
                               const el = document.querySelector(
@@ -2530,7 +2530,7 @@ export default function AdminMessagesPage() {
                                 sx={{
                                   borderRadius: 999,
                                   px: 1.5,
-                                  bgcolor: "#fff",
+                                  bgcolor: "var(--imaa-dm-surface, #fff)",
                                   borderColor: "rgba(148,163,184,0.5)",
                                   fontSize: 12,
                                 }}
@@ -2553,7 +2553,7 @@ export default function AdminMessagesPage() {
                                   py: 0.5,
                                   borderRadius: 999,
                                   border: "1px solid rgba(148,163,184,0.45)",
-                                  bgcolor: "#f8fafc",
+                                  bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
                                   color: "text.secondary",
                                 }}
                               >
@@ -2643,8 +2643,8 @@ export default function AdminMessagesPage() {
                                 px: 1.5,
                                 py: 1,
                                 borderRadius: 1,
-                                bgcolor: "#ffffff",
-                                border: "1px solid #e2e8f0",
+                                bgcolor: "var(--imaa-dm-surface, #ffffff)",
+                                border: "1px solid var(--imaa-dm-border, #e2e8f0)",
                                 boxShadow: "0 6px 16px rgba(15,23,42,0.06)",
                               }}
                               onContextMenu={(e) => handleOpenMessageMenu(e, m)}
@@ -2690,8 +2690,8 @@ export default function AdminMessagesPage() {
                                             borderRadius: 2,
                                             overflow: "hidden",
                                             cursor: "pointer",
-                                            bgcolor: "rgba(0,0,0,0.05)",
-                                            border: "1px solid rgba(0,0,0,0.08)",
+                                            bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.05))",
+                                            border: "1px solid var(--imaa-dm-border, rgba(0,0,0,0.08))",
                                           }}
                                         >
                                           <img
@@ -2738,16 +2738,16 @@ export default function AdminMessagesPage() {
                                             maxWidth: "100%",
                                             borderRadius: 2,
                                             overflow: "hidden",
-                                            bgcolor: mine ? "rgba(0,0,0,0.05)" : "#f0f2f5",
+                                            bgcolor: mine ? "var(--imaa-dm-overlay, rgba(0,0,0,0.05))" : "var(--imaa-dm-surface-alt, #f0f2f5)",
                                             cursor: "pointer",
-                                            border: "1px solid rgba(0,0,0,0.08)"
+                                            border: "1px solid var(--imaa-dm-border, rgba(0,0,0,0.08))"
                                           }}
                                         >
-                                          <Box sx={{ height: 100, bgcolor: "#fff", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid rgba(0,0,0,0.08)" }}>
-                                            <PictureAsPdfRoundedIcon sx={{ fontSize: 48, color: "#e0e0e0" }} />
+                                          <Box sx={{ height: 100, bgcolor: "var(--imaa-dm-surface, #fff)", display: "flex", alignItems: "center", justifyContent: "center", borderBottom: "1px solid var(--imaa-dm-border, rgba(0,0,0,0.08))" }}>
+                                            <PictureAsPdfRoundedIcon sx={{ fontSize: 48, color: "var(--imaa-dm-text-faint, #e0e0e0)" }} />
                                           </Box>
                                           <Stack direction="row" alignItems="center" spacing={1.5} sx={{ p: 1.5 }}>
-                                            <PictureAsPdfRoundedIcon sx={{ color: "#d32f2f", fontSize: 24 }} />
+                                            <PictureAsPdfRoundedIcon sx={{ color: "var(--imaa-dm-red-text, #d32f2f)", fontSize: 24 }} />
                                             <Box sx={{ flex: 1, minWidth: 0 }}>
                                               <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
                                               <Typography variant="caption" color="text.secondary">{formatSize(size)} • PDF</Typography>
@@ -2771,12 +2771,12 @@ export default function AdminMessagesPage() {
                                         sx={{
                                           p: 1.5,
                                           borderRadius: 2,
-                                          bgcolor: "rgba(0,0,0,0.06)",
+                                          bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.06))",
                                           cursor: "pointer",
-                                          border: "1px solid rgba(0,0,0,0.05)"
+                                          border: "1px solid var(--imaa-dm-border, rgba(0,0,0,0.05))"
                                         }}
                                       >
-                                        <InsertDriveFileRoundedIcon sx={{ color: "#54656f", fontSize: 24 }} />
+                                        <InsertDriveFileRoundedIcon sx={{ color: "var(--imaa-dm-text-body, #54656f)", fontSize: 24 }} />
                                         <Box sx={{ flex: 1, minWidth: 0 }}>
                                           <Typography variant="body2" fontWeight={600} noWrap sx={{ fontSize: 13 }}>{name}</Typography>
                                           <Typography variant="caption" sx={{ opacity: 0.7 }}>{formatSize(size)} • {type.split('/').pop().toUpperCase() || "FILE"}</Typography>
@@ -2887,8 +2887,8 @@ export default function AdminMessagesPage() {
                       <Box
                         sx={{
                           borderRadius: 2,
-                          border: "1px solid #e2e8f0",
-                          bgcolor: "#f8fafc",
+                          border: "1px solid var(--imaa-dm-border, #e2e8f0)",
+                          bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
                           px: { xs: 1.5, md: 2 },
                           py: { xs: 1, md: 1.25 },
                           display: "flex",
@@ -2951,7 +2951,7 @@ export default function AdminMessagesPage() {
                                 maxWidth: "100%",
                                 borderRadius: 2,
                                 objectFit: "contain",
-                                bgcolor: "#e2e8f0",
+                                bgcolor: "var(--imaa-dm-muted, #e2e8f0)",
                               }}
                             />
                           ) : (
@@ -2959,8 +2959,8 @@ export default function AdminMessagesPage() {
                               elevation={0}
                               sx={{
                                 borderRadius: 2,
-                                border: "1px dashed #94a3b8",
-                                bgcolor: "#e2e8f0",
+                                border: "1px dashed var(--imaa-dm-border-strong, #94a3b8)",
+                                bgcolor: "var(--imaa-dm-muted, #e2e8f0)",
                                 px: 4,
                                 py: 3,
                                 display: "flex",
@@ -3013,7 +3013,7 @@ export default function AdminMessagesPage() {
                                     border:
                                       idx === activePreviewIndex
                                         ? "2px solid #0ea5e9"
-                                        : "1px solid #e2e8f0",
+                                        : "1px solid var(--imaa-dm-border, #e2e8f0)",
                                     cursor: "pointer",
                                   }}
                                 >
@@ -3104,7 +3104,7 @@ export default function AdminMessagesPage() {
                         onClick={handleAttachClick}
                         size="small"
                         sx={{
-                          bgcolor: isAttachMenuOpen ? "rgba(0,0,0,0.06)" : "transparent",
+                          bgcolor: isAttachMenuOpen ? "var(--imaa-dm-overlay, rgba(0,0,0,0.06))" : "transparent",
                           transition: "transform 0.2s",
                           transform: isAttachMenuOpen ? "rotate(45deg)" : "rotate(0deg)",
                         }}

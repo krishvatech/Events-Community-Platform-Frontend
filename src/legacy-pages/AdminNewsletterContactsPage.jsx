@@ -364,7 +364,7 @@ export default function AdminNewsletterContactsPage() {
           sx={{ p: 2, borderBottom: `1px solid ${UI_BORDER}` }}
         >
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>
+            <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>
               All Contacts
             </Typography>
             {!loading && (
@@ -533,7 +533,7 @@ export default function AdminNewsletterContactsPage() {
           <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
             <Table aria-label="Mautic contacts" sx={{ minWidth: 1180 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                   <TableCell padding="checkbox">
                     <Checkbox
                       checked={
@@ -590,7 +590,7 @@ export default function AdminNewsletterContactsPage() {
                     </TableCell>
                     <TableCell sx={{ minWidth: 170 }}>
                       <Typography
-                        sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere", "&:hover": { color: "var(--imaa-teal-hover)" } }}
+                        sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere", "&:hover": { color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))" } }}
                       >
                         {contact.name || `Contact #${contact.mautic_contact_id}`}
                       </Typography>

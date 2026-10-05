@@ -167,7 +167,7 @@ export default function NewsletterPage() {
             }}
           >
             <Box sx={{ display: "flex", alignItems: "center", gap: 1.25, width: { xs: "100%", sm: "auto" } }}>
-              <MarkEmailReadRoundedIcon aria-hidden="true" sx={{ color: "var(--imaa-coral)" }} />
+              <MarkEmailReadRoundedIcon aria-hidden="true" sx={{ color: "var(--imaa-dm-orange-text, var(--imaa-coral))" }} />
               <Typography component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, color: "var(--imaa-ink)" }}>
                 My Subscriptions
               </Typography>
@@ -184,7 +184,7 @@ export default function NewsletterPage() {
                 maxWidth: { xs: "100%", sm: "auto" },
                 "& .MuiTabs-scroller": { maxWidth: "100%" },
                 "& .MuiTab-root": { textTransform: "none", minHeight: 40, px: 1.5 },
-                "& .Mui-selected": { color: "var(--imaa-teal-hover) !important", fontWeight: 700 },
+                "& .Mui-selected": { color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover)) !important", fontWeight: 700 },
                 "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal)" },
               }}
             >
@@ -260,7 +260,7 @@ export default function NewsletterPage() {
                         )}
                         <Typography
                           variant="caption"
-                          sx={{ display: "block", mt: 0.75, color: preference.subscribed ? "var(--imaa-teal-hover)" : "text.secondary", fontWeight: 700 }}
+                          sx={{ display: "block", mt: 0.75, color: preference.subscribed ? "var(--imaa-dm-teal-text, var(--imaa-teal-hover))" : "text.secondary", fontWeight: 700 }}
                         >
                           {preference.subscribed ? "Subscribed" : "Unsubscribed"}
                         </Typography>

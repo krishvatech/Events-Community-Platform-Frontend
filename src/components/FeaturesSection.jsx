@@ -47,7 +47,7 @@ export default function FeaturesSection() {
             borderRadius: "var(--imaa-radius-card)",
             border: "1px solid var(--imaa-border)",
             boxShadow: "var(--imaa-shadow-sm)",
-            bgcolor: "#fff",
+            bgcolor: "var(--imaa-dm-surface, #fff)",
             display: "flex",
             flexDirection: "column",
             alignItems: "center",

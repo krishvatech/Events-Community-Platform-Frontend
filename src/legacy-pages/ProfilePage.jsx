@@ -886,7 +886,7 @@ function VerificationCard({ status, pendingRequest, onVerify, onRenew }) {
       sx={{
         mb: 2,
         borderColor: isVerified ? "primary.light" : isPending ? "#14b8a6" : "var(--imaa-border)",
-        bgcolor: isVerified ? "primary.50" : isPending ? "#f0fdfa" : "background.paper"
+        bgcolor: isVerified ? "primary.50" : isPending ? "var(--imaa-dm-surface-alt, #f0fdfa)" : "background.paper"
       }}
     >
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center", textAlign: "center", pb: 1 }}>
@@ -3885,7 +3885,7 @@ export default function ProfilePage() {
                           />
                         ) : (
                           <Box sx={{ textAlign: "center", py: 4 }}>
-                            <Avatar sx={{ width: 64, height: 64, bgcolor: "grey.200", color: "grey.600", mx: "auto" }}>
+                            <Avatar sx={{ width: 64, height: 64, bgcolor: "var(--imaa-dm-muted, #eeeeee)", color: "var(--imaa-dm-text-meta, #757575)", mx: "auto" }}>
                               <WorkOutlineIcon />
                             </Avatar>
 
@@ -3958,7 +3958,7 @@ export default function ProfilePage() {
                               </ListItem>
                             ))}
                           </List>
-                        ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'grey.200', mx: 'auto' }}><HistoryEduRoundedIcon /></Avatar><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an education to your profile</Typography><Box><Button variant="contained" size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
+                        ) : <Box sx={{ textAlign: 'center', py: 4 }}><Avatar sx={{ width: 64, height: 64, bgcolor: 'var(--imaa-dm-muted, #eeeeee)', mx: 'auto' }}><HistoryEduRoundedIcon /></Avatar><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>Add an education to your profile</Typography><Box><Button variant="contained" size="small" sx={{ mt: 1.5 }} onClick={() => { setEditEduId(null); setEduForm(EMPTY_EDU_FORM); setEduOpen(true); }}>Create</Button></Box></Box>}
                       </SectionCard>
                       <SectionCard
                         sx={{ mt: 2 }}
@@ -4038,8 +4038,8 @@ export default function ProfilePage() {
                               sx={{
                                 width: 64,
                                 height: 64,
-                                bgcolor: "grey.200",
-                                color: "grey.600",
+                                bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                                color: "var(--imaa-dm-text-meta, #757575)",
                                 mx: "auto",
                               }}
                             >
@@ -4141,8 +4141,8 @@ export default function ProfilePage() {
                               sx={{
                                 width: 64,
                                 height: 64,
-                                bgcolor: "grey.200",
-                                color: "grey.600",
+                                bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                                color: "var(--imaa-dm-text-meta, #757575)",
                                 mx: "auto",
                               }}
                             >
@@ -4686,8 +4686,8 @@ export default function ProfilePage() {
                               sx={{
                                 width: 64,
                                 height: 64,
-                                bgcolor: "grey.200",
-                                color: "grey.600",
+                                bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                                color: "var(--imaa-dm-text-meta, #757575)",
                                 mx: "auto",
                               }}
                             >
@@ -4779,8 +4779,8 @@ export default function ProfilePage() {
                               sx={{
                                 width: 64,
                                 height: 64,
-                                bgcolor: "grey.200",
-                                color: "grey.600",
+                                bgcolor: "var(--imaa-dm-muted, #eeeeee)",
+                                color: "var(--imaa-dm-text-meta, #757575)",
                                 mx: "auto",
                               }}
                             >
@@ -4999,7 +4999,7 @@ export default function ProfilePage() {
                     </Typography>
                   </Box>
                   {contactForm.require_verified && !isUserVerified && !integrityPromptDismissed && (
-                    <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, bgcolor: "#f8fafc", borderColor: "#e2e8f0" }}>
+                    <Paper variant="outlined" sx={{ mt: 1.5, p: 1.5, bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", borderColor: "var(--imaa-dm-border, #e2e8f0)" }}>
                       <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
                         Great choice.
                       </Typography>

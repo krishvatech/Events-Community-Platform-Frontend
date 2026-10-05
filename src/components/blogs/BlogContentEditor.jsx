@@ -76,7 +76,7 @@ export default function BlogContentEditor({ value, onChange, disabled, error, id
             onChange={(e) => onChange(e.target.value)}
             disabled={disabled}
             inputProps={{ "aria-labelledby": labelId, spellCheck: false }}
-            InputProps={{ sx: { fontFamily: "monospace", fontSize: 13, bgcolor: "#fff" } }}
+            InputProps={{ sx: { fontFamily: "monospace", fontSize: 13, bgcolor: "var(--imaa-dm-surface, #fff)" } }}
           />
         </>
       )}

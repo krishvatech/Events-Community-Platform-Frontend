@@ -20,7 +20,7 @@ const dot = {
   width: 8,
   height: 8,
   borderRadius: "50%",
-  bgcolor: "grey.400",
+  bgcolor: "var(--imaa-dm-muted-strong, #bdbdbd)",
 };
 
 const connector = {
@@ -29,7 +29,7 @@ const connector = {
   top: 19,
   bottom: -5,
   width: 2,
-  bgcolor: "grey.300",
+  bgcolor: "var(--imaa-dm-border, #e0e0e0)",
 };
 
 const joinDot = (...parts) => parts.filter(Boolean).join(" · ");

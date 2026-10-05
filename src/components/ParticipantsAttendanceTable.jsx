@@ -291,7 +291,7 @@ export default function ParticipantsAttendanceTable({
           <TableContainer>
             <Table stickyHeader>
               <TableHead>
-                <TableRow sx={{ backgroundColor: "#f8fafc" }}>
+                <TableRow sx={{ backgroundColor: "var(--imaa-dm-surface-alt, #f8fafc)" }}>
                   <TableCell sx={{ fontWeight: 600 }}>User</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Email</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600 }}>

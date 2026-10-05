@@ -11,12 +11,13 @@
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v15-appRouter";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
-import theme from "../muiTheme";
+import { appTheme, appThemeProviderProps } from "../muiTheme";
 
 export default function AppProviders({ children }) {
   return (
     <AppRouterCacheProvider options={{ prepend: true }}>
-      <ThemeProvider theme={theme}>
+      {/* Same theme selection as src/main.jsx; dark-mode props are empty while the flag is off */}
+      <ThemeProvider theme={appTheme} {...appThemeProviderProps}>
         {/* Keep Tailwind look exactly the same; CssBaseline only normalizes defaults */}
         <CssBaseline />
         {children}

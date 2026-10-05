@@ -207,7 +207,7 @@ function SegmentContactsPanel({
         <TableContainer component={Paper} variant="outlined" sx={{ ...surfaceSx, overflowX: "auto", maxWidth: "100%", boxShadow: "none" }}>
           <Table size="small" aria-label="Segment contacts" sx={{ minWidth: 720 }}>
             <TableHead>
-              <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+              <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                 <TableCell>Contact</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Stage</TableCell>
@@ -320,14 +320,14 @@ function SegmentDetailDialog({
             )}
             {activeTab === "filters" && (
               <Box>
-                <Typography sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1 }}>
+                <Typography sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 1 }}>
                   Filters
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                   Membership is decided by these filters. Edit them with the Edit button.
                 </Typography>
                 {filters.length ? (
-                  <Paper variant="outlined" sx={{ p: 2, borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, bgcolor: "#F8FAFC", overflow: "auto" }}>
+                  <Paper variant="outlined" sx={{ p: 2, borderRadius: "var(--imaa-radius-card)", borderColor: UI_BORDER, bgcolor: "var(--imaa-dm-surface-alt, #F8FAFC)", overflow: "auto" }}>
                     <pre style={{ margin: 0, whiteSpace: "pre-wrap", fontFamily: "monospace", fontSize: 13 }}>
                       {JSON.stringify(filters, null, 2)}
                     </pre>
@@ -557,7 +557,7 @@ function AddContactDialog({
                       p: 1.5,
                       borderRadius: "var(--imaa-radius-card)",
                       borderColor: selected ? UI_TEAL : UI_BORDER,
-                      bgcolor: selected ? "#ECFDF5" : "#fff",
+                      bgcolor: selected ? "var(--imaa-dm-surface-alt, #ECFDF5)" : "var(--imaa-dm-surface, #fff)",
                       cursor: "pointer",
                       "&:focus-visible": { outline: "var(--imaa-focus-width) solid var(--imaa-focus-color)", outlineOffset: "var(--imaa-focus-offset)" },
                     }}
@@ -998,7 +998,7 @@ export default function AdminNewsletterNativeSegmentsPanel() {
           <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
             <Table aria-label="Mautic segments" sx={{ minWidth: 900 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                   <TableCell>Name</TableCell>
                   <TableCell>Alias</TableCell>
                   <TableCell>Type</TableCell>

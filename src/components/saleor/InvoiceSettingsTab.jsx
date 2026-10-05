@@ -13,7 +13,7 @@ import RestartAltOutlinedIcon from "@mui/icons-material/RestartAltOutlined";
 import ReceiptLongOutlinedIcon from "@mui/icons-material/ReceiptLongOutlined";
 import { apiClient } from "../../utils/api";
 
-const ORANGE = "var(--imaa-teal-hover)";
+const ORANGE = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))";
 const TEXT = "var(--imaa-ink)";
 const ENDPOINT = "/invoicing/admin/legal-entity/";
 
@@ -98,7 +98,7 @@ function SectionTitle({ icon, title, subtitle }) {
       </Box>
       <Box>
         <Typography sx={{ color: TEXT, fontWeight: 800 }}>{title}</Typography>
-        <Typography variant="body2" sx={{ color: "#64748b", mt: 0.25 }}>
+        <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748b)", mt: 0.25 }}>
           {subtitle}
         </Typography>
       </Box>
@@ -194,7 +194,7 @@ export default function InvoiceSettingsTab() {
       <Box role="status" aria-live="polite" aria-label="Loading invoice settings" sx={{ minHeight: 360, display: "grid", placeItems: "center" }}>
         <Box sx={{ textAlign: "center" }}>
           <CircularProgress sx={{ color: ORANGE }} />
-          <Typography sx={{ mt: 2, color: "#64748b" }}>Loading invoice settings…</Typography>
+          <Typography sx={{ mt: 2, color: "var(--imaa-dm-text-meta, #64748b)" }}>Loading invoice settings…</Typography>
         </Box>
       </Box>
     );
@@ -206,7 +206,7 @@ export default function InvoiceSettingsTab() {
         <Typography component="h2" variant="h6" sx={{ fontFamily: "var(--imaa-font-serif)", color: TEXT, fontWeight: 800 }}>
           Invoice Settings
         </Typography>
-        <Typography variant="body2" sx={{ color: "#64748b", mt: 0.5 }}>
+        <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748b)", mt: 0.5 }}>
           Manage the legal-entity information shown in the Invoice From section of invoice PDFs.
         </Typography>
       </Box>
@@ -342,36 +342,36 @@ export default function InvoiceSettingsTab() {
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 2 }}>
             <Box>
               <Typography sx={{ color: TEXT, fontWeight: 800 }}>Invoice Preview</Typography>
-              <Typography variant="caption" sx={{ color: "#64748b" }}>Preview of editable issuer fields</Typography>
+              <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #64748b)" }}>Preview of editable issuer fields</Typography>
             </Box>
             <Typography variant="caption" sx={{ color: ORANGE, fontWeight: 800, letterSpacing: 0.7 }}>
               {settings.code || "ENTITY"}
             </Typography>
           </Box>
 
-          <Box sx={{ border: "1px solid #dbe3ef", borderRadius: 2, overflow: "hidden" }}>
-            <Box sx={{ bgcolor: "#f8fafc", px: 2, py: 1.4, borderBottom: "1px solid #dbe3ef" }}>
-              <Typography variant="subtitle2" sx={{ color: "#0f2857", fontWeight: 800 }}>
+          <Box sx={{ border: "1px solid var(--imaa-dm-border, #dbe3ef)", borderRadius: 2, overflow: "hidden" }}>
+            <Box sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", px: 2, py: 1.4, borderBottom: "1px solid var(--imaa-dm-border, #dbe3ef)" }}>
+              <Typography variant="subtitle2" sx={{ color: "var(--imaa-dm-blue-text, #0f2857)", fontWeight: 800 }}>
                 Invoice From
               </Typography>
             </Box>
             <Box sx={{ p: 2, minHeight: 150 }}>
               {invoiceFromLines.length ? invoiceFromLines.map((line, index) => (
-                <Typography key={`${line}-${index}`} variant="body2" sx={{ color: "#1f2937", lineHeight: 1.55 }}>
+                <Typography key={`${line}-${index}`} variant="body2" sx={{ color: "var(--imaa-dm-text, #1f2937)", lineHeight: 1.55 }}>
                   {line}
                 </Typography>
               )) : (
-                <Typography variant="body2" sx={{ color: "#94a3b8" }}>Enter invoice issuer details.</Typography>
+                <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-hint, #94a3b8)" }}>Enter invoice issuer details.</Typography>
               )}
             </Box>
           </Box>
 
-          <Box sx={{ mt: 2.5, p: 2, borderRadius: 2, bgcolor: "#f8fafc", border: "1px solid #e2e8f0" }}>
-            <Typography variant="caption" sx={{ color: "#64748b", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>
+          <Box sx={{ mt: 2.5, p: 2, borderRadius: 2, bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", border: "1px solid var(--imaa-dm-border, #e2e8f0)" }}>
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #64748b)", fontWeight: 800, textTransform: "uppercase", letterSpacing: 0.8 }}>
               Invoice defaults
             </Typography>
             <Box sx={{ mt: 1.2, display: "flex", justifyContent: "space-between", gap: 2 }}>
-              <Typography variant="body2" sx={{ color: "#64748b" }}>Currency</Typography>
+              <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748b)" }}>Currency</Typography>
               <Typography variant="body2" sx={{ color: TEXT, fontWeight: 800 }}>{settings.currency || "—"}</Typography>
             </Box>
           </Box>

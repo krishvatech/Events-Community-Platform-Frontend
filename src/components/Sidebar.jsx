@@ -21,7 +21,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
 ];
 
   const drawer = (
-    <Box sx={{ height: '100%', bgcolor: '#f9fafb', pt: 2 }}>
+    <Box sx={{ height: '100%', bgcolor: 'var(--imaa-dm-surface-alt, #f9fafb)', pt: 2 }}>
       <List sx={{ px: 1 }}>
         {sidebarItems.map((item) => (
           <ListItem
@@ -32,7 +32,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
               bgcolor: item.active ? 'transparent' : 'transparent',
               color: item.active ? '#ffffff' : '#14b8b1',
               '&:hover': { 
-                bgcolor: '#e6f7f6', // Light teal background on hover
+                bgcolor: 'var(--imaa-dm-surface-hover, #e6f7f6)', // Light teal background on hover
                 borderRadius: 1,
                 color: '#14b8b1', // Teal font color on hover
                 '& .MuiListItemIcon-root': {
@@ -50,7 +50,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
                 minWidth: 40,
                 display: 'flex',
                 alignItems: 'center',
-                color: item.active ? '#14b8b1' : '#525252',
+                color: item.active ? '#14b8b1' : 'var(--imaa-dm-text-body, #525252)',
                 '& svg': {
                   display: 'block',
                   fontSize: 24,
@@ -65,7 +65,7 @@ const Sidebar = ({ mobileOpen, handleDrawerToggle }) => {
                 '& .MuiListItemText-primary': {
                   fontWeight: item.active ? 600 : 500,
                   fontSize: '0.95rem',
-                  color: item.active ? '#14b8b1' : '#525252',
+                  color: item.active ? '#14b8b1' : 'var(--imaa-dm-text-body, #525252)',
                 },
               }}
             />

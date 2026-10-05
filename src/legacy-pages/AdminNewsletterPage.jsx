@@ -121,6 +121,7 @@ const STATUS_COLORS = {
 const UI_BORDER = "var(--imaa-border)";
 const UI_TEXT = "var(--imaa-ink)";
 const UI_TEAL = "var(--imaa-teal-hover)";
+const UI_TEAL_TEXT = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))"; // as text: readable variant in dark mode
 const surfaceSx = {
   borderRadius: "var(--imaa-radius-card)",
   borderColor: UI_BORDER,
@@ -267,9 +268,9 @@ function MetadataItem({ label, value }) {
 
 function MetricCard({ label, value, loading, helper }) {
   return (
-    <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 2, borderColor: "#E7ECEF", minHeight: 116 }}>
+    <Paper variant="outlined" sx={{ p: 2.25, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", minHeight: 116 }}>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>{label}</Typography>
-      {loading ? <Skeleton width="70%" height={34} /> : <Typography variant="h5" sx={{ color: "#1B2A4A", fontWeight: 850 }}>{value}</Typography>}
+      {loading ? <Skeleton width="70%" height={34} /> : <Typography variant="h5" sx={{ color: "var(--imaa-dm-text, #1B2A4A)", fontWeight: 850 }}>{value}</Typography>}
       {helper && <Typography variant="caption" color="text.secondary">{helper}</Typography>}
     </Paper>
   );
@@ -277,9 +278,9 @@ function MetricCard({ label, value, loading, helper }) {
 
 function EmptyState({ title, description, action }) {
   return (
-    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, borderColor: "#E7ECEF", bgcolor: "#fff" }}>
+    <Paper variant="outlined" sx={{ p: 3, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", bgcolor: "var(--imaa-dm-surface, #fff)" }}>
       <Stack spacing={1.5} alignItems="flex-start">
-        <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>{title}</Typography>
         {description && <Typography color="text.secondary">{description}</Typography>}
         {action}
       </Stack>
@@ -341,7 +342,7 @@ function PreviewDialog({ open, loading, preview, error, onClose }) {
                 title="Newsletter HTML preview"
                 sandbox=""
                 srcDoc={preview?.html_content || preview?.html || "<p>No HTML preview available.</p>"}
-                style={{ width: "100%", height: "100%", border: 0, background: "white" }}
+                style={{ width: "100%", height: "100%", border: 0, background: "var(--imaa-dm-surface, white)" }}
               />
             </Paper>
           </Stack>
@@ -449,7 +450,7 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
       </Stack>
       <Paper component="section" aria-label="Email broadcasts" variant="outlined" sx={{ ...surfaceSx, overflow: "hidden", minWidth: 0 }}>
         <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderBottom: `1px solid ${UI_BORDER}`, display: "flex", justifyContent: "space-between", gap: 2, flexDirection: { xs: "column", md: "row" }, minWidth: 0 }}>
-          <Tabs aria-label="Filter email broadcasts by status" value={filter} onChange={(_, value) => onFilter(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ minHeight: 40, minWidth: 0, maxWidth: "100%", "& .MuiTab-root": { textTransform: "none", minHeight: 44 }, "& .Mui-selected": { color: `${UI_TEAL} !important`, fontWeight: 800 }, "& .MuiTabs-indicator": { backgroundColor: UI_TEAL } }}>
+          <Tabs aria-label="Filter email broadcasts by status" value={filter} onChange={(_, value) => onFilter(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ minHeight: 40, minWidth: 0, maxWidth: "100%", "& .MuiTab-root": { textTransform: "none", minHeight: 44 }, "& .Mui-selected": { color: `${UI_TEAL_TEXT} !important`, fontWeight: 800 }, "& .MuiTabs-indicator": { backgroundColor: UI_TEAL } }}>
             <Tab label="All" value="all" />
             <Tab label="Draft" value="draft" />
             <Tab label="Scheduled" value="scheduled" />
@@ -472,7 +473,7 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
           <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
             <Table aria-label="Email broadcasts" sx={{ minWidth: 1080 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                   <TableCell>Broadcast Name</TableCell>
                   <TableCell>Audience</TableCell>
                   <TableCell>Status</TableCell>
@@ -553,11 +554,11 @@ function BroadcastAnalyticsPanel({ status, analyticsState, onRefresh }) {
   const sentUnknown = providerUnavailable && data?.metadata?.send_summary_source !== "ecp";
 
   return (
-    <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
+    <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
       <Stack spacing={2}>
         <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={1}>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>Broadcast Analytics</Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>Broadcast Analytics</Typography>
             <Typography variant="body2" color="text.secondary">
               Rates use delivered emails, or sends when delivery is not reported. Opens and clicks count each recipient once.
             </Typography>
@@ -623,10 +624,10 @@ function SettingsPage() {
   };
 
   const InfoCard = ({ title, children, status }) => (
-    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF", minHeight: 132 }}>
+    <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", minHeight: 132 }}>
       <Stack spacing={1.25}>
         <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-          <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{title}</Typography>
+          <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>{title}</Typography>
           {status ? <StatusChip value={status} /> : null}
         </Stack>
         {children}
@@ -637,7 +638,7 @@ function SettingsPage() {
   const Field = ({ label, value }) => (
     <Stack direction="row" justifyContent="space-between" spacing={2}>
       <Typography variant="body2" color="text.secondary">{label}</Typography>
-      <Typography variant="body2" sx={{ fontWeight: 700, textAlign: "right", color: "#1B2A4A" }}>
+      <Typography variant="body2" sx={{ fontWeight: 700, textAlign: "right", color: "var(--imaa-dm-text, #1B2A4A)" }}>
         {value === null || value === undefined || value === "" ? "Not available" : String(value)}
       </Typography>
     </Stack>
@@ -659,11 +660,11 @@ function SettingsPage() {
   return (
     <Stack spacing={3}>
       <Box>
-        <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Settings</Typography>
+        <Typography variant="h5" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>Settings</Typography>
         <Typography color="text.secondary">Newsletter configuration visible to marketing users.</Typography>
       </Box>
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", overflow: "hidden" }}>
         <Tabs
           value={section}
           onChange={(_, value) => setSection(value)}
@@ -673,7 +674,7 @@ function SettingsPage() {
           sx={{
             px: 2,
             "& .MuiTab-root": { textTransform: "none", fontWeight: 750 },
-            "& .Mui-selected": { color: "#0f766e !important" },
+            "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0f766e) !important" },
             "& .MuiTabs-indicator": { backgroundColor: "#0f766e" },
           }}
         >
@@ -1329,10 +1330,10 @@ export default function AdminNewsletterPage() {
       )}
 
       {detailLoaded && activeStep === 3 && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
+        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)" }}>
           <Stack spacing={2}>
             <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A" }}>Broadcast Actions</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>Broadcast Actions</Typography>
               <Typography color="text.secondary">
                 {isNew
                   ? "Save the draft before testing, scheduling, or sending."

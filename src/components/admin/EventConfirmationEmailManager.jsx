@@ -484,7 +484,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
                   helperText="This appears in the recipient's inbox. Use {{ event_title }} to include the event name."
                 />
 
-                <Box sx={{ my: 2, p: 2, bgcolor: "#f0f0f0", borderRadius: 1 }}>
+                <Box sx={{ my: 2, p: 2, bgcolor: "var(--imaa-dm-surface-alt, #f0f0f0)", borderRadius: 1 }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, mb: 1 }}>
                     Original Template (Preserved)
                   </Typography>
@@ -561,13 +561,13 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
                     <Grid item xs={12} sm={6} md={4} key={variable}>
                       <Box
                         sx={{
-                          bgcolor: "grey.100",
+                          bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)",
                           p: 1,
                           borderRadius: 1,
                           fontFamily: "monospace",
                           fontSize: "0.85rem",
                           cursor: "pointer",
-                          "&:hover": { bgcolor: "grey.200" },
+                          "&:hover": { bgcolor: "var(--imaa-dm-muted, #eeeeee)" },
                         }}
                         onClick={() => {
                           // Copy to clipboard
@@ -642,7 +642,7 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
                 </Typography>
                 <Box
                   sx={{
-                    bgcolor: "grey.100",
+                    bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)",
                     p: 2,
                     borderRadius: 1,
                     fontFamily: "monospace",
@@ -659,11 +659,11 @@ export default function EventConfirmationEmailManager({ event, eventId }) {
                 </Typography>
                 <Box
                   sx={{
-                    border: "1px solid #ddd",
+                    border: "1px solid var(--imaa-dm-border, #ddd)",
                     borderRadius: 1,
                     p: 2,
                     minHeight: 200,
-                    bgcolor: "#fff",
+                    bgcolor: "var(--imaa-dm-surface, #fff)",
                   }}
                 >
                   <iframe

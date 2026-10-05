@@ -64,7 +64,7 @@ import PageHeader from "../../components/page/PageHeader.jsx";
 import EmptyState from "../../components/page/EmptyState.jsx";
 
 /* --------------------- constants & helpers --------------------- */
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 const CONTACTS_MAP_TILE_URL =
     "https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}";
 const CONTACTS_MAP_ATTRIBUTION =
@@ -404,9 +404,11 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
         ? rawSkills.split(",").map((s) => s.trim()).filter(Boolean)
         : [];
 
-    const accent = "#077B7E";
+    const accent = "var(--imaa-dm-teal-text, #077B7E)";
     const degree = status === "friends" ? 1 : status === "pending_outgoing" ? 2 : 3;
     const degreeColors = { 1: "#0A9396", 2: "#E8532F", 3: "#1B2A4A" };
+    // Badge text: same colours in light mode, readable variants in dark mode
+    const degreeTextColors = { 1: "var(--imaa-dm-teal-text, #0A9396)", 2: "var(--imaa-dm-orange-text, #E8532F)", 3: "var(--imaa-dm-text-2, #1B2A4A)" };
     const degreeLabels = { 1: "1st", 2: "2nd", 3: "3rd" };
 
     return (
@@ -454,7 +456,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                             <Box sx={{
                                 position: "absolute", top: -3, right: -3,
                                 width: 16, height: 16, borderRadius: "50%",
-                                bgcolor: "#0A9396", border: "1.5px solid #fff",
+                                bgcolor: "#0A9396", border: "1.5px solid var(--imaa-dm-surface, #fff)",
                                 display: "flex", alignItems: "center", justifyContent: "center",
                             }}>
                                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
@@ -469,7 +471,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                         {!isMe && (
                             <Box sx={{
                                 fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
-                                bgcolor: degreeColors[degree] + "15", color: degreeColors[degree],
+                                bgcolor: degreeColors[degree] + "15", color: degreeTextColors[degree],
                                 letterSpacing: 0.3, lineHeight: 1,
                             }}>
                                 {degreeLabels[degree]}
@@ -478,14 +480,14 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                         {status === "friends" ? (
                             <Box sx={{
                                 fontSize: 10, fontWeight: 700, px: "10px", py: "3px", borderRadius: "20px",
-                                bgcolor: "#0A939614", color: "#0A9396",
+                                bgcolor: "#0A939614", color: "var(--imaa-dm-teal-text, #0A9396)",
                             }}>
                                 ✓ Connected
                             </Box>
                         ) : industry ? (
                             <Box sx={{
                                 fontSize: 10, fontWeight: 600, px: "10px", py: "3px", borderRadius: "20px",
-                                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
+                                bgcolor: "var(--imaa-dm-overlay, #1B2A4A08)", color: "var(--imaa-dm-text-body, #1B2A4A99)",
                                 maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                             }}>
                                 {industry}
@@ -531,7 +533,7 @@ const MemberCard = ({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
                         {skillsArr.slice(0, 3).map((skill, i) => (
                             <Box key={i} sx={{
                                 fontSize: 10, fontWeight: 600, px: "9px", py: "3px", borderRadius: "14px",
-                                bgcolor: "#1B2A4A08", color: "#1B2A4A99",
+                                bgcolor: "var(--imaa-dm-overlay, #1B2A4A08)", color: "var(--imaa-dm-text-body, #1B2A4A99)",
                             }}>
                                 {skill}
                             </Box>
@@ -612,7 +614,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
     const iso2 = resolveCountryCode(u);
     const flag = flagEmojiFromISO2(iso2);
 
-    const accent = "#077B7E";
+    const accent = "var(--imaa-dm-teal-text, #077B7E)";
 
     return (
         <Box
@@ -659,7 +661,7 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                             <Box sx={{
                                 position: "absolute", top: -3, right: -3,
                                 width: 16, height: 16, borderRadius: "50%",
-                                bgcolor: "#0A9396", border: "1.5px solid #fff",
+                                bgcolor: "#0A9396", border: "1.5px solid var(--imaa-dm-surface, #fff)",
                                 display: "flex", alignItems: "center", justifyContent: "center",
                             }}>
                                 <svg width="9" height="9" viewBox="0 0 24 24" fill="none">
@@ -672,8 +674,8 @@ const RequestCard = ({ req, type, onOpenProfile, onAccept, onDecline, onCancel }
                     {/* Status badge */}
                     <Box sx={{
                         fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
-                        bgcolor: type === "received" ? "#E8532F15" : "#1B2A4A08",
-                        color: type === "received" ? "#E8532F" : "#1B2A4A99",
+                        bgcolor: type === "received" ? "#E8532F15" : "var(--imaa-dm-overlay, #1B2A4A08)",
+                        color: type === "received" ? "var(--imaa-dm-orange-text, #E8532F)" : "var(--imaa-dm-text-body, #1B2A4A99)",
                         letterSpacing: 0.3, lineHeight: 1,
                     }}>
                         {type === "received" ? "Pending" : "Waiting"}
@@ -1741,11 +1743,11 @@ export default function MyContacts() {
                                                         sx={{
                                                             py: 1.5,
                                                             px: 0,
-                                                            borderBottom: "1px solid rgba(0, 0, 0, 0.08)",
+                                                            borderBottom: "1px solid var(--imaa-dm-border, rgba(0, 0, 0, 0.08))",
                                                             "&:last-child": { borderBottom: "none" },
                                                             cursor: !visitor.is_anonymous ? "pointer" : "default",
                                                             "&:hover": !visitor.is_anonymous ? {
-                                                                backgroundColor: "rgba(0, 0, 0, 0.04)",
+                                                                backgroundColor: "var(--imaa-dm-overlay, rgba(0, 0, 0, 0.04))",
                                                             } : {},
                                                             transition: "background-color 0.2s",
                                                         }}
@@ -1863,7 +1865,7 @@ export default function MyContacts() {
                                                 height: 12,
                                                 borderRadius: "50%",
                                                 bgcolor: CURRENT_MAP_THEME.friendDot,
-                                                border: "1px solid #fff",
+                                                border: "1px solid var(--imaa-dm-surface, #fff)",
                                             }}
                                         />
                                         <Typography variant="caption">My Contacts</Typography>
@@ -1955,7 +1957,7 @@ export default function MyContacts() {
                                             height: 12,
                                             borderRadius: "50%",
                                             bgcolor: CURRENT_MAP_THEME.friendDot,
-                                            border: "1px solid #fff",
+                                            border: "1px solid var(--imaa-dm-surface, #fff)",
                                         }}
                                     />
                                     <Typography variant="caption">My Contact</Typography>
@@ -1987,7 +1989,7 @@ export default function MyContacts() {
                     sx: {
                         borderRadius: 4,
                         overflow: "hidden",
-                        background: "linear-gradient(180deg, #f8fbff 0%, #ffffff 100%)",
+                        background: "linear-gradient(180deg, var(--imaa-dm-surface-alt, #f8fbff) 0%, var(--imaa-dm-surface, #ffffff) 100%)",
                         boxShadow: "0 28px 90px rgba(15, 23, 42, 0.22)",
                     },
                 }}
@@ -2007,11 +2009,11 @@ export default function MyContacts() {
                         sx={{
                             mb: 1.5,
                             bgcolor: "rgba(8,145,178,0.12)",
-                            color: "#0f766e",
+                            color: "var(--imaa-dm-teal-text, #0f766e)",
                             fontWeight: 700,
                         }}
                     />
-                    <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "#0f172a" }}>
+                    <DialogTitle sx={{ p: 0, fontSize: "1.15rem", fontWeight: 800, color: "var(--imaa-dm-text, #0f172a)" }}>
                         Remove contact?
                     </DialogTitle>
                 </Box>
@@ -2021,10 +2023,10 @@ export default function MyContacts() {
                             {(removeDialog.name || "?").slice(0, 1).toUpperCase()}
                         </Avatar>
                         <Box>
-                            <Typography sx={{ fontWeight: 700, color: "#0f172a" }}>
+                            <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #0f172a)" }}>
                                 {removeDialog.name || "This member"}
                             </Typography>
-                            <Typography variant="body2" sx={{ color: "#475569" }}>
+                            <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-body, #475569)" }}>
                                 This removes them from your contacts list. You can send a new request later.
                             </Typography>
                         </Box>

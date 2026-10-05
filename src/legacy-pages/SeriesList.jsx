@@ -123,7 +123,7 @@ const SeriesList = () => {
     <TableContainer sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
       <Table size="small">
         <TableHead>
-          <TableRow sx={{ bgcolor: 'grey.50' }}>
+          <TableRow sx={{ bgcolor: 'var(--imaa-dm-surface-alt, #fafafa)' }}>
             <TableCell sx={{ fontWeight: 800 }}>Title</TableCell>
             <TableCell align="center">Events</TableCell>
             <TableCell align="center">Registrations</TableCell>
@@ -170,12 +170,12 @@ const SeriesList = () => {
             {s.card_image_url ? (
               <CardMedia
                 component="img"
-                sx={{ height: 200, bgcolor: 'grey.200', objectFit: 'cover' }}
+                sx={{ height: 200, bgcolor: 'var(--imaa-dm-muted, #eeeeee)', objectFit: 'cover' }}
                 image={s.card_image_url}
                 alt={s.title}
               />
             ) : (
-              <Box sx={{ height: 200, bgcolor: 'grey.100' }} />
+              <Box sx={{ height: 200, bgcolor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }} />
             )}
             <CardContent sx={{ flexGrow: 1 }}>
               <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>
@@ -221,7 +221,7 @@ const SeriesList = () => {
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           size="small"
           sx={{ minWidth: 200 }}
-          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'grey.500' }} /> }}
+          InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'var(--imaa-dm-text-hint, #9e9e9e)' }} /> }}
         />
 
         <FormControl sx={{ minWidth: 150 }} size="small">

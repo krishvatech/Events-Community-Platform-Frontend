@@ -383,7 +383,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
     <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" gap={2}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: "#172b4d" }}>
+          <Typography variant="h5" sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #172b4d)" }}>
             Email Notifications
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -401,7 +401,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      <Paper variant="outlined" sx={{ borderRadius: 1, p: 1.5, bgcolor: "#ffffff" }}>
+      <Paper variant="outlined" sx={{ borderRadius: 1, p: 1.5, bgcolor: "var(--imaa-dm-surface, #ffffff)" }}>
         <Box
           sx={{
             display: "grid",
@@ -568,7 +568,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                 borderColor: "divider",
                 borderRadius: 1,
                 overflow: "hidden",
-                bgcolor: "#ffffff",
+                bgcolor: "var(--imaa-dm-surface, #ffffff)",
                 minWidth: 0,
               }}
             >
@@ -578,7 +578,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                   py: 1.25,
                   borderBottom: "1px solid",
                   borderColor: "divider",
-                  bgcolor: "#f8fafc",
+                  bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
                 }}
               >
                 <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
@@ -607,7 +607,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                 borderColor: "divider",
                 borderRadius: 1,
                 overflow: "hidden",
-                bgcolor: "#ffffff",
+                bgcolor: "var(--imaa-dm-surface, #ffffff)",
                 minWidth: 0,
               }}
             >
@@ -621,7 +621,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                   py: 1.25,
                   borderBottom: "1px solid",
                   borderColor: "divider",
-                  bgcolor: "#f8fafc",
+                  bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)",
                 }}
               >
                 <Box sx={{ minWidth: 0 }}>
@@ -651,7 +651,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
                   width: "100%",
                   height: 720,
                   border: 0,
-                  bgcolor: "#f4f7fb",
+                  bgcolor: "var(--imaa-dm-surface-alt, #f4f7fb)",
                   display: "block",
                 }}
               />
@@ -703,7 +703,7 @@ export default function EventEmailTemplatesManager({ event, eventId: eventIdProp
               border: "1px solid",
               borderColor: "divider",
               borderRadius: 1,
-              bgcolor: "white",
+              bgcolor: "var(--imaa-dm-surface, white)",
             }}
           />
         </DialogContent>

@@ -291,7 +291,7 @@ const ReviewQueueApplicationDetail = ({
         {success && <Alert severity="success" sx={{ mb: 2 }}>{success}</Alert>}
 
         {/* Applicant Section */}
-        <Paper sx={{ p: 2, mb: 3, backgroundColor: '#f5f5f5' }}>
+        <Paper sx={{ p: 2, mb: 3, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>
             Applicant Information
           </Typography>
@@ -316,7 +316,7 @@ const ReviewQueueApplicationDetail = ({
         </Paper>
 
         {/* Application Details */}
-        <Paper sx={{ p: 2, mb: 3, backgroundColor: '#f5f5f5' }}>
+        <Paper sx={{ p: 2, mb: 3, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>
             Application Details
           </Typography>
@@ -334,7 +334,7 @@ const ReviewQueueApplicationDetail = ({
 
         {/* Pre-Approval Info */}
         {application.is_preapproved && (
-          <Paper sx={{ p: 2, mb: 3, backgroundColor: '#e8f5e9' }}>
+          <Paper sx={{ p: 2, mb: 3, backgroundColor: 'var(--imaa-dm-surface-alt, #e8f5e9)' }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Pre-Approval Information
             </Typography>
@@ -350,7 +350,7 @@ const ReviewQueueApplicationDetail = ({
 
         {/* Third-Party Nomination Info */}
         {application.submission_mode === 'third_party_nomination' && (
-          <Paper sx={{ p: 2, mb: 3, backgroundColor: '#f3e5f5' }}>
+          <Paper sx={{ p: 2, mb: 3, backgroundColor: 'var(--imaa-dm-muted, #f3e5f5)' }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Nominator Information
             </Typography>
@@ -363,7 +363,7 @@ const ReviewQueueApplicationDetail = ({
 
         {/* Confirmed Submission Info */}
         {application.submission_mode === 'confirmed' && application.sponsor_organization && (
-          <Paper sx={{ p: 2, mb: 3, backgroundColor: '#e3f2fd' }}>
+          <Paper sx={{ p: 2, mb: 3, backgroundColor: 'var(--imaa-dm-surface-alt, #e3f2fd)' }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Sponsor Information
             </Typography>
@@ -392,7 +392,7 @@ const ReviewQueueApplicationDetail = ({
         )}
 
         {/* Review Status */}
-        <Paper sx={{ p: 2, mb: 3, backgroundColor: '#f5f5f5' }}>
+        <Paper sx={{ p: 2, mb: 3, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>
             Review Status
           </Typography>
@@ -430,7 +430,7 @@ const ReviewQueueApplicationDetail = ({
             ) : (
               <Table size="small">
                 <TableHead>
-                  <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                  <TableRow sx={{ backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }}>
                     <TableCell>Track</TableCell>
                     <TableCell>Role</TableCell>
                     <TableCell>Tier</TableCell>
@@ -482,7 +482,7 @@ const ReviewQueueApplicationDetail = ({
 
         {/* Phase 10: Decision Actions */}
         <Divider sx={{ my: 2 }} />
-        <Paper sx={{ p: 2, backgroundColor: isTerminalStatus ? '#f5f5f5' : '#fff3e0' }}>
+        <Paper sx={{ p: 2, backgroundColor: isTerminalStatus ? 'var(--imaa-dm-surface-alt, #f5f5f5)' : 'var(--imaa-dm-tint-orange, #fff3e0)' }}>
           <Typography variant="h6" sx={{ mb: 2 }}>
             Application Decision
           </Typography>

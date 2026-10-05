@@ -128,7 +128,7 @@ const EventSeriesDisplay = ({ event, onSeriesRegister }) => {
           alt={series.title}
         />
       ) : (
-        <Box sx={{ height: 200, bgcolor: 'grey.100' }} />
+        <Box sx={{ height: 200, bgcolor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }} />
       )}
       <CardContent sx={{ flexGrow: 1 }}>
         <Box sx={{ mb: 1 }}>

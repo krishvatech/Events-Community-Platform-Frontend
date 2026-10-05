@@ -103,7 +103,7 @@ export default function PublicGroupLandingPage() {
   const encodedNext = encodeURIComponent(groupPath);
 
   return (
-    <Box sx={{ bgcolor: "#f8fafc", minHeight: "100vh", pb: 8 }}>
+    <Box sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", minHeight: "100vh", pb: 8 }}>
       <Box
         sx={{
           minHeight: { xs: 240, md: 360 },
@@ -133,7 +133,7 @@ export default function PublicGroupLandingPage() {
           elevation={0}
           sx={{
             borderRadius: 4,
-            border: "1px solid #dbe4ea",
+            border: "1px solid var(--imaa-dm-border, #dbe4ea)",
             boxShadow: "0 20px 50px rgba(15, 41, 66, 0.12)",
             overflow: "hidden",
           }}
@@ -153,7 +153,7 @@ export default function PublicGroupLandingPage() {
                     width: { xs: 76, md: 96 },
                     height: { xs: 76, md: 96 },
                     bgcolor: "#0f2942",
-                    border: "4px solid white",
+                    border: "4px solid var(--imaa-dm-surface, white)",
                     boxShadow: "0 8px 24px rgba(15, 41, 66, .16)",
                     fontSize: 32,
                     fontWeight: 800,
@@ -164,7 +164,7 @@ export default function PublicGroupLandingPage() {
 
                 <Box>
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                    <Chip size="small" label="Public group" sx={{ bgcolor: "#e6fffb", color: "#0f766e", fontWeight: 700 }} />
+                    <Chip size="small" label="Public group" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #e6fffb)", color: "var(--imaa-dm-teal-text, #0f766e)", fontWeight: 700 }} />
                     <Chip
                       size="small"
                       icon={<GroupsRoundedIcon />}
@@ -176,7 +176,7 @@ export default function PublicGroupLandingPage() {
                   <Typography
                     component="h1"
                     sx={{
-                      color: "#102a43",
+                      color: "var(--imaa-dm-blue-text, #102a43)",
                       fontSize: { xs: 30, md: 44 },
                       lineHeight: 1.1,
                       fontWeight: 800,
@@ -189,7 +189,7 @@ export default function PublicGroupLandingPage() {
                     <Typography
                       sx={{
                         mt: 1,
-                        color: "#334e68",
+                        color: "var(--imaa-dm-text-body, #334e68)",
                         fontWeight: 600,
                         fontSize: { xs: 16, md: 19 },
                         maxWidth: 620,
@@ -246,13 +246,13 @@ export default function PublicGroupLandingPage() {
               )}
             </Stack>
 
-            <Box sx={{ mt: { xs: 4, md: 5 }, pt: { xs: 3, md: 4 }, borderTop: "1px solid #e2e8f0" }}>
-              <Typography variant="h5" sx={{ color: "#102a43", fontWeight: 800, mb: 1.5 }}>
+            <Box sx={{ mt: { xs: 4, md: 5 }, pt: { xs: 3, md: 4 }, borderTop: "1px solid var(--imaa-dm-border, #e2e8f0)" }}>
+              <Typography variant="h5" sx={{ color: "var(--imaa-dm-blue-text, #102a43)", fontWeight: 800, mb: 1.5 }}>
                 About this group
               </Typography>
               <Typography
                 sx={{
-                  color: "#486581",
+                  color: "var(--imaa-dm-blue-text, #486581)",
                   lineHeight: 1.8,
                   fontSize: { xs: 16, md: 17 },
                   maxWidth: 900,
@@ -265,8 +265,8 @@ export default function PublicGroupLandingPage() {
           </Box>
 
           {!signedIn && (
-            <Box sx={{ bgcolor: "#eef8f7", borderTop: "1px solid #d9efec", px: { xs: 3, md: 5 }, py: 3 }}>
-              <Typography sx={{ color: "#334e68", fontWeight: 600 }}>
+            <Box sx={{ bgcolor: "var(--imaa-dm-surface-alt, #eef8f7)", borderTop: "1px solid var(--imaa-dm-border, #d9efec)", px: { xs: 3, md: 5 }, py: 3 }}>
+              <Typography sx={{ color: "var(--imaa-dm-text-body, #334e68)", fontWeight: 600 }}>
                 Join the Events & Community Platform to access group members, posts, relations and chat.
               </Typography>
             </Box>

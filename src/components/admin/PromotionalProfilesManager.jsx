@@ -536,7 +536,7 @@ export default function PromotionalProfilesManager({ eventId }) {
           <TableContainer component={Paper}>
             <Table>
               <TableHead>
-                <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
+                <TableRow sx={{ backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)' }}>
                   <TableCell>
                     <Checkbox
                       checked={selectAll}

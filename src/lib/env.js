@@ -39,6 +39,7 @@ export const env = Object.freeze({
 
   // Feature flags / diagnostics
   CMS_ENABLED: process.env.NEXT_PUBLIC_CMS_ENABLED, // VITE_CMS_ENABLED
+  ENABLE_DARK_MODE: process.env.NEXT_PUBLIC_ENABLE_DARK_MODE, // VITE_ENABLE_DARK_MODE
   MEMBER_DIRECTORY_PERF_LOGS: process.env.NEXT_PUBLIC_MEMBER_DIRECTORY_PERF_LOGS, // VITE_MEMBER_DIRECTORY_PERF_LOGS
 
   // Sentry (browser SDK configuration only; the DSN is public by design)

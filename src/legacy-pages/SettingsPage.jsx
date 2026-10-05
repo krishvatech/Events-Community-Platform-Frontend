@@ -22,10 +22,10 @@ export default function SettingsPage() {
             onClick={() => navigate(-1)}
             sx={{
               textTransform: "none",
-              borderColor: "var(--imaa-navy)",
-              color: "var(--imaa-navy)",
+              borderColor: "var(--imaa-dm-text-2, var(--imaa-navy))",
+              color: "var(--imaa-dm-text, var(--imaa-navy))",
               // Darker teal on hover keeps the label at AA contrast
-              "&:hover": { borderColor: "var(--imaa-teal)", color: "var(--imaa-teal-hover)" },
+              "&:hover": { borderColor: "var(--imaa-teal)", color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))" },
             }}
           >
             Go Back

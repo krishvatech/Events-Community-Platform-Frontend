@@ -59,9 +59,9 @@ function SessionList({
         sx={{
           textAlign: "center",
           py: 3,
-          backgroundColor: "#f9fafb",
+          backgroundColor: "var(--imaa-dm-surface-alt, #f9fafb)",
           borderRadius: 2,
-          border: "1px dashed #d1d5db",
+          border: "1px dashed var(--imaa-dm-border-strong, #d1d5db)",
         }}
       >
         <p className="text-slate-500">No sessions added yet. Click "Add Session" to create one.</p>
@@ -143,14 +143,14 @@ function SessionList({
   dateOrder.sort();
 
   return (
-    <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid #e5e7eb" }}>
+    <TableContainer component={Paper} elevation={0} sx={{ border: "1px solid var(--imaa-dm-border, #e5e7eb)" }}>
       {(onSortByStartTime || onMoveUp || onMoveDown) && (
         <Box
           sx={{
             px: 2,
             py: 1.5,
-            borderBottom: "1px solid #e5e7eb",
-            backgroundColor: "#fafafa",
+            borderBottom: "1px solid var(--imaa-dm-border, #e5e7eb)",
+            backgroundColor: "var(--imaa-dm-surface-alt, #fafafa)",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
@@ -158,7 +158,7 @@ function SessionList({
             flexWrap: "wrap",
           }}
         >
-          <Typography variant="body2" sx={{ color: "#475569" }}>
+          <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-body, #475569)" }}>
             Reorder sessions manually, or sort them by start time.
           </Typography>
           {onSortByStartTime && (
@@ -176,7 +176,7 @@ function SessionList({
         </Box>
       )}
       <Table size="small">
-        <TableHead sx={{ backgroundColor: "#f3f4f6" }}>
+        <TableHead sx={{ backgroundColor: "var(--imaa-dm-surface-alt, #f3f4f6)" }}>
           <TableRow>
             <TableCell sx={{ fontWeight: 600 }}>Title</TableCell>
             <TableCell sx={{ fontWeight: 600, textAlign: "center" }}>Image</TableCell>
@@ -185,13 +185,13 @@ function SessionList({
             <TableCell sx={{ fontWeight: 600 }}>
               <Box>
                 <Typography variant="subtitle2">Start</Typography>
-                <Typography variant="caption" sx={{ color: "#6b7280" }}>Event • User</Typography>
+                <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>Event • User</Typography>
               </Box>
             </TableCell>
             <TableCell sx={{ fontWeight: 600 }}>
               <Box>
                 <Typography variant="subtitle2">End</Typography>
-                <Typography variant="caption" sx={{ color: "#6b7280" }}>Event • User</Typography>
+                <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>Event • User</Typography>
               </Box>
             </TableCell>
             <TableCell align="right" sx={{ fontWeight: 600 }}>Actions</TableCell>
@@ -210,8 +210,8 @@ function SessionList({
             return (
               <React.Fragment key={dateKey}>
                 {/* Day Header Row */}
-                <TableRow sx={{ backgroundColor: "#f0f9ff", "&:hover": { backgroundColor: "#f0f9ff" } }}>
-                  <TableCell colSpan={7} sx={{ py: 1.5, fontWeight: 600, color: "#0284c7" }}>
+                <TableRow sx={{ backgroundColor: "var(--imaa-dm-surface-alt, #f0f9ff)", "&:hover": { backgroundColor: "var(--imaa-dm-surface-hover, #f0f9ff)" } }}>
+                  <TableCell colSpan={7} sx={{ py: 1.5, fontWeight: 600, color: "var(--imaa-dm-blue-text, #0284c7)" }}>
                     {dayLabel} — {dateDisplay}
                   </TableCell>
                 </TableRow>
@@ -235,13 +235,13 @@ function SessionList({
                           sx={{
                             width: 50,
                             height: 80,
-                            backgroundColor: "#f3f4f6",
+                            backgroundColor: "var(--imaa-dm-surface-alt, #f3f4f6)",
                             borderRadius: 1,
                             display: "flex",
                             alignItems: "center",
                             justifyContent: "center",
                             overflow: "hidden",
-                            border: "1px solid #e5e7eb",
+                            border: "1px solid var(--imaa-dm-border, #e5e7eb)",
                           }}
                         >
                           {session.session_image ? (
@@ -260,7 +260,7 @@ function SessionList({
                             />
                           ) : null}
                           {!session.session_image && (
-                            <ImageRoundedIcon sx={{ fontSize: 24, color: "#9ca3af" }} />
+                            <ImageRoundedIcon sx={{ fontSize: 24, color: "var(--imaa-dm-text-hint, #9ca3af)" }} />
                           )}
                         </Box>
                       </TableCell>
@@ -280,7 +280,7 @@ function SessionList({
                           {formatDuration(session.effective_duration_minutes)}
                         </Typography>
                         {session.session_breaks && session.session_breaks.length > 0 && (
-                          <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                          <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
                             {session.session_breaks.map((b) => b.label || b.break_type).join(", ")} ({session.session_breaks.reduce((sum, b) => sum + b.duration_minutes, 0)}m break)
                           </Typography>
                         )}
@@ -294,7 +294,7 @@ function SessionList({
                                 {formatted.primary}
                               </Typography>
                               {formatted.secondary && (
-                                <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                                <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
                                   {formatted.secondary.label}
                                 </Typography>
                               )}
@@ -311,7 +311,7 @@ function SessionList({
                                 {formatted.primary}
                               </Typography>
                               {formatted.secondary && (
-                                <Typography variant="caption" sx={{ color: "#6b7280" }}>
+                                <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
                                   {formatted.secondary.label}
                                 </Typography>
                               )}
@@ -329,7 +329,7 @@ function SessionList({
                                     size="small"
                                     onClick={() => onMoveUp?.(originalIdx)}
                                     disabled={disableReordering || originalIdx === 0}
-                                    sx={{ color: "#64748b" }}
+                                    sx={{ color: "var(--imaa-dm-text-meta, #64748b)" }}
                                   >
                                     <ArrowUpwardIcon fontSize="small" />
                                   </IconButton>
@@ -341,7 +341,7 @@ function SessionList({
                                     size="small"
                                     onClick={() => onMoveDown?.(originalIdx)}
                                     disabled={disableReordering || originalIdx === sessions.length - 1}
-                                    sx={{ color: "#64748b" }}
+                                    sx={{ color: "var(--imaa-dm-text-meta, #64748b)" }}
                                   >
                                     <ArrowDownwardIcon fontSize="small" />
                                   </IconButton>
@@ -362,7 +362,7 @@ function SessionList({
                             <IconButton
                               size="small"
                               onClick={() => onDelete(session, originalIdx)}
-                              sx={{ color: "#ef4444" }}
+                              sx={{ color: "var(--imaa-dm-red-text, #ef4444)" }}
                             >
                               <DeleteIcon fontSize="small" />
                             </IconButton>

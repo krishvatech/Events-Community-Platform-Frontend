@@ -90,7 +90,7 @@ function AiComparePanel({ original, improved, onKeepOriginal, onUseImproved }) {
                         sx={{
                             mt: 0.5,
                             p: 1.5,
-                            bgcolor: "grey.50",
+                            bgcolor: "var(--imaa-dm-surface-alt, #fafafa)",
                             border: "1px solid",
                             borderColor: "divider",
                             borderRadius: 1.5,
@@ -355,7 +355,7 @@ function EditDialog({
                             startIcon={polishing ? <CircularProgress size={14} /> : <AutoFixHighIcon fontSize="small" />}
                             onClick={handlePolish}
                             disabled={polishing || content.trim().length < 5}
-                            sx={{ textTransform: "none", borderColor: "#6366f1", color: "#6366f1" }}
+                            sx={{ textTransform: "none", borderColor: "#6366f1", color: "var(--imaa-dm-blue-text, #6366f1)" }}
                         >
                             {polishing ? "Improving…" : "Improve with AI"}
                         </Button>
@@ -479,7 +479,7 @@ function DeleteDialog({ open, question, token, onClose, onDeleted }) {
                 {question && (
                     <Paper
                         elevation={0}
-                        sx={{ p: 1.5, bgcolor: "grey.50", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}
+                        sx={{ p: 1.5, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)", border: "1px solid", borderColor: "divider", borderRadius: 1.5 }}
                     >
                         <Typography variant="body2" sx={{ fontStyle: "italic" }}>
                             "{question.content}"

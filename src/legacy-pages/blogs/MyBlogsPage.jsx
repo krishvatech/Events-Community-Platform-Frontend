@@ -50,7 +50,7 @@ import {
 } from "../../config/blogNavigation";
 import { getBlogStatusMeta } from "../../utils/blogContent";
 import { blogPrimaryButtonSx } from "../../components/blogs/blogTheme";
-import { colors, focus, radii, shadows } from "../../styles/designTokens";
+import { colors, focus, radii, shadows, semanticColors } from "../../styles/designTokens";
 
 const TABS = ["blogs", "categories", "tags"];
 
@@ -229,9 +229,9 @@ function BlogsTab({ onNotify }) {
           gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(240px, 1fr) 180px auto" },
           gap: 1.5,
           alignItems: "center",
-          borderColor: colors.border,
+          borderColor: semanticColors.border,
           borderRadius: `${radii.card}px`,
-          bgcolor: colors.white,
+          bgcolor: semanticColors.surface,
           boxShadow: shadows.sm,
         }}
       >
@@ -242,7 +242,7 @@ function BlogsTab({ onNotify }) {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           inputProps={{ "aria-label": "Search blogs" }}
-          InputProps={{ startAdornment: <SearchRoundedIcon sx={{ mr: 1, color: "grey.500" }} /> }}
+          InputProps={{ startAdornment: <SearchRoundedIcon sx={{ mr: 1, color: "var(--imaa-dm-text-hint, #9e9e9e)" }} /> }}
           fullWidth
           sx={{ "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } }}
         />
@@ -321,7 +321,7 @@ function BlogsTab({ onNotify }) {
       )}
 
       <Dialog open={Boolean(confirm)} onClose={() => setConfirm(null)} maxWidth="xs" fullWidth aria-labelledby="blog-action-dialog-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
-        <DialogTitle id="blog-action-dialog-title" sx={{ color: colors.navy, fontWeight: 750 }}>{confirm?.action === "publish" ? "Publish blog?" : "Unpublish blog?"}</DialogTitle>
+        <DialogTitle id="blog-action-dialog-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>{confirm?.action === "publish" ? "Publish blog?" : "Unpublish blog?"}</DialogTitle>
         <DialogContent>
           <DialogContentText>
             {confirm?.action === "publish"
@@ -353,7 +353,7 @@ export default function MyBlogsPage() {
 
   return (
     <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: "auto", width: "100%", minWidth: 0 }}>
-      <Typography variant="h4" component="h1" sx={{ fontWeight: 800, mb: 2, color: colors.navy }}>
+      <Typography variant="h4" component="h1" sx={{ fontWeight: 800, mb: 2, color: semanticColors.text }}>
         My Blogs
       </Typography>
 
@@ -361,7 +361,7 @@ export default function MyBlogsPage() {
         value={tab}
         onChange={(_e, value) => setSearchParams(value === "blogs" ? {} : { tab: value })}
         aria-label="Blog management sections"
-        sx={{ mb: 2, borderBottom: 1, borderColor: colors.border, minHeight: 44 }}
+        sx={{ mb: 2, borderBottom: 1, borderColor: semanticColors.border, minHeight: 44 }}
         variant="scrollable"
         allowScrollButtonsMobile
       >

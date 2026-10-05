@@ -9,7 +9,30 @@
     <!-- Same font loading as src/app/layout.jsx: Inter (body/UI) + Source Serif 4 (design headings) -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400..900&family=Source+Serif+4:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
   </head>
-  <body class="min-h-screen antialiased text-gray-900">
+  <body class="min-h-screen antialiased imaa-body-text">
+    <!-- Dark mode start-up, Vite build. Does nothing unless VITE_ENABLE_DARK_MODE is "true".
+         Applies the saved mode (light or dark only, default light) before React starts and keeps
+         light-only routes (always-light routes, and routes not yet reviewed for dark mode) light.
+         Keep the storage key, attribute and both route patterns in sync with src/theme/colorMode.js. -->
+    <script>
+      (function () {
+        try {
+          if ("%VITE_ENABLE_DARK_MODE%".toLowerCase() !== "true") return;
+          var attr = "data-imaa-color-mode";
+          var mode = null;
+          try {
+            mode = window.localStorage.getItem("imaa_color_mode");
+          } catch (e) {}
+          document.documentElement.setAttribute(attr, mode === "dark" ? "dark" : "light");
+          var path = window.location.pathname;
+          var alwaysLight = /^\/(m-and-a-trainings|recognition)(\/|$)|^\/(public|staging|landing)\/|^\/live(\/|$)|\/companion(\/|$)/;
+          var darkReady = /^\/($|about\/?$|signin\/?$|signup\/?$|forgot-password\/?$|reset-password\/?$|auth\/|cognito\/|oauth\/|sso\/|kyc\/|events(\/|$)|account(\/|$)|community(\/|$)|groups(\/|$)|forms(\/|$)|series(\/|$)|blogs(\/|$)|resource(\/|$)|newsletter(\/|$)|cms(\/|$)|admin(\/|$)|AdminEvents(\/|$))/;
+          if (alwaysLight.test(path) || !darkReady.test(path)) {
+            document.body.setAttribute(attr, "light");
+          }
+        } catch (e) {}
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

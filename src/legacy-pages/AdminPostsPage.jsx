@@ -65,7 +65,7 @@ function authHeader() {
   return tok ? { Authorization: `Bearer ${tok}` } : {};
 }
 
-const BORDER = "#e5e7eb";
+const BORDER = "var(--imaa-dm-border, #e5e7eb)";
 
 // --- LinkedIn-style reactions ---
 const POST_REACTIONS = [
@@ -504,7 +504,7 @@ function PostCard({ item }) {
                       <LinearProgress
                         variant="determinate"
                         value={pct}
-                        sx={{ height: 6, borderRadius: 3, bgcolor: "#f0f2f5", "& .MuiLinearProgress-bar": { borderRadius: 3 } }}
+                        sx={{ height: 6, borderRadius: 3, bgcolor: "var(--imaa-dm-surface-alt, #f0f2f5)", "& .MuiLinearProgress-bar": { borderRadius: 3 } }}
                       />
                     </Box>
                   );
@@ -786,7 +786,7 @@ function EditPostDialog({ open, onClose, item, communityId, onSaved }) {
 
             {kind === "image" && (
               <Stack spacing={1.5}>
-                <Box sx={{ width: "100%", border: `1px dashed ${BORDER}`, borderRadius: 2, p: 2, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 140, bgcolor: "#fafafa" }}>
+                <Box sx={{ width: "100%", border: `1px dashed ${BORDER}`, borderRadius: 2, p: 2, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 140, bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                   {imagePreview ? (
                     <img src={imagePreview} alt="preview" style={{ maxWidth: "100%", maxHeight: 240, borderRadius: 12 }} />
                   ) : (item.image_url || item.image || item.image_preview) ? (
@@ -2378,7 +2378,7 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
                     alignItems: "center",
                     justifyContent: "center",
                     minHeight: 140,
-                    bgcolor: "#fafafa",
+                    bgcolor: "var(--imaa-dm-surface-alt, #fafafa)",
                   }}
                 >
                   {imagePreview ? (
@@ -2518,7 +2518,7 @@ function CreatePostDialog({ open, onClose, onCreated, communityId }) {
 
 function AdminPostSkeleton() {
   return (
-    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: "#e5e7eb", mb: 2 }}>
+    <Card variant="outlined" sx={{ borderRadius: 3, borderColor: "var(--imaa-dm-border, #e5e7eb)", mb: 2 }}>
       <CardContent>
         {/* Header: Avatar + Name + Date */}
         <Stack direction="row" alignItems="center" spacing={1} mb={2}>
@@ -2774,7 +2774,7 @@ export default function AdminPostsPage() {
               variant="outlined"
               sx={{
                 borderRadius: 3,
-                borderColor: "#e5e7eb",
+                borderColor: "var(--imaa-dm-border, #e5e7eb)",
                 p: 4,
                 textAlign: "center",
                 color: loadingErr ? "error.main" : "text.secondary",

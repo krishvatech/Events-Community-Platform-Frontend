@@ -60,7 +60,7 @@ export function BlogArticleView({
               component={RouterLink}
               to={`${BLOGS_PATH}?category=${encodeURIComponent(c.slug)}`}
               clickable
-              sx={{ bgcolor: "#E8F7F7", color: BLOG_TEAL, fontWeight: 700 }}
+              sx={{ bgcolor: "var(--imaa-dm-surface-alt, #E8F7F7)", color: BLOG_TEAL, fontWeight: 700 }}
             />
           ))}
         </Stack>
@@ -83,7 +83,7 @@ export function BlogArticleView({
       )}
 
       {post.excerpt && (
-        <Typography sx={{ color: "#4b5563", fontSize: { xs: 17, md: 19 }, mt: 2, lineHeight: 1.6 }}>
+        <Typography sx={{ color: "var(--imaa-dm-text-body, #4b5563)", fontSize: { xs: 17, md: 19 }, mt: 2, lineHeight: 1.6 }}>
           {post.excerpt}
         </Typography>
       )}

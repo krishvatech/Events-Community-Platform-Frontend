@@ -327,7 +327,7 @@ export default function MauticDynamicFields({
   return (
     <Box>
       {title ? (
-        <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1.5 }}>{title}</Typography>
+        <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)", mb: 1.5 }}>{title}</Typography>
       ) : null}
       {unsupported.length ? (
         <Alert severity="warning" variant="outlined" sx={{ mb: 2 }}>

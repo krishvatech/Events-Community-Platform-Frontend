@@ -4,10 +4,14 @@
 // Header / member UnifiedSidebar / KYC notice / Footer, and the main content
 // wrapper. Extracted verbatim from App.jsx's AppShell; routes are passed as children.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useCallback } from "react";
 import { useLocation } from "#navigation";
 import { Toolbar, Box, IconButton, useMediaQuery, useTheme, CircularProgress } from "@mui/material";
+import { ThemeProvider } from "@mui/material/styles";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded"; // Mobile toggle
+
+import lightTheme from "../../muiTheme";
+import { COLOR_MODE_ATTRIBUTE, DARK_MODE_ENABLED, isForceLightPath } from "../../theme/colorMode";
 
 import KYCNotification from "../KYCNotification";
 import Header from "../Header.jsx";
@@ -139,6 +143,21 @@ const AppChrome = ({ children }) => {
   const showSidebar = authed && !hideChrome && !isMarketingHub;
   const showHeader = !authed && !hideChrome;
 
+  // Dark mode (flag on only): light-only routes (always-light routes and routes not reviewed for
+  // dark mode, see src/theme/colorMode.js) stay fully light whatever the saved preference, without
+  // changing it. The <body> attribute switches the CSS variables (and MUI's) back to light; the
+  // ThemeProvider below gives MUI the original light theme. Initial page load is handled before
+  // paint by the start-up script (layout.jsx / index.html).
+  const forceLight = DARK_MODE_ENABLED && isForceLightPath(location.pathname);
+  useLayoutEffect(() => {
+    if (!DARK_MODE_ENABLED) return;
+    if (forceLight) document.body.setAttribute(COLOR_MODE_ATTRIBUTE, "light");
+    else document.body.removeAttribute(COLOR_MODE_ATTRIBUTE);
+  }, [forceLight]);
+  // A theme function keeps the same provider in the tree on every route, so switching between
+  // light-only and dark-ready routes changes the theme without remounting the sidebar or page.
+  const routeTheme = useCallback((outerTheme) => (forceLight ? lightTheme : outerTheme), [forceLight]);
+
   if (!authReady) {
     return (
       <Box sx={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -147,7 +166,7 @@ const AppChrome = ({ children }) => {
     );
   }
 
-  return (
+  const chrome = (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
 
       {/* 1. Unauthorized User -> Header */}
@@ -169,7 +188,7 @@ const AppChrome = ({ children }) => {
               <IconButton
                 aria-label="Open navigation menu"
                 onClick={() => setMobileOpen(true)}
-                sx={{ bgcolor: "white", boxShadow: 1, "&:hover": { bgcolor: "#f9fafb" } }}
+                sx={{ bgcolor: "var(--imaa-bg-surface)", boxShadow: 1, "&:hover": { bgcolor: "var(--imaa-bg-surface-hover)" } }}
               >
                 <MenuRoundedIcon />
               </IconButton>
@@ -208,6 +227,10 @@ const AppChrome = ({ children }) => {
       {!hideChrome && !authed && typeof Footer !== "undefined" && <Footer />}
     </Box>
   );
+
+  // Dark mode disabled: the tree is exactly as before.
+  if (!DARK_MODE_ENABLED) return chrome;
+  return <ThemeProvider theme={routeTheme}>{chrome}</ThemeProvider>;
 };
 
 export default AppChrome;

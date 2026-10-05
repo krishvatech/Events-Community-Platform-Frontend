@@ -325,7 +325,7 @@ export default function AdminNewsletterCompaniesPage() {
         <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
           <Table aria-label="Mautic companies" sx={{ minWidth: 900 }}>
             <TableHead>
-              <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+              <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                 <TableCell>Company</TableCell>
                 <TableCell>Email</TableCell>
                 <TableCell>Phone</TableCell>
@@ -348,8 +348,8 @@ export default function AdminNewsletterCompaniesPage() {
                 <TableRow>
                   <TableCell colSpan={7}>
                     <Stack spacing={1} alignItems="center" sx={{ py: 5 }}>
-                      <ApartmentRoundedIcon sx={{ fontSize: 40, color: "#94A3B8" }} />
-                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>
+                      <ApartmentRoundedIcon sx={{ fontSize: 40, color: "var(--imaa-dm-text-hint, #94A3B8)" }} />
+                      <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                         {search ? "No companies match that search" : "No companies in Mautic yet"}
                       </Typography>
                       <Typography color="text.secondary" variant="body2">

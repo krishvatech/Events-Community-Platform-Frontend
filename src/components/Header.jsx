@@ -27,7 +27,7 @@ import { authConfig } from "../utils/api";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
 import { getAccessToken } from "../utils/tokenStore";
 import imaaLogo from "../assets/IMAA-logo130.svg";
-import { colors, focus, layout, radii } from "../styles/designTokens";
+import { colors, focus, layout, radii, semanticColors } from "../styles/designTokens";
 const apiBase =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
@@ -284,7 +284,7 @@ const Header = () => {
           minHeight: 44,
           fontSize: 14,
           fontWeight: 500,
-          color: active ? colors.navy : colors.inkBody,
+          color: active ? semanticColors.text : semanticColors.textBody,
           textDecoration: "none",
           px: 0.25,
           transition: "color .15s ease",
@@ -298,7 +298,7 @@ const Header = () => {
             borderRadius: 1,
             bgcolor: active ? colors.teal : "transparent",
           },
-          "&:hover": { color: colors.navy },
+          "&:hover": { color: semanticColors.text },
           "&:hover::after": { bgcolor: colors.teal },
           "&:focus-visible": {
             outline: `${focus.width}px solid ${focus.color}`,
@@ -317,9 +317,9 @@ const Header = () => {
       position="fixed"
       elevation={0}
       sx={{
-        bgcolor: colors.white,
-        color: colors.navy,
-        borderBottom: `1px solid ${colors.border}`,
+        bgcolor: semanticColors.surface,
+        color: semanticColors.text,
+        borderBottom: `1px solid ${semanticColors.border}`,
         zIndex: (t) => t.zIndex.drawer + 2,
       }}
     >
@@ -349,6 +349,7 @@ const Header = () => {
               component="img"
               src={imaaLogoSrc}
               alt="IMAA"
+              className="imaa-logo-plate"
               sx={{ display: "block", width: { xs: 96, sm: 108 }, height: "auto", maxHeight: { xs: 42, sm: 46 } }}
             />
           </Box>
@@ -394,14 +395,14 @@ const Header = () => {
                   component={Link}
                   to={accountHref}
                   variant="text"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, color: colors.navy, "&:hover": { color: colors.coral, bgcolor: "transparent" } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, color: semanticColors.text, "&:hover": { color: semanticColors.coralText, bgcolor: "transparent" } }}
                 >
                   My Account
                 </Button>
                 <Button
                   onClick={signOut}
                   variant="outlined"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: radii.pill, borderColor: colors.navy, color: colors.navy, px: 2.5, "&:hover": { bgcolor: colors.navy, color: colors.white, borderColor: colors.navy } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: radii.pill, borderColor: semanticColors.text, color: semanticColors.text, px: 2.5, "&:hover": { bgcolor: colors.navy, color: colors.white, borderColor: colors.navy } }}
                 >
                   Log out
                 </Button>
@@ -412,7 +413,7 @@ const Header = () => {
                   component={Link}
                   to="/signin"
                   variant="text"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 500, color: colors.inkBody, borderRadius: radii.pill, px: 2, "&:hover": { color: colors.navy, bgcolor: "rgba(27,42,74,.05)" } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 500, color: semanticColors.textBody, borderRadius: radii.pill, px: 2, "&:hover": { color: semanticColors.text, bgcolor: "var(--imaa-dm-overlay, rgba(27,42,74,.05))" } }}
                 >
                   Log in
                 </Button>
@@ -430,7 +431,7 @@ const Header = () => {
 
           {/* Mobile burger */}
           <Box sx={{ display: { xs: "flex", lg: "none" } }}>
-            <IconButton onClick={openDrawer} aria-label="Open navigation menu" sx={{ color: colors.navy, minWidth: 44, minHeight: 44 }}>
+            <IconButton onClick={openDrawer} aria-label="Open navigation menu" sx={{ color: semanticColors.text, minWidth: 44, minHeight: 44 }}>
               <MenuRoundedIcon />
             </IconButton>
           </Box>
@@ -439,10 +440,10 @@ const Header = () => {
 
       {/* Mobile Drawer */}
       <Drawer anchor="right" open={mobileOpen} onClose={closeDrawer}>
-        <Box sx={{ width: { xs: "min(320px, 88vw)", sm: 320 }, color: colors.navy }} role="presentation">
+        <Box sx={{ width: { xs: "min(320px, 88vw)", sm: 320 }, color: semanticColors.text }} role="presentation">
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5 }}>
-            <span style={{ fontWeight: 700, fontSize: 16, color: colors.navy }}>Menu</span>
-            <IconButton onClick={closeDrawer} aria-label="Close navigation menu" sx={{ minWidth: 44, minHeight: 44, color: colors.navy }}>
+            <span style={{ fontWeight: 700, fontSize: 16, color: semanticColors.text }}>Menu</span>
+            <IconButton onClick={closeDrawer} aria-label="Close navigation menu" sx={{ minWidth: 44, minHeight: 44, color: semanticColors.text }}>
               <CloseRoundedIcon />
             </IconButton>
           </Box>
@@ -490,7 +491,7 @@ const Header = () => {
                 <ListItemText primary="Log in" />
               </ListItemButton>
               <ListItemButton component={Link} to="/signup">
-                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 700, color: colors.tealDark }} />
+                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 700, color: semanticColors.tealText }} />
               </ListItemButton>
             </List>
           )}

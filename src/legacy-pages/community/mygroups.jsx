@@ -34,7 +34,7 @@ import {
     CommunityGroupCardSkeleton,
 } from "../../components/CommunityGroupCard.jsx";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
-import { colors, layout, radii, shadows } from "../../styles/designTokens";
+import { colors, layout, radii, shadows, semanticColors } from "../../styles/designTokens";
 
 const BORDER = "#e2e8f0";
 const JOIN_POLICY_LABELS = {
@@ -172,7 +172,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
                                 }}
                                 className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
                                 sx={{
-                                    backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
+                                    backgroundColor: value === opt.value ? "var(--imaa-dm-muted, #e0f2f1)" : "transparent",
                                     fontWeight: value === opt.value ? 600 : 400,
                                     color: value === opt.value ? "#10b8a6" : "inherit"
                                 }}
@@ -552,7 +552,7 @@ function QuickViewDialog({ open, group, onClose, onJoin, onEdit, canEdit }) {
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm" PaperProps={{ className: "rounded-2xl" }}>
-            <Box sx={{ position: "relative", height: 160, bgcolor: "#f1f5f9" }}>
+            <Box sx={{ position: "relative", height: 160, bgcolor: "var(--imaa-dm-surface-alt, #f1f5f9)" }}>
                 {cover && (
                     <img
                         src={toAbsolute(cover)}
@@ -571,8 +571,8 @@ function QuickViewDialog({ open, group, onClose, onJoin, onEdit, canEdit }) {
                             height: 80,
                             borderRadius: "50%",
                             overflow: "hidden",
-                            border: "4px solid white",
-                            backgroundColor: "white",
+                            border: "4px solid var(--imaa-dm-surface, white)",
+                            backgroundColor: "var(--imaa-dm-surface, white)",
                             zIndex: 2,
                             boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
                         }}
@@ -582,7 +582,7 @@ function QuickViewDialog({ open, group, onClose, onJoin, onEdit, canEdit }) {
                 )}
                 <IconButton
                     onClick={onClose}
-                    sx={{ position: "absolute", top: 8, right: 8, bgcolor: "rgba(255,255,255,0.8)", "&:hover": { bgcolor: "#fff" } }}
+                    sx={{ position: "absolute", top: 8, right: 8, bgcolor: "var(--imaa-dm-glass, rgba(255,255,255,0.8))", "&:hover": { bgcolor: "var(--imaa-dm-surface, #fff)" } }}
                     size="small"
                 >
                     ✕
@@ -841,7 +841,7 @@ export default function MyGroupsPage() {
     };
 
     return (
-        <Box sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: colors.bgMember, minHeight: "100vh" }}>
+        <Box sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: semanticColors.page, minHeight: "100vh" }}>
             <Box
                 sx={{
                     display: "flex",
@@ -855,19 +855,19 @@ export default function MyGroupsPage() {
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                     {/* Header */}
                     <Box sx={{ mb: { xs: 3, md: 4 }, pt: 1 }}>
-                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: colors.tealDark, textTransform: "uppercase", letterSpacing: "0.12em", mb: 0.75 }}>
+                        <Typography sx={{ fontSize: 11, fontWeight: 800, color: semanticColors.tealText, textTransform: "uppercase", letterSpacing: "0.12em", mb: 0.75 }}>
                             COMMUNITY
                         </Typography>
-                        <Typography component="h1" variant="h4" sx={{ fontWeight: 800, color: colors.ink, mb: 1, lineHeight: 1.2 }}>
+                        <Typography component="h1" variant="h4" sx={{ fontWeight: 800, color: semanticColors.text, mb: 1, lineHeight: 1.2 }}>
                             My Groups
                         </Typography>
-                        <Typography sx={{ fontSize: 14, color: colors.inkBody }}>
+                        <Typography sx={{ fontSize: 14, color: semanticColors.textBody }}>
                             Groups you have joined or are managing
                         </Typography>
                     </Box>
 
                     {/* Filters */}
-                    <Box sx={{ mb: 3, p: { xs: 1.5, sm: 2 }, bgcolor: colors.white, border: `1px solid ${colors.border}`, borderRadius: `${radii.card}px`, boxShadow: shadows.sm }}>
+                    <Box sx={{ mb: 3, p: { xs: 1.5, sm: 2 }, bgcolor: semanticColors.surface, border: `1px solid ${semanticColors.border}`, borderRadius: `${radii.card}px`, boxShadow: shadows.sm }}>
                         <Stack direction="column" spacing={2}>
                     <TextField
                         placeholder="Search my groups..."
@@ -885,7 +885,7 @@ export default function MyGroupsPage() {
                                 </InputAdornment>
                             ),
                         }}
-                        sx={{ bgcolor: colors.white }}
+                        sx={{ bgcolor: semanticColors.surface }}
                     />
 
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -899,7 +899,7 @@ export default function MyGroupsPage() {
                             filterSelectedOptions
                             disableCloseOnSelect
                             renderInput={(params) => (
-                                <TextField {...params} label="Company" placeholder={selectedCompanies.length ? "" : "All companies"} sx={{ bgcolor: "white" }} />
+                                <TextField {...params} label="Company" placeholder={selectedCompanies.length ? "" : "All companies"} sx={{ bgcolor: "var(--imaa-dm-surface, white)" }} />
                             )}
                             sx={{ flex: 1 }}
                         />
@@ -913,7 +913,7 @@ export default function MyGroupsPage() {
                             filterSelectedOptions
                             disableCloseOnSelect
                             renderInput={(params) => (
-                                <TextField {...params} label="Region" placeholder={selectedRegions.length ? "" : "All regions"} sx={{ bgcolor: "white" }} />
+                                <TextField {...params} label="Region" placeholder={selectedRegions.length ? "" : "All regions"} sx={{ bgcolor: "var(--imaa-dm-surface, white)" }} />
                             )}
                             sx={{ flex: 1 }}
                         />
@@ -927,7 +927,7 @@ export default function MyGroupsPage() {
                             filterSelectedOptions
                             disableCloseOnSelect
                             renderInput={(params) => (
-                                <TextField {...params} label="Job title" placeholder={selectedTitles.length ? "" : "All job titles"} sx={{ bgcolor: "white" }} />
+                                <TextField {...params} label="Job title" placeholder={selectedTitles.length ? "" : "All job titles"} sx={{ bgcolor: "var(--imaa-dm-surface, white)" }} />
                             )}
                             sx={{ flex: 1 }}
                         />
@@ -945,7 +945,7 @@ export default function MyGroupsPage() {
                             disableCloseOnSelect
                             getOptionLabel={(opt) => JOIN_POLICY_LABELS[opt] || opt}
                             renderInput={(params) => (
-                                <TextField {...params} label="Join policy" placeholder={selectedJoinPolicies.length ? "" : "All policies"} sx={{ bgcolor: "white" }} />
+                                <TextField {...params} label="Join policy" placeholder={selectedJoinPolicies.length ? "" : "All policies"} sx={{ bgcolor: "var(--imaa-dm-surface, white)" }} />
                             )}
                             sx={{ flex: 1 }}
                         />
@@ -960,7 +960,7 @@ export default function MyGroupsPage() {
                             disableCloseOnSelect
                             getOptionLabel={(opt) => VISIBILITY_LABELS[opt] || opt}
                             renderInput={(params) => (
-                                <TextField {...params} label="Visibility" placeholder={selectedVisibilities.length ? "" : "All visibilities"} sx={{ bgcolor: "white" }} />
+                                <TextField {...params} label="Visibility" placeholder={selectedVisibilities.length ? "" : "All visibilities"} sx={{ bgcolor: "var(--imaa-dm-surface, white)" }} />
                             )}
                             sx={{ flex: 1 }}
                         />
@@ -970,7 +970,7 @@ export default function MyGroupsPage() {
 
                     {/* Showing count */}
                     {!loading && (
-                        <Typography sx={{ fontSize: 12, fontWeight: 700, color: colors.inkBody, textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
+                        <Typography sx={{ fontSize: 12, fontWeight: 700, color: semanticColors.textBody, textTransform: "uppercase", letterSpacing: "0.06em", mb: 2 }}>
                             MY GROUPS {data.length}
                         </Typography>
                     )}
@@ -986,11 +986,11 @@ export default function MyGroupsPage() {
                 ) : error ? (
                     <Alert severity="error">{error}</Alert>
                 ) : data.length === 0 ? (
-                    <Paper variant="outlined" sx={{ py: { xs: 6, md: 8 }, px: 2, textAlign: "center", borderColor: colors.border, borderRadius: `${radii.card}px`, boxShadow: "none" }}>
-                        <Typography component="h2" variant="h6" sx={{ color: colors.ink, mb: 0.5 }}>
+                    <Paper variant="outlined" sx={{ py: { xs: 6, md: 8 }, px: 2, textAlign: "center", borderColor: semanticColors.border, borderRadius: `${radii.card}px`, boxShadow: "none" }}>
+                        <Typography component="h2" variant="h6" sx={{ color: semanticColors.text, mb: 0.5 }}>
                             No groups found
                         </Typography>
-                        <Typography variant="body2" sx={{ color: colors.inkBody, mb: 3 }}>
+                        <Typography variant="body2" sx={{ color: semanticColors.textBody, mb: 3 }}>
                             {search || selectedCompanies.length || selectedRegions.length || selectedTitles.length || selectedJoinPolicies.length || selectedVisibilities.length
                                 ? "Try a different search term or filter selection."
                                 : "You haven't joined any groups yet."}
@@ -1019,7 +1019,7 @@ export default function MyGroupsPage() {
                         {/* Pagination */}
                         {!loading && totalPages > 1 && (
                             <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, mt: 4 }}>
-                                <Typography variant="caption" sx={{ color: colors.inkBody }}>
+                                <Typography variant="caption" sx={{ color: semanticColors.textBody }}>
                                     {ITEMS_PER_PAGE} per page
                                 </Typography>
                                 <Pagination

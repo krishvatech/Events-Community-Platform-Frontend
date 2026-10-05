@@ -85,8 +85,8 @@ function CanvasNode({ data, isConnectable }) {
         borderRadius: "var(--imaa-radius-card)",
         overflow: "hidden",
         width: 200,
-        bgcolor: "#fff",
-        border: data.isSelected ? "2px solid #1B2A4A" : "1px solid #E7ECEF",
+        bgcolor: "var(--imaa-dm-surface, #fff)",
+        border: data.isSelected ? "2px solid var(--imaa-dm-text, #1B2A4A)" : "1px solid var(--imaa-dm-border, #E7ECEF)",
         cursor: "pointer",
       }}
     >
@@ -131,7 +131,7 @@ function CanvasNode({ data, isConnectable }) {
       <Stack spacing={0.5} sx={{ px: 1, py: 0.85 }}>
         <Typography
           variant="body2"
-          sx={{ fontWeight: 750, color: "#1B2A4A", lineHeight: 1.25, overflowWrap: "anywhere" }}
+          sx={{ fontWeight: 750, color: "var(--imaa-dm-text, #1B2A4A)", lineHeight: 1.25, overflowWrap: "anywhere" }}
         >
           {data.eventName}
         </Typography>
@@ -156,7 +156,7 @@ function CanvasNode({ data, isConnectable }) {
       </Stack>
 
       {data.timingLabel && (
-        <Typography variant="caption" sx={{ display: "block", px: 1, pb: 0.75, color: "#7C3AED" }}>
+        <Typography variant="caption" sx={{ display: "block", px: 1, pb: 0.75, color: "var(--imaa-dm-purple-text, #7C3AED)" }}>
           {data.timingLabel}
         </Typography>
       )}
@@ -396,7 +396,7 @@ export default function WorkflowCanvas({
         position: "relative",
         borderRadius: "var(--imaa-radius-card)",
         overflow: "hidden",
-        border: "1px solid #E7ECEF",
+        border: "1px solid var(--imaa-dm-border, #E7ECEF)",
       }}
       onContextMenu={handleCanvasContextMenu}
     >

@@ -627,7 +627,7 @@ function TriggerEventsDialog({ open, trigger, types, typesLoading, typesError, o
               <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 2 }}>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                    <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                       <TableCell>Name</TableCell>
                       <TableCell>Type</TableCell>
                       <TableCell>Order</TableCell>
@@ -887,7 +887,7 @@ export default function AdminNewsletterPointTriggersPanel() {
       >
         <Box>
           <Stack direction="row" spacing={1} alignItems="center">
-            <RuleRoundedIcon sx={{ color: "#0f766e" }} />
+            <RuleRoundedIcon sx={{ color: "var(--imaa-dm-teal-text, #0f766e)" }} />
             <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT }}>
               Point Triggers
             </Typography>
@@ -935,7 +935,7 @@ export default function AdminNewsletterPointTriggersPanel() {
           direction={{ xs: "column", md: "row" }}
           spacing={1.5}
           justifyContent="space-between"
-          sx={{ p: 2, borderBottom: "1px solid #E7ECEF" }}
+          sx={{ p: 2, borderBottom: "1px solid var(--imaa-dm-border, #E7ECEF)" }}
         >
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
             <TextField
@@ -988,7 +988,7 @@ export default function AdminNewsletterPointTriggersPanel() {
           <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
             <Table aria-label="Mautic point triggers" sx={{ minWidth: 960 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                   <TableCell>Name</TableCell>
                   <TableCell>Threshold</TableCell>
                   <TableCell>Events</TableCell>
@@ -1011,7 +1011,7 @@ export default function AdminNewsletterPointTriggersPanel() {
                               height: 12,
                               borderRadius: "50%",
                               bgcolor: `#${normalizeColor(row.color || "a0acb8")}`,
-                              border: "1px solid rgba(0,0,0,0.12)",
+                              border: "1px solid var(--imaa-dm-border, rgba(0,0,0,0.12))",
                               mt: 0.75,
                               flexShrink: 0,
                             }}

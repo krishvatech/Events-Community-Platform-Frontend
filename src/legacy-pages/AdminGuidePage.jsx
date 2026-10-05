@@ -34,8 +34,8 @@ import VerifiedUserRoundedIcon from "@mui/icons-material/VerifiedUserRounded";
 import HelpOutlineRoundedIcon from "@mui/icons-material/HelpOutlineRounded";
 import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 
-const ORANGE = "var(--imaa-teal-hover)";
-const TEAL = "var(--imaa-teal-hover)";
+const ORANGE = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))";
+const TEAL = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))";
 const NAVY = "var(--imaa-ink)";
 const TEXT = "var(--imaa-ink-body)";
 const BORDER = "var(--imaa-border)";
@@ -168,7 +168,7 @@ function StatusPill({ value }) {
       sx={{
         minWidth: 54,
         fontWeight: 800,
-        color: isYes ? TEAL : "#6B7280",
+        color: isYes ? TEAL : "var(--imaa-dm-text-meta, #6B7280)",
         bgcolor: isYes ? "rgba(10,147,150,0.10)" : "rgba(107,114,128,0.10)",
       }}
     />
@@ -187,7 +187,7 @@ function SectionHeader({ eyebrow, title, description }) {
         {title}
       </Typography>
       {description && (
-        <Typography variant="body2" sx={{ color: "#64748B", maxWidth: 900, lineHeight: 1.65 }}>
+        <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748B)", maxWidth: 900, lineHeight: 1.65 }}>
           {description}
         </Typography>
       )}
@@ -282,7 +282,7 @@ export default function AdminGuidePage() {
       >
         <Stack direction={{ xs: "column", md: "row" }} spacing={3} alignItems={{ xs: "stretch", md: "center" }} justifyContent="space-between">
           <Box sx={{ minWidth: 0 }}>
-            <Chip label="Admin Help Center" size="small" sx={{ mb: 1.5, bgcolor: "#fff", color: ORANGE, fontWeight: 900 }} />
+            <Chip label="Admin Help Center" size="small" sx={{ mb: 1.5, bgcolor: "var(--imaa-dm-surface, #fff)", color: ORANGE, fontWeight: 900 }} />
             <Typography component="h1" variant="h3" sx={{ fontFamily: "var(--imaa-font-serif)", color: NAVY, fontWeight: 950, letterSpacing: "-0.04em", mb: 1, lineHeight: 1.05 }}>
               Admin Guide
             </Typography>
@@ -300,7 +300,7 @@ export default function AdminGuidePage() {
             sx={{
               width: { xs: "100%", md: 340 },
               flexShrink: 0,
-              bgcolor: "#fff",
+              bgcolor: "var(--imaa-dm-surface, #fff)",
               borderRadius: "var(--imaa-radius-field)",
               "& .MuiOutlinedInput-root": { borderRadius: "var(--imaa-radius-field)" },
             }}
@@ -322,7 +322,7 @@ export default function AdminGuidePage() {
           mb: 2.5,
           border: `1px solid ${BORDER}`,
           borderRadius: "var(--imaa-radius-card)",
-          bgcolor: "#fff",
+          bgcolor: "var(--imaa-dm-surface, #fff)",
         }}
       >
         <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
@@ -390,7 +390,7 @@ export default function AdminGuidePage() {
                       <Icon sx={{ color: ORANGE }} />
                     </Box>
                     <Typography sx={{ color: NAVY, fontWeight: 900, mb: 0.75 }}>{card.title}</Typography>
-                    <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.55 }}>{card.description}</Typography>
+                    <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748B)", lineHeight: 1.55 }}>{card.description}</Typography>
                   </CardContent>
                 </Card>
               );
@@ -420,7 +420,7 @@ export default function AdminGuidePage() {
               >
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.75 }}>
                   <Chip size="small" label={`Step ${index + 1}`} sx={{ height: 22, color: ORANGE, bgcolor: "var(--imaa-teal-light)", fontWeight: 900 }} />
-                  {index < 6 && <RouteRoundedIcon sx={{ color: "#CBD5E1", fontSize: 18 }} />}
+                  {index < 6 && <RouteRoundedIcon sx={{ color: "var(--imaa-dm-text-faint, #CBD5E1)", fontSize: 18 }} />}
                 </Stack>
                 <Typography sx={{ color: NAVY, fontWeight: 900, lineHeight: 1.35 }}>{step}</Typography>
               </Paper>
@@ -445,7 +445,7 @@ export default function AdminGuidePage() {
               ].map(([title, body]) => (
                 <Paper key={title} elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: "var(--imaa-radius-card)" }}>
                   <Typography sx={{ color: NAVY, fontWeight: 900 }}>{title}</Typography>
-                  <Typography variant="body2" sx={{ color: "#64748B" }}>{body}</Typography>
+                  <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748B)" }}>{body}</Typography>
                 </Paper>
               ))}
             </Box>
@@ -489,13 +489,13 @@ export default function AdminGuidePage() {
             <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
               <Paper id="participant-information" elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24 }}>
                 <Typography sx={{ color: NAVY, fontWeight: 900, mb: 0.75 }}>Participant Information</Typography>
-                <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.65 }}>
+                <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748B)", lineHeight: 1.65 }}>
                   Used for logistics such as accessibility, dietary needs, emergency contact, travel information, and consent. It is for confirmed in-person or hybrid attendees.
                 </Typography>
               </Paper>
               <Paper id="promotional-profiles" elevation={0} sx={{ p: 2, bgcolor: SOFT_BG, borderRadius: "var(--imaa-radius-card)", scrollMarginTop: 24 }}>
                 <Typography sx={{ color: NAVY, fontWeight: 900, mb: 0.75 }}>Promotional Profile</Typography>
-                <Typography variant="body2" sx={{ color: "#64748B", lineHeight: 1.65 }}>
+                <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748B)", lineHeight: 1.65 }}>
                   Used for public-facing profile content such as speaker bio, headshot, talk title, sponsor logo, start-up pitch, or investor display details.
                 </Typography>
               </Paper>

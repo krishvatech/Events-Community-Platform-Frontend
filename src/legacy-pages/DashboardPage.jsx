@@ -33,6 +33,7 @@ const INK = "var(--imaa-ink)";
 const INK_BODY = "var(--imaa-ink-body)"; // secondary text that meets AA contrast
 const ORANGE_DARK = "var(--imaa-orange-hover)"; // white text on it meets AA (plain orange does not)
 const TEAL_DARK = "var(--imaa-teal-hover)"; // AA as text, and white text on it meets AA
+const TEAL_DARK_TEXT = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))"; // as text: readable variant in dark mode
 const CARD_RADIUS = "var(--imaa-radius-card)";
 const FIELD_RADIUS = "var(--imaa-radius-field)";
 const PAGE_PX = { xs: 2, sm: 3, md: 5 }; // 16 / 24 / 40px side padding
@@ -153,7 +154,7 @@ function DashTopbar({ notifCount, messageCount, isAdmin }) {
 
   return (
     <Box sx={{
-      minHeight: 50, bgcolor: "#fff", borderBottom: `1px solid ${BORDER}`,
+      minHeight: 50, bgcolor: "var(--imaa-dm-surface, #fff)", borderBottom: `1px solid ${BORDER}`,
       display: "flex", flexWrap: "wrap", alignItems: "center", columnGap: 2, rowGap: 1,
       px: { xs: 2, md: 3.5 }, py: 1,
       // Sticky on desktop. Below md it scrolls with the page, so it never sits under the shell's
@@ -163,7 +164,7 @@ function DashTopbar({ notifCount, messageCount, isAdmin }) {
       <Box sx={{ order: 1, display: "flex", alignItems: "center", gap: 0.75, flexShrink: 0 }}>
         <span style={{ fontSize: 12, color: INK_BODY, fontWeight: 500 }}>Home</span>
         <ChevronIcon sx={{ fontSize: 14, color: INK_BODY }} />
-        <span style={{ fontSize: 12, fontWeight: 700, color: N }}>Dashboard</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: INK }}>Dashboard</span>
       </Box>
       {/* Search field: visual only (no search behaviour is wired up). Full-width row on phones. */}
       <Box sx={{
@@ -181,7 +182,7 @@ function DashTopbar({ notifCount, messageCount, isAdmin }) {
           style={{ outline: "none" }}
           sx={{
             flex: 1, minWidth: 0, border: "none", background: "transparent",
-            fontSize: { xs: 16, md: 13 }, color: N, fontFamily: FONT,
+            fontSize: { xs: 16, md: 13 }, color: INK, fontFamily: FONT,
             "&::placeholder": { color: INK_BODY, opacity: 1 },
           }}
         />
@@ -248,7 +249,7 @@ const topActionSx = {
 // ── Shared look for the notice banners (profile, verification, pending forms) ──
 // Flat white surface, token border, coloured left edge (was a tinted gradient). Wraps on phones.
 const bannerSx = (accent, hasDismiss) => ({
-  position: "relative", bgcolor: "#fff",
+  position: "relative", bgcolor: "var(--imaa-dm-surface, #fff)",
   border: `1px solid ${BORDER}`, borderLeft: `4px solid ${accent}`, borderRadius: CARD_RADIUS,
   boxShadow: "var(--imaa-shadow-sm)",
   py: 1.75, pl: { xs: 2, sm: 2.5 }, pr: hasDismiss ? { xs: 5, sm: 6 } : { xs: 2, sm: 2.5 },
@@ -256,7 +257,7 @@ const bannerSx = (accent, hasDismiss) => ({
 });
 // Icon/ring + text stay on one row; the call-to-action wraps below them when space runs out
 const bannerBodySx = { display: "flex", alignItems: "center", gap: 2, flex: "1 1 260px", minWidth: 0 };
-const bannerTitleSx = { fontSize: 13, fontWeight: 700, color: N, mb: 0.25, fontFamily: FONT };
+const bannerTitleSx = { fontSize: 13, fontWeight: 700, color: INK, mb: 0.25, fontFamily: FONT };
 const bannerTextSx = { fontSize: 12, color: INK_BODY, lineHeight: 1.5, fontFamily: FONT };
 const bannerCtaSx = (bg) => ({
   display: "inline-block", fontSize: 12, fontWeight: 700, color: "#fff", bgcolor: bg, textDecoration: "none",
@@ -423,7 +424,7 @@ function FeaturedHero({ event }) {
     // The whole card is one link (unchanged destination). Two columns from lg; stacked below.
     <Box component="a" href={href} sx={{
       textDecoration: "none", color: "inherit", mb: 3,
-      borderRadius: CARD_RADIUS, overflow: "hidden", border: `1px solid ${BORDER}`, bgcolor: "#fff",
+      borderRadius: CARD_RADIUS, overflow: "hidden", border: `1px solid ${BORDER}`, bgcolor: "var(--imaa-dm-surface, #fff)",
       display: "grid", gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
       boxShadow: "var(--imaa-shadow-sm)", position: "relative",
       transition: "box-shadow .2s", "&:hover": { boxShadow: "var(--imaa-shadow-md)" },
@@ -489,7 +490,7 @@ function DashEventCard({ event, index }) {
     // One link per card (unchanged destination). Hover is CSS now (was JS style mutation).
     <Box component="a" href={href} sx={{
       textDecoration: "none", color: "inherit",
-      borderRadius: CARD_RADIUS, overflow: "hidden", border: `1px solid ${BORDER}`, bgcolor: "#fff",
+      borderRadius: CARD_RADIUS, overflow: "hidden", border: `1px solid ${BORDER}`, bgcolor: "var(--imaa-dm-surface, #fff)",
       boxShadow: "var(--imaa-shadow-sm)", cursor: "pointer", position: "relative",
       transition: "box-shadow .2s, border-color .2s", display: "flex", flexDirection: "column", height: 280,
       "&:hover": { boxShadow: "var(--imaa-shadow-md)", borderColor: `${accent}50` },
@@ -541,7 +542,7 @@ function DiscRow({ d, index }) {
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
         <a href={d.url || "/community?view=feed"}
-          style={{ fontSize: 13, fontWeight: 600, color: N, textDecoration: "none", lineHeight: 1.4, display: "block", marginBottom: 6, fontFamily: FONT }}>
+          style={{ fontSize: 13, fontWeight: 600, color: INK, textDecoration: "none", lineHeight: 1.4, display: "block", marginBottom: 6, fontFamily: FONT }}>
           {d.title || (d.content ? d.content.substring(0, 80) + (d.content.length > 80 ? "…" : "") : "Discussion")}
         </a>
         <div style={{ display: "flex", gap: 14 }}>
@@ -569,7 +570,7 @@ function GroupRow({ g }) {
           {g.icon || "👥"}
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: N, lineHeight: 1.3, fontFamily: FONT }}>{g.name}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: INK, lineHeight: 1.3, fontFamily: FONT }}>{g.name}</div>
           <div style={{ fontSize: 11, color: "#AAA", marginTop: 1, fontFamily: FONT }}>{g.members_count || g.members || 0} members</div>
         </div>
         <ChevronIcon sx={{ fontSize: 14, color: "#C0BAB4" }} />
@@ -805,7 +806,7 @@ export default function DashboardPage() {
       <FadeIn delay={200}>
         <Box component="section" aria-labelledby="dashboard-upcoming-events" sx={{ pt: 1.5, pb: 6, px: PAGE_PX, maxWidth: 1200, mx: "auto" }}>
           <Box sx={{ textAlign: "center", mb: 3.5 }}>
-            <Box component="span" sx={{ fontSize: 11, fontWeight: 800, color: TEAL_DARK, textTransform: "uppercase", letterSpacing: 2, display: "block", mb: 0.75, fontFamily: FONT }}>
+            <Box component="span" sx={{ fontSize: 11, fontWeight: 800, color: TEAL_DARK_TEXT, textTransform: "uppercase", letterSpacing: 2, display: "block", mb: 0.75, fontFamily: FONT }}>
               WHAT'S HAPPENING
             </Box>
             {/* Section heading: smaller than the page h1 */}
@@ -829,7 +830,7 @@ export default function DashboardPage() {
           )}
           <Box sx={{ textAlign: "center", mt: 3.5 }}>
             {/* Navy outline: the orange text/border was below AA contrast */}
-            <Box component="a" href="/events" sx={{ display: "inline-block", fontSize: 13, fontWeight: 700, color: INK, textDecoration: "none", border: `1.5px solid ${N}`, px: 2.75, py: 1.125, borderRadius: FIELD_RADIUS, fontFamily: FONT, "&:hover": { bgcolor: "#fff" } }}>
+            <Box component="a" href="/events" sx={{ display: "inline-block", fontSize: 13, fontWeight: 700, color: INK, textDecoration: "none", border: `1.5px solid ${INK}`, px: 2.75, py: 1.125, borderRadius: FIELD_RADIUS, fontFamily: FONT, "&:hover": { bgcolor: "var(--imaa-dm-surface, #fff)" } }}>
               Browse All Events →
             </Box>
           </Box>

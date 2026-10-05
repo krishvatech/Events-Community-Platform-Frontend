@@ -399,7 +399,7 @@ export default function AdminNewsletterStagesPage() {
               <Typography variant="body2" color="text.secondary">
                 Total Contacts
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                 {Number(analytics.total_contacts || 0)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -413,7 +413,7 @@ export default function AdminNewsletterStagesPage() {
               <Typography variant="body2" color="text.secondary">
                 Staged Contacts
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                 {Number(analytics.staged_contacts || 0)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -427,7 +427,7 @@ export default function AdminNewsletterStagesPage() {
               <Typography variant="body2" color="text.secondary">
                 No Stage
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>
+              <Typography variant="h4" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)" }}>
                 {Number(analytics.unstaged_contacts || 0)}
               </Typography>
               <Typography variant="caption" color="text.secondary">
@@ -440,7 +440,7 @@ export default function AdminNewsletterStagesPage() {
             variant="outlined"
             sx={{ ...surfaceSx, p: 2.25 }}
           >
-            <Typography sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1.5 }}>
+            <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)", mb: 1.5 }}>
               Stage Distribution
             </Typography>
             {analyticsStages.length ? (
@@ -481,7 +481,7 @@ export default function AdminNewsletterStagesPage() {
           sx={{ p: 2, borderBottom: `1px solid ${UI_BORDER}` }}
         >
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>All Stages</Typography>
+            <Typography sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1B2A4A)" }}>All Stages</Typography>
             {!loading && <Chip size="small" label={`${count} stage${count === 1 ? "" : "s"}`} variant="outlined" color="primary" />}
           </Stack>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ minWidth: { md: 440 } }}>
@@ -518,7 +518,7 @@ export default function AdminNewsletterStagesPage() {
           <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
             <Table aria-label="Mautic lifecycle stages" sx={{ minWidth: 880 }}>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                   <TableCell>Stage</TableCell>
                   <TableCell>Weight</TableCell>
                   <TableCell>Status</TableCell>
@@ -536,7 +536,7 @@ export default function AdminNewsletterStagesPage() {
                     <TableRow hover key={stage.id}>
                       <TableCell sx={{ minWidth: 220 }}>
                         <Stack direction="row" spacing={1} alignItems="flex-start">
-                          <FlagRoundedIcon fontSize="small" sx={{ mt: 0.35, color: "#64748B" }} />
+                          <FlagRoundedIcon fontSize="small" sx={{ mt: 0.35, color: "var(--imaa-dm-text-meta, #64748B)" }} />
                           <Box>
                             <Typography sx={{ fontWeight: 800, color: UI_TEXT, overflowWrap: "anywhere" }}>
                               {stage.name || `Stage #${stage.id}`}

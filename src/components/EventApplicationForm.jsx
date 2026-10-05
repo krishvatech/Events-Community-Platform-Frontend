@@ -305,7 +305,7 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
                     <Box>
                       <strong>{track.label}</strong>
                       {track.short_description && (
-                        <Box sx={{ fontSize: "0.9rem", color: "#666" }}>
+                        <Box sx={{ fontSize: "0.9rem", color: "var(--imaa-dm-text-body, #666)" }}>
                           {track.short_description}
                         </Box>
                       )}
@@ -339,7 +339,7 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
                   >
                     <Box>
                       <strong>{formatSubmissionMode(mode)}</strong>
-                      <Box sx={{ fontSize: "0.9rem", color: "#666" }}>
+                      <Box sx={{ fontSize: "0.9rem", color: "var(--imaa-dm-text-body, #666)" }}>
                         {getSubmissionModeDescription(mode)}
                       </Box>
                     </Box>
@@ -367,11 +367,11 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
             <h2>Application Form</h2>
 
             {/* Track Info Section - User Friendly Display */}
-            <Box sx={{ mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1, border: '1px solid #e0e0e0' }}>
+            <Box sx={{ mb: 3, p: 2, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)', borderRadius: 1, border: '1px solid var(--imaa-dm-border, #e0e0e0)' }}>
               <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>
                 APPLICATION TRACK
               </Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1976d2' }}>
+              <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: 'var(--imaa-dm-blue-text, #1976d2)' }}>
                 {getApplicationIntroText(selectedTrack)}
               </Typography>
 
@@ -384,7 +384,7 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
 
               {/* Show what role they'll receive */}
               {selectedTrack?.role_mappings_on_acceptance && selectedTrack.role_mappings_on_acceptance.length > 0 && (
-                <Box sx={{ mb: 2, p: 1.5, backgroundColor: '#fff3e0', borderRadius: 0.5, borderLeft: '4px solid #ff9800' }}>
+                <Box sx={{ mb: 2, p: 1.5, backgroundColor: 'var(--imaa-dm-tint-orange, #fff3e0)', borderRadius: 0.5, borderLeft: '4px solid #ff9800' }}>
                   <Typography variant="body2" color="primary" sx={{ fontWeight: 600 }}>
                     {getAcceptanceMessage(selectedTrack.role_mappings_on_acceptance)}
                   </Typography>
@@ -529,7 +529,7 @@ export default function EventApplicationForm({ eventId, onSuccess }) {
 
             {/* Tier Selection - if track has multiple tiers */}
             {pricingTiers.length > 0 && (
-              <Box sx={{ mb: 3, p: 2, backgroundColor: '#f5f5f5', borderRadius: 1 }}>
+              <Box sx={{ mb: 3, p: 2, backgroundColor: 'var(--imaa-dm-surface-alt, #f5f5f5)', borderRadius: 1 }}>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
                   Pricing Tier Selection
                 </Typography>

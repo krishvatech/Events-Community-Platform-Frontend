@@ -134,7 +134,7 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
   };
 
   const renderTrackSelector = () => (
-    <Card sx={{ mb: 2, bgcolor: "#f5f5f5" }}>
+    <Card sx={{ mb: 2, bgcolor: "var(--imaa-dm-surface-alt, #f5f5f5)" }}>
       <CardContent>
         <Typography variant="h6" sx={{ mb: 2 }}>
           Select Application Track

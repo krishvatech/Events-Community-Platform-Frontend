@@ -3,7 +3,7 @@ import React from "react";
 import { Box, ButtonBase, FormControlLabel, Switch } from "@mui/material";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
 
-const BORDER = "#e2e8f0";
+const BORDER = "var(--imaa-dm-border, #e2e8f0)";
 const MAP_PREVIEW_ZOOM = 2;
 
 // World tiles for a Leaflet-style URL template ({s}/{r} are CARTO-style placeholders).
@@ -32,7 +32,7 @@ export function MapToggle({ checked, onChange }) {
         py: 0.25,
         borderRadius: 999,
         border: `1px solid ${BORDER}`,
-        bgcolor: checked ? "rgba(10, 147, 150, 0.08)" : "#f8fafc",
+        bgcolor: checked ? "rgba(10, 147, 150, 0.08)" : "var(--imaa-dm-surface-alt, #f8fafc)",
         "& .MuiFormControlLabel-label": { fontSize: 13, fontWeight: 600, color: "text.secondary" },
       }}
     />
@@ -57,7 +57,7 @@ export function MembersMapPreview({ tileUrl, onShowMap, minHeight = 300 }) {
         borderRadius: 3,
         overflow: "hidden",
         border: `1px solid ${BORDER}`,
-        bgcolor: "#b5d0d0",
+        bgcolor: "var(--imaa-dm-tint-teal, #b5d0d0)",
         "& .map-preview-tiles": { transition: "transform 400ms ease" },
         "&:hover .map-preview-tiles": { transform: "translate(-50%, -42%) scale(1.04)" },
         "&:hover .map-preview-cta": { boxShadow: "0 6px 18px rgba(15, 23, 42, 0.28)" },

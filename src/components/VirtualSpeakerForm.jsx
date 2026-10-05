@@ -16,7 +16,7 @@ import {
 import InsertPhotoRoundedIcon from '@mui/icons-material/InsertPhotoRounded';
 import { toast } from 'react-toastify';
 import { createVirtualSpeaker, updateVirtualSpeaker } from '../services/virtualSpeakerService';
-import { colors, radii } from '../styles/designTokens';
+import { colors, radii, semanticColors } from '../styles/designTokens';
 
 const VirtualSpeakerForm = ({
   open,
@@ -163,11 +163,11 @@ const VirtualSpeakerForm = ({
       aria-labelledby="virtual-speaker-form-title"
       PaperProps={{ sx: { borderRadius: `${radii.popup}px`, m: 2 } }}
     >
-      <DialogTitle id="virtual-speaker-form-title" sx={{ color: colors.navy, fontWeight: 700 }}>
+      <DialogTitle id="virtual-speaker-form-title" sx={{ color: semanticColors.text, fontWeight: 700 }}>
         {initialData ? 'Edit Virtual Speaker' : 'Create Virtual Speaker'}
       </DialogTitle>
 
-      <DialogContent sx={{ bgcolor: colors.white }}>
+      <DialogContent sx={{ bgcolor: semanticColors.surface }}>
         <Box
           sx={{
             display: 'flex',
@@ -192,8 +192,8 @@ const VirtualSpeakerForm = ({
                 sx={{
                   width: 100,
                   height: 100,
-                  bgcolor: imagePreview ? 'transparent' : colors.bgCool,
-                  border: `1px solid ${colors.border}`,
+                  bgcolor: imagePreview ? 'transparent' : semanticColors.surfaceCool,
+                  border: `1px solid ${semanticColors.border}`,
                 }}
                 src={imagePreview}
                 alt={`${formData.name || 'Virtual speaker'} profile preview`}

@@ -114,7 +114,7 @@ function AudienceStatusChip({ status }) {
 
 function NewsletterAdminTabs({ onChange }) {
   return (
-    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
+    <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #E7ECEF)", overflow: "hidden" }}>
       <Tabs
         value="audiences"
         onChange={(_, value) => onChange(value)}
@@ -125,7 +125,7 @@ function NewsletterAdminTabs({ onChange }) {
           minHeight: 52,
           px: { xs: 1, md: 2 },
           "& .MuiTab-root": { gap: 1, minHeight: 52, textTransform: "none", fontWeight: 750 },
-          "& .Mui-selected": { color: "#0f766e !important" },
+          "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0f766e) !important" },
           "& .MuiTabs-indicator": { backgroundColor: "#0f766e", height: 3 },
         }}
       >
@@ -179,7 +179,7 @@ export default function AdminNewsletterAudiencesPage() {
   return (
     <Stack spacing={3}>
       <Box>
-        <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>
+        <Typography variant="h4" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 0.75 }}>
           Newsletter
         </Typography>
         <Typography color="text.secondary">
@@ -191,7 +191,7 @@ export default function AdminNewsletterAudiencesPage() {
 
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: { xs: "flex-start", sm: "center" }, gap: 2, flexDirection: { xs: "column", sm: "row" } }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 0.75 }}>Audiences</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 850, color: "var(--imaa-dm-text, #1B2A4A)", mb: 0.75 }}>Audiences</Typography>
           <Typography color="text.secondary">Create advanced audience segments for future targeting.</Typography>
         </Box>
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={() => navigate("/admin/newsletter/audiences/new")} sx={{ textTransform: "none" }}>
@@ -199,8 +199,8 @@ export default function AdminNewsletterAudiencesPage() {
         </Button>
       </Box>
 
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#F0EEEB", overflow: "hidden" }}>
-        <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderBottom: "1px solid #F0EEEB", display: "flex", justifyContent: "flex-end" }}>
+      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "var(--imaa-dm-border, #F0EEEB)", overflow: "hidden" }}>
+        <Box sx={{ px: { xs: 2, md: 3 }, py: 2, borderBottom: "1px solid var(--imaa-dm-border, #F0EEEB)", display: "flex", justifyContent: "flex-end" }}>
           <Button startIcon={<RefreshRoundedIcon />} onClick={loadAudiences} disabled={loading} sx={{ textTransform: "none" }}>
             Refresh
           </Button>
@@ -222,7 +222,7 @@ export default function AdminNewsletterAudiencesPage() {
           <TableContainer sx={{ overflowX: "auto" }}>
             <Table>
               <TableHead>
-                <TableRow sx={{ bgcolor: "#f3f4f6" }}>
+                <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f3f4f6)" }}>
                   <TableCell>Name</TableCell>
                   <TableCell>Description</TableCell>
                   <TableCell>Subscriber Count</TableCell>
@@ -235,7 +235,7 @@ export default function AdminNewsletterAudiencesPage() {
                 {rows.map((row) => (
                   <TableRow hover key={row.uuid} sx={{ cursor: "pointer" }} onClick={() => navigate(`/admin/newsletter/audiences/${row.uuid}`)}>
                     <TableCell>
-                      <Typography sx={{ fontWeight: 700, color: "#1B2A4A" }}>{row.name || "Untitled audience"}</Typography>
+                      <Typography sx={{ fontWeight: 700, color: "var(--imaa-dm-text, #1B2A4A)" }}>{row.name || "Untitled audience"}</Typography>
                       <Typography variant="body2" color="text.secondary">{TYPE_LABELS[row.audience_type] || row.audience_type || "Static"}</Typography>
                     </TableCell>
                     <TableCell sx={{ maxWidth: 360 }}>

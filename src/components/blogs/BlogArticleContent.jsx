@@ -6,7 +6,7 @@ import { BLOG_NAVY, BLOG_TEAL } from "./blogTheme";
 // Article typography scoped to this container only (emotion-generated class),
 // so article HTML can never restyle the rest of ECP.
 const articleSx = {
-  color: "#1f2937",
+  color: "var(--imaa-dm-text, #1f2937)",
   fontSize: { xs: 16, md: 17 },
   lineHeight: 1.75,
   overflowWrap: "anywhere",
@@ -35,20 +35,20 @@ const articleSx = {
   "& iframe, & embed": { display: "block", width: "100%", maxWidth: "100%", border: 0 },
   "& .wp-block-embed, & .wp-block-embed__wrapper": { maxWidth: "100%", overflowX: "auto" },
   "& figure": { mx: 0, my: 3 },
-  "& figcaption": { fontSize: 13, color: "#6b7280", textAlign: "center", mt: 1 },
+  "& figcaption": { fontSize: 13, color: "var(--imaa-dm-text-meta, #6b7280)", textAlign: "center", mt: 1 },
   "& blockquote": {
     borderLeft: `4px solid ${BLOG_TEAL}`,
-    bgcolor: "#F3FAFA",
+    bgcolor: "var(--imaa-dm-surface-alt, #F3FAFA)",
     m: 0,
     my: 3,
     px: 2.5,
     py: 1.5,
-    color: "#374151",
+    color: "var(--imaa-dm-text-2, #374151)",
     fontStyle: "italic",
   },
-  "& pre": { bgcolor: "#f3f4f6", p: 2, borderRadius: "8px", overflowX: "auto", fontSize: 14 },
+  "& pre": { bgcolor: "var(--imaa-dm-surface-alt, #f3f4f6)", p: 2, borderRadius: "8px", overflowX: "auto", fontSize: 14 },
   "& code": { fontFamily: "monospace", fontSize: "0.9em" },
-  "& hr": { border: 0, borderTop: "1px solid #e5e7eb", my: 4 },
+  "& hr": { border: 0, borderTop: "1px solid var(--imaa-dm-border, #e5e7eb)", my: 4 },
   "& table": {
     display: "block",
     width: "100%",
@@ -57,8 +57,8 @@ const articleSx = {
     my: 3,
     fontSize: 15,
   },
-  "& th, & td": { border: "1px solid #e5e7eb", p: 1, textAlign: "left", verticalAlign: "top" },
-  "& th": { bgcolor: "#f9fafb", fontWeight: 700 },
+  "& th, & td": { border: "1px solid var(--imaa-dm-border, #e5e7eb)", p: 1, textAlign: "left", verticalAlign: "top" },
+  "& th": { bgcolor: "var(--imaa-dm-surface-alt, #f9fafb)", fontWeight: 700 },
   "& .aligncenter": { mx: "auto", textAlign: "center" },
 };
 

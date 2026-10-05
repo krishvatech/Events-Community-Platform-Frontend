@@ -228,7 +228,7 @@ export default function InviteGroupUsersDialog({
                     />
                 </Box>
 
-                <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "grey.50" }}>
+                <Box sx={{ mb: 2, p: 1.5, borderRadius: 2, border: "1px solid", borderColor: "divider", bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
                     <FormControlLabel
                         control={
                             <MuiCheckbox

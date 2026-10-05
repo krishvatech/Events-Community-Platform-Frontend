@@ -263,8 +263,8 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
     if (error) {
         return (
-            <Box sx={{ py: 2, px: 2, bgcolor: '#fef2f2', borderRadius: 2, border: '1px solid #fee2e2' }}>
-                <Typography sx={{ color: '#ef4444' }}>
+            <Box sx={{ py: 2, px: 2, bgcolor: 'var(--imaa-dm-surface-alt, #fef2f2)', borderRadius: 2, border: '1px solid var(--imaa-dm-border, #fee2e2)' }}>
+                <Typography sx={{ color: 'var(--imaa-dm-red-text, #ef4444)' }}>
                     Error: {error}
                 </Typography>
             </Box>
@@ -273,7 +273,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
     if (matches.length === 0) {
         return (
-            <Box sx={{ py: 6, textAlign: 'center', bgcolor: 'background.paper', borderRadius: 4, px: 3, border: '1px solid #e2e8f0' }}>
+            <Box sx={{ py: 6, textAlign: 'center', bgcolor: 'background.paper', borderRadius: 4, px: 3, border: '1px solid var(--imaa-dm-border, #e2e8f0)' }}>
                 <Typography variant="h6" color="text.secondary" gutterBottom>
                     No matches yet
                 </Typography>
@@ -335,14 +335,14 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                             <Card
                                 elevation={0}
                                 sx={{
-                                    border: '1px solid #e2e8f0',
+                                    border: '1px solid var(--imaa-dm-border, #e2e8f0)',
                                     borderRadius: 3,
                                     height: '100%',
                                     display: 'flex',
                                     flexDirection: 'column',
                                     transition: 'all 0.2s ease',
                                     '&:hover': {
-                                        borderColor: '#cbd5e1',
+                                        borderColor: 'var(--imaa-dm-border-strong, #cbd5e1)',
                                         boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'
                                     }
                                 }}
@@ -359,7 +359,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                         <Avatar
                                             src={match.partner.avatar_url}
                                             alt={match.partner.first_name}
-                                            sx={{ width: 56, height: 56, bgcolor: '#f1f5f9', color: '#64748b', fontWeight: 700 }}
+                                            sx={{ width: 56, height: 56, bgcolor: 'var(--imaa-dm-surface-alt, #f1f5f9)', color: 'var(--imaa-dm-text-meta, #64748b)', fontWeight: 700 }}
                                         >
                                             {(match.partner.first_name || 'U').charAt(0)}
                                         </Avatar>
@@ -386,8 +386,8 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                     {/* Match Details */}
                                     <Box sx={{
                                         py: 2,
-                                        borderTop: '1px solid #f1f5f9',
-                                        borderBottom: '1px solid #f1f5f9',
+                                        borderTop: '1px solid var(--imaa-dm-border, #f1f5f9)',
+                                        borderBottom: '1px solid var(--imaa-dm-border, #f1f5f9)',
                                         mb: 2.5
                                     }}>
                                         <Stack spacing={1.5}>
@@ -410,7 +410,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                                         if (scorePercent === null) return null;
                                                         return (
                                                             <Typography variant="body2" fontWeight={700} sx={{
-                                                                color: scorePercent >= 70 ? '#16a34a' : scorePercent >= 50 ? '#d97706' : '#dc2626',
+                                                                color: scorePercent >= 70 ? '#16a34a' : scorePercent >= 50 ? '#d97706' : 'var(--imaa-dm-red-text, #dc2626)',
                                                             }}>
                                                                 {scorePercent.toFixed(0)}%
                                                             </Typography>
@@ -429,7 +429,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                                 label="Completed"
                                                 size="small"
                                                 sx={{
-                                                    bgcolor: '#f0fdf4',
+                                                    bgcolor: 'var(--imaa-dm-surface-alt, #f0fdf4)',
                                                     color: '#16a34a',
                                                     fontWeight: 600,
                                                     fontSize: '0.75rem',
@@ -443,12 +443,12 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                                 label="Skipped"
                                                 size="small"
                                                 sx={{
-                                                    bgcolor: '#fef2f2',
-                                                    color: '#dc2626',
+                                                    bgcolor: 'var(--imaa-dm-surface-alt, #fef2f2)',
+                                                    color: 'var(--imaa-dm-red-text, #dc2626)',
                                                     fontWeight: 600,
                                                     fontSize: '0.75rem',
                                                     height: 24,
-                                                    '& .MuiChip-icon': { color: '#dc2626' }
+                                                    '& .MuiChip-icon': { color: 'var(--imaa-dm-red-text, #dc2626)' }
                                                 }}
                                             />
                                         )}
@@ -484,11 +484,11 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
                                             sx={{
                                                 borderRadius: 2,
                                                 textTransform: 'none',
-                                                borderColor: '#e2e8f0',
+                                                borderColor: 'var(--imaa-dm-border, #e2e8f0)',
                                                 color: 'text.primary',
                                                 '&:hover': {
-                                                    borderColor: '#cbd5e1',
-                                                    bgcolor: '#f8fafc'
+                                                    borderColor: 'var(--imaa-dm-border-strong, #cbd5e1)',
+                                                    bgcolor: 'var(--imaa-dm-surface-hover, #f8fafc)'
                                                 }
                                             }}
                                         >
@@ -504,7 +504,7 @@ export default function SpeedNetworkingMatchHistory({ eventId, sessionId }) {
 
             {/* Empty State Message */}
             {filteredMatches.length === 0 && matches.length > 0 && (
-                <Box sx={{ py: 6, textAlign: 'center', bgcolor: 'background.paper', borderRadius: 4, px: 3, border: '1px dashed #e2e8f0', mt: 2 }}>
+                <Box sx={{ py: 6, textAlign: 'center', bgcolor: 'background.paper', borderRadius: 4, px: 3, border: '1px dashed var(--imaa-dm-border, #e2e8f0)', mt: 2 }}>
                     <Typography color="text.secondary">
                         No matches found in this category
                     </Typography>

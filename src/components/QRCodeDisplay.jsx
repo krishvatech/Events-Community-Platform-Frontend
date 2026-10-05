@@ -66,10 +66,10 @@ function QRCodeDisplay({ url, eventSlug, size = 300 }) {
           sx={{
             width: size,
             height: size,
-            border: '1px solid #ddd',
+            border: '1px solid var(--imaa-dm-border, #ddd)',
             borderRadius: 1,
             p: 2,
-            bgcolor: '#fff',
+            bgcolor: 'var(--imaa-dm-surface, #fff)',
           }}
         />
         <Stack direction="row" gap={1} sx={{ mt: 2, justifyContent: 'center' }}>

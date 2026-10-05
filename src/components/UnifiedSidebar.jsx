@@ -56,6 +56,8 @@ import ForumRoundedIcon from "@mui/icons-material/ForumRounded";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AutoStoriesRoundedIcon from "@mui/icons-material/AutoStoriesRounded"; // Explore Blogs
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded"; // My Blogs
+import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded"; // Dark mode switch: light (sun)
+import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded"; // Dark mode switch: dark (moon)
 import { getBlogSidebarItems } from "../config/blogNavigation";
 import { canManageBlogs } from "../utils/blogAccess";
 
@@ -63,17 +65,20 @@ import { isOwnerUser, isStaffUser, canEditProfilesUser } from "../utils/adminRol
 import { apiClient, createWagtailSession, createOpenApiDocsSession, getSaleorDashboardUrl } from "../utils/api";
 import { logoutBrowserSession } from "../utils/logoutSession";
 import { getAccessToken } from "../utils/tokenStore";
+import { DARK_MODE_ENABLED } from "../theme/colorMode";
+import { useColorMode } from "../theme/useColorMode";
 
 // Member-shell sidebar styling, from the IMAA design tokens (src/styles/brand.css).
 // Mockup reference: connect-sidebar-full-nav.html (light sidebar, white selected row, teal indicator).
+// Light values in the comments; the variables switch in dark mode.
 const SIDEBAR_BG = "var(--imaa-bg-member)"; // #F7F8FA member-area grey
-const SURFACE = "#ffffff"; // selected row, search field, user strip
+const SURFACE = "var(--imaa-bg-surface)"; // #FFFFFF: selected row, search field, user strip
 const CARD_BORDER = "var(--imaa-border)"; // #E2E4E8
-const TEXT = "#2C3E5A"; // default item text (unchanged)
+const TEXT = "var(--imaa-nav-text)"; // #2C3E5A default item text
 const TEXT_ACTIVE = "var(--imaa-ink)"; // #1B2A4A navy, selected/hover text
 const TEXT_MUTED = "var(--imaa-ink-body)"; // #5A6070: section labels, icons, back link (AA on the grey)
 const ACCENT = "var(--imaa-teal)"; // selected-row indicator bar
-const HOVER_BG = "rgba(27, 42, 74, 0.05)"; // navy-tinted hover (was a coral tint)
+const HOVER_BG = "var(--imaa-bg-hover)"; // rgba(27, 42, 74, 0.05) navy-tinted hover
 
 // --- Helpers for badges ---
 const BADGE_CACHE_TTL_MS = 60_000;
@@ -193,6 +198,9 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
     // We handle mobile drawer state in AppShell or local? 
     // Ideally AppShell passes it down.
     const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+    // Dark-mode switch state (MUI owns and persists it; inert while the feature flag is off)
+    const { isDark, setDark, setLight } = useColorMode();
+    const themeSwitchLabel = isDark ? "Switch to light mode" : "Switch to dark mode";
 
     const userIsOwner = isOwnerUser();
     const userIsStaff = isStaffUser(); // This is true for BOTH Staff and SuperUser(Platform Admin) usually?
@@ -733,9 +741,67 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     </svg>
                 </Box>
                 <Box>
-                    <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#1B2A4A", lineHeight: 1.2, letterSpacing: "-0.01em" }}>IMAA</Typography>
-                    <Typography sx={{ fontWeight: 700, fontSize: 10, color: "#0A9396", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>CONNECT</Typography>
+                    <Typography sx={{ fontWeight: 800, fontSize: 14, color: "var(--imaa-ink)", lineHeight: 1.2, letterSpacing: "-0.01em" }}>IMAA</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: 10, color: "var(--imaa-dm-teal-text, #0A9396)", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>CONNECT</Typography>
                 </Box>
+                {/* Dark mode switch (feature flag VITE_ENABLE_DARK_MODE), right-aligned in the brand row.
+                    Native button with role="switch" + aria-checked; its label and tooltip say what a click
+                    does. Keyboard: Tab, then Space/Enter; global teal focus ring. Changes the mode only. */}
+                {DARK_MODE_ENABLED && (
+                    <Tooltip title={themeSwitchLabel} placement="bottom">
+                        <Box
+                            component="button"
+                            type="button"
+                            role="switch"
+                            aria-checked={isDark}
+                            aria-label={themeSwitchLabel}
+                            onClick={isDark ? setLight : setDark}
+                            sx={{
+                                ml: "auto",
+                                position: "relative",
+                                flexShrink: 0,
+                                width: 44,
+                                height: 24,
+                                p: 0,
+                                appearance: "none",
+                                border: "1px solid var(--imaa-border-hover)",
+                                borderRadius: "var(--imaa-radius-pill)",
+                                bgcolor: "var(--imaa-bg-cool)",
+                                cursor: "pointer",
+                                transition: "border-color .15s ease",
+                                "&:hover": { borderColor: "var(--imaa-ink-meta)" },
+                            }}
+                        >
+                            {/* Thumb: left + sun in light mode, right + moon in dark mode */}
+                            <Box
+                                component="span"
+                                aria-hidden="true"
+                                sx={{
+                                    position: "absolute",
+                                    top: 2,
+                                    left: 2,
+                                    width: 18,
+                                    height: 18,
+                                    borderRadius: "50%",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    // white in light mode, a raised slate in dark mode
+                                    bgcolor: "var(--imaa-dm-muted-strong, #FFFFFF)",
+                                    boxShadow: "var(--imaa-shadow-sm)",
+                                    transform: isDark ? "translateX(20px)" : "none",
+                                    transition: "transform .2s ease",
+                                }}
+                            >
+                                {isDark ? (
+                                    <DarkModeRoundedIcon sx={{ fontSize: 12, color: "var(--imaa-dm-teal-text, var(--imaa-teal))" }} />
+                                ) : (
+                                    <LightModeRoundedIcon sx={{ fontSize: 12, color: "var(--imaa-orange)" }} />
+                                )}
+                            </Box>
+                        </Box>
+                    </Tooltip>
+                )}
             </Box>
 
             <Box sx={{
@@ -750,14 +816,14 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                     bg: "transparent"
                 },
                 "&::-webkit-scrollbar-thumb": {
-                    bgcolor: "rgba(0, 0, 0, 0.2)",
+                    bgcolor: "var(--imaa-scrollbar-thumb)",
                     borderRadius: "3px",
                     "&:hover": {
-                        bgcolor: "rgba(0, 0, 0, 0.3)"
+                        bgcolor: "var(--imaa-scrollbar-thumb-hover)"
                     }
                 },
                 scrollbarWidth: "thin",
-                scrollbarColor: "rgba(0, 0, 0, 0.2) transparent"
+                scrollbarColor: "var(--imaa-scrollbar-thumb) transparent"
             }} ref={menuScrollRef}>
                 {/* Sticky Search Bar */}
                 <Box sx={{
@@ -984,8 +1050,8 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
                                 onClick={() => navigate(isStaffOnly ? "/admin/carts" : "/account/cart")}
                                 sx={{
                                     color: "text.secondary",
-                                    bgcolor: "rgba(0, 0, 0, 0.04)",
-                                    "&:hover": { bgcolor: "rgba(0, 0, 0, 0.1)" }
+                                    bgcolor: "var(--imaa-dm-overlay, rgba(0, 0, 0, 0.04))",
+                                    "&:hover": { bgcolor: "var(--imaa-dm-overlay, rgba(0, 0, 0, 0.1))" }
                                 }}
                             >
                                 <Badge

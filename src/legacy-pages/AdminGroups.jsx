@@ -183,7 +183,7 @@ function CustomSelect({ label, value, onChange, options, disabled, helperText })
                 }}
                 className="px-4 py-2.5 hover:bg-slate-100 cursor-pointer transition border-b border-slate-100 last:border-b-0"
                 sx={{
-                  backgroundColor: value === opt.value ? "#e0f2f1" : "transparent",
+                  backgroundColor: value === opt.value ? "var(--imaa-dm-muted, #e0f2f1)" : "transparent",
                   fontWeight: value === opt.value ? 600 : 400,
                   color: value === opt.value ? "#10b8a6" : "inherit"
                 }}
@@ -919,7 +919,7 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
           />
         ) : (
-          <div style={{ position: "absolute", inset: 0, background: "#E5E7EB" }} />
+          <div style={{ position: "absolute", inset: 0, background: "var(--imaa-dm-muted, #E5E7EB)" }} />
         )}
 
         {/* Logo overlay */}
@@ -933,8 +933,8 @@ function GroupCard({ g, onOpen, onEdit, canEdit }) {
               height: 48,
               borderRadius: "50%",
               overflow: "hidden",
-              border: "3px solid white",
-              backgroundColor: "white",
+              border: "3px solid var(--imaa-dm-surface, white)",
+              backgroundColor: "var(--imaa-dm-surface, white)",
               zIndex: 2,
               boxShadow: "0 2px 8px rgba(0,0,0,0.15)"
             }}

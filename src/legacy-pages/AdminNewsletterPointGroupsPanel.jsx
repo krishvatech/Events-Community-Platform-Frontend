@@ -410,7 +410,7 @@ export default function AdminNewsletterPointGroupsPanel() {
           sx={{
             px: { xs: 2, md: 3 },
             py: 2,
-            borderBottom: "1px solid #E7ECEF",
+            borderBottom: "1px solid var(--imaa-dm-border, #E7ECEF)",
           }}
         >
           <Stack
@@ -498,7 +498,7 @@ export default function AdminNewsletterPointGroupsPanel() {
             <TableContainer sx={{ overflowX: "auto", maxWidth: "100%" }}>
               <Table aria-label="Mautic point groups" sx={{ minWidth: 680 }}>
                 <TableHead>
-                  <TableRow sx={{ bgcolor: "#F6F8FA" }}>
+                  <TableRow sx={{ bgcolor: "var(--imaa-dm-surface-alt, #F6F8FA)" }}>
                     <TableCell>Point Group</TableCell>
                     <TableCell>Status</TableCell>
                     <TableCell>Modified</TableCell>
@@ -563,7 +563,7 @@ export default function AdminNewsletterPointGroupsPanel() {
               <Stack
                 direction="row"
                 justifyContent="center"
-                sx={{ p: 2, borderTop: "1px solid #E7ECEF" }}
+                sx={{ p: 2, borderTop: "1px solid var(--imaa-dm-border, #E7ECEF)" }}
               >
                 <Pagination
                   count={numPages}

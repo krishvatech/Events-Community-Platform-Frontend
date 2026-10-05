@@ -155,7 +155,7 @@ export default function LinkedInProfileImportDialog({
                 mb: 2,
                 p: 2,
                 borderRadius: 1,
-                backgroundColor: "#f5f7fa",
+                backgroundColor: "var(--imaa-dm-page, #f5f7fa)",
               }}
             >
               <Typography variant="subtitle2">

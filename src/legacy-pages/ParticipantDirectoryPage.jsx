@@ -165,7 +165,7 @@ function ParticipantDirectoryPage({ eventId }) {
             Participant Directory
           </Typography>
           {event && (
-            <Typography variant="body2" sx={{ color: '#666', mb: 3 }}>
+            <Typography variant="body2" sx={{ color: 'var(--imaa-dm-text-body, #666)', mb: 3 }}>
               {event.title} · {totalCount} {totalCount === 1 ? 'participant' : 'participants'}
             </Typography>
           )}
@@ -179,13 +179,13 @@ function ParticipantDirectoryPage({ eventId }) {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <SearchIcon sx={{ color: '#999' }} />
+                  <SearchIcon sx={{ color: 'var(--imaa-dm-text-hint, #999)' }} />
                 </InputAdornment>
               ),
               endAdornment: searchQuery && (
                 <InputAdornment position="end">
                   <ClearIcon
-                    sx={{ cursor: 'pointer', color: '#999' }}
+                    sx={{ cursor: 'pointer', color: 'var(--imaa-dm-text-hint, #999)' }}
                     onClick={handleClearSearch}
                   />
                 </InputAdornment>
@@ -222,7 +222,7 @@ function ParticipantDirectoryPage({ eventId }) {
         {/* Participants Grid */}
         {participants.length === 0 ? (
           <Paper sx={{ p: 4, textAlign: 'center', bgcolor: COLORS.bg }}>
-            <Typography sx={{ color: '#666' }}>
+            <Typography sx={{ color: 'var(--imaa-dm-text-body, #666)' }}>
               No participants found. Try adjusting your search or filters.
             </Typography>
           </Paper>
@@ -236,7 +236,7 @@ function ParticipantDirectoryPage({ eventId }) {
                     sx={{
                       p: 2,
                       borderRadius: 2,
-                      border: '1px solid #E8E4DF',
+                      border: '1px solid var(--imaa-dm-border, #E8E4DF)',
                       transition: 'all 0.2s',
                       '&:hover': {
                         boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
@@ -276,12 +276,12 @@ function ParticipantDirectoryPage({ eventId }) {
                           {participant.display_name}
                         </Typography>
                         {participant.job_title && (
-                          <Typography sx={{ fontSize: 12, color: '#666', mb: 0.25 }}>
+                          <Typography sx={{ fontSize: 12, color: 'var(--imaa-dm-text-body, #666)', mb: 0.25 }}>
                             {participant.job_title}
                           </Typography>
                         )}
                         {participant.company && (
-                          <Typography sx={{ fontSize: 12, color: '#999' }}>
+                          <Typography sx={{ fontSize: 12, color: 'var(--imaa-dm-text-hint, #999)' }}>
                             {participant.company}
                           </Typography>
                         )}

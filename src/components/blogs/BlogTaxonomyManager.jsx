@@ -27,7 +27,7 @@ import AdminTableShell from "../admin/AdminTableShell.jsx";
 import useDebouncedValue from "../../hooks/useDebouncedValue";
 import { totalPagesFor } from "../../services/blogService";
 import { blogPrimaryButtonSx } from "./blogTheme";
-import { colors, focus, radii, shadows } from "../../styles/designTokens";
+import { colors, focus, radii, shadows, semanticColors } from "../../styles/designTokens";
 
 /**
  * Lightweight list/create/edit manager for a flat Blog taxonomy (categories or
@@ -139,7 +139,7 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
           gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "minmax(240px, 1fr) auto" },
           gap: 1.5,
           alignItems: "center",
-          borderColor: colors.border,
+          borderColor: semanticColors.border,
           borderRadius: `${radii.card}px`,
           boxShadow: shadows.sm,
         }}
@@ -151,7 +151,7 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
           onChange={(e) => setSearch(e.target.value)}
           placeholder={`Search ${plural.toLowerCase()}`}
           inputProps={{ "aria-label": `Search ${plural.toLowerCase()}` }}
-          InputProps={{ startAdornment: <SearchRoundedIcon sx={{ mr: 1, color: "grey.500" }} /> }}
+          InputProps={{ startAdornment: <SearchRoundedIcon sx={{ mr: 1, color: "var(--imaa-dm-text-hint, #9e9e9e)" }} /> }}
           fullWidth
           sx={{ "& .MuiOutlinedInput-root": { borderRadius: `${radii.field}px` } }}
         />
@@ -227,7 +227,7 @@ export default function BlogTaxonomyManager({ api, singular, plural, onNotify })
       )}
 
       <Dialog open={Boolean(dialog)} onClose={closeDialog} maxWidth="xs" fullWidth aria-labelledby="taxonomy-dialog-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
-        <DialogTitle id="taxonomy-dialog-title" sx={{ color: colors.navy, fontWeight: 750 }}>{dialog?.id ? `Edit ${singular}` : `New ${singular}`}</DialogTitle>
+        <DialogTitle id="taxonomy-dialog-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>{dialog?.id ? `Edit ${singular}` : `New ${singular}`}</DialogTitle>
         <DialogContent>
           {formError && <Alert severity="error" sx={{ mb: 2 }}>{formError}</Alert>}
           <TextField

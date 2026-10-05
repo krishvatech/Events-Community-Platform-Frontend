@@ -416,7 +416,7 @@ export default function AdminRecordingsPage() {
                         position: "relative",
                         width: "100%",
                         aspectRatio: "16/9",
-                        background: hasRec ? "#0b1220" : "#E5E7EB",
+                        background: hasRec ? "#0b1220" : "var(--imaa-dm-muted, #E5E7EB)",
                       }}
                     >
                       {hasRec ? (
