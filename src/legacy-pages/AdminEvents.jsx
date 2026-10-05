@@ -3585,6 +3585,8 @@ function AdminEventCard({
                       sx={{
                         textTransform: "none",
                         backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
+                        // disabled text: MUI's own light value; readable but still muted in dark mode
+                        "&.Mui-disabled": { color: "var(--imaa-dm-text-hint, rgba(0, 0, 0, 0.26))" },
                         minWidth: 0,
                         px: 1,
                       }}
@@ -3901,6 +3903,8 @@ function AdminEventCard({
                   sx={{
                     textTransform: "none",
                     backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
+                    // disabled text: MUI's own light value; readable but still muted in dark mode
+                    "&.Mui-disabled": { color: "var(--imaa-dm-text-hint, rgba(0, 0, 0, 0.26))" },
                   }}
                 >
                   <Box
@@ -3926,6 +3930,8 @@ function AdminEventCard({
                   sx={{
                     textTransform: "none",
                     backgroundColor: "var(--imaa-dm-muted-strong, #CBD5E1)",
+                    // disabled text: MUI's own light value; readable but still muted in dark mode
+                    "&.Mui-disabled": { color: "var(--imaa-dm-text-hint, rgba(0, 0, 0, 0.26))" },
                   }}
                 >
                   <Box
@@ -4606,8 +4612,9 @@ export default function DashbAdminEventsoard() {
     }
   }, [location.search, location.pathname]);
 
+  // Page ground: slate-50 (#f8fafc) in light mode, the member page background in dark mode.
   return (
-    <Box className="min-h-screen bg-slate-50">
+    <Box className="min-h-screen bg-[var(--imaa-dm-page,#f8fafc)]">
       <Container
         maxWidth="xl"
         sx={{

@@ -2,6 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } f
 import { Box, CircularProgress, Alert } from "@mui/material";
 import { init } from "@templatical/editor";
 import "@templatical/editor/style.css";
+import { useColorMode } from "../../theme/useColorMode";
 
 const STARTER_VERSION = 5;
 const EMAIL_GREEN = "#28a745";
@@ -564,6 +565,14 @@ const TemplaticalEmailEditor = forwardRef(function TemplaticalEmailEditor(
   const containerRef = useRef(null);
   const editorRef = useRef(null);
   const readyRef = useRef(false);
+  // Editor chrome (toolbar, side panels, workspace) follows the app's light/dark mode through
+  // Templatical's own uiTheme. Its dark theme keeps the email blocks in their light email colours,
+  // so the content being edited is shown as recipients will see it. Always "light" while dark
+  // mode is disabled.
+  const { isDark } = useColorMode();
+  const uiTheme = isDark ? "dark" : "light";
+  const uiThemeRef = useRef(uiTheme);
+  uiThemeRef.current = uiTheme;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -592,7 +601,7 @@ const TemplaticalEmailEditor = forwardRef(function TemplaticalEmailEditor(
           content: getInitialContent(template, editorContext),
           mergeTags: normalizeMergeTags(template),
           branding: false,
-          uiTheme: "light",
+          uiTheme: uiThemeRef.current,
           onChange(content) {
             onContentChange?.(content, { initial: !readyRef.current });
           },
@@ -627,6 +636,11 @@ const TemplaticalEmailEditor = forwardRef(function TemplaticalEmailEditor(
       }
     };
   }, [template?.template_key, editorContext?.is_multi_day]);
+
+  // Switch the editor theme in place when the app mode changes (no remount, content untouched).
+  useEffect(() => {
+    editorRef.current?.setTheme?.(uiTheme);
+  }, [uiTheme]);
 
   return (
     <Box sx={{ position: "relative" }}>

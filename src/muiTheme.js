@@ -121,6 +121,9 @@ const darkPalette = {
   background: { default: '#0E1626', paper: '#16213A', cool: '#121D33', member: '#0E1626' },
   text: { primary: '#E8ECF3', secondary: '#B3BCCB' },
   divider: 'rgba(226, 232, 240, 0.14)',
+  // Disabled text/icons: MUI's dark default (white at 30%) is about 2:1 on dark cards and reads as
+  // missing; 40% stays clearly disabled but legible. Other action values keep MUI's dark defaults.
+  action: { disabled: 'rgba(255, 255, 255, 0.4)' },
 };
 
 export const colorModeTheme = responsiveFontSizes(
@@ -184,6 +187,14 @@ export const colorModeTheme = responsiveFontSizes(
       MuiPopover: {
         styleOverrides: {
           paper: ({ theme: t }) => ({ border: `1px solid ${t.vars.palette.divider}`, borderRadius: radii.card }),
+        },
+      },
+      // Dialogs: no dark-mode elevation overlay. At elevation 24 MUI lightens the paper with ~16% white,
+      // which turns dialogs a washed-out grey and makes fields look darker than the dialog. Dialogs
+      // use the standard card surface instead. Light mode has no overlay, so nothing changes there.
+      MuiDialog: {
+        styleOverrides: {
+          paper: { backgroundImage: 'none' },
         },
       },
     },

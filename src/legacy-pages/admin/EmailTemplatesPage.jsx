@@ -734,7 +734,8 @@ export default function EmailTemplatesPage() {
                       width: "100%",
                       height: { xs: 520, sm: 620, md: 700 },
                       border: 0,
-                      bgcolor: "var(--imaa-dm-surface-alt, #f4f7fb)",
+                      // Email canvas behind the rendered email: stays light in dark mode (recipient view)
+                      bgcolor: "#f4f7fb",
                       display: "block",
                     }}
                   />
@@ -797,7 +798,8 @@ export default function EmailTemplatesPage() {
               border: "1px solid",
               borderColor: semanticColors.border,
               borderRadius: `${radii.field}px`,
-              bgcolor: "var(--imaa-dm-surface, white)",
+              // Email canvas behind the rendered email: stays light in dark mode (recipient view)
+              bgcolor: "white",
               display: "block",
             }}
           />

@@ -201,3 +201,20 @@ body.qna-open rtk-controlbar-button[label="Q&A"] {
   --xy-minimap-node-background-color: #3A4867;
   --xy-attribution-background-color: rgba(22, 33, 58, 0.6);
 }
+
+/* @templatical/editor (Admin email templates): the editor's own dark UI theme (uiTheme "dark",
+   set only in dark mode) uses IMAA's dark neutrals for its toolbar, panels and workspace. Accent
+   and status colours keep the library's dark variants. Email blocks are unaffected: the library
+   resets `.tpl-block-content` to its light email colours in the dark theme. */
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) .tpl {
+  --tpl-user-dark-bg: var(--imaa-dm-surface);
+  --tpl-user-dark-bg-elevated: var(--imaa-dm-surface-hover);
+  --tpl-user-dark-bg-hover: var(--imaa-dm-muted);
+  --tpl-user-dark-bg-active: var(--imaa-dm-muted-strong);
+  --tpl-user-dark-border: var(--imaa-dm-border);
+  --tpl-user-dark-border-light: var(--imaa-dm-border-strong);
+  --tpl-user-dark-text: var(--imaa-dm-text);
+  --tpl-user-dark-text-muted: var(--imaa-dm-text-meta);
+  --tpl-user-dark-text-dim: var(--imaa-dm-text-hint);
+  --tpl-user-dark-canvas-bg: var(--imaa-dm-page);
+}
