@@ -4731,19 +4731,30 @@ export default function GroupDetailsPage() {
     if (tab >= tabDefs.length) setTab(0);
   }, [tab, tabDefs.length]);
 
+  // The active tab follows ?tab=<key> (no ?tab = Overview), so direct links, refresh and Back/Forward
+  // all land on the right tab. Tab clicks update the URL (handleTabChange), keeping the two in step.
   React.useEffect(() => {
-    if (!requestedTab) return;
+    const wantedTab = requestedTab || "overview";
 
     const nextIndex = tabDefs.findIndex((item) => {
       const key = String(item.key || "").toLowerCase();
       const label = String(item.label || "").toLowerCase();
-      return key === requestedTab || label === requestedTab;
+      return key === wantedTab || label === wantedTab;
     });
 
     if (nextIndex >= 0 && nextIndex !== tab) {
       setTab(nextIndex);
     }
   }, [requestedTab, tab, tabDefs]);
+
+  // Switch immediately, then record the tab in the URL. Navigation state (e.g. backTo) is carried over.
+  const handleTabChange = (_, index) => {
+    setTab(index);
+    const key = tabDefs[index]?.key;
+    if (key && key !== requestedTab) {
+      navigate(`${location.pathname}?tab=${key}`, { state: location.state });
+    }
+  };
 
   // Filter Logic for Likes Dialog
   const likesFilteredUsers = likesFilter === "all" ? listUsers : listUsers.filter(u => u.reactionId === likesFilter);
@@ -4964,7 +4975,7 @@ export default function GroupDetailsPage() {
             <Box sx={{ borderBottom: 1, borderColor: "divider", maxWidth: "100%" }}>
               <Tabs
                 value={tab}
-                onChange={(_, v) => setTab(v)}
+                onChange={handleTabChange}
                 variant="scrollable"
                 scrollButtons="auto"
                 allowScrollButtonsMobile

@@ -52,6 +52,15 @@ import AdminStatusChip from "../components/admin/AdminStatusChip.jsx";
 const ORANGE = "var(--imaa-teal-hover)";
 const ORANGE_TEXT = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))"; // as text: readable variant in dark mode
 const TEXT = "var(--imaa-ink)";
+// Disabled filled buttons: MUI's own light values (rgba 0.12 / 0.26). In dark mode a muted fill with a
+// visible outline and a readable but secondary label, instead of MUI's faint white-on-white tint.
+const DISABLED_FILLED_BUTTON = {
+  "&.Mui-disabled": {
+    bgcolor: "var(--imaa-dm-muted, rgba(0, 0, 0, 0.12))",
+    color: "var(--imaa-dm-text-meta, rgba(0, 0, 0, 0.26))",
+    boxShadow: "inset 0 0 0 1px var(--imaa-dm-border-strong, transparent)",
+  },
+};
 const INVOICE_SETTINGS_TAB = 6;
 const SALEOR_PERMISSION_OPTIONS = [
   "MANAGE_USERS",
@@ -1520,7 +1529,9 @@ export default function SaleorManager() {
                 px: 3,
                 textTransform: "none",
                 fontWeight: 700,
-                "&:hover": { bgcolor: "var(--imaa-ink)" },
+                // hover: navy in light mode; in dark mode --imaa-ink is light, so use a visible dark fill
+                "&:hover": { bgcolor: "var(--imaa-dm-muted-strong, var(--imaa-ink))" },
+                ...DISABLED_FILLED_BUTTON,
               }}
             >
               Connect Saleor SSO
@@ -1600,7 +1611,7 @@ export default function SaleorManager() {
             </Box>
           </Box>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, flexWrap: "wrap", width: { xs: "100%", md: "auto" } }}>
-            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #6b7280)" }}>
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-body, #6b7280)" }}>
               Connected as: {saleorStatus.saleor_email}
             </Typography>
             {tab !== INVOICE_SETTINGS_TAB && (
@@ -1610,14 +1621,17 @@ export default function SaleorManager() {
                 onClick={handleSync}
                 disabled={syncing}
                 sx={{
+                  // Ink fill: navy with white text in light mode; --imaa-ink turns light in dark mode,
+                  // so the label switches to the dark page colour there.
                   bgcolor: TEXT,
-                  color: "white",
+                  color: "var(--imaa-dm-page, white)",
                   borderRadius: "var(--imaa-radius-field)",
                   minHeight: 40,
                   px: 3,
                   textTransform: "none",
                   fontWeight: 600,
-                  "&:hover": { bgcolor: "#1a253a" },
+                  "&:hover": { bgcolor: "var(--imaa-dm-text-2, #1a253a)" },
+                  ...DISABLED_FILLED_BUTTON,
                 }}
               >
                 Sync {tab === 0 ? "Channels" : tab === 1 ? "Warehouses" : tab === 2 ? "Shipping Zones" : tab === 3 ? "Product Types" : tab === 4 ? "Staff Users" : "Permission Groups"}
@@ -1632,9 +1646,10 @@ export default function SaleorManager() {
                 borderRadius: "var(--imaa-radius-field)",
                 minHeight: 40,
                 textTransform: "none",
-                borderColor: "var(--imaa-dm-border, #e5e7eb)",
+                borderColor: "var(--imaa-dm-border-strong, #e5e7eb)",
                 color: TEXT,
                 fontWeight: 600,
+                "&:hover": { borderColor: "var(--imaa-dm-text-hint, #e5e7eb)" },
               }}
             >
               Saleor Dashboard
@@ -1684,7 +1699,7 @@ export default function SaleorManager() {
                 color: ORANGE_TEXT,
               },
               "& .MuiTabs-indicator": {
-                backgroundColor: ORANGE,
+                backgroundColor: ORANGE_TEXT, // same teal as ORANGE in light mode; matches the selected label in dark mode
                 height: 3,
                 borderRadius: "3px 3px 0 0",
               },
@@ -1806,7 +1821,7 @@ export default function SaleorManager() {
                             label={`${(item.permissions || []).length} Permission${(item.permissions || []).length !== 1 ? "s" : ""}`}
                             size="small"
                             variant="outlined"
-                            sx={{ bgcolor: "var(--imaa-dm-surface-alt, #eff6ff)", color: "var(--imaa-dm-blue-text, #2563eb)", borderColor: "var(--imaa-dm-border-strong, #bfdbfe)" }}
+                            sx={{ bgcolor: "var(--imaa-dm-tint-blue, #eff6ff)", color: "var(--imaa-dm-blue-text, #2563eb)", borderColor: "var(--imaa-dm-tint-blue-border, #bfdbfe)" }}
                           />
                         )}
                       </TableCell>
@@ -1818,7 +1833,7 @@ export default function SaleorManager() {
                             label={`${item.user_count || 0} User${item.user_count !== 1 ? "s" : ""}`}
                             size="small"
                             variant="outlined"
-                            sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "#16a34a", borderColor: "var(--imaa-dm-tint-green-border, #bbf7d0)" }}
+                            sx={{ bgcolor: "var(--imaa-dm-tint-green, #f0fdf4)", color: "var(--imaa-dm-green-text, #16a34a)", borderColor: "var(--imaa-dm-tint-green-border, #bbf7d0)" }}
                           />
                         ) : tab !== 3 ? (
                           <AdminStatusChip status={item.is_active ? "active" : "inactive"} />
@@ -1863,7 +1878,7 @@ export default function SaleorManager() {
                               <>
                                 {(item.countries || []).length > 0 && (
                                   <Tooltip title="Countries">
-                                    <Chip label={`${item.countries.length} Countries`} size="small" variant="outlined" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #eff6ff)", color: "var(--imaa-dm-blue-text, #2563eb)", borderColor: "var(--imaa-dm-border-strong, #bfdbfe)" }} />
+                                    <Chip label={`${item.countries.length} Countries`} size="small" variant="outlined" sx={{ bgcolor: "var(--imaa-dm-tint-blue, #eff6ff)", color: "var(--imaa-dm-blue-text, #2563eb)", borderColor: "var(--imaa-dm-tint-blue-border, #bfdbfe)" }} />
                                   </Tooltip>
                                 )}
                                 {(item.channel_ids || []).length > 0 && (
@@ -1873,7 +1888,7 @@ export default function SaleorManager() {
                                 )}
                                 {(item.warehouse_ids || []).length > 0 && (
                                   <Tooltip title="Linked Warehouses">
-                                    <Chip label={`${item.warehouse_ids.length} Warehouse${item.warehouse_ids.length > 1 ? "s" : ""}`} size="small" variant="outlined" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f0fdf4)", color: "#16a34a", borderColor: "var(--imaa-dm-tint-green-border, #bbf7d0)" }} />
+                                    <Chip label={`${item.warehouse_ids.length} Warehouse${item.warehouse_ids.length > 1 ? "s" : ""}`} size="small" variant="outlined" sx={{ bgcolor: "var(--imaa-dm-tint-green, #f0fdf4)", color: "var(--imaa-dm-green-text, #16a34a)", borderColor: "var(--imaa-dm-tint-green-border, #bbf7d0)" }} />
                                   </Tooltip>
                                 )}
                                 {(item.shipping_methods || []).length > 0 && (
@@ -1978,7 +1993,7 @@ export default function SaleorManager() {
         </Paper>
 
         <Box sx={{ mt: 4, display: "flex", justifyContent: "center" }}>
-          <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-hint, #9ca3af)" }}>
+          <Typography variant="caption" sx={{ color: "var(--imaa-dm-text-meta, #9ca3af)" }}>
             {tab === INVOICE_SETTINGS_TAB
               ? "Invoice settings are stored securely in ECP and are not synchronized from Saleor."
               : `Last Synced: ${new Date().toLocaleString()} • ECP-Saleor Bridge v2.0`}

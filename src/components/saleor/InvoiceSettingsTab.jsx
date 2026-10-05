@@ -303,7 +303,16 @@ export default function InvoiceSettingsTab() {
               startIcon={<RestartAltOutlinedIcon />}
               onClick={handleReset}
               disabled={!dirty || saving}
-              sx={{ borderRadius: "var(--imaa-radius-field)", textTransform: "none", fontWeight: 700, color: TEXT, borderColor: "var(--imaa-border)", minHeight: 44 }}
+              sx={{
+                borderRadius: "var(--imaa-radius-field)",
+                textTransform: "none",
+                fontWeight: 700,
+                color: TEXT,
+                // outline: unchanged in light mode; the stronger dark border (and hover) in dark mode
+                borderColor: "var(--imaa-dm-border-strong, var(--imaa-border))",
+                "&:hover": { borderColor: "var(--imaa-dm-text-hint, var(--imaa-border))" },
+                minHeight: 44,
+              }}
             >
               Reset Unsaved Changes
             </Button>
@@ -319,7 +328,14 @@ export default function InvoiceSettingsTab() {
                 fontWeight: 700,
                 px: 3,
                 minHeight: 44,
-                "&:hover": { bgcolor: "#1a253a" },
+                // hover: unchanged in light mode; in dark mode the ink fill is light, so hover a shade dimmer
+                "&:hover": { bgcolor: "var(--imaa-dm-text-2, #1a253a)" },
+                // disabled: MUI's own light values; a muted fill, outline and readable label in dark mode
+                "&.Mui-disabled": {
+                  bgcolor: "var(--imaa-dm-muted, rgba(0, 0, 0, 0.12))",
+                  color: "var(--imaa-dm-text-meta, rgba(0, 0, 0, 0.26))",
+                  boxShadow: "inset 0 0 0 1px var(--imaa-dm-border-strong, transparent)",
+                },
               }}
             >
               Save Invoice Settings
