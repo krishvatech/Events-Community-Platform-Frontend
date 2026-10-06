@@ -117,7 +117,7 @@ const inputSx = {
     borderRadius: "10px",
     fontSize: 14,
     minHeight: 48,
-    bgcolor: "#FFFFFF",
+    bgcolor: "transparent",
     color: "#1B2A4A",
     "& fieldset": { borderColor: "#DCE5EC" },
     "&:hover fieldset": { borderColor: "#A9BAC8" },
@@ -128,6 +128,16 @@ const inputSx = {
   "& .MuiInputLabel-root.Mui-focused": { color: "#0A9396" },
   "& .MuiInputBase-input": {
     py: 1.45,
+    bgcolor: "transparent",
+    color: "#1B2A4A",
+    caretColor: "#1B2A4A",
+    "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active": {
+      WebkitBackgroundClip: "text",
+      WebkitTextFillColor: "#1B2A4A",
+      WebkitBoxShadow: "0 0 0 1000px transparent inset",
+      transition: "background-color 9999s ease-out 0s",
+      caretColor: "#1B2A4A",
+    },
   },
 };
 
@@ -583,8 +593,9 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
       }}
       BackdropProps={{
         sx: {
-          backdropFilter: "blur(2px)",
-          bgcolor: "rgba(240, 244, 245, 0.72)",
+          bgcolor: "transparent",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
         },
       }}
     >

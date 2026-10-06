@@ -26,6 +26,7 @@ import LogoutRoundedIcon from "@mui/icons-material/LogoutRounded";
 import { authConfig } from "../utils/api";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
 import { getAccessToken } from "../utils/tokenStore";
+import AuthModal from "./AuthModal.jsx";
 import imaaLogo from "../assets/IMAA-logo130.svg";
 import { colors, focus, layout, radii } from "../styles/designTokens";
 const apiBase =
@@ -123,8 +124,15 @@ const Header = () => {
   const accountHref = isAdmin ? "/admin/events" : "/account/profile";
   const resourcesHref = owner ? "/admin/resources" : "/account/resources";
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState("login");
   const openDrawer = () => setMobileOpen(true);
   const closeDrawer = () => setMobileOpen(false);
+  const openAuthModal = (mode) => {
+    setAuthModalMode(mode);
+    setAuthModalOpen(true);
+    setMobileOpen(false);
+  };
 
   const [authed, setAuthed] = useState(isAuthed());
   const next = encodeURIComponent((pathname + search) || "/events");
@@ -405,16 +413,14 @@ const Header = () => {
             ) : (
               <>
                 <Button
-                  component={Link}
-                  to="/signin"
+                  onClick={() => openAuthModal("login")}
                   variant="text"
                   sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, minHeight: 44, color: colors.navy, borderRadius: `${radii.field}px`, px: 2, "&:hover": { color: "#CC4422", bgcolor: "rgba(232,76,56,.05)" } }}
                 >
                   Log in
                 </Button>
                 <Button
-                  component={Link}
-                  to="/signup"
+                  onClick={() => openAuthModal("signup")}
                   variant="contained"
                   sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: `${radii.field}px`, px: 2.75, bgcolor: "#CC4422", color: colors.white, "&:hover": { bgcolor: "#A9361C" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${colors.navy}`, outlineOffset: "3px" }, boxShadow: "none" }}
                 >
@@ -481,17 +487,23 @@ const Header = () => {
             </List>
           ) : (
             <List onClick={closeDrawer}>
-              <ListItemButton component={Link} to="/signin">
+              <ListItemButton onClick={() => openAuthModal("login")}>
                 <ListItemIcon><LoginRoundedIcon /></ListItemIcon>
                 <ListItemText primary="Log in" />
               </ListItemButton>
-              <ListItemButton component={Link} to="/signup">
+              <ListItemButton onClick={() => openAuthModal("signup")}>
                 <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 700, color: "#CC4422" }} />
               </ListItemButton>
             </List>
           )}
         </Box>
       </Drawer>
+      <AuthModal
+        key={authModalMode}
+        open={authModalOpen}
+        onClose={() => setAuthModalOpen(false)}
+        initialMode={authModalMode}
+      />
     </AppBar>
   );
 };
