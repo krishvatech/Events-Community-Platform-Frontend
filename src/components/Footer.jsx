@@ -4,15 +4,15 @@ import { Container, Box, Link as MLink, IconButton } from "@mui/material";
 import { colors, focus, layout } from "../styles/designTokens";
 
 const footerLinkSx = {
-  color: colors.inkBody,
+  color: "rgba(255,255,255,.78)",
   fontSize: 14,
   fontWeight: 500,
   textDecoration: "none",
   borderRadius: "2px",
   transition: "color .15s ease",
-  "&:hover": { color: "#CC4422" },
+  "&:hover": { color: colors.white },
   "&:focus-visible": {
-    color: "#CC4422",
+    color: colors.white,
     outline: `${focus.width}px solid ${focus.color}`,
     outlineOffset: focus.offset,
   },
@@ -21,20 +21,24 @@ const footerLinkSx = {
 const socialButtonSx = {
   width: 44,
   height: 44,
-  color: colors.navy,
-  border: `1px solid ${colors.border}`,
+  color: "rgba(255,255,255,.82)",
+  border: "1px solid rgba(255,255,255,.28)",
   "&:hover": {
-    color: "#CC4422",
-    bgcolor: "rgba(232,76,56,.05)",
-    borderColor: "#CC4422",
+    color: colors.white,
+    bgcolor: "rgba(255,255,255,.08)",
+    borderColor: "rgba(255,255,255,.62)",
+  },
+  "&:focus-visible": {
+    outline: `${focus.width}px solid ${colors.white}`,
+    outlineOffset: focus.offset,
   },
 };
 
 const Footer = () => (
-  <Box component="footer" sx={{ bgcolor: colors.white, color: colors.navy, borderTop: `1px solid ${colors.border}` }}>
+  <Box component="footer" sx={{ bgcolor: colors.navy, color: colors.white, borderTop: "1px solid rgba(255,255,255,.12)" }}>
     <Container maxWidth={false} disableGutters>
-      <Box sx={{ mx: "auto", maxWidth: layout.contentMax, px: { xs: 3, sm: 4 }, py: { xs: 4, md: 5 } }}>
-        <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, alignItems: { md: "center" }, justifyContent: "space-between", gap: { xs: 3, md: 5 }, pb: 4, borderBottom: `1px solid ${colors.border}` }}>
+      <Box sx={{ mx: "auto", maxWidth: layout.contentMax, px: { xs: 3, sm: 4 }, py: { xs: 4.5, md: 5.5 } }}>
+        <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, alignItems: { md: "center" }, justifyContent: "space-between", gap: { xs: 3, md: 5 }, pb: 4, borderBottom: "1px solid rgba(255,255,255,.16)" }}>
           <Box component="nav" aria-label="Footer navigation" sx={{ display: "flex", flexWrap: "wrap", columnGap: { xs: 3, sm: 5 }, rowGap: 2 }}>
             <MLink href="/#about" underline="none" sx={footerLinkSx}>About Us</MLink>
             <MLink href="#" underline="none" sx={footerLinkSx}>Contact</MLink>
@@ -56,7 +60,7 @@ const Footer = () => (
           </Box>
         </Box>
 
-        <Box sx={{ pt: 3, textAlign: { xs: "left", sm: "center" }, color: colors.inkBody, fontSize: 13, lineHeight: 1.6 }}>
+        <Box sx={{ pt: 3, textAlign: { xs: "left", sm: "center" }, color: "rgba(255,255,255,.58)", fontSize: 13, lineHeight: 1.6 }}>
           © {new Date().getFullYear()} IMAA Connect. All rights reserved.
         </Box>
       </Box>

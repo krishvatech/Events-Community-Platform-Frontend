@@ -328,7 +328,7 @@ const Header = () => {
         bgcolor: "#FFFFFF !important",
         color: colors.navy,
         borderBottom: `1px solid ${colors.border}`,
-        boxShadow: "0 1px 8px rgba(27,42,74,.08)",
+        boxShadow: "0 2px 12px rgba(27,42,74,.06)",
         zIndex: (t) => t.zIndex.drawer + 2,
       }}
     >
@@ -336,7 +336,7 @@ const Header = () => {
         disableGutters
         sx={{ minHeight: { xs: 58, md: 66 } }}
       >
-        <Box sx={{ mx: "auto", maxWidth: layout.contentMax, width: "100%", px: { xs: 2, sm: 3, md: 4 }, display: "grid", gridTemplateColumns: { xs: "1fr auto", lg: "minmax(0, 1fr) auto minmax(0, 1fr)" }, alignItems: "center", gap: { xs: 1.5, lg: 3 } }}>
+        <Box sx={{ mx: "auto", maxWidth: layout.contentMax, width: "100%", px: { xs: 2.5, sm: 3, md: 4 }, display: "grid", gridTemplateColumns: { xs: "1fr auto", lg: "minmax(0, 1fr) auto minmax(0, 1fr)" }, alignItems: "center", gap: { xs: 1.5, lg: 3.5 } }}>
 
           {/* Left: IMAA Brand logo */}
           <Box
@@ -359,7 +359,7 @@ const Header = () => {
               component="img"
               src={imaaLogoSrc}
               alt="IMAA"
-              sx={{ display: "block", width: { xs: 126, sm: 138 }, height: "auto" }}
+              sx={{ display: "block", width: { xs: 116, sm: 128 }, height: "auto" }}
             />
           </Box>
 
@@ -367,7 +367,7 @@ const Header = () => {
           <Box
             component="nav"
             aria-label="Primary navigation"
-            sx={{ display: { xs: "none", lg: "flex" }, alignItems: "center", gap: 3.25, whiteSpace: "nowrap" }}
+            sx={{ display: { xs: "none", lg: "flex" }, alignItems: "center", gap: 3.75, whiteSpace: "nowrap" }}
           >
             <NavLink to="/events">Events</NavLink>
             <NavLink to="/community" requireAuth>Community</NavLink>
@@ -422,7 +422,7 @@ const Header = () => {
                 <Button
                   onClick={() => openAuthModal("signup")}
                   variant="contained"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: `${radii.field}px`, px: 2.75, bgcolor: "#CC4422", color: colors.white, "&:hover": { bgcolor: "#A9361C" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${colors.navy}`, outlineOffset: "3px" }, boxShadow: "none" }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: radii.pill, px: 3, bgcolor: "#CC4422", color: colors.white, "&:hover": { bgcolor: "#A9361C", boxShadow: "0 6px 14px rgba(169,54,28,.16)" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${colors.navy}`, outlineOffset: "3px" }, boxShadow: "none" }}
                 >
                   Sign up
                 </Button>

@@ -34,6 +34,8 @@ const TEAL_TEXT = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))"; // darker 
 const ORANGE = "var(--imaa-orange)";
 const ORANGE_HOVER = "var(--imaa-orange-hover)";
 const INK_BODY = "var(--imaa-ink-body)";
+const BORDER = "var(--imaa-border)";
+const COOL = "var(--imaa-bg-cool)";
 
 // Keep the public Home headings in the corporate sans-serif stack.
 const serifHeadingSx = { m: 0, fontFamily: "var(--imaa-font-sans)", fontWeight: 750, overflowWrap: "anywhere" };
@@ -72,20 +74,21 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
   <Box
     sx={{
       width: "100%",
-      minHeight: { xs: 230, md: 250 },
+      minHeight: { xs: 204, md: 224 },
       bgcolor: "#FFFFFF",
-      border: "1px solid rgba(36,62,117,.08)",
-      borderRadius: "0",
-      boxShadow: "0 18px 46px rgba(36,62,117,.08)",
-      px: { xs: 3, md: 3.75 },
-      py: { xs: 3.25, md: 3.75 },
+      border: `1px solid ${BORDER}`,
+      borderRadius: "var(--imaa-radius-card)",
+      boxShadow: "0 4px 16px rgba(27,42,74,.05)",
+      px: { xs: 2.75, md: 3 },
+      py: { xs: 2.75, md: 3 },
       display: "flex",
       flexDirection: "column",
       justifyContent: "flex-start",
-      transition: "transform .18s ease, box-shadow .18s ease",
+      transition: "transform .2s ease, box-shadow .2s ease, border-color .2s ease",
       "&:hover": {
-        transform: "translateY(-4px)",
-        boxShadow: "0 24px 54px rgba(36,62,117,.13)",
+        transform: "translateY(-2px)",
+        borderColor: "rgba(27,42,74,.18)",
+        boxShadow: "0 8px 22px rgba(27,42,74,.08)",
       },
       "@media (prefers-reduced-motion: reduce)": {
         transition: "none",
@@ -98,27 +101,27 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
         position: "relative",
         width: 40,
         height: 40,
-        borderRadius: "50%",
+        borderRadius: "var(--imaa-radius-field)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        mb: 3,
+        mb: 2,
         // Light tint of the icon colour behind the icon
-        "&::before": { content: '""', position: "absolute", inset: 0, borderRadius: "inherit", bgcolor: iconColor, opacity: 0.08 },
+        "&::before": { content: '""', position: "absolute", inset: 0, borderRadius: "inherit", bgcolor: iconColor, opacity: 0.07 },
       }}
     >
-      <Icon sx={{ position: "relative", color: iconColor, fontSize: 22 }} />
+      <Icon sx={{ position: "relative", color: iconColor, fontSize: 20 }} />
     </Box>
 
-    <Box component="h3" sx={{ ...serifHeadingSx, fontSize: "22px", lineHeight: 1.25, color: NAVY, mb: 1.5, fontWeight: 650 }}>
+    <Box component="h3" sx={{ ...serifHeadingSx, fontSize: "20px", lineHeight: 1.3, color: NAVY, mb: 1, fontWeight: 700 }}>
       {title}
     </Box>
 
     <Typography
       sx={{
         fontSize: "14px",
-        lineHeight: 1.75,
-        color: "#617398",
+        lineHeight: 1.7,
+        color: INK_BODY,
       }}
     >
       {desc}
@@ -130,19 +133,19 @@ const StatBand = () => (
   <Box
     component="section"
     sx={{
-      bgcolor: "#F7F8FA",
-      borderTop: "1px solid rgba(36,62,117,.06)",
-      borderBottom: "1px solid rgba(36,62,117,.06)",
+      bgcolor: "#FFFFFF",
+      borderTop: `1px solid ${BORDER}`,
+      borderBottom: `1px solid ${BORDER}`,
     }}
   >
     <Container maxWidth="lg">
       <Box
         sx={{
-          minHeight: { xs: "auto", md: 100 },
-          py: { xs: 3, md: 0 },
+          minHeight: { xs: "auto", md: 126 },
+          py: { xs: 3.5, md: 0 },
           display: "grid",
           gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
-          gap: { xs: 2.5, sm: 0 },
+          gap: { xs: 0, sm: 0 },
           alignItems: "center",
           textAlign: "center",
         }}
@@ -152,11 +155,11 @@ const StatBand = () => (
           ["4100+", "Professional network"],
           ["2000+", "Company connections"],
         ].map(([value, label]) => (
-          <Box key={label} sx={{ py: { xs: 1, sm: 0 }, borderRight: { sm: "1px solid rgba(36,62,117,.08)", "&:last-of-type": "none" } }}>
-            <Typography sx={{ color: "#243E75", fontSize: { xs: 32, md: 38 }, lineHeight: 1, fontWeight: 400 }}>
+          <Box key={label} sx={{ py: { xs: 2, sm: 0 }, borderRight: { sm: `1px solid ${BORDER}` }, borderBottom: { xs: `1px solid ${BORDER}`, sm: 0 }, "&:last-of-type": { borderRight: 0, borderBottom: 0 } }}>
+            <Typography sx={{ color: NAVY, fontSize: { xs: 34, md: 42 }, lineHeight: 1, fontWeight: 600, letterSpacing: "-.02em" }}>
               {value}
             </Typography>
-            <Typography sx={{ mt: 1, color: "rgba(97,115,152,.68)", fontSize: 14 }}>
+            <Typography sx={{ mt: 1.25, color: INK_BODY, fontSize: 14, letterSpacing: ".01em" }}>
               {label}
             </Typography>
           </Box>
@@ -207,14 +210,14 @@ export default function HomePage() {
 
       {/* HERO */}
       <Box component="section" sx={{
-        position: "relative", minHeight: { xs: 520, md: 570, lg: 610 }, overflow: "hidden",
+        position: "relative", minHeight: { xs: 500, md: 590, lg: 630 }, overflow: "hidden",
         display: "flex", alignItems: "center",
         borderBottom: "0",
         mt: { xs: -7.25, md: -8.25 },
         pt: { xs: 7.25, md: 8.25 },
         background: heroImage
-          ? `linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.91) 39%, rgba(255,255,255,.58) 58%, rgba(255,255,255,.2) 100%), url(${heroImage}) center/cover no-repeat`
-          : "#F7F9FB",
+          ? `linear-gradient(90deg, rgba(255,255,255,.99) 0%, rgba(255,255,255,.95) 37%, rgba(255,255,255,.68) 57%, rgba(255,255,255,.12) 100%), url(${heroImage}) center/cover no-repeat`
+          : COOL,
       }}>
         {useLightHero && <ChevronPattern />}
         <Container
@@ -222,7 +225,7 @@ export default function HomePage() {
           sx={{
             position: "relative",
             zIndex: 1,
-            py: { xs: 7, md: 9 },
+            py: { xs: 7, md: 10 },
             display: "flex",
             justifyContent: "flex-start",
           }}
@@ -230,7 +233,7 @@ export default function HomePage() {
           <Box
             sx={{
               width: "100%",
-              maxWidth: { xs: "100%", md: 700 },
+              maxWidth: { xs: "100%", md: 670 },
               textAlign: "left",
               display: "flex",
               flexDirection: "column",
@@ -247,9 +250,9 @@ export default function HomePage() {
             {/* Set the title colour locally so the global h1 rule cannot override it. */}
             <Box component="h1" sx={{
               ...serifHeadingSx,
-              fontSize: { xs: 44, sm: 58, md: 72 }, lineHeight: 1.08,
-              color: "#243E75", mb: 3, letterSpacing: 0, textWrap: "balance",
-              fontWeight: 650,
+              fontSize: { xs: 42, sm: 56, md: 68 }, lineHeight: 1.08,
+              color: NAVY, mb: 3, letterSpacing: "-.025em", textWrap: "balance",
+              fontWeight: 700,
             }}>
               {heroTitle}
             </Box>
@@ -259,8 +262,8 @@ export default function HomePage() {
                 fontSize: { xs: 16, md: 19 },
                 lineHeight: 1.7,
                 mb: 4,
-                color: "#617398",
-                maxWidth: 620,
+                color: INK_BODY,
+                maxWidth: 590,
                 textAlign: "left",
               }}
             >
@@ -278,18 +281,18 @@ export default function HomePage() {
             >
               {authed ? (
                 <Button component={Link} to="/events" variant="contained" size="large"
-                  sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                  sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" }, boxShadow: "none", borderRadius: 999, minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                   Explore Events
                 </Button>
               ) : (
                 <>
                   {/* Keep the primary label white for readable contrast on coral. */}
                   <Button onClick={openSignup} variant="contained" size="large"
-                    sx={{ bgcolor: "#F05843", color: "#FFFFFF", "&:hover": { bgcolor: "#D9422E" }, boxShadow: "none", borderRadius: 999, minHeight: 46, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase" }}>
+                    sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" }, boxShadow: "none", borderRadius: 999, minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em" }}>
                     Get started
                   </Button>
                   <Button onClick={openLogin} variant="outlined" size="large"
-                    sx={{ borderColor: "transparent", bgcolor: "#FFFFFF", color: "#F05843", "&:hover": { borderColor: "transparent", bgcolor: "#F8F8F8" }, borderRadius: 999, minHeight: 46, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", boxShadow: "0 8px 24px rgba(36,62,117,.08)" }}>
+                    sx={{ borderColor: "rgba(27,42,74,.2)", bgcolor: "rgba(255,255,255,.94)", color: NAVY, "&:hover": { borderColor: NAVY, bgcolor: "#FFFFFF" }, borderRadius: 999, minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em", boxShadow: "none" }}>
                     Log in
                   </Button>
                 </>
@@ -306,8 +309,9 @@ export default function HomePage() {
       <Box
         component="section"
         sx={{
-          py: { xs: 7, md: 9 },
-          bgcolor: "#FFFFFF",
+          pt: { xs: 7, md: 10 },
+          pb: { xs: 6, md: 8 },
+          bgcolor: COOL,
         }}
       >
         <Container maxWidth="lg">
@@ -323,10 +327,12 @@ export default function HomePage() {
             <Box>
               <Typography
                 sx={{
-                  color: "#617398",
-                  fontWeight: 400,
-                  fontSize: { xs: 24, md: 30 },
-                  mb: 0.75,
+                  color: TEAL_TEXT,
+                  fontWeight: 700,
+                  fontSize: 13,
+                  letterSpacing: ".12em",
+                  textTransform: "uppercase",
+                  mb: 1.25,
                 }}
               >
                 Why join
@@ -336,10 +342,10 @@ export default function HomePage() {
                 component="h2"
                 sx={{
                   ...serifHeadingSx,
-                  fontSize: { xs: 38, md: 54 },
+                  fontSize: { xs: 36, md: 50 },
                   lineHeight: 1.12,
                   color: "#243E75",
-                  fontWeight: 650,
+                  fontWeight: 700,
                   maxWidth: 720,
                 }}
               >
@@ -354,16 +360,16 @@ export default function HomePage() {
               variant="contained"
               sx={{
                 justifySelf: { xs: "start", md: "end" },
-                bgcolor: "#F05843",
+                bgcolor: ORANGE_HOVER,
                 color: "#FFFFFF",
                 borderRadius: 999,
                 boxShadow: "none",
-                minHeight: 46,
+                minHeight: 48,
                 px: 4.5,
                 fontSize: 14,
                 fontWeight: 700,
                 textTransform: "uppercase",
-                "&:hover": { bgcolor: "#D9422E", boxShadow: "none" },
+                "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" },
               }}
             >
               {authed ? "View events" : "Join now"}
@@ -374,31 +380,31 @@ export default function HomePage() {
             sx={{
               display: "grid",
               gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" },
-              gap: { xs: 2.5, md: 3.75 },
+              gap: { xs: 2.5, md: 3 },
             }}
           >
             {[
               {
                 icon: EventNoteIcon,
-                iconColor: ORANGE,
+                iconColor: ORANGE_HOVER,
                 title: "Events & Webinars",
                 desc: "Attend conferences, workshops, and live webinars tailored for M&A professionals worldwide.",
               },
               {
                 icon: GroupIcon,
-                iconColor: TEAL,
+                iconColor: TEAL_TEXT,
                 title: "Professional Community",
                 desc: "Connect with dealmakers, advisors, and executives across the full M&A spectrum.",
               },
               {
                 icon: LibraryIcon,
-                iconColor: "var(--imaa-purple)",
+                iconColor: NAVY,
                 title: "E-Library & Resources",
                 desc: "Access curated research, templates, and thought leadership from industry experts.",
               },
               {
                 icon: TrendingIcon,
-                iconColor: "var(--imaa-gold)",
+                iconColor: ORANGE_HOVER,
                 title: "Courses & Training",
                 desc: "Earn designations and upskill with structured M&A training programs.",
               },
@@ -410,7 +416,7 @@ export default function HomePage() {
               },
               {
                 icon: GroupsIcon,
-                iconColor: "var(--imaa-coral)",
+                iconColor: NAVY,
                 title: "Private Groups",
                 desc: "Join invite-only groups, alumni networks, and deal communities.",
               },
@@ -427,7 +433,7 @@ export default function HomePage() {
           component="section"
           sx={{
             py: { xs: 7, md: 10 },
-            bgcolor: "#F0F4F5",
+            bgcolor: "#FFFFFF",
           }}
         >
           <Container maxWidth="lg">
@@ -439,17 +445,17 @@ export default function HomePage() {
                 display: "grid",
                 // Single column when there is no image, so there is no empty half
                 gridTemplateColumns: { xs: "1fr", md: featuredEvent.preview_image ? "1fr 1fr" : "1fr" },
-                gap: 4,
+                gap: 0,
                 alignItems: "center",
                 backgroundColor: "#FFFFFF",
-                borderRadius: "var(--imaa-radius-field)",
+                borderRadius: "var(--imaa-radius-card)",
                 overflow: "hidden",
                 border: "1px solid var(--imaa-border)",
-                boxShadow: "0 10px 32px rgba(27,42,74,.08)",
+                boxShadow: "0 12px 36px rgba(27,42,74,.08)",
                 textDecoration: "none",
                 color: "inherit",
                 "&:hover": {
-                  boxShadow: "0 16px 40px rgba(27,42,74,.13)",
+                  boxShadow: "0 18px 42px rgba(27,42,74,.12)",
                   transform: "translateY(-3px)",
                 },
                 "&:hover .featured-event-cta": { bgcolor: "#A9361C" },
@@ -466,11 +472,13 @@ export default function HomePage() {
                     backgroundImage: `url(${featuredEvent.preview_image})`,
                     backgroundSize: "cover",
                     backgroundPosition: "center",
-                    height: { xs: 250, md: 400 },
+                    minHeight: { xs: 240, md: 420 },
                   }}
+                  role="img"
+                  aria-label={featuredEvent.title}
                 />
               )}
-              <Box sx={{ p: { xs: 3, md: 5 }, display: "flex", flexDirection: "column", justifyContent: "center" }}>
+              <Box sx={{ p: { xs: 3.5, sm: 4, md: 5.5 }, display: "flex", flexDirection: "column", justifyContent: "center" }}>
                 <Chip
                   label={<><span aria-hidden="true">⭐</span> Featured Event</>}
                   sx={{
@@ -479,14 +487,14 @@ export default function HomePage() {
                     fontWeight: 600,
                     bgcolor: "#FEF2EE",
                     color: ORANGE_HOVER,
-                    borderRadius: "var(--imaa-radius-field)",
+                    borderRadius: 999,
                   }}
                 />
                 <Box
                   component="h2"
                   sx={{
                     ...serifHeadingSx,
-                    fontSize: { xs: 24, md: 34 },
+                    fontSize: { xs: 26, md: 36 },
                     color: NAVY,
                     mb: 2,
                     lineHeight: 1.2,
@@ -531,7 +539,7 @@ export default function HomePage() {
                     justifyContent: "center",
                     bgcolor: ORANGE_HOVER,
                     color: "#FFFFFF",
-                    borderRadius: "var(--imaa-radius-field)",
+                    borderRadius: 999,
                     boxShadow: "none",
                     fontWeight: 700,
                     fontSize: "0.875rem",
@@ -552,12 +560,12 @@ export default function HomePage() {
       {/* CTA BANNER */}
       {!authed && (
         <Box component="section" sx={{
-          py: { xs: 7, md: 9 },
+          py: { xs: 7, md: 8 },
           bgcolor: NAVY, // flat navy (gradients retired)
           textAlign: "center",
         }}>
           <Container maxWidth="md">
-            <Box component="h2" sx={{ ...serifHeadingSx, fontSize: { xs: 30, md: 42 }, lineHeight: 1.2, color: "#FFFFFF", mb: 2 }}>
+            <Box component="h2" sx={{ ...serifHeadingSx, fontSize: { xs: 30, md: 42 }, lineHeight: 1.2, color: "#FFFFFF", mb: 2, fontWeight: 700, letterSpacing: "-.015em" }}>
               Ready to join the M&A network?
             </Box>
             <Typography sx={{ color: "rgba(255,255,255,.75)", fontSize: 17, mb: 5, lineHeight: 1.7 }}>
@@ -565,11 +573,11 @@ export default function HomePage() {
             </Typography>
             <Box sx={{ display: "flex", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
               <Button onClick={openSignup} variant="contained" size="large"
-                sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: 999, minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                 Create free account
               </Button>
               <Button onClick={openLogin} variant="outlined" size="large"
-                sx={{ borderColor: "rgba(255,255,255,.65)", color: "#FFFFFF", "&:hover": { borderColor: "#FFFFFF", bgcolor: "rgba(255,255,255,.08)" }, borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                sx={{ borderColor: "rgba(255,255,255,.65)", color: "#FFFFFF", "&:hover": { borderColor: "#FFFFFF", bgcolor: "rgba(255,255,255,.08)" }, borderRadius: 999, minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                 Sign in
               </Button>
             </Box>
