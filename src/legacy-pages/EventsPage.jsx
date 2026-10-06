@@ -989,8 +989,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
     <MUICard
       elevation={0}
       onClick={handleCardClick}
-      className="group h-full w-full flex flex-col rounded-lg border border-imaa-border bg-white shadow-imaa-sm
-                transition-all duration-300 hover:shadow-imaa-md hover:-translate-y-1 motion-reduce:hover:translate-y-0
+      className="group h-full w-full flex flex-col rounded-lg border border-imaa-border bg-white shadow-[0_4px_16px_rgba(27,42,74,.05)]
+                transition-all duration-200 hover:shadow-[0_8px_22px_rgba(27,42,74,.08)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
                 hover:border-imaa-border-hover overflow-hidden cursor-pointer"
     >
       {/* MEDIA */}
@@ -1017,9 +1017,9 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
           </span>
         )}
       </Box>
-      <CardContent className="p-4 sm:p-5 md:p-6 flex-1 flex flex-col min-h-[260px] sm:min-h-[280px] md:min-h-[300px]">
+      <CardContent className="p-4 sm:p-5 flex-1 flex flex-col min-h-[250px] sm:min-h-[270px] md:min-h-[286px]">
         <div className="flex items-start gap-2 mb-1">
-          <h3 className="font-serif text-xl sm:text-2xl font-semibold text-imaa-ink leading-snug two-line flex-1">
+          <h3 className="font-sans text-xl sm:text-[22px] font-bold text-imaa-ink leading-snug two-line flex-1">
             {ev.title}
           </h3>
           {ev.isPinnedTopCopy && (
@@ -1284,7 +1284,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       {!isSecondaryDataReady ? (
         <CardFooterSkeleton />
       ) : (
-      <div className="flex items-center justify-between border-t p-6">
+      <div className="flex items-center justify-between border-t border-imaa-border p-5">
         <div className="text-base font-semibold text-neutral-900">
           {isPaymentPending ? (
             <PaymentPendingSummary reg={reg} />
@@ -1332,7 +1332,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     size="medium"
                     onClick={handleJoinCard}
                     disabled={!canJoinNow}
-                    className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                    className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
                   >
                     {effectiveJoinLabel}
                   </Button>
@@ -1404,7 +1404,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           size="medium"
                           color="primary"
                           onClick={openApplyModalAfterProfileCheck}
-                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
                         >
                           {applicationStatus === 'declined'
                             ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
@@ -1524,7 +1524,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           size="medium"
                           color="primary"
                           onClick={(e) => { e.stopPropagation(); handleRegisterCard(false); }}
-                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
                         >
                           {getReplayCtaText(ev, isAuthenticatedUser)}
                         </Button>
@@ -1543,7 +1543,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         size="medium"
                         color="primary"
                         onClick={(e) => { e.stopPropagation(); handleRegisterCard(false); }}
-                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                        className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
                       >
                         Register Now
                       </Button>
@@ -1790,8 +1790,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   return (
     <MUICard
       elevation={0}
-      className="group rounded-lg border border-imaa-border bg-white shadow-imaa-sm
-                 transition-all duration-300 hover:shadow-imaa-md hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
+      className="group rounded-lg border border-imaa-border bg-white shadow-[0_4px_16px_rgba(27,42,74,.05)]
+                 transition-all duration-200 hover:shadow-[0_8px_22px_rgba(27,42,74,.08)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
                  hover:border-imaa-border-hover overflow-hidden"
     >
       <div className="md:flex">
@@ -1801,7 +1801,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
             <img
               src={toAbs(ev.cover_image || ev.image)}
               alt={ev.title}
-              className="w-full h-44 md:h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105 will-change-transform"
+              className="w-full h-44 md:h-full object-cover transform-gpu transition-transform duration-500 ease-out group-hover:scale-[1.02] will-change-transform"
             />
           ) : (
             <div className="w-full h-44 md:h-full object-cover">No image</div>
@@ -1824,7 +1824,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex items-start gap-2 mb-1">
-                <h3 className="font-serif text-xl md:text-2xl font-semibold text-imaa-ink leading-snug flex-1">
+                <h3 className="font-sans text-xl md:text-[22px] font-bold text-imaa-ink leading-snug flex-1">
                   {ev.title}
                 </h3>
                 {ev.isPinnedTopCopy && (
@@ -1975,7 +1975,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           size="medium"
                           onClick={handleJoinRow}
                           disabled={!canJoinNow}
-                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
                         >
                           {effectiveJoinLabel}
                         </Button>
@@ -2043,7 +2043,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           size="medium"
                           color="primary"
                           onClick={openApplyModalAfterProfileCheck}
-                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
                         >
                           {applicationStatus === 'declined'
                             ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
@@ -2111,7 +2111,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             size="medium"
                             color="primary"
                             onClick={(e) => { e.stopPropagation(); handleRegisterRow(false); }}
-                            className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                            className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
                           >
                             {getReplayCtaText(ev, isAuthenticatedUser)}
                           </Button>
@@ -2130,7 +2130,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           size="medium"
                           color="primary"
                           onClick={(e) => { e.stopPropagation(); handleRegisterRow(false); }}
-                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
                         >
                           Register Now
                         </Button>
@@ -3280,14 +3280,16 @@ export default function EventsPage() {
 
 
   const selectSx = {
-    height: 42,                       // 12 * 4px
-    borderRadius: 1,                 // rounded-xl
+    height: 48,
+    borderRadius: "var(--imaa-radius-card)",
     bgcolor: "var(--imaa-dm-surface, white)",
-    minWidth: { xs: 200, sm: 190, lg: 160 },
-    "& .MuiOutlinedInput-notchedOutline": { borderColor: "divider" },
+    minWidth: 0,
+    width: "100%",
+    fontSize: 14,
+    "& .MuiOutlinedInput-notchedOutline": { borderColor: "var(--imaa-border)" },
     "&:hover .MuiOutlinedInput-notchedOutline": { borderColor: "var(--imaa-dm-border-strong, #CBD5E1)" },
     "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-      borderColor: "primary.main",
+      borderColor: "var(--imaa-teal)",
       borderWidth: 2,
     },
     "& .MuiSelect-icon": { color: "text.secondary" },
@@ -3447,27 +3449,24 @@ export default function EventsPage() {
   return (
     <>
       {/* Hero (background image) */}
-      <section className="relative">
+      <section className="relative border-b border-imaa-border bg-white">
         <div
-          className="relative text-white text-center"
+          className="relative text-left"
           style={{
-            backgroundImage: `url("${heroBg}")`,
+            backgroundImage: `linear-gradient(90deg, rgba(255,255,255,.99) 0%, rgba(255,255,255,.96) 42%, rgba(255,255,255,.76) 62%, rgba(255,255,255,.28) 100%), url("${heroBg}")`,
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
         >
-          {/* Flat navy photo overlay (design tokens) */}
-          <div className="absolute inset-0 bg-imaa-navy/85" />
           <Container maxWidth={false} disableGutters>
-            <div className="relative mx-auto max-w-7xl px-6 py-16 md:py-20">
-              {/* text-white is set on the heading itself: the base h1 rule in index.css would otherwise make it navy */}
-              <h1 className="font-serif text-4xl md:text-5xl font-bold tracking-tight text-white mb-4">
+            <div className="relative mx-auto max-w-[1200px] px-6 py-12 md:py-14">
+              <h1 className="max-w-3xl font-sans text-4xl md:text-5xl font-bold tracking-[-0.025em] leading-[1.08] text-imaa-ink mb-4">
                 {heroTitle}
               </h1>
-              <p className="mx-auto max-w-3xl text-lg md:text-xl text-white/80">
+              <p className="max-w-2xl text-base md:text-lg leading-relaxed text-imaa-body">
                 {heroSubtitle}
               </p>
-              <div className="mt-8 flex flex-wrap justify-center items-center gap-4">
+              <div className="mt-7 flex flex-wrap justify-start items-center gap-3">
                 {ctaButtons
                   .filter((btn) => (btn?.label || "").trim())
                   .map((btn) => {
@@ -3491,7 +3490,16 @@ export default function EventsPage() {
                           target={isExternal ? "_blank" : undefined}
                           rel={isExternal ? "noreferrer" : undefined}
                           variant="contained"
-                          className="normal-case rounded-xl bg-teal-500 hover:bg-teal-600"
+                          sx={{
+                            minHeight: 48,
+                            px: 4.5,
+                            borderRadius: 999,
+                            textTransform: "none",
+                            fontWeight: 700,
+                            bgcolor: "var(--imaa-orange-hover)",
+                            boxShadow: "none",
+                            "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" },
+                          }}
                         >
                           {label}
                         </Button>
@@ -3509,7 +3517,17 @@ export default function EventsPage() {
                           target={isExternal ? "_blank" : undefined}
                           rel={isExternal ? "noreferrer" : undefined}
                           variant="outlined"
-                          className="normal-case rounded-xl border-white/30 text-imaa-ink bg-white hover:border-white hover:bg-white/90"
+                          sx={{
+                            minHeight: 48,
+                            px: 4.5,
+                            borderRadius: 999,
+                            textTransform: "none",
+                            fontWeight: 700,
+                            color: "var(--imaa-navy)",
+                            borderColor: "rgba(27,42,74,.22)",
+                            bgcolor: "rgba(255,255,255,.94)",
+                            "&:hover": { borderColor: "var(--imaa-navy)", bgcolor: "#fff" },
+                          }}
                         >
                           {label}
                         </Button>
@@ -3526,7 +3544,17 @@ export default function EventsPage() {
                         target={isExternal ? "_blank" : undefined}
                         rel={isExternal ? "noreferrer" : undefined}
                         variant="outlined"
-                        className="normal-case rounded-xl border-white/30 text-white hover:border-white hover:bg-white/10"
+                        sx={{
+                          minHeight: 48,
+                          px: 4.5,
+                          borderRadius: 999,
+                          textTransform: "none",
+                          fontWeight: 700,
+                          color: "var(--imaa-navy)",
+                          borderColor: "rgba(27,42,74,.22)",
+                          bgcolor: "rgba(255,255,255,.94)",
+                          "&:hover": { borderColor: "var(--imaa-navy)", bgcolor: "#fff" },
+                        }}
                       >
                         {label}
                       </Button>
@@ -3540,7 +3568,7 @@ export default function EventsPage() {
 
       {/* Top filters / controls bar */}
       <Container maxWidth={false} disableGutters className="mt-6 px-4 sm:px-6">
-        <div className="w-full rounded-2xl border border-imaa-border bg-white p-3 sm:p-4 overflow-visible">
+        <div className="mx-auto w-full max-w-[1200px] rounded-lg border border-imaa-border bg-white p-3 sm:p-4 overflow-visible shadow-[0_4px_16px_rgba(27,42,74,.05)]">
           {/* Responsive grid: 1 col on xs, 2 cols on sm, 12-col layout on lg+ */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
 
@@ -3557,7 +3585,7 @@ export default function EventsPage() {
                   type="text"
                   placeholder="Search events by keyword..."
                   aria-label="Search events"
-                  className="w-full h-11 pl-12 pr-4 rounded-xl border border-imaa-border bg-white text-imaa-ink outline-none transition-colors hover:border-imaa-border-hover focus:border-imaa-teal focus:ring-2 focus:ring-imaa-teal/25"
+                  className="w-full h-12 pl-12 pr-4 rounded-lg border border-imaa-border bg-white text-sm text-imaa-ink placeholder:text-slate-500 outline-none transition-colors hover:border-imaa-border-hover focus:border-imaa-teal focus:ring-2 focus:ring-imaa-teal/20"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                 />
@@ -3576,7 +3604,8 @@ export default function EventsPage() {
                   {...getOpenProps("date")}
                   sx={{
                     ...selectSx,
-                    "& .MuiOutlinedInput-root": { height: 44, borderRadius: 12 },
+                    height: 48,
+                    borderRadius: "var(--imaa-radius-card)",
                     "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" },
                   }}
                 >
@@ -3599,7 +3628,8 @@ export default function EventsPage() {
                   {...getOpenProps("topic")}
                   sx={{
                     ...selectSx,
-                    "& .MuiOutlinedInput-root": { height: 44, borderRadius: 12 },
+                    height: 48,
+                    borderRadius: "var(--imaa-radius-card)",
                     "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" },
                   }}
                 >
@@ -3621,7 +3651,9 @@ export default function EventsPage() {
                   MenuProps={selectMenuProps}
                   {...getOpenProps("format")}
                   sx={{
-                    ...selectSx, "& .MuiOutlinedInput-root": { height: 44, borderRadius: 12 },
+                    ...selectSx,
+                    height: 48,
+                    borderRadius: "var(--imaa-radius-card)",
                     "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" }
                   }}
                 >
@@ -3639,7 +3671,7 @@ export default function EventsPage() {
                 onClick={() => setShowAdvanced((v) => !v)}
                 type="button"
                 aria-expanded={showAdvanced}
-                className="w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl border border-imaa-border bg-white text-sm font-medium text-imaa-ink transition-colors hover:border-imaa-border-hover hover:bg-imaa-member"
+                className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-lg border border-imaa-border bg-white text-sm font-semibold text-imaa-ink transition-colors hover:border-imaa-border-hover hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-imaa-teal"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-slate-600" aria-hidden="true">
                   <path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -3654,13 +3686,13 @@ export default function EventsPage() {
               className="hidden sm:block sm:col-span-2 lg:col-span-1 min-w-0"
               aria-hidden={false} // hidden only on xs due to Tailwind
             >
-              <div className="flex w-full h-11 rounded-xl overflow-hidden border border-imaa-border bg-white">
+              <div className="flex w-full h-12 rounded-lg overflow-hidden border border-imaa-border bg-white">
                 <button
                   type="button"
                   aria-label="Grid view"
                   aria-pressed={view === 'grid'}
                   onClick={() => setView('grid')}
-                  className={`flex-1 h-full grid place-items-center focus-visible:[outline-offset:-2px]
+                  className={`flex-1 h-full grid place-items-center transition-colors focus-visible:[outline-offset:-2px]
                     ${view === 'grid' ? 'bg-imaa-navy text-white' : 'bg-white text-slate-800 hover:bg-imaa-member'}`}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -3676,7 +3708,7 @@ export default function EventsPage() {
                   aria-label="List view"
                   aria-pressed={view === 'list'}
                   onClick={() => setView('list')}
-                  className={`flex-1 h-full grid place-items-center border-l border-imaa-border focus-visible:[outline-offset:-2px]
+                  className={`flex-1 h-full grid place-items-center border-l border-imaa-border transition-colors focus-visible:[outline-offset:-2px]
                     ${view === 'list' ? 'bg-imaa-navy text-white' : 'bg-white text-slate-800 hover:bg-imaa-member'}`}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -3693,8 +3725,8 @@ export default function EventsPage() {
       </Container>
 
       {/* Results */}
-      <Container id="events" maxWidth={false} disableGutters className="mt-8 mb-16 px-4 sm:px-6">
-        <Grid container spacing={4} sx={{ alignItems: "flex-start" }}>
+      <Container id="events" maxWidth={false} disableGutters className="mt-6 px-4 sm:px-6 pb-12" sx={{ bgcolor: "var(--imaa-bg-cool)" }}>
+        <Grid container spacing={4} sx={{ alignItems: "flex-start", maxWidth: 1200, mx: "auto", pt: { xs: 3, md: 4 } }}>
           {/* LEFT: Advanced Filters — desktop only */}
           {isDesktop && showAdvanced && (
             <Grid
@@ -3709,7 +3741,7 @@ export default function EventsPage() {
               }}
             >
               <div className="sticky top-24 h-fit">
-                <div className="rounded-2xl bg-imaa-navy text-white p-6">
+                <div className="rounded-lg border border-imaa-border bg-white text-imaa-ink p-5 shadow-[0_4px_16px_rgba(27,42,74,.05)]">
                   <div className="flex items-center gap-2 mb-6">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                       <path
@@ -3724,7 +3756,7 @@ export default function EventsPage() {
 
                   {/* Date Range */}
                   <div className="mb-5">
-                    <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                    <div className="text-imaa-teal-dark font-semibold mb-2 flex items-center gap-2">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                         <rect
                           x="3"
@@ -3745,7 +3777,7 @@ export default function EventsPage() {
                     </div>
                     <LocalizationProvider dateAdapter={AdapterDayjs}>
                       <DatePicker
-                        className="text-white bg-teal-500"
+                        className="bg-white"
                         label={null}
                         value={startDMY ? dayjs(dmyToISO(startDMY)) : null}
                         onChange={(v) => {
@@ -3760,15 +3792,15 @@ export default function EventsPage() {
                             sx: {
                               "& .MuiOutlinedInput-root": {
                                 height: 44,
-                                background: "rgba(255, 255, 255, 0.1)",
-                                borderRadius: 12,
-                                color: "#fff",
+                                background: "#fff",
+                                borderRadius: "var(--imaa-radius-card)",
+                                color: "var(--imaa-ink)",
                               },
                               "& .MuiOutlinedInput-notchedOutline": {
-                                borderColor: "rgba(255,255,255,.2)",
+                                borderColor: "var(--imaa-border)",
                               },
                               "& .MuiInputBase-input::placeholder": {
-                                color: "rgba(243, 240, 240, 0.7)",
+                                color: "var(--imaa-ink-meta)",
                               },
                               mb: 1.5,
                             },
@@ -3777,7 +3809,7 @@ export default function EventsPage() {
                       />
 
                       <DatePicker
-                        className="text-white bg-teal-500"
+                        className="bg-white"
                         label={null}
                         value={endDMY ? dayjs(dmyToISO(endDMY)) : null}
                         onChange={(v) => {
@@ -3792,15 +3824,15 @@ export default function EventsPage() {
                             sx: {
                               "& .MuiOutlinedInput-root": {
                                 height: 44,
-                                background: "rgba(255,255,255,.1)",
-                                borderRadius: 12,
-                                color: "#fff",
+                                background: "#fff",
+                                borderRadius: "var(--imaa-radius-card)",
+                                color: "var(--imaa-ink)",
                               },
                               "& .MuiOutlinedInput-notchedOutline": {
-                                borderColor: "rgba(255,255,255,.2)",
+                                borderColor: "var(--imaa-border)",
                               },
                               "& .MuiInputBase-input::placeholder": {
-                                color: "rgba(255,255,255,.7)",
+                                color: "var(--imaa-ink-meta)",
                               },
                             },
                           },
@@ -3845,7 +3877,7 @@ export default function EventsPage() {
 
                   {/* Topic/Industry */}
                   <div className="mb-6">
-                    <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                    <div className="text-imaa-teal-dark font-semibold mb-2 flex items-center gap-2">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                         <path
                           d="M4 7h16M4 12h16M4 17h16"
@@ -3856,12 +3888,12 @@ export default function EventsPage() {
                       </svg>
                       Topic/Industry
                     </div>
-                    <div className="space-y-3 text-white/90">
+                    <div className="space-y-3 text-imaa-body">
                       {categories.map((x) => (
                         <label key={x} className="flex items-center gap-3">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 rounded border-white/30 bg-transparent"
+                            className="h-4 w-4 rounded border-imaa-border bg-white accent-imaa-teal"
                             checked={selectedTopics.includes(x)}
                             onChange={(e) =>
                               setSelectedTopics((prev) =>
@@ -3877,7 +3909,7 @@ export default function EventsPage() {
                       {selectedTopics.length > 0 && (
                         <button
                           type="button"
-                          className="mt-2 text-xs underline text-white/70"
+                          className="mt-2 text-xs underline text-imaa-teal-dark"
                           onClick={() => setSelectedTopics([])}
                         >
                           Clear all
@@ -3888,7 +3920,7 @@ export default function EventsPage() {
 
                   {/* Event Format */}
                   <div className="mb-6">
-                    <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                    <div className="text-imaa-teal-dark font-semibold mb-2 flex items-center gap-2">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                         <path
                           d="M4 7h16M4 12h16M4 17h16"
@@ -3899,12 +3931,12 @@ export default function EventsPage() {
                       </svg>
                       Event Format
                     </div>
-                    <div className="space-y-3 text-white/90">
+                    <div className="space-y-3 text-imaa-body">
                       {formats.map((x) => (
                         <label key={x} className="flex items-center gap-3">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 rounded border-white/30 bg-transparent"
+                            className="h-4 w-4 rounded border-imaa-border bg-white accent-imaa-teal"
                             checked={selectedFormats.includes(x)}
                             onChange={(e) =>
                               setSelectedFormats((prev) =>
@@ -3920,7 +3952,7 @@ export default function EventsPage() {
                       {selectedFormats.length > 0 && (
                         <button
                           type="button"
-                          className="mt-2 text-xs underline text-white/70"
+                          className="mt-2 text-xs underline text-imaa-teal-dark"
                           onClick={() => setSelectedFormats([])}
                         >
                           Clear all
@@ -3931,7 +3963,7 @@ export default function EventsPage() {
 
                   {/* Price (visual) */}
                   <div className="mb-6">
-                    <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                    <div className="text-imaa-teal-dark font-semibold mb-2 flex items-center gap-2">
                       <span>$</span> Price Range
                     </div>
                     <Slider
@@ -3941,24 +3973,24 @@ export default function EventsPage() {
                       min={0}
                       max={Math.max(0, Number(maxPrice) || 0)}
                       sx={{
-                        "& .MuiSlider-thumb": { bgcolor: "var(--imaa-dm-surface, white)" },
-                        "& .MuiSlider-track": { bgcolor: "var(--imaa-dm-surface, white)" },
-                        "& .MuiSlider-rail": { opacity: 0.3 },
+                        color: "var(--imaa-teal)",
+                        "& .MuiSlider-thumb": { bgcolor: "#fff", border: "2px solid currentColor" },
+                        "& .MuiSlider-rail": { opacity: 0.22 },
                       }}
                     />
-                    <div className="flex justify-between text-sm mt-1 text-white/80">
+                    <div className="flex justify-between text-sm mt-1 text-imaa-body">
                       <span>{priceStr(priceRange[0])}</span>
                       <span>{priceStr(priceRange[1])}+</span>
                     </div>
                   </div>
 
-                  <button className="w-full h-11 rounded-xl bg-teal-500 hover:bg-teal-600 text-white font-semibold">
+                  <button className="w-full h-11 rounded-full bg-[#CC4422] hover:bg-[#A9361C] text-white font-semibold transition-colors">
                     Apply Filters
                   </button>
 
                   <button
                     type="button"
-                    className="w-full h-11 px-2 rounded-xl border-white/30 text-black bg-white hover:border-white hover:bg-white/10 mt-3"
+                    className="w-full h-11 px-2 rounded-full border border-imaa-border text-imaa-ink bg-white hover:border-imaa-navy hover:bg-slate-50 mt-3 transition-colors"
                     onClick={() => {
                       setQ("");
                       setDateRange("");
@@ -3988,7 +4020,7 @@ export default function EventsPage() {
             sx={{ flex: 1, minWidth: 0 }}
           >
             {/* Tab Navigation */}
-            <Paper elevation={0} className="rounded-2xl border border-imaa-border mb-4">
+            <Paper elevation={0} className="rounded-lg border border-imaa-border mb-5 bg-white overflow-hidden">
               <Tabs
                 value={selectedTab === "upcoming" ? 0 : 1}
                 onChange={(_, value) => {
@@ -3999,7 +4031,7 @@ export default function EventsPage() {
                 scrollButtons="auto"
                 sx={{
                   px: 1,
-                  "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
+                  "& .MuiTab-root": { textTransform: "none", minHeight: 48, color: "var(--imaa-ink-body)", fontWeight: 600 },
                   // Selected label in ink (teal text was below AA contrast); teal indicator bar
                   "& .Mui-selected": { color: "var(--imaa-ink) !important", fontWeight: 700 },
                   "& .MuiTabs-indicator": { backgroundColor: "var(--imaa-teal)" },
@@ -4011,8 +4043,8 @@ export default function EventsPage() {
             </Paper>
 
             <div className="w-full">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-serif text-2xl sm:text-3xl font-bold text-imaa-ink">
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="font-sans text-2xl sm:text-3xl font-bold tracking-[-0.015em] text-imaa-ink">
                   {selectedTab === "replays" ? "Available Replays" : "Upcoming Events"}
                 </h2>
                 {selectedTab === "upcoming" && (
@@ -4021,6 +4053,11 @@ export default function EventsPage() {
                       size="small"
                       onClick={() => setRefreshKey((k) => k + 1)}
                       disabled={initialLoading}
+                      sx={{
+                        color: "var(--imaa-navy)",
+                        border: "1px solid var(--imaa-border)",
+                        "&:hover": { bgcolor: "#fff", borderColor: "var(--imaa-border-hover)" },
+                      }}
                     >
                       <RefreshRoundedIcon />
                     </IconButton>
@@ -4056,7 +4093,7 @@ export default function EventsPage() {
             {view === "grid" ? (
               <Box
                 sx={{
-                  mt: 3,
+                  mt: 2.5,
                   display: "grid",
                   gap: 3,
                   // As many >=320px columns as fit the results column (which narrows with the sidebar and
@@ -4109,8 +4146,8 @@ export default function EventsPage() {
                       return (
                         <div
                           key={`series-${series.id}`}
-                          className="group h-full w-full flex flex-col rounded-lg border border-imaa-border bg-white shadow-imaa-sm
-                                     transition-all duration-300 hover:shadow-imaa-md hover:-translate-y-1 motion-reduce:hover:translate-y-0
+                          className="group h-full w-full flex flex-col rounded-lg border border-imaa-border bg-white shadow-[0_4px_16px_rgba(27,42,74,.05)]
+                                     transition-all duration-200 hover:shadow-[0_8px_22px_rgba(27,42,74,.08)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
                                      hover:border-imaa-border-hover overflow-hidden"
                         >
                           {/*
@@ -4145,7 +4182,7 @@ export default function EventsPage() {
                           {/* Content */}
                           <div className="p-4 sm:p-5 md:p-6 flex flex-col flex-grow">
                             {/* Title */}
-                            <h3 className="font-serif text-xl sm:text-2xl font-semibold text-imaa-ink mb-2 leading-snug">
+                            <h3 className="font-sans text-xl sm:text-[22px] font-bold text-imaa-ink mb-2 leading-snug">
                               {series.title}
                             </h3>
 
@@ -4184,7 +4221,7 @@ export default function EventsPage() {
                             <div className="flex gap-2 mt-auto pt-2">
                               <button
                                 onClick={() => navigate(`/series/${series.slug}`)}
-                                className="rounded-full bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                                className="rounded-full bg-[#CC4422] hover:bg-[#A9361C] text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
                               >
                                 View Series
                               </button>
@@ -4267,8 +4304,8 @@ export default function EventsPage() {
 
                       return (
                         <Grid item key={`series-${series.id}`} xs={12}>
-                          <div className="group rounded-lg border border-imaa-border bg-white shadow-imaa-sm
-                                          transition-all duration-300 hover:shadow-imaa-md hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
+                          <div className="group rounded-lg border border-imaa-border bg-white shadow-[0_4px_16px_rgba(27,42,74,.05)]
+                                          transition-all duration-200 hover:shadow-[0_8px_22px_rgba(27,42,74,.08)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
                                           hover:border-imaa-border-hover overflow-hidden">
                             <div className="md:flex">
                               {/*
@@ -4285,7 +4322,7 @@ export default function EventsPage() {
                                     src={series.card_image_url}
                                     alt={series.title}
                                     loading="lazy"
-                                    className="w-full h-44 md:h-full object-cover transform-gpu transition-transform duration-700 ease-out group-hover:scale-105 will-change-transform"
+                                    className="w-full h-44 md:h-full object-cover transform-gpu transition-transform duration-500 ease-out group-hover:scale-[1.02] will-change-transform"
                                   />
                                 ) : (
                                   <div className="w-full h-44 md:h-full bg-slate-100" />
@@ -4302,7 +4339,7 @@ export default function EventsPage() {
                               {/* Details */}
                               <div className="p-6 md:w-3/5 flex flex-col">
                                 <div className="min-w-0">
-                                  <h3 className="font-serif text-xl md:text-2xl font-semibold text-imaa-ink leading-snug">
+                                  <h3 className="font-sans text-xl md:text-[22px] font-bold text-imaa-ink leading-snug">
                                     {series.title}
                                   </h3>
                                   {series.description && (
@@ -4333,7 +4370,7 @@ export default function EventsPage() {
                                 <div className="mt-6 flex flex-wrap gap-3">
                                   <button
                                     onClick={() => navigate(`/series/${series.slug}`)}
-                                    className="rounded-full bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                                    className="rounded-full bg-[#CC4422] hover:bg-[#A9361C] text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
                                   >
                                     View Series
                                   </button>
@@ -4383,13 +4420,19 @@ export default function EventsPage() {
                 title="No upcoming events found"
                 description="Try a different search, date range, topic or format."
                 titleComponent="h3"
-                sx={{ mt: 3 }}
+                sx={{
+                  mt: 2.5,
+                  py: { xs: 3.5, sm: 4 },
+                  bgcolor: "#fff",
+                  boxShadow: "0 4px 16px rgba(27,42,74,.04)",
+                  "& h3": { fontFamily: "var(--imaa-font-sans)", color: "var(--imaa-navy)" },
+                }}
               />
             )}
 
             {/* Pagination */}
             <Box
-              className="mt-8 flex items-center justify-center"
+              className="mt-6 flex items-center justify-center"
               sx={{ opacity: rawEvents.length === 0 && initialLoading ? 0.6 : 1, pointerEvents: rawEvents.length === 0 && initialLoading ? "none" : "auto" }}
             >
               <Pagination
@@ -4400,6 +4443,12 @@ export default function EventsPage() {
                 shape="rounded"
                 siblingCount={1}
                 boundaryCount={1}
+                sx={{
+                  "& .MuiPaginationItem-root": { borderRadius: 999, color: "var(--imaa-ink)", "&:hover": { bgcolor: "#fff" } },
+                  "& .Mui-selected": { bgcolor: "var(--imaa-navy) !important", color: "#fff" },
+                  "& .Mui-disabled": { opacity: 0.35 },
+                  "& .MuiPaginationItem-root:focus-visible": { outline: "2px solid var(--imaa-teal)", outlineOffset: 2 },
+                }}
               />
             </Box>
             </>
@@ -4411,7 +4460,7 @@ export default function EventsPage() {
             {view === "grid" ? (
               <Box
                 sx={{
-                  mt: 3,
+                  mt: 2.5,
                   display: "grid",
                   gap: 3,
                   // As many >=320px columns as fit the results column (which narrows with the sidebar and
@@ -4484,13 +4533,19 @@ export default function EventsPage() {
                 title="No replays available"
                 description="Recordings of past events will appear here once they are published."
                 titleComponent="h3"
-                sx={{ mt: 3 }}
+                sx={{
+                  mt: 2.5,
+                  py: { xs: 3.5, sm: 4 },
+                  bgcolor: "#fff",
+                  boxShadow: "0 4px 16px rgba(27,42,74,.04)",
+                  "& h3": { fontFamily: "var(--imaa-font-sans)", color: "var(--imaa-navy)" },
+                }}
               />
             )}
 
             {/* Pagination for Replays */}
             <Box
-              className="mt-8 flex items-center justify-center"
+              className="mt-6 flex items-center justify-center"
               sx={{ opacity: replayLoading ? 0.6 : 1, pointerEvents: replayLoading ? "none" : "auto" }}
             >
               <Pagination
@@ -4501,6 +4556,12 @@ export default function EventsPage() {
                 shape="rounded"
                 siblingCount={1}
                 boundaryCount={1}
+                sx={{
+                  "& .MuiPaginationItem-root": { borderRadius: 999, color: "var(--imaa-ink)", "&:hover": { bgcolor: "#fff" } },
+                  "& .Mui-selected": { bgcolor: "var(--imaa-navy) !important", color: "#fff" },
+                  "& .Mui-disabled": { opacity: 0.35 },
+                  "& .MuiPaginationItem-root:focus-visible": { outline: "2px solid var(--imaa-teal)", outlineOffset: 2 },
+                }}
               />
             </Box>
             </>
@@ -4521,8 +4582,8 @@ export default function EventsPage() {
                 width: '100%',          // not 100vw (avoids overshoot)
                 maxWidth: '100%',
                 height: '100dvh',       // better on mobile than 100vh
-                bgcolor: 'var(--imaa-navy)',
-                color: 'white',
+                bgcolor: '#fff',
+                color: 'var(--imaa-ink)',
                 borderRadius: 0,
                 boxSizing: 'border-box', // include border in width
                 overflowX: 'clip',       // hide any stray overflow
@@ -4530,7 +4591,7 @@ export default function EventsPage() {
             }}
           >
             {/* Top bar */}
-            <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-imaa-navy border-b border-white/10 w-full">
+            <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 bg-white border-b border-imaa-border w-full">
               <span className="text-lg font-semibold">Advanced Filters</span>
               <Button size="small" variant="outlined" onClick={() => setShowAdvanced(false)}>
                 Close
@@ -4546,7 +4607,7 @@ export default function EventsPage() {
 
               {/* Date Range */}
               <div className="mb-5">
-                <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                <div className="text-imaa-teal-dark font-semibold mb-2 flex items-center gap-2">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
                     <path d="M16 2v4M8 2v4M3 10h18" stroke="currentColor" strokeWidth="2" />
@@ -4555,7 +4616,7 @@ export default function EventsPage() {
                 </div>
                 <LocalizationProvider dateAdapter={AdapterDayjs}>
                   <DatePicker
-                    className="text-white bg-teal-500"
+                    className="bg-white"
                     label={null}
                     value={startDMY ? dayjs(dmyToISO(startDMY)) : null}
                     onChange={(v) => { setStartDMY(v ? v.format('DD-MM-YYYY') : ''); setDateRange(''); }}
@@ -4565,16 +4626,16 @@ export default function EventsPage() {
                         placeholder: 'dd-mm-yyyy',
                         size: 'small',
                         sx: {
-                          '& .MuiOutlinedInput-root': { height: 44, background: 'rgba(255,255,255,.1)', borderRadius: 12, color: '#fff' },
-                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,.2)' },
-                          '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,.7)' },
+                          '& .MuiOutlinedInput-root': { height: 44, background: '#fff', borderRadius: 'var(--imaa-radius-card)', color: 'var(--imaa-ink)' },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--imaa-border)' },
+                          '& .MuiInputBase-input::placeholder': { color: 'var(--imaa-ink-meta)' },
                           mb: 1.5,
                         },
                       },
                     }}
                   />
                   <DatePicker
-                    className="text-white bg-teal-500"
+                    className="bg-white"
                     label={null}
                     value={endDMY ? dayjs(dmyToISO(endDMY)) : null}
                     onChange={(v) => { setEndDMY(v ? v.format('DD-MM-YYYY') : ''); setDateRange(''); }}
@@ -4584,9 +4645,9 @@ export default function EventsPage() {
                         placeholder: 'dd-mm-yyyy',
                         size: 'small',
                         sx: {
-                          '& .MuiOutlinedInput-root': { height: 44, background: 'rgba(255,255,255,.1)', borderRadius: 12, color: '#fff' },
-                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,.2)' },
-                          '& .MuiInputBase-input::placeholder': { color: 'rgba(255,255,255,.7)' },
+                          '& .MuiOutlinedInput-root': { height: 44, background: '#fff', borderRadius: 'var(--imaa-radius-card)', color: 'var(--imaa-ink)' },
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'var(--imaa-border)' },
+                          '& .MuiInputBase-input::placeholder': { color: 'var(--imaa-ink-meta)' },
                         },
                       },
                     }}
@@ -4623,18 +4684,18 @@ export default function EventsPage() {
 
               {/* Topic/Industry */}
               <div className="mb-6">
-                <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                <div className="text-imaa-teal-dark font-semibold mb-2 flex items-center gap-2">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                   Topic/Industry
                 </div>
-                <div className="space-y-3 text-white/90">
+                <div className="space-y-3 text-imaa-body">
                   {categories.map((x) => (
                     <label key={x} className="flex items-center gap-3">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-white/30 bg-transparent"
+                      className="h-4 w-4 rounded border-imaa-border bg-white accent-imaa-teal"
                         checked={selectedTopics.includes(x)}
                         onChange={(e) =>
                           setSelectedTopics((prev) => e.target.checked ? [...prev, x] : prev.filter((v) => v !== x))
@@ -4644,7 +4705,7 @@ export default function EventsPage() {
                     </label>
                   ))}
                   {selectedTopics.length > 0 && (
-                    <button type="button" className="mt-2 text-xs underline text-white/70" onClick={() => setSelectedTopics([])}>
+                    <button type="button" className="mt-2 text-xs underline text-imaa-teal-dark" onClick={() => setSelectedTopics([])}>
                       Clear all
                     </button>
                   )}
@@ -4653,18 +4714,18 @@ export default function EventsPage() {
 
               {/* Event Format */}
               <div className="mb-6">
-                <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                <div className="text-imaa-teal-dark font-semibold mb-2 flex items-center gap-2">
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                     <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                   </svg>
                   Event Format
                 </div>
-                <div className="space-y-3 text-white/90">
+                <div className="space-y-3 text-imaa-body">
                   {formats.map((x) => (
                     <label key={x} className="flex items-center gap-3">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 rounded border-white/30 bg-transparent"
+                      className="h-4 w-4 rounded border-imaa-border bg-white accent-imaa-teal"
                         checked={selectedFormats.includes(x)}
                         onChange={(e) =>
                           setSelectedFormats((prev) => e.target.checked ? [...prev, x] : prev.filter((v) => v !== x))
@@ -4674,7 +4735,7 @@ export default function EventsPage() {
                     </label>
                   ))}
                   {selectedFormats.length > 0 && (
-                    <button type="button" className="mt-2 text-xs underline text-white/70" onClick={() => setSelectedFormats([])}>
+                    <button type="button" className="mt-2 text-xs underline text-imaa-teal-dark" onClick={() => setSelectedFormats([])}>
                       Clear all
                     </button>
                   )}
@@ -4683,7 +4744,7 @@ export default function EventsPage() {
 
               {/* Price (visual) */}
               <div className="mb-6">
-                <div className="text-teal-300 font-semibold mb-2 flex items-center gap-2">
+                <div className="text-imaa-teal-dark font-semibold mb-2 flex items-center gap-2">
                   <span>$</span> Price Range
                 </div>
                 <Slider
@@ -4693,12 +4754,12 @@ export default function EventsPage() {
                   min={0}
                   max={Math.max(0, Number(maxPrice) || 0)}
                   sx={{
-                    '& .MuiSlider-thumb': { bgcolor: 'var(--imaa-dm-surface, white)' },
-                    '& .MuiSlider-track': { bgcolor: 'var(--imaa-dm-surface, white)' },
-                    '& .MuiSlider-rail': { opacity: 0.3 },
+                    color: 'var(--imaa-teal)',
+                    '& .MuiSlider-thumb': { bgcolor: '#fff', border: '2px solid currentColor' },
+                    '& .MuiSlider-rail': { opacity: 0.22 },
                   }}
                 />
-                <div className="flex justify-between text-sm mt-1 text-white/80">
+                <div className="flex justify-between text-sm mt-1 text-imaa-body">
                   <span>{priceStr(priceRange[0])}</span>
                   <span>{priceStr(priceRange[1])}+</span>
                 </div>
@@ -4707,7 +4768,7 @@ export default function EventsPage() {
             </div>
 
             {/* Bottom action bar (no left/right offsets) */}
-            <div className="sticky bottom-0 w-full bg-imaa-navy border-t border-white/10 p-3 flex gap-2">
+            <div className="sticky bottom-0 w-full bg-white border-t border-imaa-border p-3 flex gap-2">
               <Button
                 fullWidth
                 variant="outlined"
@@ -4720,7 +4781,12 @@ export default function EventsPage() {
               >
                 Clear
               </Button>
-              <Button fullWidth variant="contained" onClick={() => setShowAdvanced(false)}>
+              <Button
+                fullWidth
+                variant="contained"
+                onClick={() => setShowAdvanced(false)}
+                sx={{ bgcolor: "var(--imaa-orange-hover)", "&:hover": { bgcolor: "#A9361C" } }}
+              >
                 Apply
               </Button>
             </div>
