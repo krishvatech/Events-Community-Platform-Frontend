@@ -21,6 +21,7 @@ import {
   AccessTime as AccessTimeIcon,
 } from "@mui/icons-material";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import heroFallbackImage from "../assets/cities.png";
 
 const getAccessToken = () => getStoredAccessToken();
 const isAuthed = () => !!getAccessToken();
@@ -37,25 +38,31 @@ const INK_BODY = "var(--imaa-ink-body)";
 // Keep the public Home headings in the corporate sans-serif stack.
 const serifHeadingSx = { m: 0, fontFamily: "var(--imaa-font-sans)", fontWeight: 750, overflowWrap: "anywhere" };
 
-// Decorative chevrons on the light (no-image) hero, in flat brand colours
+// Retained for routes that inject no hero image, but the public home now uses
+// a local photographic fallback to mirror the parent IMAA homepage composition.
 const ChevronPattern = () => (
   <Box
     sx={{
-      position: "absolute", right: 0, top: 0, bottom: 0,
-      width: { xs: 0, md: "42%" }, overflow: "hidden", pointerEvents: "none",
+      position: "absolute",
+      right: { md: 24, lg: 52 },
+      top: 0,
+      bottom: 0,
+      width: { xs: 0, md: "34%", lg: "36%" },
+      overflow: "hidden",
+      pointerEvents: "none",
     }}
     aria-hidden
   >
     {[
-      { top: "8%", size: 280, color: TEAL },
-      { top: "38%", size: 220, color: "var(--imaa-gold)" },
-      { top: "62%", size: 170, color: ORANGE },
+      { top: "12%", size: 220, color: TEAL },
+      { top: "39%", size: 180, color: "var(--imaa-gold)" },
+      { top: "61%", size: 145, color: ORANGE },
     ].map(({ top, size, color }, i) => (
-      <svg key={i} style={{ position: "absolute", top, right: -size * 0.2 }}
+      <svg key={i} style={{ position: "absolute", top, right: 0 }}
         width={size} height={size} viewBox="0 0 100 100" fill="none">
         <polyline points="20,50 50,20 80,50 50,80" fill="none"
-          style={{ stroke: color }} strokeWidth="10" strokeLinecap="round"
-          strokeLinejoin="round" opacity="0.65" />
+          style={{ stroke: color }} strokeWidth="8" strokeLinecap="round"
+          strokeLinejoin="round" opacity="0.72" />
       </svg>
     ))}
   </Box>
@@ -65,16 +72,25 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
   <Box
     sx={{
       width: "100%",
-      minHeight: { xs: 180, md: 190 },
+      minHeight: { xs: 230, md: 250 },
       bgcolor: "#FFFFFF",
-      border: "1px solid var(--imaa-border)",
-      borderRadius: "var(--imaa-radius-field)",
-      boxShadow: "0 8px 24px rgba(27,42,74,.06)",
-      px: { xs: 3, md: 3.5 },
-      py: { xs: 3, md: 3.25 },
+      border: "1px solid rgba(36,62,117,.08)",
+      borderRadius: "0",
+      boxShadow: "0 18px 46px rgba(36,62,117,.08)",
+      px: { xs: 3, md: 3.75 },
+      py: { xs: 3.25, md: 3.75 },
       display: "flex",
       flexDirection: "column",
       justifyContent: "flex-start",
+      transition: "transform .18s ease, box-shadow .18s ease",
+      "&:hover": {
+        transform: "translateY(-4px)",
+        boxShadow: "0 24px 54px rgba(36,62,117,.13)",
+      },
+      "@media (prefers-reduced-motion: reduce)": {
+        transition: "none",
+        "&:hover": { transform: "none" },
+      },
     }}
   >
     <Box
@@ -82,11 +98,11 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
         position: "relative",
         width: 40,
         height: 40,
-        borderRadius: "var(--imaa-radius-field)",
+        borderRadius: "50%",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        mb: 2.25,
+        mb: 3,
         // Light tint of the icon colour behind the icon
         "&::before": { content: '""', position: "absolute", inset: 0, borderRadius: "inherit", bgcolor: iconColor, opacity: 0.08 },
       }}
@@ -94,19 +110,59 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
       <Icon sx={{ position: "relative", color: iconColor, fontSize: 22 }} />
     </Box>
 
-    <Box component="h3" sx={{ ...serifHeadingSx, fontSize: "18px", lineHeight: 1.35, color: NAVY, mb: 1.25 }}>
+    <Box component="h3" sx={{ ...serifHeadingSx, fontSize: "22px", lineHeight: 1.25, color: NAVY, mb: 1.5, fontWeight: 650 }}>
       {title}
     </Box>
 
     <Typography
       sx={{
         fontSize: "14px",
-        lineHeight: 1.7,
-        color: "#5A6070",
+        lineHeight: 1.75,
+        color: "#617398",
       }}
     >
       {desc}
     </Typography>
+  </Box>
+);
+
+const StatBand = () => (
+  <Box
+    component="section"
+    sx={{
+      bgcolor: "#F7F8FA",
+      borderTop: "1px solid rgba(36,62,117,.06)",
+      borderBottom: "1px solid rgba(36,62,117,.06)",
+    }}
+  >
+    <Container maxWidth="lg">
+      <Box
+        sx={{
+          minHeight: { xs: "auto", md: 100 },
+          py: { xs: 3, md: 0 },
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" },
+          gap: { xs: 2.5, sm: 0 },
+          alignItems: "center",
+          textAlign: "center",
+        }}
+      >
+        {[
+          ["100+", "Global reach"],
+          ["4100+", "Professional network"],
+          ["2000+", "Company connections"],
+        ].map(([value, label]) => (
+          <Box key={label} sx={{ py: { xs: 1, sm: 0 }, borderRight: { sm: "1px solid rgba(36,62,117,.08)", "&:last-of-type": "none" } }}>
+            <Typography sx={{ color: "#243E75", fontSize: { xs: 32, md: 38 }, lineHeight: 1, fontWeight: 400 }}>
+              {value}
+            </Typography>
+            <Typography sx={{ mt: 1, color: "rgba(97,115,152,.68)", fontSize: 14 }}>
+              {label}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
+    </Container>
   </Box>
 );
 
@@ -143,7 +199,7 @@ export default function HomePage() {
   const heroTitle = page?.hero_title || "The network that moves deals forward";
   const heroSubtitle = page?.hero_subtitle ||
     "IMAA Connect brings together M&A professionals worldwide — events, community, resources and more.";
-  const heroImage = page?.hero_image_url || "";
+  const heroImage = page?.hero_image_url || heroFallbackImage;
   const useLightHero = !heroImage;
 
   return (
@@ -151,12 +207,13 @@ export default function HomePage() {
 
       {/* HERO */}
       <Box component="section" sx={{
-        position: "relative", minHeight: { xs: 520, md: 570 }, overflow: "hidden",
+        position: "relative", minHeight: { xs: 520, md: 570, lg: 610 }, overflow: "hidden",
         display: "flex", alignItems: "center",
-        borderBottom: "1px solid var(--imaa-border)",
-        // The same CMS image is retained and blended into a light corporate composition.
+        borderBottom: "0",
+        mt: { xs: -7.25, md: -8.25 },
+        pt: { xs: 7.25, md: 8.25 },
         background: heroImage
-          ? `linear-gradient(90deg, rgba(247,249,251,.99) 0%, rgba(247,249,251,.97) 42%, rgba(247,249,251,.7) 65%, rgba(247,249,251,.12) 100%), url(${heroImage}) center/cover no-repeat`
+          ? `linear-gradient(90deg, rgba(255,255,255,.98) 0%, rgba(255,255,255,.91) 39%, rgba(255,255,255,.58) 58%, rgba(255,255,255,.2) 100%), url(${heroImage}) center/cover no-repeat`
           : "#F7F9FB",
       }}>
         {useLightHero && <ChevronPattern />}
@@ -173,7 +230,7 @@ export default function HomePage() {
           <Box
             sx={{
               width: "100%",
-              maxWidth: { xs: "100%", md: 680 },
+              maxWidth: { xs: "100%", md: 700 },
               textAlign: "left",
               display: "flex",
               flexDirection: "column",
@@ -181,13 +238,7 @@ export default function HomePage() {
             }}
           >
             <Box sx={{
-              display: "inline-flex", alignItems: "center", gap: 1,
-              bgcolor: "#FFFFFF",
-              color: TEAL_TEXT,
-              border: "1px solid rgba(10,147,150,.3)",
-              borderRadius: 100, px: 1.75, py: 0.625, fontSize: 11, fontWeight: 700,
-              boxShadow: "0 2px 10px rgba(27,42,74,.06)",
-              textTransform: "uppercase", letterSpacing: "0.06em", mb: 3,
+              display: "none",
             }}>
               <Box aria-hidden sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: TEAL }} />
               IMAA Connect
@@ -196,18 +247,19 @@ export default function HomePage() {
             {/* Set the title colour locally so the global h1 rule cannot override it. */}
             <Box component="h1" sx={{
               ...serifHeadingSx,
-              fontSize: { xs: 38, sm: 46, md: 56 }, lineHeight: 1.08,
-              color: NAVY, mb: 2.5, letterSpacing: "-0.035em", textWrap: "balance",
+              fontSize: { xs: 44, sm: 58, md: 72 }, lineHeight: 1.08,
+              color: "#243E75", mb: 3, letterSpacing: 0, textWrap: "balance",
+              fontWeight: 650,
             }}>
               {heroTitle}
             </Box>
 
             <Typography
               sx={{
-                fontSize: { xs: 16, md: 18 },
+                fontSize: { xs: 16, md: 19 },
                 lineHeight: 1.7,
                 mb: 4,
-                color: "#5A6070",
+                color: "#617398",
                 maxWidth: 620,
                 textAlign: "left",
               }}
@@ -233,11 +285,11 @@ export default function HomePage() {
                 <>
                   {/* Keep the primary label white for readable contrast on coral. */}
                   <Button onClick={openSignup} variant="contained" size="large"
-                    sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                    sx={{ bgcolor: "#F05843", color: "#FFFFFF", "&:hover": { bgcolor: "#D9422E" }, boxShadow: "none", borderRadius: 999, minHeight: 46, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase" }}>
                     Get started
                   </Button>
                   <Button onClick={openLogin} variant="outlined" size="large"
-                    sx={{ borderColor: ORANGE, color: ORANGE_HOVER, "&:hover": { borderColor: ORANGE_HOVER, bgcolor: "#FEF2EE" }, borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                    sx={{ borderColor: "transparent", bgcolor: "#FFFFFF", color: "#F05843", "&:hover": { borderColor: "transparent", bgcolor: "#F8F8F8" }, borderRadius: 999, minHeight: 46, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", boxShadow: "0 8px 24px rgba(36,62,117,.08)" }}>
                     Log in
                   </Button>
                 </>
@@ -247,63 +299,82 @@ export default function HomePage() {
         </Container>
       </Box>
 
+      <StatBand />
+
       {/* FEATURES */}
       {/* Sections alternate surfaces: hero (cool grey or photo) → white → cool grey → navy */}
       <Box
         component="section"
         sx={{
-          py: { xs: 7, md: 10 },
+          py: { xs: 7, md: 9 },
           bgcolor: "#FFFFFF",
         }}
       >
         <Container maxWidth="lg">
-          <Box sx={{ textAlign: "center", mb: { xs: 5, md: 6.5 } }}>
-            <Typography
-              sx={{
-                color: TEAL_TEXT,
-                fontWeight: 700,
-                letterSpacing: "0.14em",
-                textTransform: "uppercase",
-                fontSize: 12,
-                mb: 1.5,
-              }}
-            >
-              WHY JOIN
-            </Typography>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", md: "1fr auto" },
+              gap: 3,
+              alignItems: "end",
+              mb: { xs: 4.5, md: 6 },
+            }}
+          >
+            <Box>
+              <Typography
+                sx={{
+                  color: "#617398",
+                  fontWeight: 400,
+                  fontSize: { xs: 24, md: 30 },
+                  mb: 0.75,
+                }}
+              >
+                Why join
+              </Typography>
 
-            <Box
-              component="h2"
-              sx={{
-                ...serifHeadingSx,
-                fontSize: { xs: 30, md: 42 },
-                lineHeight: 1.15,
-                color: NAVY,
-                mb: 1.5,
-                letterSpacing: "-0.01em",
-              }}
-            >
-              Built for M&A professionals
+              <Box
+                component="h2"
+                sx={{
+                  ...serifHeadingSx,
+                  fontSize: { xs: 38, md: 54 },
+                  lineHeight: 1.12,
+                  color: "#243E75",
+                  fontWeight: 650,
+                  maxWidth: 720,
+                }}
+              >
+                Built for M&A professionals
+              </Box>
             </Box>
 
-            <Typography
+            <Button
+              onClick={authed ? undefined : openSignup}
+              component={authed ? Link : "button"}
+              to={authed ? "/events" : undefined}
+              variant="contained"
               sx={{
-                color: INK_BODY,
-                maxWidth: 560,
-                mx: "auto",
-                fontSize: { xs: 15, md: 16 },
-                lineHeight: 1.8,
+                justifySelf: { xs: "start", md: "end" },
+                bgcolor: "#F05843",
+                color: "#FFFFFF",
+                borderRadius: 999,
+                boxShadow: "none",
+                minHeight: 46,
+                px: 4.5,
+                fontSize: 14,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                "&:hover": { bgcolor: "#D9422E", boxShadow: "none" },
               }}
             >
-              Everything you need to grow your dealmaking network and career — in
-              one place.
-            </Typography>
+              {authed ? "View events" : "Join now"}
+            </Button>
           </Box>
 
           <Box
             sx={{
               display: "grid",
               gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" },
-              gap: 2.5,
+              gap: { xs: 2.5, md: 3.75 },
             }}
           >
             {[

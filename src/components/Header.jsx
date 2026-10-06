@@ -317,16 +317,16 @@ const Header = () => {
       position="fixed"
       elevation={0}
       sx={{
-        bgcolor: colors.white,
+        bgcolor: "#FFFFFF !important",
         color: colors.navy,
         borderBottom: `1px solid ${colors.border}`,
-        boxShadow: "0 2px 14px rgba(27,42,74,.06)",
+        boxShadow: "0 1px 8px rgba(27,42,74,.08)",
         zIndex: (t) => t.zIndex.drawer + 2,
       }}
     >
       <Toolbar
         disableGutters
-        sx={{ minHeight: { xs: 56, md: 64 } }}
+        sx={{ minHeight: { xs: 58, md: 66 } }}
       >
         <Box sx={{ mx: "auto", maxWidth: layout.contentMax, width: "100%", px: { xs: 2, sm: 3, md: 4 }, display: "grid", gridTemplateColumns: { xs: "1fr auto", lg: "minmax(0, 1fr) auto minmax(0, 1fr)" }, alignItems: "center", gap: { xs: 1.5, lg: 3 } }}>
 
@@ -351,7 +351,7 @@ const Header = () => {
               component="img"
               src={imaaLogoSrc}
               alt="IMAA"
-              sx={{ display: "block", width: { xs: 100, sm: 112 }, height: "auto" }}
+              sx={{ display: "block", width: { xs: 126, sm: 138 }, height: "auto" }}
             />
           </Box>
 
@@ -359,7 +359,7 @@ const Header = () => {
           <Box
             component="nav"
             aria-label="Primary navigation"
-            sx={{ display: { xs: "none", lg: "flex" }, alignItems: "center", gap: 3, whiteSpace: "nowrap" }}
+            sx={{ display: { xs: "none", lg: "flex" }, alignItems: "center", gap: 3.25, whiteSpace: "nowrap" }}
           >
             <NavLink to="/events">Events</NavLink>
             <NavLink to="/community" requireAuth>Community</NavLink>
