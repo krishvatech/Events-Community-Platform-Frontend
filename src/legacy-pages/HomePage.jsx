@@ -34,8 +34,8 @@ const ORANGE = "var(--imaa-orange)";
 const ORANGE_HOVER = "var(--imaa-orange-hover)";
 const INK_BODY = "var(--imaa-ink-body)";
 
-// Headings are plain elements: index.css forces the sans font on MUI Typography
-const serifHeadingSx = { m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, overflowWrap: "anywhere" };
+// Keep the public Home headings in the corporate sans-serif stack.
+const serifHeadingSx = { m: 0, fontFamily: "var(--imaa-font-sans)", fontWeight: 750, overflowWrap: "anywhere" };
 
 // Decorative chevrons on the light (no-image) hero, in flat brand colours
 const ChevronPattern = () => (
@@ -65,11 +65,11 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
   <Box
     sx={{
       width: "100%",
-      minHeight: { xs: 160, md: 152 },
-      bgcolor: "var(--imaa-dm-surface, #FFFFFF)",
+      minHeight: { xs: 180, md: 190 },
+      bgcolor: "#FFFFFF",
       border: "1px solid var(--imaa-border)",
-      borderRadius: "var(--imaa-radius-card)",
-      boxShadow: "var(--imaa-shadow-sm)",
+      borderRadius: "var(--imaa-radius-field)",
+      boxShadow: "0 8px 24px rgba(27,42,74,.06)",
       px: { xs: 3, md: 3.5 },
       py: { xs: 3, md: 3.25 },
       display: "flex",
@@ -82,19 +82,19 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
         position: "relative",
         width: 40,
         height: 40,
-        borderRadius: "50%",
+        borderRadius: "var(--imaa-radius-field)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        mb: 2.5,
+        mb: 2.25,
         // Light tint of the icon colour behind the icon
-        "&::before": { content: '""', position: "absolute", inset: 0, borderRadius: "50%", bgcolor: iconColor, opacity: 0.08 },
+        "&::before": { content: '""', position: "absolute", inset: 0, borderRadius: "inherit", bgcolor: iconColor, opacity: 0.08 },
       }}
     >
-      <Icon sx={{ position: "relative", color: iconColor, fontSize: 20 }} />
+      <Icon sx={{ position: "relative", color: iconColor, fontSize: 22 }} />
     </Box>
 
-    <Box component="h3" sx={{ ...serifHeadingSx, fontSize: "17px", lineHeight: 1.35, color: NAVY_TEXT, mb: 1.25 }}>
+    <Box component="h3" sx={{ ...serifHeadingSx, fontSize: "18px", lineHeight: 1.35, color: NAVY, mb: 1.25 }}>
       {title}
     </Box>
 
@@ -102,7 +102,7 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
       sx={{
         fontSize: "14px",
         lineHeight: 1.7,
-        color: INK_BODY,
+        color: "#5A6070",
       }}
     >
       {desc}
@@ -147,16 +147,17 @@ export default function HomePage() {
   const useLightHero = !heroImage;
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-dm-surface, #FFFFFF)" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: "#FFFFFF", color: NAVY, overflowX: "hidden" }}>
 
       {/* HERO */}
       <Box component="section" sx={{
-        position: "relative", minHeight: { xs: 520, md: 620 }, overflow: "hidden",
+        position: "relative", minHeight: { xs: 520, md: 570 }, overflow: "hidden",
         display: "flex", alignItems: "center",
-        // Photo hero: flat navy overlay (single-colour gradient layer). No photo: flat cool-grey surface.
+        borderBottom: "1px solid var(--imaa-border)",
+        // The same CMS image is retained and blended into a light corporate composition.
         background: heroImage
-          ? `linear-gradient(rgba(27,42,74,.65),rgba(27,42,74,.65)), url(${heroImage}) center/cover no-repeat`
-          : "var(--imaa-bg-cool)",
+          ? `linear-gradient(90deg, rgba(247,249,251,.99) 0%, rgba(247,249,251,.97) 42%, rgba(247,249,251,.7) 65%, rgba(247,249,251,.12) 100%), url(${heroImage}) center/cover no-repeat`
+          : "#F7F9FB",
       }}>
         {useLightHero && <ChevronPattern />}
         <Container
@@ -164,39 +165,39 @@ export default function HomePage() {
           sx={{
             position: "relative",
             zIndex: 1,
-            py: { xs: 8, md: 10 },
+            py: { xs: 7, md: 9 },
             display: "flex",
-            justifyContent: "center",
+            justifyContent: "flex-start",
           }}
         >
           <Box
             sx={{
               width: "100%",
-              maxWidth: { xs: "100%", md: 760 },
-              textAlign: "center",
-              mx: "auto",
+              maxWidth: { xs: "100%", md: 680 },
+              textAlign: "left",
               display: "flex",
               flexDirection: "column",
-              alignItems: "center",
+              alignItems: "flex-start",
             }}
           >
             <Box sx={{
               display: "inline-flex", alignItems: "center", gap: 1,
-              bgcolor: useLightHero ? "var(--imaa-teal-light)" : "rgba(255,255,255,.15)",
-              color: useLightHero ? TEAL_TEXT : "rgba(255,255,255,.9)",
-              border: `1px solid ${useLightHero ? "rgba(10,147,150,.2)" : "rgba(255,255,255,.3)"}`,
-              borderRadius: 100, px: 1.5, py: 0.5, fontSize: 11, fontWeight: 700,
+              bgcolor: "#FFFFFF",
+              color: TEAL_TEXT,
+              border: "1px solid rgba(10,147,150,.3)",
+              borderRadius: 100, px: 1.75, py: 0.625, fontSize: 11, fontWeight: 700,
+              boxShadow: "0 2px 10px rgba(27,42,74,.06)",
               textTransform: "uppercase", letterSpacing: "0.06em", mb: 3,
             }}>
               <Box aria-hidden sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: TEAL }} />
               IMAA Connect
             </Box>
 
-            {/* Page title: serif heading; the colour is set here so the global h1 rule can't override it */}
+            {/* Set the title colour locally so the global h1 rule cannot override it. */}
             <Box component="h1" sx={{
               ...serifHeadingSx,
-              fontSize: { xs: 34, md: 52 }, lineHeight: 1.1,
-              color: useLightHero ? NAVY_TEXT : "#FFFFFF", mb: 2.5, letterSpacing: "-0.02em",
+              fontSize: { xs: 38, sm: 46, md: 56 }, lineHeight: 1.08,
+              color: NAVY, mb: 2.5, letterSpacing: "-0.035em", textWrap: "balance",
             }}>
               {heroTitle}
             </Box>
@@ -206,10 +207,9 @@ export default function HomePage() {
                 fontSize: { xs: 16, md: 18 },
                 lineHeight: 1.7,
                 mb: 4,
-                color: useLightHero ? INK_BODY : "rgba(255,255,255,.85)",
-                maxWidth: 720,
-                mx: "auto",
-                textAlign: "center",
+                color: "#5A6070",
+                maxWidth: 620,
+                textAlign: "left",
               }}
             >
               {heroSubtitle}
@@ -220,24 +220,24 @@ export default function HomePage() {
                 display: "flex",
                 gap: 2,
                 flexWrap: "wrap",
-                justifyContent: "center",
+                justifyContent: "flex-start",
                 alignItems: "center",
               }}
             >
               {authed ? (
                 <Button component={Link} to="/events" variant="contained" size="large"
-                  sx={{ bgcolor: ORANGE, "&:hover": { bgcolor: ORANGE_HOVER }, boxShadow: "none", borderRadius: 2, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                  sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                   Explore Events
                 </Button>
               ) : (
                 <>
-                  {/* On the navy (light-hero) variant the label is white: the theme's dark button text was ~1.4:1 on navy */}
+                  {/* Keep the primary label white for readable contrast on coral. */}
                   <Button onClick={openSignup} variant="contained" size="large"
-                    sx={{ bgcolor: useLightHero ? NAVY : ORANGE, color: useLightHero ? "#FFFFFF" : undefined, "&:hover": { bgcolor: useLightHero ? "var(--imaa-navy-2)" : ORANGE_HOVER }, boxShadow: "none", borderRadius: 2, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                    sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                     Get started
                   </Button>
                   <Button onClick={openLogin} variant="outlined" size="large"
-                    sx={{ borderColor: useLightHero ? "var(--imaa-dm-border-strong, rgba(27,42,74,.3))" : "rgba(255,255,255,.5)", color: useLightHero ? NAVY_TEXT : "#FFFFFF", "&:hover": { borderColor: useLightHero ? NAVY : "#FFFFFF", bgcolor: useLightHero ? "var(--imaa-dm-overlay, rgba(27,42,74,.04))" : "rgba(255,255,255,.1)" }, borderRadius: 2, px: 4, py: 1.5, fontWeight: 600, fontSize: 15, textTransform: "none" }}>
+                    sx={{ borderColor: ORANGE, color: ORANGE_HOVER, "&:hover": { borderColor: ORANGE_HOVER, bgcolor: "#FEF2EE" }, borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                     Log in
                   </Button>
                 </>
@@ -252,8 +252,8 @@ export default function HomePage() {
       <Box
         component="section"
         sx={{
-          py: { xs: 8, md: 10 },
-          bgcolor: "var(--imaa-dm-surface, #FFFFFF)",
+          py: { xs: 7, md: 10 },
+          bgcolor: "#FFFFFF",
         }}
       >
         <Container maxWidth="lg">
@@ -275,9 +275,9 @@ export default function HomePage() {
               component="h2"
               sx={{
                 ...serifHeadingSx,
-                fontSize: { xs: 28, md: 40 },
+                fontSize: { xs: 30, md: 42 },
                 lineHeight: 1.15,
-                color: NAVY_TEXT,
+                color: NAVY,
                 mb: 1.5,
                 letterSpacing: "-0.01em",
               }}
@@ -302,8 +302,8 @@ export default function HomePage() {
           <Box
             sx={{
               display: "grid",
-              gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
-              gap: 3,
+              gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" },
+              gap: 2.5,
             }}
           >
             {[
@@ -355,8 +355,8 @@ export default function HomePage() {
         <Box
           component="section"
           sx={{
-            py: { xs: 8, md: 10 },
-            bgcolor: "var(--imaa-bg-cool)",
+            py: { xs: 7, md: 10 },
+            bgcolor: "#F0F4F5",
           }}
         >
           <Container maxWidth="lg">
@@ -370,18 +370,18 @@ export default function HomePage() {
                 gridTemplateColumns: { xs: "1fr", md: featuredEvent.preview_image ? "1fr 1fr" : "1fr" },
                 gap: 4,
                 alignItems: "center",
-                backgroundColor: "var(--imaa-dm-surface, #FFFFFF)",
-                borderRadius: "var(--imaa-radius-card)",
+                backgroundColor: "#FFFFFF",
+                borderRadius: "var(--imaa-radius-field)",
                 overflow: "hidden",
-                border: `2px solid ${TEAL}`,
-                boxShadow: "var(--imaa-shadow-sm)",
+                border: "1px solid var(--imaa-border)",
+                boxShadow: "0 10px 32px rgba(27,42,74,.08)",
                 textDecoration: "none",
                 color: "inherit",
                 "&:hover": {
-                  boxShadow: "var(--imaa-shadow-md)",
-                  transform: "translateY(-2px)",
+                  boxShadow: "0 16px 40px rgba(27,42,74,.13)",
+                  transform: "translateY(-3px)",
                 },
-                "&:hover .featured-event-cta": { bgcolor: ORANGE_HOVER },
+                "&:hover .featured-event-cta": { bgcolor: "#A9361C" },
                 transition: "box-shadow 0.2s ease, transform 0.2s ease",
                 "@media (prefers-reduced-motion: reduce)": {
                   transition: "none",
@@ -406,8 +406,9 @@ export default function HomePage() {
                     width: "fit-content",
                     mb: 2,
                     fontWeight: 600,
-                    bgcolor: "var(--imaa-gold)",
-                    color: NAVY_TEXT,
+                    bgcolor: "#FEF2EE",
+                    color: ORANGE_HOVER,
+                    borderRadius: "var(--imaa-radius-field)",
                   }}
                 />
                 <Box
@@ -415,7 +416,7 @@ export default function HomePage() {
                   sx={{
                     ...serifHeadingSx,
                     fontSize: { xs: 24, md: 34 },
-                    color: NAVY_TEXT,
+                    color: NAVY,
                     mb: 2,
                     lineHeight: 1.2,
                   }}
@@ -457,11 +458,11 @@ export default function HomePage() {
                     display: "inline-flex",
                     alignItems: "center",
                     justifyContent: "center",
-                    bgcolor: ORANGE,
-                    color: "var(--imaa-dm-text, rgba(0, 0, 0, 0.87))",
-                    borderRadius: 2,
-                    boxShadow: 2,
-                    fontWeight: 600,
+                    bgcolor: ORANGE_HOVER,
+                    color: "#FFFFFF",
+                    borderRadius: "var(--imaa-radius-field)",
+                    boxShadow: "none",
+                    fontWeight: 700,
                     fontSize: "0.875rem",
                     lineHeight: 1.75,
                     px: 4,
@@ -480,12 +481,12 @@ export default function HomePage() {
       {/* CTA BANNER */}
       {!authed && (
         <Box component="section" sx={{
-          py: { xs: 8, md: 10 },
+          py: { xs: 7, md: 9 },
           bgcolor: NAVY, // flat navy (gradients retired)
           textAlign: "center",
         }}>
           <Container maxWidth="md">
-            <Box component="h2" sx={{ ...serifHeadingSx, fontSize: { xs: 28, md: 40 }, lineHeight: 1.2, color: "#FFFFFF", mb: 2 }}>
+            <Box component="h2" sx={{ ...serifHeadingSx, fontSize: { xs: 30, md: 42 }, lineHeight: 1.2, color: "#FFFFFF", mb: 2 }}>
               Ready to join the M&A network?
             </Box>
             <Typography sx={{ color: "rgba(255,255,255,.75)", fontSize: 17, mb: 5, lineHeight: 1.7 }}>
@@ -493,11 +494,11 @@ export default function HomePage() {
             </Typography>
             <Box sx={{ display: "flex", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
               <Button onClick={openSignup} variant="contained" size="large"
-                sx={{ bgcolor: ORANGE, "&:hover": { bgcolor: ORANGE_HOVER }, boxShadow: "none", borderRadius: 2, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                 Create free account
               </Button>
               <Button onClick={openLogin} variant="outlined" size="large"
-                sx={{ borderColor: "rgba(255,255,255,.4)", color: "#FFFFFF", "&:hover": { borderColor: "#FFFFFF", bgcolor: "rgba(255,255,255,.08)" }, borderRadius: 2, px: 5, py: 1.5, fontWeight: 600, fontSize: 15, textTransform: "none" }}>
+                sx={{ borderColor: "rgba(255,255,255,.65)", color: "#FFFFFF", "&:hover": { borderColor: "#FFFFFF", bgcolor: "rgba(255,255,255,.08)" }, borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                 Sign in
               </Button>
             </Box>
