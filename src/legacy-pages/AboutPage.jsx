@@ -1,119 +1,159 @@
 import React from "react";
-import { Container, Box, Paper, Alert, Skeleton } from "@mui/material";
+import { Container, Box, Alert, Skeleton } from "@mui/material";
 import { apiClient } from "../utils/api";
 import { EmptyState } from "../components/page";
 
-// Section title: serif heading in ink (design tokens)
-const SectionTitle = ({ children }) => (
-  <h2 className="font-serif text-2xl md:text-3xl font-bold text-imaa-ink">{children}</h2>
+const NAVY = "var(--imaa-navy)";
+const BODY = "var(--imaa-ink-body)";
+const BORDER = "var(--imaa-border)";
+const COOL = "var(--imaa-bg-cool)";
+
+const headingSx = {
+  m: 0,
+  fontFamily: "var(--imaa-font-sans)",
+  color: NAVY,
+  fontWeight: 700,
+  letterSpacing: "-.02em",
+  overflowWrap: "anywhere",
+};
+
+const SectionTitle = ({ children, align = "left" }) => (
+  <Box
+    component="h2"
+    sx={{
+      ...headingSx,
+      fontSize: { xs: 32, md: 44 },
+      lineHeight: 1.15,
+      textAlign: align,
+      textWrap: "balance",
+    }}
+  >
+    {children}
+  </Box>
 );
 
-// Hero height grows with long CMS titles (was a fixed height); same minimum sizes as before
-const HERO_CLASS = "relative min-h-[max(380px,50vh)] md:min-h-[60vh] py-16 flex items-center justify-center text-center";
+const cmsHtmlSx = {
+  color: BODY,
+  fontSize: { xs: 16, md: 18 },
+  lineHeight: 1.75,
+  overflowWrap: "anywhere",
+  "& p": { mt: 2, mb: 0 },
+  "& p:first-of-type": { mt: 0 },
+  "& h2": { ...headingSx, mt: 4, mb: 0, fontSize: { xs: 26, md: 32 }, lineHeight: 1.25 },
+  "& h3": { ...headingSx, mt: 3, mb: 0, fontSize: { xs: 21, md: 24 }, lineHeight: 1.3 },
+  "& ul, & ol": { mt: 2.5, mb: 0, pl: { xs: 3, md: 3.5 } },
+  "& li": { mb: 1, pl: 0.5 },
+  "& li::marker": { color: "var(--imaa-teal)" },
+  "& a": { color: "var(--imaa-link)", textDecoration: "underline", textUnderlineOffset: "3px" },
+  "& a:focus-visible": { outline: "2px solid var(--imaa-teal)", outlineOffset: 3, borderRadius: 1 },
+  "& strong": { color: NAVY, fontWeight: 700 },
+};
 
-// Readable defaults for the CMS HTML blocks. The `prose` classes used before had no effect
-// (the Tailwind typography plugin isn't installed). Styling only; the HTML itself is rendered as before.
-const CMS_HTML_CLASS = [
-  "max-w-4xl mx-auto text-center text-base md:text-lg leading-relaxed text-imaa-body",
-  "[&_p]:mt-4 [&_p:first-child]:mt-0",
-  "[&_h2]:mt-8 [&_h2]:font-serif [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-imaa-ink",
-  "[&_h3]:mt-6 [&_h3]:font-serif [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-imaa-ink",
-  "[&_ul]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:text-left [&_ol]:mt-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:text-left",
-  "[&_a]:text-imaa-link [&_a]:underline [&_strong]:font-semibold [&_strong]:text-imaa-ink",
-].join(" ");
-
-// Feature card: 8px corners, token border and shadows
 const FeaturedCard = ({ image, title, desc }) => (
   <Box
     component="article"
-    className="bg-white rounded-lg border border-imaa-border overflow-hidden shadow-imaa-sm transition-shadow hover:shadow-imaa-md h-full flex flex-col"
+    sx={{
+      bgcolor: "#FFFFFF",
+      border: `1px solid ${BORDER}`,
+      borderRadius: "var(--imaa-radius-card)",
+      overflow: "hidden",
+      boxShadow: "0 4px 16px rgba(27,42,74,.05)",
+      height: "100%",
+      display: "flex",
+      flexDirection: "column",
+      transition: "transform .2s ease, box-shadow .2s ease, border-color .2s ease",
+      "&:hover": {
+        transform: "translateY(-2px)",
+        borderColor: "rgba(27,42,74,.18)",
+        boxShadow: "0 8px 22px rgba(27,42,74,.08)",
+      },
+      "@media (prefers-reduced-motion: reduce)": {
+        transition: "none",
+        "&:hover": { transform: "none" },
+      },
+    }}
   >
-    <Box className="w-full overflow-hidden">
+    <Box sx={{ width: "100%", aspectRatio: "16 / 9", overflow: "hidden", bgcolor: COOL }}>
       <img
         src={image}
         alt={title}
         loading="lazy"
-        className="w-full h-40 sm:h-48 md:h-56 object-cover"
+        style={{ width: "100%", height: "100%", display: "block", objectFit: "cover", objectPosition: "center" }}
       />
     </Box>
 
-    <Box className="p-5 flex-1 flex flex-col">
-      <h3 className="font-serif text-lg font-semibold text-imaa-ink">{title}</h3>
-      <p className="mt-2 text-sm text-imaa-body">{desc}</p>
+    <Box sx={{ p: { xs: 2.5, md: 3 }, flex: 1, display: "flex", flexDirection: "column" }}>
+      <Box component="h3" sx={{ ...headingSx, fontSize: 20, lineHeight: 1.3 }}>
+        {title}
+      </Box>
+      <Box component="p" sx={{ mt: 1.25, mb: 0, color: BODY, fontSize: 15, lineHeight: 1.7 }}>
+        {desc}
+      </Box>
     </Box>
   </Box>
 );
 
 const AboutPageSkeleton = () => {
   return (
-    <div className="bg-white">
+    <Box sx={{ bgcolor: "#FFFFFF" }}>
       {/* HERO Skeleton */}
-      <section className={`${HERO_CLASS} bg-cover bg-center`}>
-        <div className="absolute inset-0 bg-black/10" />
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6 z-10">
-          <Skeleton variant="text" sx={{ mx: "auto" }} width="60%" height={70} />
-          <Skeleton variant="text" sx={{ mx: "auto", mt: 2 }} width="75%" height={28} />
-          <Skeleton variant="text" sx={{ mx: "auto" }} width="65%" height={28} />
+      <Box component="section" sx={{ minHeight: { xs: 390, md: 470 }, display: "flex", alignItems: "center", bgcolor: COOL }}>
+        <Container maxWidth="lg">
+          <Skeleton variant="text" width="55%" height={70} />
+          <Skeleton variant="text" sx={{ mt: 2 }} width="68%" height={28} />
+          <Skeleton variant="text" width="58%" height={28} />
         </Container>
-      </section>
+      </Box>
 
       {/* Intro Skeleton */}
-      <section className="py-12 md:py-20">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <div className="text-center">
-            <Skeleton variant="text" sx={{ mx: "auto" }} width="30%" height={40} />
-          </div>
-
-          <Box sx={{ mt: 4 }}>
+      <Box component="section" sx={{ py: { xs: 7, md: 9 } }}>
+        <Container maxWidth="md">
+          <Skeleton variant="text" width="34%" height={48} />
+          <Box sx={{ mt: 3 }}>
             <Skeleton variant="text" height={28} />
             <Skeleton variant="text" height={28} />
             <Skeleton variant="text" height={28} width="85%" />
             <Skeleton variant="text" height={28} width="75%" />
           </Box>
         </Container>
-      </section>
+      </Box>
 
       {/* Feature Cards Skeleton */}
-      <section className="py-12 md:py-20">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <div className="text-center">
-            <Skeleton variant="text" sx={{ mx: "auto" }} width="40%" height={40} />
-          </div>
-
-          <div className="mt-8 md:mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 xl:gap-8">
+      <Box component="section" sx={{ py: { xs: 7, md: 9 }, bgcolor: COOL }}>
+        <Container maxWidth="lg">
+          <Skeleton variant="text" width="46%" height={48} />
+          <Box sx={{ mt: { xs: 4, md: 5 }, display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" }, gap: { xs: 2.5, md: 3 } }}>
             {[0, 1, 2].map((i) => (
               <Box
                 key={i}
-                className="bg-white rounded-lg border border-imaa-border overflow-hidden shadow-imaa-sm h-full flex flex-col"
+                sx={{ bgcolor: "#FFFFFF", borderRadius: "var(--imaa-radius-card)", border: `1px solid ${BORDER}`, overflow: "hidden" }}
               >
-                <Skeleton variant="rectangular" height={220} />
-                <Box className="p-5">
+                <Skeleton variant="rectangular" sx={{ aspectRatio: "16 / 9" }} />
+                <Box sx={{ p: 3 }}>
                   <Skeleton variant="text" height={28} width="70%" />
                   <Skeleton variant="text" height={22} />
                   <Skeleton variant="text" height={22} width="85%" />
                 </Box>
               </Box>
             ))}
-          </div>
+          </Box>
         </Container>
-      </section>
+      </Box>
 
       {/* Mission Skeleton */}
-      <section className="py-12 md:py-20">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <Paper elevation={0} className="bg-white rounded-lg border border-imaa-border shadow-imaa-sm p-6 md:p-10">
-            <div className="text-center">
-              <Skeleton variant="text" sx={{ mx: "auto" }} width="30%" height={40} />
-            </div>
+      <Box component="section" sx={{ py: { xs: 7, md: 9 } }}>
+        <Container maxWidth="lg">
+          <Box sx={{ bgcolor: COOL, borderRadius: "var(--imaa-radius-card)", p: { xs: 3.5, md: 6 } }}>
+            <Skeleton variant="text" width="30%" height={48} />
             <Box sx={{ mt: 3 }}>
               <Skeleton variant="text" height={26} />
               <Skeleton variant="text" height={26} />
               <Skeleton variant="text" height={26} width="80%" />
             </Box>
-          </Paper>
+          </Box>
         </Container>
-      </section>
-    </div>
+      </Box>
+    </Box>
   );
 };
 
@@ -202,85 +242,137 @@ export default function AboutPage() {
   const features = Array.isArray(page?.features) ? page.features : [];
 
   return (
-    // White surface scoped to this page (the app body is cream)
-    <div className="bg-white">
-      {/* HERO: CMS image under a flat navy overlay (design tokens) */}
-      <section
-        className={`${HERO_CLASS} text-white bg-cover bg-center`}
-        style={{
+    <Box sx={{ bgcolor: "#FFFFFF", color: NAVY, overflowX: "hidden" }}>
+      {/* HERO */}
+      <Box
+        component="section"
+        sx={{
+          position: "relative",
+          minHeight: { xs: 390, sm: 430, md: 470 },
+          display: "flex",
+          alignItems: "center",
+          overflow: "hidden",
           backgroundImage: `url("${heroBg}")`,
+          backgroundSize: "cover",
+          backgroundPosition: { xs: "62% center", md: "center" },
+          "&::before": {
+            content: '\"\"',
+            position: "absolute",
+            inset: 0,
+            background: {
+              xs: "linear-gradient(90deg, rgba(18,37,76,.88) 0%, rgba(18,37,76,.72) 72%, rgba(18,37,76,.5) 100%)",
+              md: "linear-gradient(90deg, rgba(18,37,76,.88) 0%, rgba(18,37,76,.72) 46%, rgba(18,37,76,.24) 78%, rgba(18,37,76,.12) 100%)",
+            },
+          },
         }}
       >
-        <div className="absolute inset-0 bg-imaa-navy/75" />
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6 z-10">
-          {/* text-white is set on the heading itself: the global h1 rule in index.css would otherwise make it navy */}
-          <h1 className="font-serif text-3xl md:text-5xl font-bold leading-tight text-white break-words">
-            {page?.hero_title || page?.title || "About"}
-          </h1>
+        <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1, py: { xs: 6, md: 8 } }}>
+          <Box sx={{ maxWidth: { xs: 610, md: 700 } }}>
+            <Box
+              component="h1"
+              sx={{
+                ...headingSx,
+                color: "#FFFFFF",
+                fontSize: { xs: 40, sm: 50, md: 60 },
+                lineHeight: 1.08,
+                fontWeight: 700,
+                textWrap: "balance",
+              }}
+            >
+              {page?.hero_title || page?.title || "About"}
+            </Box>
 
-          {!!page?.hero_subtitle && (
-            <p className="mt-3 md:mt-4 text-base md:text-xl max-w-3xl mx-auto text-white/90 break-words">
-              {page.hero_subtitle}
-            </p>
-          )}
+            {!!page?.hero_subtitle && (
+              <Box
+                component="p"
+                sx={{
+                  mt: { xs: 2, md: 2.5 },
+                  mb: 0,
+                  maxWidth: 620,
+                  color: "rgba(255,255,255,.9)",
+                  fontSize: { xs: 16, md: 19 },
+                  lineHeight: 1.7,
+                  overflowWrap: "anywhere",
+                }}
+              >
+                {page.hero_subtitle}
+              </Box>
+            )}
+          </Box>
         </Container>
-      </section>
+      </Box>
 
       {/* Intro Section */}
-      <section className="py-12 md:py-20">
-        <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-          <div className="text-center">
-            <SectionTitle>{page?.title || "About"}</SectionTitle>
-          </div>
+      <Box component="section" sx={{ py: { xs: 7, md: 9 }, bgcolor: "#FFFFFF" }}>
+        <Container maxWidth="md">
+          <SectionTitle>{page?.title || "About"}</SectionTitle>
 
-          <div
-            className={`${CMS_HTML_CLASS} mt-6 md:mt-8`}
+          <Box
+            sx={{ ...cmsHtmlSx, mt: { xs: 3, md: 3.5 } }}
             dangerouslySetInnerHTML={{
               __html: page?.intro_html || page?.body_html || "",
             }}
           />
         </Container>
-      </section>
+      </Box>
 
-      {/* Feature Cards Section (cool-grey band between the white sections) */}
+      {/* Feature Cards Section */}
       {features.length > 0 && (
-        <section className="py-12 md:py-20 bg-imaa-cool">
-          <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-            <div className="text-center">
-              <SectionTitle>{page?.features_title || "What You Can Do"}</SectionTitle>
-            </div>
+        <Box component="section" sx={{ py: { xs: 7, md: 9 }, bgcolor: COOL }}>
+          <Container maxWidth="lg">
+            <SectionTitle>{page?.features_title || "What You Can Do"}</SectionTitle>
 
-            <div className="mt-8 md:mt-12 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 xl:gap-8">
+            <Box
+              sx={{
+                mt: { xs: 4, md: 5 },
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "minmax(0, 1fr)",
+                  sm: "repeat(2, minmax(0, 1fr))",
+                  lg: "repeat(3, minmax(0, 1fr))",
+                },
+                gap: { xs: 2.5, md: 3 },
+                alignItems: "stretch",
+              }}
+            >
               {features.map((f, idx) => (
-                <div key={idx} className="h-full">
+                <Box key={idx} sx={{ minWidth: 0, height: "100%" }}>
                   <FeaturedCard
                     image={f.image_url || heroBg}
                     title={f.title || ""}
                     desc={f.desc || ""}
                   />
-                </div>
+                </Box>
               ))}
-            </div>
+            </Box>
           </Container>
-        </section>
+        </Box>
       )}
 
       {/* Mission Section */}
       {(page?.mission_title || page?.mission_html) && (
-        <section className="py-12 md:py-20">
-          <Container maxWidth="lg" disableGutters className="px-4 md:px-6">
-            <Paper elevation={0} className="bg-white rounded-lg border border-imaa-border shadow-imaa-sm p-6 md:p-10">
-              <div className="text-center">
+        <Box component="section" sx={{ py: { xs: 7, md: 9 }, bgcolor: "#FFFFFF" }}>
+          <Container maxWidth="lg">
+            <Box
+              sx={{
+                bgcolor: COOL,
+                borderRadius: "var(--imaa-radius-card)",
+                borderLeft: "3px solid var(--imaa-teal)",
+                px: { xs: 3, sm: 4, md: 6 },
+                py: { xs: 3.5, md: 5 },
+              }}
+            >
+              <Box sx={{ maxWidth: 850 }}>
                 <SectionTitle>{page?.mission_title || "Our Mission"}</SectionTitle>
-              </div>
-              <div
-                className={`${CMS_HTML_CLASS} mt-6`}
+              </Box>
+              <Box
+                sx={{ ...cmsHtmlSx, mt: { xs: 2.5, md: 3 }, maxWidth: 850 }}
                 dangerouslySetInnerHTML={{ __html: page?.mission_html || "" }}
               />
-            </Paper>
+            </Box>
           </Container>
-        </section>
+        </Box>
       )}
-    </div>
+    </Box>
   );
 }
