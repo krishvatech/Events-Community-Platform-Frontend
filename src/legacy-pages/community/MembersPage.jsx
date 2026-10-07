@@ -39,6 +39,8 @@ import MapRoundedIcon from "@mui/icons-material/MapRounded";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
+import LocationOnOutlinedIcon from "@mui/icons-material/LocationOnOutlined";
+import CategoryOutlinedIcon from "@mui/icons-material/CategoryOutlined";
 import { geoCentroid } from "d3-geo";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import VisibilityOffRoundedIcon from "@mui/icons-material/VisibilityOffRounded";
@@ -554,8 +556,7 @@ const countryColor = (name) => {
 };
 
 /* -------------------------- Member card (left) -------------------------- */
-function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFriend, onCancelFriend, onAcceptFriend, onDeclineFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
-  const isMobile = useMediaQuery("(max-width:600px)");
+function MemberCard({ u, friendStatus, onOpenProfile, onMessage, onAddFriend, onRemoveFriend, onCancelFriend, onAcceptFriend, onDeclineFriend, currentUserId, viewerIsStaff, viewerIsVerified }) {
   const email = u?.email || "";
   const usernameFromEmail = email ? email.split("@")[0] : "";
   const name =
@@ -575,8 +576,6 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
 
   const isVerified =
     rawKycStatus === "approved" || rawKycStatus === "verified";
-  // --- NEW LOGIC START ---
-  // 1. Get raw values to check if they actually exist (ignoring defaults)
   const rawCompany = (u?.company_from_experience || "").trim();
   const rawTitle = (
     u?.position_from_experience ||
@@ -584,15 +583,6 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
     u?.job_title ||
     ""
   ).trim();
-
-  // 2. Check if we have data to show
-  const hasWorkInfo = rawCompany.length > 0 || rawTitle.length > 0;
-
-  // 3. Set display values (if hidden, these serve as placeholders to maintain height)
-  const displayCompany = rawCompany || "—";
-  const displayTitle = rawTitle || "—";
-  // --- NEW LOGIC END ---
-
   const status = (friendStatus || "").toLowerCase();
   const isSelf = currentUserId && String(currentUserId) === String(u?.id);
   const emailInfo = getEmailVisibilityInfo(u);
@@ -606,9 +596,6 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
         (emailInfo.visibility === "public" ||
           (["contacts", "request", "contacts_groups"].includes(emailInfo.visibility) &&
             status === "friends"))));
-
-  // Check if user is hidden in directory (for Admins to see)
-  const isDirectoryHidden = !!u?.profile?.directory_hidden;
 
   const emailDisplay = !emailInfo.hasEmail
     ? ""
@@ -635,7 +622,6 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
   // Badge text: same colours in light mode, readable variants in dark mode
   const degreeTextColors = { 1: "var(--imaa-dm-teal-text, #0A9396)", 2: "var(--imaa-dm-orange-text, #E8532F)", 3: "var(--imaa-dm-text-2, #1B2A4A)" };
   const degreeLabels = { 1: "1st", 2: "2nd", 3: "3rd" };
-  const isOnline = !!(u?.is_online || u?.profile?.is_online);
   const rawSkills = u?.profile?.skills || u?.skills || u?.profile?.expertise || [];
   const skillsArr = Array.isArray(rawSkills)
     ? rawSkills
@@ -667,10 +653,10 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
         component="div"
         onClick={() => onOpenProfile?.(u)}
         aria-label={`Open ${name}'s profile`}
-        sx={{ p: 2, flex: 1, width: "100%", display: "flex", alignItems: "stretch", textAlign: "left", flexDirection: "column", gap: 1 }}
+        sx={{ p: 2, flex: 1, width: "100%", display: "flex", alignItems: "stretch", textAlign: "left", flexDirection: "column", gap: 1.25 }}
       >
         {/* Row 1: Avatar (left) + degree / industry (right) */}
-        <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <Box sx={{ display: "flex", alignItems: "flex-start", gap: 1.25, minWidth: 0 }}>
           {/* Avatar with colour ring */}
           <Box sx={{ position: "relative", flexShrink: 0 }}>
             <Avatar
@@ -699,78 +685,56 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
             )}
           </Box>
 
-          {/* Degree badge + industry / connected pill */}
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+          <Box sx={{ minWidth: 0, flex: 1 }}>
+            <Typography component="h3" sx={{ fontSize: 16, fontWeight: 750, color: "var(--imaa-ink)", lineHeight: 1.3, mb: 0.25, overflowWrap: "anywhere" }}>
+              {name}
+            </Typography>
+            {rawTitle && <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", lineHeight: 1.4, overflowWrap: "anywhere" }}>{rawTitle}</Typography>}
+            {rawCompany && <Typography sx={{ fontSize: 12, color: accent, fontWeight: 600, lineHeight: 1.4, overflowWrap: "anywhere" }}>{rawCompany}</Typography>}
+          </Box>
+
+          {/* Relationship state */}
+          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px", flexShrink: 0 }}>
             {!isSelf && (
               <Box sx={{
                 fontSize: 9, fontWeight: 800, px: "7px", py: "2px", borderRadius: "4px",
                 bgcolor: degreeColors[degree] + "15", color: degreeTextColors[degree],
                 letterSpacing: 0.3, lineHeight: 1,
               }}>
-                {degreeLabels[degree]}
+                {status === "friends" ? "CONNECTED" : degreeLabels[degree].toUpperCase()}
               </Box>
             )}
-            {status === "friends" ? (
-              <Box sx={{
-                fontSize: 10, fontWeight: 700, px: "10px", py: "3px", borderRadius: "20px",
-                bgcolor: "#0A939614", color: "var(--imaa-dm-teal-text, #0A9396)",
-              }}>
-                ✓ Connected
-              </Box>
-            ) : industry ? (
-              <Box sx={{
-                fontSize: 10, fontWeight: 600, px: "10px", py: "3px", borderRadius: "20px",
-                bgcolor: "var(--imaa-dm-overlay, #1B2A4A08)", color: "var(--imaa-dm-text-body, #1B2A4A99)",
-                maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>
-                {industry}
-              </Box>
-            ) : null}
           </Box>
         </Box>
 
-        {/* Name + title + company */}
-        <Box>
-          <Typography component="h3" sx={{ fontSize: 16, fontWeight: 750, color: "var(--imaa-ink)", lineHeight: 1.3, mb: 0.25, overflowWrap: "anywhere" }}>
-            {name}
-          </Typography>
-          {(rawTitle || rawCompany) && (
-            <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", lineHeight: 1.45 }}>
-              {rawTitle}
-              {rawTitle && rawCompany
-                ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}> · {rawCompany}</Box>
-                : rawCompany
-                ? <Box component="span" sx={{ color: accent, fontWeight: 600 }}>{rawCompany}</Box>
-                : null}
-            </Typography>
-          )}
-        </Box>
-
-        {/* Location + online indicator */}
-        {country && (
-          <Typography sx={{ fontSize: 12, color: "var(--imaa-ink-body)", display: "flex", alignItems: "center", gap: 0.5, flexWrap: "wrap" }}>
-            {flag && <span>{flag}</span>}
-            {country}
-            {isOnline && (
-              <Box component="span" sx={{ display: "inline-flex", alignItems: "center", gap: "3px", color: "#22C55E", fontWeight: 700, ml: "4px" }}>
-                <Box component="span" sx={{ width: 6, height: 6, borderRadius: "50%", bgcolor: "#22C55E", display: "inline-block" }} />
-                Online
-              </Box>
-            )}
-          </Typography>
+        {/* Location and industry use only fields already returned by the directory API. */}
+        {(country || industry) && (
+          <Box sx={{ borderTop: "1px solid var(--imaa-border)", borderBottom: "1px solid var(--imaa-border)", py: 1, display: "grid", gridTemplateColumns: { xs: "1fr", sm: country && industry ? "1fr 1fr" : "1fr" }, gap: 0.75 }}>
+            {country && <Box sx={{ minWidth: 0, display: "flex", alignItems: "center", gap: 0.5, color: "var(--imaa-ink-body)" }}>
+              <LocationOnOutlinedIcon sx={{ fontSize: 16, color: accent, flexShrink: 0 }} />
+              <Typography sx={{ fontSize: 12, overflowWrap: "anywhere" }}>{flag && <Box component="span" sx={{ mr: 0.5 }}>{flag}</Box>}{country}</Typography>
+            </Box>}
+            {industry && <Box sx={{ minWidth: 0, display: "flex", alignItems: "center", gap: 0.5, color: "var(--imaa-ink-body)" }}>
+              <CategoryOutlinedIcon sx={{ fontSize: 16, color: accent, flexShrink: 0 }} />
+              <Typography sx={{ fontSize: 12, overflowWrap: "anywhere" }}>{industry}</Typography>
+            </Box>}
+          </Box>
         )}
 
-        {/* Skills / expertise chips */}
+        {/* Existing expertise is retained as compact chips; no credentials are inferred. */}
         {skillsArr.length > 0 && (
-          <Box sx={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
-            {skillsArr.slice(0, 3).map((skill, i) => (
-              <Box key={i} sx={{
-                fontSize: 10, fontWeight: 600, px: "9px", py: "3px", borderRadius: "14px",
-                bgcolor: "var(--imaa-dm-overlay, #1B2A4A08)", color: "var(--imaa-dm-text-body, #1B2A4A99)",
-              }}>
-                {skill}
-              </Box>
-            ))}
+          <Box>
+            <Typography sx={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.7, color: "var(--imaa-ink-body)", mb: 0.65 }}>EXPERTISE</Typography>
+            <Box sx={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+              {skillsArr.slice(0, 3).map((skill, i) => (
+                <Box key={i} sx={{
+                  fontSize: 10, fontWeight: 600, px: "8px", py: "3px", borderRadius: "4px", border: "1px solid var(--imaa-border)",
+                  bgcolor: "var(--imaa-dm-overlay, #1B2A4A08)", color: "var(--imaa-dm-text-body, #1B2A4A99)", overflowWrap: "anywhere",
+                }}>
+                  {skill}
+                </Box>
+              ))}
+            </Box>
           </Box>
         )}
 
@@ -785,18 +749,19 @@ function MemberCard({ u, friendStatus, onOpenProfile, onAddFriend, onRemoveFrien
       {/* Action footer */}
       {!isSelf && (
         <Box
-          sx={{ borderTop: "1px solid var(--imaa-border)", px: 2, py: 1, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}
+          sx={{ borderTop: "1px solid var(--imaa-border)", px: 2, py: 1.25, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}
           onClick={(e) => e.stopPropagation()}
         >
           {status === "friends" ? (
             <>
               <Button
                 size="small"
-                variant="outlined"
-                onClick={() => onOpenProfile?.(u)}
+                variant="contained"
+                onClick={() => onMessage?.(u)}
                 sx={{
                   minHeight: 40, textTransform: "none", fontSize: 12, fontWeight: 700, borderRadius: "var(--imaa-radius-field)",
-                  flex: 1,
+                  bgcolor: "var(--imaa-teal-hover)", boxShadow: "none", flex: 1,
+                  "&:hover": { bgcolor: "var(--imaa-navy)", boxShadow: "none" },
                 }}
               >
                 Message
@@ -1892,6 +1857,32 @@ export default function MembersPage() {
     navigate(`/community/rich-profile/${id}`, { state: { user: m } });
   };
 
+  const handleMessage = async (member) => {
+    const recipientId = Number(member?.id);
+    if (!recipientId) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/messaging/conversations/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...tokenHeader(),
+        },
+        credentials: "include",
+        body: JSON.stringify({ recipient_id: recipientId }),
+      });
+      const conversation = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(conversation?.detail || "Unable to start conversation");
+
+      const conversationId = conversation?.id || conversation?.conversation?.id || conversation?.pk;
+      if (!conversationId) throw new Error("Unable to open conversation");
+      localStorage.setItem(`conv_read_${conversationId}`, new Date().toISOString());
+      navigate(`/community?view=messages&conversation=${conversationId}`);
+    } catch (error) {
+      setToast({ open: true, msg: error?.message || "Unable to start conversation", type: "error" });
+    }
+  };
+
 
   const zoomIn = () =>
     setMapPos((p) => ({ ...p, zoom: Math.min(MAX_ZOOM, +(p.zoom * ZOOM_STEP).toFixed(3)) }));
@@ -2260,6 +2251,7 @@ export default function MembersPage() {
                       u={u}
                       friendStatus={friendStatusByUser[u.id]}
                       onOpenProfile={handleOpenProfile}
+                      onMessage={handleMessage}
                       onAddFriend={() => sendFriendRequest(u.id)}
                       onRemoveFriend={openRemoveFriendDialog}
                       onCancelFriend={() => cancelFriendRequest(u.id)}

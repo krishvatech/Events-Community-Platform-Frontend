@@ -13,13 +13,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  useMediaQuery,
-  useTheme,
 } from '@mui/material';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
@@ -40,10 +33,6 @@ import { colors, radii, semanticColors } from '../styles/designTokens';
 
 const VirtualSpeakersPage = () => {
   const navigate = useNavigate();
-  const theme = useTheme();
-  // Below md (where the sidebar collapses to a menu) speakers are shown as a stacked list instead of
-  // the table, which needs ~760px. The page is client-only, so the first render already matches.
-  const isCompact = useMediaQuery(theme.breakpoints.down('md'), { noSsr: true });
 
   // Role-based access control: Super Admin only
   useEffect(() => {
@@ -239,6 +228,59 @@ const VirtualSpeakersPage = () => {
     </>
   );
 
+  const renderSpeakerCard = (speaker) => {
+    const metadata = [speaker.company, speaker.job_title].filter(Boolean).join(' · ');
+    const initials = (speaker.name || '?').trim().charAt(0).toUpperCase() || '?';
+
+    return (
+      <Box
+        component="li"
+        key={speaker.id}
+        sx={{
+          display: 'flex',
+          flexDirection: { xs: 'column', sm: 'row' },
+          alignItems: { xs: 'stretch', sm: 'center' },
+          gap: { xs: 1.5, sm: 2 },
+          p: { xs: 1.75, sm: 2 },
+          '&:not(:first-of-type)': { borderTop: `1px solid ${semanticColors.border}` },
+        }}
+      >
+        <Avatar
+          src={speaker.profile_image_url}
+          alt={speaker.name || 'Virtual speaker'}
+          sx={{ width: 60, height: 60, flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'center' } }}
+        >
+          {initials}
+        </Avatar>
+
+        <Box sx={{ minWidth: 0, flex: 1 }}>
+          <Typography component="h2" sx={{ color: semanticColors.text, fontSize: '1.05rem', fontWeight: 750, lineHeight: 1.35, overflowWrap: 'anywhere' }}>
+            {speaker.name || 'Unnamed speaker'}
+          </Typography>
+          {metadata && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35, lineHeight: 1.5, overflowWrap: 'anywhere' }}>
+              {metadata}
+            </Typography>
+          )}
+          {speaker.bio && (
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.65, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+              {speaker.bio}
+            </Typography>
+          )}
+        </Box>
+
+        <Box sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 190 }, alignSelf: { xs: 'stretch', sm: 'center' } }}>
+          <Box sx={{ display: 'flex', justifyContent: { xs: 'flex-start', sm: 'flex-end' } }}>
+            {renderStatus(speaker, { overflowWrap: 'anywhere', textAlign: { sm: 'right' } })}
+          </Box>
+          <Stack direction="row" spacing={0.5} alignItems="center" justifyContent={{ xs: 'flex-start', sm: 'flex-end' }} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+            {renderActions(speaker)}
+          </Stack>
+        </Box>
+      </Box>
+    );
+  };
+
   return (
     <>
     <Box sx={{ width: '100%', minWidth: 0, p: { xs: 2, md: 3 } }}>
@@ -309,112 +351,10 @@ const VirtualSpeakersPage = () => {
                 ? 'No speakers found matching your search'
                 : 'No virtual speakers created yet. Create one to get started!'
             }
-            minWidth={760}
           >
-            {isCompact ? (
-              <Box component="ul" aria-label="Virtual speakers" sx={{ listStyle: 'none', m: 0, p: 0 }}>
-                {filteredSpeakers.map((speaker) => (
-                  <Box
-                    component="li"
-                    key={speaker.id}
-                    sx={{
-                      p: 2,
-                      '&:not(:first-of-type)': { borderTop: `1px solid ${semanticColors.border}` },
-                    }}
-                  >
-                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                      <Avatar
-                        src={speaker.profile_image_url}
-                        alt={speaker.name}
-                        sx={{ width: 44, height: 44 }}
-                      >
-                        {speaker.name.charAt(0)}
-                      </Avatar>
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'break-word' }}>
-                          {speaker.name}
-                        </Typography>
-                        {(speaker.job_title || speaker.company) && (
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25, overflowWrap: 'break-word' }}>
-                            {[speaker.job_title, speaker.company].filter(Boolean).join(' · ')}
-                          </Typography>
-                        )}
-                        {speaker.bio && (
-                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, overflowWrap: 'break-word' }}>
-                            {speaker.bio.substring(0, 50)}...
-                          </Typography>
-                        )}
-                        <Box sx={{ mt: 1 }}>
-                          {renderStatus(speaker, { overflowWrap: 'anywhere' })}
-                        </Box>
-                        <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mt: 1, ml: -1 }}>
-                          {renderActions(speaker)}
-                        </Stack>
-                      </Box>
-                    </Stack>
-                  </Box>
-                ))}
-              </Box>
-            ) : (
-            <Table aria-label="Virtual speakers">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 600, minWidth: 220 }}>Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Job Title</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Company</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Status</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }} align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {filteredSpeakers.map((speaker) => (
-                  <TableRow key={speaker.id} hover>
-                    <TableCell>
-                      <Stack direction="row" spacing={2} alignItems="center">
-                        <Avatar
-                          src={speaker.profile_image_url}
-                          alt={speaker.name}
-                          sx={{ width: 40, height: 40 }}
-                        >
-                          {speaker.name.charAt(0)}
-                        </Avatar>
-                        {/* break-word, not anywhere: in a table, "anywhere" lets the column shrink until
-                            names break after every few letters */}
-                        <Box sx={{ minWidth: 0, maxWidth: 300 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 600, overflowWrap: 'break-word' }}>
-                            {speaker.name}
-                          </Typography>
-                          {speaker.bio && (
-                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5, overflowWrap: 'break-word' }}>
-                              {speaker.bio.substring(0, 50)}...
-                            </Typography>
-                          )}
-                        </Box>
-                      </Stack>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {speaker.job_title || '—'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {speaker.company || '—'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      {renderStatus(speaker)}
-                    </TableCell>
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={0.5} justifyContent="flex-end" flexWrap="wrap" useFlexGap>
-                        {renderActions(speaker)}
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            )}
+            <Box component="ul" aria-label="Virtual speakers" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+              {filteredSpeakers.map(renderSpeakerCard)}
+            </Box>
           </AdminTableShell>
         )}
       </Box>

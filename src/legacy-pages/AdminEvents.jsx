@@ -48,6 +48,7 @@ import AlternateEmailRoundedIcon from "@mui/icons-material/AlternateEmailRounded
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
+import LocationOnRoundedIcon from "@mui/icons-material/LocationOnRounded";
 import { IconButton, InputAdornment, Tooltip } from "@mui/material";
 import AdminPostsPage from "./AdminPostsPage.jsx";
 import MyRecordingsPage from "./MyRecordingsPage.jsx"
@@ -3282,6 +3283,13 @@ function AdminEventCard({
   const timesDiffer = (orgTimeRangeKey !== localTimeRangeKey) || (orgDateStr !== localDateStr);
   // Check both format fields just in case
   const isVirtual = ev.format === 'virtual' || ev.event_format === 'virtual';
+  const eventFormat = ev.format || ev.event_format || '';
+  const formatLabel = {
+    virtual: 'Online',
+    in_person: 'In-person',
+    hybrid: 'Hybrid',
+  }[eventFormat] || eventFormat;
+  const locationLabel = ev.location || (isVirtual ? 'Online' : '');
   const showYourTime = isVirtual && organizerTimezone && timesDiffer;
 
   const handleOpenDetails = () => {
@@ -3297,7 +3305,7 @@ function AdminEventCard({
       sx={{ cursor: "pointer" }}
     >
       {/* Top image area */}
-      <Box sx={{ position: "relative", width: "100%", paddingTop: "56.25%" }}>
+      <Box sx={{ position: "relative", width: "100%", height: { xs: 180, md: 200 }, bgcolor: "var(--imaa-navy, #172554)" }}>
         {(ev.cover_image || ev.preview_image) ? (
           <img
             src={toAbs(ev.cover_image || ev.preview_image)}
@@ -3312,13 +3320,24 @@ function AdminEventCard({
             }}
           />
         ) : (
-          <div
-            style={{
+          <Box
+            sx={{
               position: "absolute",
               inset: 0,
-              background: "var(--imaa-dm-muted, #E5E7EB)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              px: 2,
+              bgcolor: "var(--imaa-navy, #172554)",
+              color: "rgba(255,255,255,0.88)",
+              fontSize: 11,
+              fontWeight: 800,
+              letterSpacing: 1.1,
+              textAlign: "center",
             }}
-          />
+          >
+            {(ev.category || formatLabel || "EVENT").toUpperCase()}
+          </Box>
         )}
 
         {isOwner && (
@@ -3346,7 +3365,12 @@ function AdminEventCard({
       </Box>
       {/* Content */}
       <Box className="p-4 flex flex-col gap-2 flex-1">
-        <div className="flex items-center justify-between gap-2">
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+          {ev.category ? (
+            <Typography variant="caption" sx={{ color: "var(--imaa-dm-teal-text, #077B7E)", fontWeight: 800, letterSpacing: 0.8, lineHeight: 1.2, textTransform: "uppercase", overflowWrap: "anywhere" }}>
+              {ev.category}
+            </Typography>
+          ) : <Box />}
           <div className="flex gap-2 items-center">
             <Chip
               size="small"
@@ -3357,21 +3381,27 @@ function AdminEventCard({
               <PushPinIcon sx={{ color: "error.main", fontSize: 20 }} />
             )}
           </div>
-          {ev.category && (
-            <span className="text-xs text-slate-500">{ev.category}</span>
-          )}
-        </div>
+        </Box>
 
         <Typography
           variant="h6"
           className="font-extrabold !leading-snug text-slate-900"
+          sx={{ minHeight: { xs: 0, md: "3.3em" }, color: "var(--imaa-navy, #172554)", overflowWrap: "anywhere" }}
         >
           {ev.title}
         </Typography>
 
-        {Array.isArray(ev.platforms) && ev.platforms.length > 0 && (
+        {(formatLabel || (Array.isArray(ev.platforms) && ev.platforms.length > 0)) && (
           <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
-            {ev.platforms
+            {formatLabel && (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={formatLabel}
+                sx={{ height: 22, fontSize: "0.72rem", borderColor: "var(--imaa-dm-teal-text, #077B7E)", color: "var(--imaa-dm-teal-text, #077B7E)" }}
+              />
+            )}
+            {Array.isArray(ev.platforms) && ev.platforms
               .filter((platform) => platform?.is_enabled !== false && platform?.slug)
               .map((platform) => (
                 <Chip
@@ -3385,7 +3415,9 @@ function AdminEventCard({
           </Stack>
         )}
 
-        <div className="text-sm text-slate-500">
+        <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ color: "text.secondary" }}>
+          <CalendarMonthRoundedIcon sx={{ fontSize: 17, mt: "2px", color: "var(--imaa-dm-teal-text, #077B7E)", flexShrink: 0 }} />
+          <Box className="text-sm text-slate-500" sx={{ minWidth: 0, flex: 1 }}>
           {(() => {
             // DEBUG: Log event data
             // console.log(`[AdminEventCard Debug] Event "${ev.title}":`, {
@@ -3399,11 +3431,6 @@ function AdminEventCard({
             if (ev.is_multi_day && ev.sessions && ev.sessions.length > 0) {
               return (
                 <div>
-                  {/* Show location */}
-                  <span className="block font-medium text-slate-900 mb-1">
-                    {ev.location || "Virtual"}
-                  </span>
-
                   {/* Show next upcoming session with timezone handling */}
                   {(() => {
                     // Find next upcoming session
@@ -3471,7 +3498,15 @@ function AdminEventCard({
               </>
             );
           })()}
-        </div>
+          </Box>
+        </Stack>
+
+        {locationLabel && (
+          <Stack direction="row" spacing={0.75} alignItems="flex-start" sx={{ color: "text.secondary" }}>
+            <LocationOnRoundedIcon sx={{ fontSize: 17, mt: "1px", color: "var(--imaa-dm-teal-text, #077B7E)", flexShrink: 0 }} />
+            <Typography variant="caption" sx={{ lineHeight: 1.45, overflowWrap: "anywhere" }}>{locationLabel}</Typography>
+          </Stack>
+        )}
 
         {/* Session counts for multi-day events */}
         {ev.is_multi_day && (
@@ -3500,8 +3535,12 @@ function AdminEventCard({
 
         {/* Actions – stop click bubbling so buttons don't trigger card navigation */}
         <Box
-          className="mt-auto pt-1 flex gap-2"
+          className="mt-auto pt-3 flex gap-2"
           onClick={(e) => e.stopPropagation()}
+          sx={{
+            borderTop: "1px solid var(--imaa-dm-border, #e2e8f0)",
+            "& .MuiButton-root": { minHeight: 36, borderRadius: "var(--imaa-radius-field)" },
+          }}
         >
           {isOwner ? (
             <>
@@ -4390,7 +4429,7 @@ function EventsPage() {
           sx={{
             px: 1,
             "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
-            "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0ea5a4) !important", fontWeight: 700 },
+            "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
             "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
           }}
         >
