@@ -113,7 +113,9 @@ const getRoleFlags = () => {
 
 
 
-const Header = () => {
+// `instituteTheme`: Institute-style public chrome (Home and About): taller, shadow-free bar with a
+// larger logo. Other routes keep the default compact header.
+const Header = ({ instituteTheme = false }) => {
 
   const location = useLocation();
   const navigate = useNavigate();
@@ -329,13 +331,13 @@ const Header = () => {
         bgcolor: `${semanticColors.surface} !important`,
         color: semanticColors.text,
         borderBottom: `1px solid ${semanticColors.border}`,
-        boxShadow: "0 2px 12px rgba(27,42,74,.06)",
+        boxShadow: instituteTheme ? "none" : "0 2px 12px rgba(27,42,74,.06)",
         zIndex: (t) => t.zIndex.drawer + 2,
       }}
     >
       <Toolbar
         disableGutters
-        sx={{ minHeight: { xs: 58, md: 66 } }}
+        sx={{ minHeight: instituteTheme ? { xs: 64, sm: 64, md: 76 } : { xs: 58, md: 66 } }}
       >
         <Box sx={{ mx: "auto", maxWidth: layout.contentMax, width: "100%", px: { xs: 2.5, sm: 3, md: 4 }, display: "grid", gridTemplateColumns: { xs: "1fr auto", lg: "minmax(0, 1fr) auto minmax(0, 1fr)" }, alignItems: "center", gap: { xs: 1.5, lg: 3.5 } }}>
 
@@ -363,7 +365,7 @@ const Header = () => {
               src={imaaLogoSrc}
               alt="IMAA"
               className="imaa-logo-plate"
-              sx={{ display: "block", width: { xs: 116, sm: 128 }, height: "auto" }}
+              sx={{ display: "block", width: instituteTheme ? { xs: 130, sm: 150 } : { xs: 116, sm: 128 }, height: "auto" }}
             />
           </Box>
 
@@ -427,7 +429,7 @@ const Header = () => {
                 <Button
                   onClick={() => openAuthModal("signup")}
                   variant="contained"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: radii.pill, px: 3, bgcolor: "#CC4422", color: colors.white, "&:hover": { bgcolor: "#A9361C", boxShadow: "0 6px 14px rgba(169,54,28,.16)" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${semanticColors.text}`, outlineOffset: "3px" }, boxShadow: "none" }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: radii.pill, px: instituteTheme ? 3.25 : 3, bgcolor: "#CC4422", color: colors.white, "&:hover": { bgcolor: "#A9361C", boxShadow: "0 6px 14px rgba(169,54,28,.16)" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${semanticColors.text}`, outlineOffset: "3px" }, boxShadow: "none" }}
                 >
                   Sign up
                 </Button>

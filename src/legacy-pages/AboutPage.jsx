@@ -2,16 +2,23 @@ import React from "react";
 import { Container, Box, Alert, Skeleton } from "@mui/material";
 import { apiClient } from "../utils/api";
 import { EmptyState } from "../components/page";
+import heroFallbackImage from "../assets/cities.png";
 
-const NAVY = "var(--imaa-navy)";
+// Public-page ink: the same heading colour as Home and the public footer, readable in dark mode.
+const INK = "var(--imaa-dm-text, #243E75)";
 const BODY = "var(--imaa-ink-body)";
 const BORDER = "var(--imaa-border)";
 const COOL = "var(--imaa-bg-cool)";
+// Dark-mode aware white grounds (light values unchanged; brand.css "Dark-mode override tokens").
+const PAGE_BG = "var(--imaa-dm-page, #FFFFFF)";
+const CARD_BG = "var(--imaa-dm-surface, #FFFFFF)";
+// Hero photo scrim: white in light mode, the dark page colour in dark mode (same stops as Home).
+const heroScrim = (alpha) => `rgb(var(--imaa-dm-page-rgb, 255 255 255) / ${alpha})`;
 
 const headingSx = {
   m: 0,
   fontFamily: "var(--imaa-font-sans)",
-  color: NAVY,
+  color: INK,
   fontWeight: 700,
   letterSpacing: "-.02em",
   overflowWrap: "anywhere",
@@ -46,14 +53,14 @@ const cmsHtmlSx = {
   "& li::marker": { color: "var(--imaa-teal)" },
   "& a": { color: "var(--imaa-link)", textDecoration: "underline", textUnderlineOffset: "3px" },
   "& a:focus-visible": { outline: "2px solid var(--imaa-teal)", outlineOffset: 3, borderRadius: 1 },
-  "& strong": { color: NAVY, fontWeight: 700 },
+  "& strong": { color: INK, fontWeight: 700 },
 };
 
 const FeaturedCard = ({ image, title, desc }) => (
   <Box
     component="article"
     sx={{
-      bgcolor: "#FFFFFF",
+      bgcolor: CARD_BG,
       border: `1px solid ${BORDER}`,
       borderRadius: "var(--imaa-radius-card)",
       overflow: "hidden",
@@ -64,7 +71,7 @@ const FeaturedCard = ({ image, title, desc }) => (
       transition: "transform .2s ease, box-shadow .2s ease, border-color .2s ease",
       "&:hover": {
         transform: "translateY(-2px)",
-        borderColor: "rgba(27,42,74,.18)",
+        borderColor: "var(--imaa-dm-border-strong, rgba(27,42,74,.18))",
         boxShadow: "0 8px 22px rgba(27,42,74,.08)",
       },
       "@media (prefers-reduced-motion: reduce)": {
@@ -95,7 +102,7 @@ const FeaturedCard = ({ image, title, desc }) => (
 
 const AboutPageSkeleton = () => {
   return (
-    <Box sx={{ bgcolor: "#FFFFFF" }}>
+    <Box sx={{ bgcolor: PAGE_BG }}>
       {/* HERO Skeleton */}
       <Box component="section" sx={{ minHeight: { xs: 390, md: 470 }, display: "flex", alignItems: "center", bgcolor: COOL }}>
         <Container maxWidth="lg">
@@ -126,7 +133,7 @@ const AboutPageSkeleton = () => {
             {[0, 1, 2].map((i) => (
               <Box
                 key={i}
-                sx={{ bgcolor: "#FFFFFF", borderRadius: "var(--imaa-radius-card)", border: `1px solid ${BORDER}`, overflow: "hidden" }}
+                sx={{ bgcolor: CARD_BG, borderRadius: "var(--imaa-radius-card)", border: `1px solid ${BORDER}`, overflow: "hidden" }}
               >
                 <Skeleton variant="rectangular" sx={{ aspectRatio: "16 / 9" }} />
                 <Box sx={{ p: 3 }}>
@@ -235,15 +242,14 @@ export default function AboutPage() {
     );
   }
 
-  const heroBg =
-    page?.hero_image_url ||
-    "https://lh3.googleusercontent.com/aida-public/AB6AXuCERO0mJRa0C5b8nfoEbZ02WYWLNgo1q1K9SdRDbgkWeuFTn9uR-WFnEl4leicScEd1-Nq77ffXT3ZygGPVXuF84_Jqsjx7EjTlVasqorCu40Ue1zQ-iHrokMzCd-WPkMG1OABR1lzOYx8pOC_PXo8xQPlx2uqRHLCOyRyRMegnAWV2gkZlJ9szW7-8z-16SCxoniaJHsxJxaubkZzRyXGiFH6SEHYrSBiM71UGQ4JYW2oSy_BjFesDJoYPo5Hy-1E_I5tqqIMIeA";
+  // Local photographic fallback, the same as the Home hero (no third-party hotlink).
+  const heroBg = page?.hero_image_url || heroFallbackImage;
 
   const features = Array.isArray(page?.features) ? page.features : [];
 
   return (
-    <Box sx={{ bgcolor: "#FFFFFF", color: NAVY, overflowX: "hidden" }}>
-      {/* HERO */}
+    <Box sx={{ bgcolor: PAGE_BG, color: INK, overflowX: "hidden" }}>
+      {/* HERO: CMS photography under the same light scrim and typography as the Home hero */}
       <Box
         component="section"
         sx={{
@@ -252,18 +258,9 @@ export default function AboutPage() {
           display: "flex",
           alignItems: "center",
           overflow: "hidden",
-          backgroundImage: `url("${heroBg}")`,
+          backgroundImage: `linear-gradient(90deg, ${heroScrim(".97")} 0%, ${heroScrim(".88")} 45%, ${heroScrim(".3")} 100%), url("${heroBg}")`,
           backgroundSize: "cover",
           backgroundPosition: { xs: "62% center", md: "center" },
-          "&::before": {
-            content: '\"\"',
-            position: "absolute",
-            inset: 0,
-            background: {
-              xs: "linear-gradient(90deg, rgba(18,37,76,.88) 0%, rgba(18,37,76,.72) 72%, rgba(18,37,76,.5) 100%)",
-              md: "linear-gradient(90deg, rgba(18,37,76,.88) 0%, rgba(18,37,76,.72) 46%, rgba(18,37,76,.24) 78%, rgba(18,37,76,.12) 100%)",
-            },
-          },
         }}
       >
         <Container maxWidth="lg" sx={{ position: "relative", zIndex: 1, py: { xs: 6, md: 8 } }}>
@@ -272,7 +269,6 @@ export default function AboutPage() {
               component="h1"
               sx={{
                 ...headingSx,
-                color: "#FFFFFF",
                 fontSize: { xs: 40, sm: 50, md: 60 },
                 lineHeight: 1.08,
                 fontWeight: 700,
@@ -289,7 +285,7 @@ export default function AboutPage() {
                   mt: { xs: 2, md: 2.5 },
                   mb: 0,
                   maxWidth: 620,
-                  color: "rgba(255,255,255,.9)",
+                  color: BODY,
                   fontSize: { xs: 16, md: 19 },
                   lineHeight: 1.7,
                   overflowWrap: "anywhere",
@@ -303,7 +299,7 @@ export default function AboutPage() {
       </Box>
 
       {/* Intro Section */}
-      <Box component="section" sx={{ py: { xs: 7, md: 9 }, bgcolor: "#FFFFFF" }}>
+      <Box component="section" sx={{ py: { xs: 7, md: 9 }, bgcolor: PAGE_BG }}>
         <Container maxWidth="md">
           <SectionTitle>{page?.title || "About"}</SectionTitle>
 
@@ -351,7 +347,7 @@ export default function AboutPage() {
 
       {/* Mission Section */}
       {(page?.mission_title || page?.mission_html) && (
-        <Box component="section" sx={{ py: { xs: 7, md: 9 }, bgcolor: "#FFFFFF" }}>
+        <Box component="section" sx={{ py: { xs: 7, md: 9 }, bgcolor: PAGE_BG }}>
           <Container maxWidth="lg">
             <Box
               sx={{

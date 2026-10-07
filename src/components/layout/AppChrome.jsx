@@ -142,6 +142,8 @@ const AppChrome = ({ children }) => {
 
   const showSidebar = authed && !hideChrome && !isMarketingHub;
   const showHeader = !authed && !hideChrome;
+  // Institute-style public chrome is limited to this first public-page batch.
+  const institutePublicTheme = normalizedPath === "" || normalizedPath === "/about";
 
   // Dark mode (flag on only): light-only routes (always-light routes and routes not reviewed for
   // dark mode, see src/theme/colorMode.js) stay fully light whatever the saved preference, without
@@ -172,8 +174,8 @@ const AppChrome = ({ children }) => {
       {/* 1. Unauthorized User -> Header */}
       {showHeader && (
         <>
-          <Header />
-          <Toolbar />
+          <Header instituteTheme={institutePublicTheme} />
+          <Toolbar sx={institutePublicTheme ? { minHeight: { xs: 64, sm: 64, md: 76 } } : undefined} />
         </>
       )}
 
@@ -224,7 +226,7 @@ const AppChrome = ({ children }) => {
         {children}
       </Box>
 
-      {!hideChrome && !authed && typeof Footer !== "undefined" && <Footer />}
+      {!hideChrome && !authed && typeof Footer !== "undefined" && <Footer instituteTheme={institutePublicTheme} />}
     </Box>
   );
 

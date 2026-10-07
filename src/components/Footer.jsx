@@ -1,10 +1,15 @@
 // src/components/Footer.jsx
 import React from "react";
 import { Container, Box, Link as MLink, IconButton } from "@mui/material";
-import { colors, focus, layout } from "../styles/designTokens";
+import { Link } from "#navigation";
+import { colors, focus, layout, semanticColors } from "../styles/designTokens";
+import imaaLogo from "../assets/IMAA-logo130.svg";
 
-// Brand navy footer with white text. The ground uses the navy CSS token (same #1B2A4A in light
-// mode) so dark mode gets the lifted navy from brand.css instead of vanishing into the page.
+const imaaLogoSrc = typeof imaaLogo === "string" ? imaaLogo : imaaLogo.src;
+
+// ── Default footer: brand navy with white text ────────────────────────────────────────────────
+// The ground uses the navy CSS token (same #1B2A4A in light mode) so dark mode gets the lifted
+// navy from brand.css instead of vanishing into the page.
 const NAVY_BG = "var(--imaa-navy)";
 
 const footerLinkSx = {
@@ -38,7 +43,76 @@ const socialButtonSx = {
   },
 };
 
-const Footer = () => (
+// ── Institute-style public footer (Home and About) ───────────────────────────────────────────
+// Light surface with three columns. Colours are dark-mode aware (light values unchanged; see
+// designTokens.semanticColors and the `var(--imaa-dm-*, light)` tokens in brand.css).
+const PUBLIC_INK = "var(--imaa-dm-text, #243E75)";
+const PUBLIC_ACCENT = "var(--imaa-dm-orange-text, #CC4422)";
+
+const publicLinkSx = {
+  color: semanticColors.textBody,
+  fontSize: 14,
+  fontWeight: 500,
+  textDecoration: "none",
+  borderRadius: "2px",
+  transition: "color .15s ease",
+  "&:hover": { color: PUBLIC_ACCENT },
+  "&:focus-visible": {
+    color: PUBLIC_ACCENT,
+    outline: `${focus.width}px solid ${focus.color}`,
+    outlineOffset: focus.offset,
+  },
+};
+
+const PUBLIC_FOOTER_COLUMNS = [
+  { title: "Explore Connect", links: [["Events & webinars", "/events"], ["Community", "/community"], ["Resources", "/account/resources"]] },
+  { title: "About IMAA", links: [["About us", "/about"], ["IMAA Institute", "https://imaa-institute.org/"], ["Contact us", "https://imaa-institute.org/contact-us/"]] },
+];
+
+const PublicFooter = () => (
+  <Box component="footer" sx={{ bgcolor: semanticColors.surface, borderTop: `1px solid ${semanticColors.border}`, color: PUBLIC_INK }}>
+    <Container maxWidth="lg" sx={{ py: { xs: 5, md: 7 } }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1.5fr 1fr 1fr" }, gap: { xs: 4, md: 7 } }}>
+        <Box>
+          <Box component={Link} to="/" aria-label="IMAA Connect home" sx={{ display: "inline-flex", ...publicLinkSx }}>
+            {/* Navy logo on a white plate in dark mode (brand.css .imaa-logo-plate); no effect in light mode. */}
+            <Box component="img" src={imaaLogoSrc} alt="IMAA" className="imaa-logo-plate" sx={{ width: 150, height: "auto" }} />
+          </Box>
+          <Box component="p" sx={{ mt: 2.5, mb: 0, maxWidth: 350, fontSize: 14, lineHeight: 1.8, color: "var(--imaa-dm-text-body, #617398)" }}>
+            Connect with the global M&A community through events, knowledge and professional networks.
+          </Box>
+        </Box>
+        {PUBLIC_FOOTER_COLUMNS.map(({ title, links }) => (
+          <Box component="nav" aria-label={title} key={title}>
+            <Box component="h2" sx={{ m: 0, mb: 2, fontFamily: "var(--imaa-font-sans)", fontSize: 15, fontWeight: 700 }}>{title}</Box>
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1 }}>
+              {links.map(([label, href]) => (
+                <MLink
+                  key={label}
+                  component={href.startsWith("/") ? Link : "a"}
+                  {...(href.startsWith("/") ? { to: href } : { href })}
+                  sx={{ ...publicLinkSx, display: "inline-flex", alignItems: "center", minHeight: 36 }}
+                >
+                  {label}
+                </MLink>
+              ))}
+            </Box>
+          </Box>
+        ))}
+      </Box>
+      <Box sx={{ mt: 5, pt: 3, borderTop: `1px solid ${semanticColors.border}`, display: "flex", flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", alignItems: { md: "center" }, gap: 2 }}>
+        <Box component="p" sx={{ m: 0, fontSize: 13, color: semanticColors.textBody }}>© {new Date().getFullYear()} IMAA Connect. All rights reserved.</Box>
+        <Box component="nav" aria-label="Legal information" sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+          <MLink href="https://imaa-institute.org/privacy-policy/" sx={publicLinkSx}>Privacy Policy</MLink>
+          <MLink href="https://imaa-institute.org/terms-and-conditions/" sx={publicLinkSx}>Terms & Conditions</MLink>
+        </Box>
+      </Box>
+    </Container>
+  </Box>
+);
+
+// `instituteTheme`: Institute-style public footer (Home and About); other routes keep the navy footer.
+const Footer = ({ instituteTheme = false }) => instituteTheme ? <PublicFooter /> : (
   <Box component="footer" sx={{ bgcolor: NAVY_BG, color: colors.white, borderTop: "1px solid rgba(255,255,255,.12)" }}>
     <Container maxWidth={false} disableGutters>
       <Box sx={{ mx: "auto", maxWidth: layout.contentMax, px: { xs: 3, sm: 4 }, py: { xs: 4.5, md: 5.5 } }}>

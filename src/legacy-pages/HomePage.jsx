@@ -1,4 +1,4 @@
-﻿// src/pages/HomePage.jsx
+// src/pages/HomePage.jsx
 import React, { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "#navigation";
 import { apiClient } from "../utils/api";
@@ -28,7 +28,7 @@ const isAuthed = () => !!getAccessToken();
 
 // IMAA design tokens (src/styles/brand.css)
 const NAVY = "var(--imaa-navy)";
-const NAVY_TEXT = "var(--imaa-dm-text, var(--imaa-navy))"; // as text: readable variant in dark mode
+const NAVY_TEXT = "var(--imaa-dm-text, #243E75)"; // as text: public-page heading ink; readable variant in dark mode
 const TEAL = "var(--imaa-teal)";
 const TEAL_TEXT = "var(--imaa-dm-teal-text, var(--imaa-teal-hover))"; // darker teal: AA contrast for small text
 const ORANGE = "var(--imaa-orange)";
@@ -223,8 +223,9 @@ export default function HomePage() {
         position: "relative", minHeight: { xs: 500, md: 590, lg: 630 }, overflow: "hidden",
         display: "flex", alignItems: "center",
         borderBottom: "0",
-        mt: { xs: -7.25, md: -8.25 },
-        pt: { xs: 7.25, md: 8.25 },
+        // Sits below the opaque institute header (AppChrome renders a matching spacer), not under it.
+        mt: 0,
+        pt: 0,
         background: heroImage
           ? `linear-gradient(90deg, ${heroScrim(".99")} 0%, ${heroScrim(".95")} 37%, ${heroScrim(".68")} 57%, ${heroScrim(".12")} 100%), url(${heroImage}) center/cover no-repeat`
           : COOL,
