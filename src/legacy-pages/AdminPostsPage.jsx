@@ -2703,7 +2703,7 @@ export default function AdminPostsPage() {
   const handleCreated = (p) => setItems((prev) => [p, ...prev]);
 
   return (
-    <Box sx={{ py: 3 }}>
+    <Box sx={{ py: 3, minWidth: 0 }}>
       <Container maxWidth="lg" disableGutters>
         <Stack
           direction={{ xs: "column", sm: "row" }}
@@ -2713,9 +2713,9 @@ export default function AdminPostsPage() {
           sx={{ mb: 2 }}
         >
           <Stack direction="row" spacing={2} alignItems="center" sx={{ width: "100%" }}>
-            <Avatar sx={{ bgcolor: "#14b8b1" }}>A</Avatar>
-            <Box>
-              <Typography variant="h5" fontWeight={800}>Community Posts</Typography>
+            <Avatar sx={{ bgcolor: "#0A9396" }}>A</Avatar>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>Community Posts</Typography>
               <Typography color="text.secondary">
                 Publish community-wide updates from the dashboard.
               </Typography>
@@ -2728,11 +2728,11 @@ export default function AdminPostsPage() {
               variant="contained"
               startIcon={<AddRoundedIcon />}
               onClick={() => setCreateOpen(true)}
-              className="rounded-xl"
               sx={{
                 textTransform: "none",
-                backgroundColor: "#10b8a6",
-                "&:hover": { backgroundColor: "#0ea5a4" },
+                borderRadius: "6px",
+                backgroundColor: "#0A9396",
+                "&:hover": { backgroundColor: "#087b7d" },
               }}
               disabled={!activeCommunityId}   // ← guard
             >
@@ -2741,7 +2741,7 @@ export default function AdminPostsPage() {
           </Box>
         </Stack>
 
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2, p: 2, border: "1px solid #e2e8f0", borderRadius: "8px", bgcolor: "#fff" }}>
           <TextField
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -2773,7 +2773,7 @@ export default function AdminPostsPage() {
             (<Paper
               variant="outlined"
               sx={{
-                borderRadius: 3,
+                borderRadius: "8px",
                 borderColor: "var(--imaa-dm-border, #e5e7eb)",
                 p: 4,
                 textAlign: "center",

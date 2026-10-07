@@ -1016,14 +1016,14 @@ export default function AdminNotificationsPage() {
   };
 
   return (
-    <Container maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6 }}>
+    <Container maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6, minWidth: 0 }}>
       {/* Header */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={2} sx={{ mb: 4 }}>
         <Stack direction="row" alignItems="center" spacing={2}>
-          <Avatar sx={{ bgcolor: TEAL, width: 48, height: 48, fontSize: '1.25rem', fontWeight: 700 }}>{userInitial}</Avatar>
-          <Box>
+          <Avatar sx={{ bgcolor: "#0A9396", width: 48, height: 48, fontSize: '1.25rem', fontWeight: 700 }}>{userInitial}</Avatar>
+          <Box sx={{ minWidth: 0 }}>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography variant="h5" sx={{ fontWeight: 800, color: "var(--imaa-dm-text, #1e293b)", letterSpacing: '-0.5px' }}>Admin Notifications</Typography>
+              <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>Admin Notifications</Typography>
               {unreadCount > 0 && <Chip size="small" label={`${unreadCount} pending`} sx={{ borderRadius: 1, bgcolor: 'var(--imaa-dm-surface-alt, #f1f5f9)', fontWeight: 600, height: 24, fontSize: '0.75rem' }} />}
             </Stack>
             <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748b)" }}>Manage system and group notifications.</Typography>
@@ -1035,14 +1035,14 @@ export default function AdminNotificationsPage() {
             startIcon={<DoneAllRoundedIcon />}
             onClick={handleMarkAllRead}
             disabled={initialLoading || unreadCount === 0}
-            sx={{ borderRadius: 99, textTransform: "uppercase", fontSize: 12, px: 2.5, borderColor: TEAL, color: TEAL, '&:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #f0fdfa)', borderColor: TEAL } }}
+            sx={{ borderRadius: "6px", textTransform: "none", fontSize: 12, px: 2.5, borderColor: "#0A9396", color: "#0A9396", '&:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #f0fdfa)', borderColor: "#0A9396" } }}
           >
             Mark all read
           </Button>
         )}
       </Stack>
       {/* Filters */}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 3 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 3, p: 2, border: "1px solid #e2e8f0", borderRadius: "8px", bgcolor: "#fff" }}>
         <Stack direction="row" alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
           <FormControlLabel
             sx={{ ml: 0 }}
@@ -1083,7 +1083,7 @@ export default function AdminNotificationsPage() {
           </Stack>
         ) : items.length === 0 ? (
           // 2. EMPTY STATE
-          (<Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: 3, bgcolor: 'var(--imaa-dm-surface-alt, #f8fafc)', borderStyle: 'dashed' }}>
+          (<Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: "8px", bgcolor: 'var(--imaa-dm-surface-alt, #f8fafc)', borderStyle: 'dashed' }}>
             <Typography color="text.secondary" fontWeight={500}>No notifications found.</Typography>
           </Paper>)
         ) : (

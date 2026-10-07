@@ -2418,10 +2418,10 @@ export default function AdminGroups() {
       className="py-6 sm:py-8"
     >
       {/* Header */}
-      < Box className="flex items-center gap-3 mb-4" >
-        <Avatar sx={{ bgcolor: "#0ea5a4" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
-        <div className="flex-1">
-          <Typography variant="h5" className="font-extrabold">
+      < Box className="flex items-center gap-3 mb-4" sx={{ flexWrap: "wrap", minWidth: 0 }} >
+        <Avatar sx={{ bgcolor: "#0A9396" }}>{(user?.first_name || "A")[0].toUpperCase()}</Avatar>
+        <div className="flex-1 min-w-0">
+          <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>
             Community Groups
           </Typography>
           <Typography className="text-slate-500">Create and manage your groups.</Typography>
@@ -2433,8 +2433,7 @@ export default function AdminGroups() {
               onClick={() => setCreateOpen(true)}
               startIcon={<AddRoundedIcon />}
               variant="contained"
-              className="rounded-xl"
-              sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }}
+              sx={{ textTransform: "none", borderRadius: "6px", backgroundColor: "#0A9396", "&:hover": { backgroundColor: "#087b7d" } }}
             >
               Create Group
             </Button>
@@ -2443,7 +2442,7 @@ export default function AdminGroups() {
       </Box >
 
       {owner && (
-        <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-5 overflow-hidden">
+        <Paper elevation={0} className="border border-slate-200 mb-5 overflow-hidden" sx={{ borderRadius: "8px" }}>
           <Tabs
             value={activeTab}
             onChange={changeTab}
@@ -2497,7 +2496,7 @@ export default function AdminGroups() {
             </div>
           </Box>
         ) : filtered.length === 0 ? (
-          <Paper elevation={0} className="rounded-2xl border border-slate-200">
+          <Paper elevation={0} className="border border-slate-200" sx={{ borderRadius: "8px" }}>
             <Box className="p-8 text-center">
               <Typography variant="h6" className="font-semibold text-slate-700">
                 No groups found

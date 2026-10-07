@@ -898,7 +898,7 @@ export default function MyResourcesAdmin() {
     <Container
       maxWidth="lg"
       disableGutters
-      sx={{ py: 4 }}
+      sx={{ py: 4, minWidth: 0 }}
     >
       {/* Header */}
       <Box
@@ -910,12 +910,12 @@ export default function MyResourcesAdmin() {
           gap: 2,
         }}
       >
-        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
+        <Avatar sx={{ bgcolor: "#0A9396" }}>
           {(currentUser?.first_name || "R")[0].toUpperCase()}
         </Avatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h5" className="font-extrabold">
+          <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>
             Resources
           </Typography>
           <Typography className="text-slate-500">
@@ -933,11 +933,11 @@ export default function MyResourcesAdmin() {
                 setEditing(null);
                 setDialogOpen(true);
               }}
-              className="rounded-xl"
               sx={{
                 textTransform: "none",
-                backgroundColor: "#10b8a6",
-                "&:hover": { backgroundColor: "#0ea5a4" },
+                borderRadius: "6px",
+                backgroundColor: "#0A9396",
+                "&:hover": { backgroundColor: "#087b7d" },
               }}
             >
               Upload Resource
@@ -950,7 +950,7 @@ export default function MyResourcesAdmin() {
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
-        sx={{ mb: 3 }}
+        sx={{ mb: 3, p: 2, border: "1px solid #e2e8f0", borderRadius: "8px", bgcolor: "#fff" }}
         alignItems={{ xs: "stretch", md: "center" }}
       >
         <TextField
@@ -1070,8 +1070,8 @@ export default function MyResourcesAdmin() {
         </Box>
       ) : (
         <>
-          <TableContainer component={Paper}>
-            <Table>
+          <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: "100%", overflowX: "auto", borderRadius: "8px", boxShadow: "0 1px 2px rgba(15,23,42,0.04)", "& .MuiTable-root": { minWidth: 640 }, "& .MuiTableCell-root": { borderColor: "#e2e8f0" }, "& .MuiTableHead-root .MuiTableCell-root": { bgcolor: "#f8fafc", color: "#1B2A4A", fontWeight: 700 } }}>
+            <Table aria-label="Resources">
               <TableHead>
                 <TableRow>
                   <TableCell>Title</TableCell>
@@ -1088,7 +1088,7 @@ export default function MyResourcesAdmin() {
 
                   return (
                     <TableRow key={row.id}>
-                      <TableCell>
+                        <TableCell sx={{ minWidth: 220, overflowWrap: "anywhere" }}>
                         {(row.file || row.link_url || row.video_url) && (
                           <Tooltip>
                             <IconButton
@@ -1117,7 +1117,7 @@ export default function MyResourcesAdmin() {
                       </TableCell>
 
                       {/* 🆕 Event column */}
-                      <TableCell>{eventLabel}</TableCell>
+                      <TableCell sx={{ minWidth: 160, overflowWrap: "anywhere" }}>{eventLabel}</TableCell>
 
                       <TableCell align="right">
                         {isDesktop ? (

@@ -1875,7 +1875,7 @@ export default function AdminMessagesPage() {
       maxWidth="xl"
       sx={{
         // reduced top + left padding vs previous version
-        pt: 2,
+        pt: 3,
         pb: 3,
         pl: { xs: 1.5, md: 3 },
         pr: { xs: 1.5, md: 3 },
@@ -1900,13 +1900,13 @@ export default function AdminMessagesPage() {
         sx={{ mb: 2 }}
       >
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <Avatar sx={{ bgcolor: "primary.main" }}>
+          <Avatar sx={{ bgcolor: "#0A9396" }}>
             {(me?.first_name || me?.last_name || "A")
               .slice(0, 1)
               .toUpperCase()}
           </Avatar>
           <Box>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>
               Messages
             </Typography>
             <Typography variant="body2" color="text.secondary">
@@ -1917,12 +1917,13 @@ export default function AdminMessagesPage() {
       </Stack>
       {/* outer card */}
       <Paper
-        className="rounded-2xl border border-slate-200"
+        className="border border-slate-200"
         sx={{
           p: { xs: 2, sm: 3 },
           height: { xs: "auto", md: "78vh" },
-          background:
-            "radial-gradient(circle at top left, rgba(45,212,191,0.08), transparent 55%), radial-gradient(circle at bottom right, rgba(59,130,246,0.06), transparent 55%)",
+          borderRadius: "8px",
+          boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+          bgcolor: "background.paper",
         }}
       >
         {/* 40 / 60 layout with vertical divider */}

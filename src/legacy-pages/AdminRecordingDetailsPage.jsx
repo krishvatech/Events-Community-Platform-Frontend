@@ -721,15 +721,15 @@ export default function AdminRecordingDetailsPage() {
     };
 
     return (
-        <Container maxWidth="xl" className="py-8">
+        <Container maxWidth="xl" className="py-8" sx={{ minWidth: 0 }}>
             {/* Header */}
-            <Box className="flex items-center gap-4 mb-6">
+            <Box className="flex items-center gap-4 mb-6 flex-wrap">
                 <IconButton onClick={handleBack}>
                     <ArrowBackRoundedIcon />
                 </IconButton>
-                <Box>
+                <Box className="min-w-0">
 
-                    <Typography variant="h5" className="font-bold">
+                    <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A", overflowWrap: "anywhere" }}>
                         {event?.title}
                     </Typography>
                     <Typography variant="body2" color="text.secondary" className="flex items-center gap-1">
@@ -737,7 +737,7 @@ export default function AdminRecordingDetailsPage() {
                         {fmtDate(event?.start_time)}
                     </Typography>
                 </Box>
-                <Box className="ml-auto flex items-center gap-2">
+                <Box className="ml-auto flex items-center gap-2 flex-wrap">
                     <IconButton
                         title="Refresh event data"
                         onClick={handleRefreshEvent}
@@ -769,7 +769,7 @@ export default function AdminRecordingDetailsPage() {
                 {/* Left Col: Video & Info */}
                 <Grid item xs={12} md={7} lg={8}>
                     {event?.replay_available && (
-                        <Paper className="rounded-2xl overflow-hidden border border-slate-200 mb-6" elevation={0}>
+                        <Paper className="overflow-hidden border border-slate-200 mb-6" elevation={0} sx={{ borderRadius: "8px" }}>
                             {hasRec ? (
                                 <Box sx={{ aspectRatio: "16/9", bgcolor: "black", position: "relative" }}>
                                     <video
@@ -803,7 +803,7 @@ export default function AdminRecordingDetailsPage() {
                     )}
 
                     {/* --- Expiry Timeline Info --- */}
-                    <Paper elevation={0} className="border border-slate-200 rounded-2xl p-5 mb-6">
+                    <Paper elevation={0} className="border border-slate-200 p-5 mb-6" sx={{ borderRadius: "8px" }}>
                     {!event?.replay_available ? (
                         <Box sx={{
                             display: "flex",

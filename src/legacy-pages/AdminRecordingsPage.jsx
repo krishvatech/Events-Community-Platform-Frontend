@@ -311,6 +311,7 @@ export default function AdminRecordingsPage() {
       maxWidth="lg"
       disableGutters
       className="pt-6 pb-6 sm:pt-6 sm:pb-8"
+      sx={{ minWidth: 0 }}
     >
       {/* Header */}
       <Box
@@ -322,12 +323,12 @@ export default function AdminRecordingsPage() {
           gap: 2,
         }}
       >
-        <Avatar sx={{ bgcolor: "#0ea5a4" }}>
+        <Avatar sx={{ bgcolor: "#0A9396" }}>
           {((me?.first_name || "R")[0] || "R").toUpperCase()}
         </Avatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="h5" className="font-extrabold tracking-tight">
+          <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>
             Recordings
           </Typography>
           <Typography className="text-slate-500">
@@ -339,7 +340,8 @@ export default function AdminRecordingsPage() {
       {/* Filters card */}
       <Paper
         elevation={0}
-        className="rounded-2xl border border-slate-200 p-3 sm:p-4 mb-3 sm:mb-4"
+        className="border border-slate-200 p-3 sm:p-4 mb-3 sm:mb-4"
+        sx={{ borderRadius: "8px", boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}
       >
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <FormControl size="small">
@@ -408,7 +410,8 @@ export default function AdminRecordingsPage() {
                 >
                   <MUICard
                     elevation={0}
-                    className="rounded-2xl border border-slate-200 overflow-hidden flex flex-col w-full cursor-pointer hover:shadow-md transition-shadow"
+                    className="border border-slate-200 overflow-hidden flex flex-col w-full cursor-pointer hover:shadow-md transition-shadow"
+                    sx={{ borderRadius: "8px", minWidth: 0 }}
                     onClick={() => navigate(`/admin/recordings/${encodeURIComponent(ev.slug || ev.id)}`)}
                   >
                     <div
@@ -542,7 +545,8 @@ export default function AdminRecordingsPage() {
       {!loading && !error && filtered.length === 0 && (
         <Paper
           elevation={0}
-          className="rounded-2xl border border-slate-200 p-8 text-center mt-4"
+          className="border border-slate-200 p-8 text-center mt-4"
+          sx={{ borderRadius: "8px" }}
         >
           <Typography
             variant="h6"
