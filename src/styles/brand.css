@@ -104,24 +104,32 @@ html:has(> body[data-imaa-color-mode="light"]) /* force-light page: the page scr
 }
 
 /* ── Dark mode (phase D2) ────────────────────────────────────────────────────────────────────
-   Only semantic grounds, text, lines and shadows change. Brand colours (navy, teal, orange,
-   coral, purple, gold, link) stay fixed; their light tints (used as backgrounds) become dark
-   tints. MUI's dark palette in src/muiTheme.js uses the same values; keep the two in sync.
-   Must follow the `:root` block above. */
+   Semantic grounds, text, lines and shadows change. Brand accents that carry white text or act
+   as links (teal, orange, coral, gold) keep their values. Brand NAVY, PURPLE and LINK are lifted
+   one step: on the navy-black grounds the light values vanish (navy fill vs page 1.3:1, link text
+   3.7:1), the lifted values stay readable with white text (navy 9.3:1, purple 4.9:1) and give
+   links 7:1. Light tints used as backgrounds become dark tints. MUI's dark palette in
+   src/muiTheme.js uses the same values; keep the two in sync. Must follow the `:root` block above. */
 [data-imaa-color-mode="dark"] {
   color-scheme: dark;
 
+  /* Brand fills and links on dark grounds (see note above). */
+  --imaa-navy: #2F4675;
+  --imaa-navy-2: #3D578D;
+  --imaa-purple: #9B52B4;
+  --imaa-link: #7FAEE8;
+
   --surface: #16213A;
   --surface-muted: #0E1626;
-  --surface-border: #24304A;
-  --surface-border-strong: #2A3651;
+  --surface-border: #303D5E;
+  --surface-border-strong: #475679;
 
   --text-primary: #E8ECF3;
   --text-secondary: #A8B1C0;
   --text-muted: #7D8798;
 
   --sidebar-bg: #121D33;
-  --sidebar-border: #24304A;
+  --sidebar-border: #303D5E;
 
   --imaa-bg-cool: #121D33;
   --imaa-bg-member: #0E1626;
@@ -129,9 +137,11 @@ html:has(> body[data-imaa-color-mode="light"]) /* force-light page: the page scr
   --imaa-ink-body: #B3BCCB;
   --imaa-ink-meta: #9AA3B2;
   --imaa-ink-hint: #6F7A8C;
-  --imaa-border: #2A3651;
-  --imaa-border-hover: #3A4867;
-  --imaa-hairline: rgba(226, 232, 240, 0.14);
+  /* Lines: 1.5:1 (border) and 2.1:1 (strong) against the card surface, so cards read as cards
+     on the near-black page without relying on shadows. */
+  --imaa-border: #303D5E;
+  --imaa-border-hover: #475679;
+  --imaa-hairline: rgba(226, 232, 240, 0.16);
 
   /* Brand tints used as light backgrounds (chips, highlights): dark tinted grounds in dark mode,
      so the text on them (which turns light) stays readable. The brand hues themselves are fixed. */
@@ -262,10 +272,10 @@ html:has(> body[data-imaa-color-mode="light"]) /* force-light page: the page scr
   --imaa-dm-text-hint-rgb: 134 145 163;
   --imaa-dm-text-faint: #56627A; /* decorative icons (was #cbd5e1 text) */
   --imaa-dm-text-faint-rgb: 86 98 122;
-  --imaa-dm-border: #2A3651; /* borders, dividers (was #e5e7eb) */
-  --imaa-dm-border-rgb: 42 54 81;
-  --imaa-dm-border-strong: #3A4867; /* strong borders (was #d1d5db) */
-  --imaa-dm-border-strong-rgb: 58 72 103;
+  --imaa-dm-border: #303D5E; /* borders, dividers (was #e5e7eb); same as --imaa-border above */
+  --imaa-dm-border-rgb: 48 61 94;
+  --imaa-dm-border-strong: #475679; /* strong borders (was #d1d5db); same as --imaa-border-hover */
+  --imaa-dm-border-strong-rgb: 71 86 121;
   --imaa-dm-overlay: rgba(255, 255, 255, 0.06); /* state layer (was rgba(0,0,0,.04)-like) */
   --imaa-dm-glass: rgba(22, 33, 58, 0.92); /* translucent surface (was rgba(255,255,255,.9)-like) */
   --imaa-dm-tint-red: #3D273C;

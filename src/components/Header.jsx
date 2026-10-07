@@ -28,7 +28,7 @@ import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
 import { getAccessToken } from "../utils/tokenStore";
 import AuthModal from "./AuthModal.jsx";
 import imaaLogo from "../assets/IMAA-logo130.svg";
-import { colors, focus, layout, radii } from "../styles/designTokens";
+import { colors, focus, layout, radii, semanticColors } from "../styles/designTokens";
 const apiBase =
   import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
@@ -292,7 +292,7 @@ const Header = () => {
           minHeight: 44,
           fontSize: 14,
           fontWeight: 500,
-          color: active ? colors.navy : colors.inkBody,
+          color: active ? semanticColors.text : semanticColors.textBody,
           textDecoration: "none",
           px: 0.25,
           transition: "color .15s ease",
@@ -306,7 +306,7 @@ const Header = () => {
             borderRadius: 1,
             bgcolor: active ? colors.teal : "transparent",
           },
-          "&:hover": { color: colors.tealDark },
+          "&:hover": { color: semanticColors.tealText },
           "&:hover::after": { bgcolor: colors.teal },
           "&:focus-visible": {
             outline: `${focus.width}px solid ${focus.color}`,
@@ -325,9 +325,10 @@ const Header = () => {
       position="fixed"
       elevation={0}
       sx={{
-        bgcolor: "#FFFFFF !important",
-        color: colors.navy,
-        borderBottom: `1px solid ${colors.border}`,
+        // Dark-mode aware surface (white in light mode; see designTokens.semanticColors).
+        bgcolor: `${semanticColors.surface} !important`,
+        color: semanticColors.text,
+        borderBottom: `1px solid ${semanticColors.border}`,
         boxShadow: "0 2px 12px rgba(27,42,74,.06)",
         zIndex: (t) => t.zIndex.drawer + 2,
       }}
@@ -355,10 +356,13 @@ const Header = () => {
               },
             }}
           >
+            {/* The navy/grey logo has no light version: in dark mode the class puts it on a small
+                white plate (brand.css .imaa-logo-plate); in light mode the class has no effect. */}
             <Box
               component="img"
               src={imaaLogoSrc}
               alt="IMAA"
+              className="imaa-logo-plate"
               sx={{ display: "block", width: { xs: 116, sm: 128 }, height: "auto" }}
             />
           </Box>
@@ -398,14 +402,15 @@ const Header = () => {
                   component={Link}
                   to={accountHref}
                   variant="text"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, color: colors.navy, "&:hover": { color: colors.coral, bgcolor: "transparent" } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, color: semanticColors.text, "&:hover": { color: colors.coral, bgcolor: "transparent" } }}
                 >
                   My Account
                 </Button>
+                {/* Hover inverts text and surface, so it stays a clear state change in both modes. */}
                 <Button
                   onClick={signOut}
                   variant="outlined"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: radii.field, borderColor: colors.navy, color: colors.navy, px: 2.5, "&:hover": { bgcolor: colors.navy, color: colors.white, borderColor: colors.navy } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, borderRadius: radii.field, borderColor: semanticColors.text, color: semanticColors.text, px: 2.5, "&:hover": { bgcolor: semanticColors.text, color: semanticColors.surface, borderColor: semanticColors.text } }}
                 >
                   Log out
                 </Button>
@@ -415,14 +420,14 @@ const Header = () => {
                 <Button
                   onClick={() => openAuthModal("login")}
                   variant="text"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, minHeight: 44, color: colors.navy, borderRadius: `${radii.field}px`, px: 2, "&:hover": { color: "#CC4422", bgcolor: "rgba(232,76,56,.05)" } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, minHeight: 44, color: semanticColors.text, borderRadius: `${radii.field}px`, px: 2, "&:hover": { color: "var(--imaa-dm-orange-text, #CC4422)", bgcolor: "rgba(232,76,56,.05)" } }}
                 >
                   Log in
                 </Button>
                 <Button
                   onClick={() => openAuthModal("signup")}
                   variant="contained"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: radii.pill, px: 3, bgcolor: "#CC4422", color: colors.white, "&:hover": { bgcolor: "#A9361C", boxShadow: "0 6px 14px rgba(169,54,28,.16)" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${colors.navy}`, outlineOffset: "3px" }, boxShadow: "none" }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: radii.pill, px: 3, bgcolor: "#CC4422", color: colors.white, "&:hover": { bgcolor: "#A9361C", boxShadow: "0 6px 14px rgba(169,54,28,.16)" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${semanticColors.text}`, outlineOffset: "3px" }, boxShadow: "none" }}
                 >
                   Sign up
                 </Button>
@@ -432,7 +437,7 @@ const Header = () => {
 
           {/* Mobile burger */}
           <Box sx={{ display: { xs: "flex", lg: "none" } }}>
-            <IconButton onClick={openDrawer} aria-label="Open navigation menu" sx={{ color: colors.navy, minWidth: 44, minHeight: 44 }}>
+            <IconButton onClick={openDrawer} aria-label="Open navigation menu" sx={{ color: semanticColors.text, minWidth: 44, minHeight: 44 }}>
               <MenuRoundedIcon />
             </IconButton>
           </Box>
@@ -441,10 +446,10 @@ const Header = () => {
 
       {/* Mobile Drawer */}
       <Drawer anchor="right" open={mobileOpen} onClose={closeDrawer}>
-        <Box sx={{ width: { xs: "min(320px, 88vw)", sm: 320 }, minHeight: "100%", bgcolor: colors.white, color: colors.navy }} role="presentation">
+        <Box sx={{ width: { xs: "min(320px, 88vw)", sm: 320 }, minHeight: "100%", bgcolor: semanticColors.surface, color: semanticColors.text }} role="presentation">
           <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, py: 1.5 }}>
-            <span style={{ fontWeight: 700, fontSize: 16, color: colors.navy }}>Menu</span>
-            <IconButton onClick={closeDrawer} aria-label="Close navigation menu" sx={{ minWidth: 44, minHeight: 44, color: colors.navy }}>
+            <span style={{ fontWeight: 700, fontSize: 16, color: semanticColors.text }}>Menu</span>
+            <IconButton onClick={closeDrawer} aria-label="Close navigation menu" sx={{ minWidth: 44, minHeight: 44, color: semanticColors.text }}>
               <CloseRoundedIcon />
             </IconButton>
           </Box>
@@ -492,7 +497,7 @@ const Header = () => {
                 <ListItemText primary="Log in" />
               </ListItemButton>
               <ListItemButton onClick={() => openAuthModal("signup")}>
-                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 700, color: "#CC4422" }} />
+                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 700, color: "var(--imaa-dm-orange-text, #CC4422)" }} />
               </ListItemButton>
             </List>
           )}

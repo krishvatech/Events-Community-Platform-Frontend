@@ -1360,7 +1360,7 @@ export default function SaleorManager() {
                     sx: {
                       color:
                         (formData.warehouse_ids || []).length > 0 && (formData.channel_ids || []).length === 0
-                          ? "#d97706"
+                          ? "var(--imaa-dm-amber-text, #d97706)"
                           : undefined,
                     },
                   }}

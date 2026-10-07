@@ -4390,7 +4390,7 @@ function EventsPage() {
           sx={{
             px: 1,
             "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
-            "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
+            "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0ea5a4) !important", fontWeight: 700 },
             "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
           }}
         >

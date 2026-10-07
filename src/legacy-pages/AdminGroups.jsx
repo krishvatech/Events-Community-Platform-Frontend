@@ -2453,7 +2453,7 @@ export default function AdminGroups() {
               px: 2,
               minHeight: 48,
               "& .MuiTab-root": { textTransform: "none", fontWeight: 700, minHeight: 48 },
-              "& .Mui-selected": { color: "#0ea5a4 !important" },
+              "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0ea5a4) !important" },
               "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
             }}
           >

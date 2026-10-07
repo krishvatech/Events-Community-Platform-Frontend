@@ -106,6 +106,21 @@ const getAccountStatusMessage = (error) => {
   return "";
 };
 
+// Dark-mode aware colours: each is the light value wrapped in its dark-mode override token
+// (src/styles/brand.css "Dark-mode override tokens"), so light mode is unchanged and dark mode
+// gets readable surfaces and text. Brand fills (coral, navy, teal) stay fixed.
+const SURFACE = "var(--imaa-dm-surface, #FFFFFF)"; // dialog card
+const SURFACE_INSET = "var(--imaa-dm-surface-alt, #FFFFFF)"; // fields and the mode-toggle track
+const SURFACE_HOVER = "var(--imaa-dm-surface-hover, #F7F8FA)";
+const TEXT = "var(--imaa-dm-text, #1B2A4A)";
+const TEXT_BODY = "var(--imaa-dm-text-body, #5A6070)";
+const TEXT_META = "var(--imaa-dm-text-meta, #747A88)";
+const TEXT_HINT = "var(--imaa-dm-text-hint, #B0B4BC)";
+const FIELD_BORDER = "var(--imaa-dm-border-strong, #DCE5EC)";
+const FIELD_BORDER_HOVER = "var(--imaa-dm-text-hint, #A9BAC8)";
+const HAIRLINE = "var(--imaa-dm-border, #E2E4E8)";
+const TEAL_TEXT = "var(--imaa-dm-teal-text, #0A9396)"; // focused label: lighter teal on dark grounds
+
 // Auth field styling (design tokens). 16px text on phones so iOS doesn't zoom in on focus.
 const inputSx = {
   "& .MuiFormHelperText-root": {
@@ -117,26 +132,27 @@ const inputSx = {
     borderRadius: "10px",
     fontSize: 14,
     minHeight: 48,
+    // Transparent field background (upstream design); text and borders follow the dark tokens.
     bgcolor: "transparent",
-    color: "#1B2A4A",
-    "& fieldset": { borderColor: "#DCE5EC" },
-    "&:hover fieldset": { borderColor: "#A9BAC8" },
+    color: TEXT,
+    "& fieldset": { borderColor: FIELD_BORDER },
+    "&:hover fieldset": { borderColor: FIELD_BORDER_HOVER },
     "&.Mui-focused fieldset": { borderColor: "#0A9396", borderWidth: 2 },
     "@media (max-width: 599.95px)": { fontSize: 16 },
   },
-  "& .MuiInputLabel-root": { fontSize: 14, color: "#5A6070" },
-  "& .MuiInputLabel-root.Mui-focused": { color: "#0A9396" },
+  "& .MuiInputLabel-root": { fontSize: 14, color: TEXT_BODY },
+  "& .MuiInputLabel-root.Mui-focused": { color: TEAL_TEXT },
   "& .MuiInputBase-input": {
     py: 1.45,
     bgcolor: "transparent",
-    color: "#1B2A4A",
-    caretColor: "#1B2A4A",
+    color: TEXT,
+    caretColor: TEXT,
     "&:-webkit-autofill, &:-webkit-autofill:hover, &:-webkit-autofill:focus, &:-webkit-autofill:active": {
       WebkitBackgroundClip: "text",
-      WebkitTextFillColor: "#1B2A4A",
+      WebkitTextFillColor: TEXT,
       WebkitBoxShadow: "0 0 0 1000px transparent inset",
       transition: "background-color 9999s ease-out 0s",
-      caretColor: "#1B2A4A",
+      caretColor: TEXT,
     },
   },
 };
@@ -159,14 +175,14 @@ const socialButtonSx = {
   textTransform: "none",
   fontWeight: 700,
   fontSize: 14,
-  borderColor: "#DCE5EC",
-  color: "#1B2A4A",
+  borderColor: FIELD_BORDER,
+  color: TEXT,
   borderRadius: "999px",
   py: 1.05,
-  bgcolor: "#FFFFFF",
+  bgcolor: SURFACE,
   "&:hover": {
-    borderColor: "#A9BAC8",
-    bgcolor: "#F7F8FA",
+    borderColor: FIELD_BORDER_HOVER,
+    bgcolor: SURFACE_HOVER,
   },
 };
 
@@ -579,7 +595,6 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
       fullWidth
       aria-labelledby={AUTH_TITLE_ID}
       PaperProps={{
-        "data-imaa-color-mode": "light",
         sx: {
           width: { xs: "calc(100% - 32px)", sm: "min(900px, calc(100% - 48px))" },
           maxWidth: 900,
@@ -587,12 +602,13 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           boxShadow: "0 24px 70px rgba(27, 42, 74, 0.18)",
           p: 0,
           overflow: "hidden",
-          bgcolor: "#FFFFFF",
-          border: "1px solid rgba(27, 42, 74, 0.08)",
+          bgcolor: SURFACE,
+          border: "1px solid var(--imaa-dm-border, rgba(27, 42, 74, 0.08))",
         },
       }}
       BackdropProps={{
         sx: {
+          // Transparent blurred backdrop (upstream design); works on light and dark pages alike.
           bgcolor: "transparent",
           backdropFilter: "blur(8px)",
           WebkitBackdropFilter: "blur(8px)",
@@ -600,13 +616,12 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
       }}
     >
       <Box
-        data-imaa-color-mode="light"
         sx={{
           position: "relative",
           display: "grid",
           gridTemplateColumns: { xs: "1fr", md: "0.9fr 1.1fr" },
           minHeight: { xs: "auto", md: 560 },
-          bgcolor: "#FFFFFF",
+          bgcolor: SURFACE,
         }}
       >
         <Box
@@ -691,10 +706,10 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
             top: 14,
             right: 14,
             zIndex: 2,
-            color: "#5A6070",
-            bgcolor: "rgba(255,255,255,0.86)",
-            border: "1px solid rgba(27,42,74,0.08)",
-            "&:hover": { bgcolor: "#F7F8FA" },
+            color: TEXT_BODY,
+            bgcolor: "var(--imaa-dm-glass, rgba(255,255,255,0.86))",
+            border: "1px solid var(--imaa-dm-border, rgba(27,42,74,0.08))",
+            "&:hover": { bgcolor: SURFACE_HOVER },
           }}
           aria-label="Close"
         >
@@ -707,7 +722,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            bgcolor: "#FFFFFF",
+            bgcolor: SURFACE,
           }}
         >
           {/* ── Title (one h1 for the active view; plain element because index.css forces sans on Typography) ── */}
@@ -720,7 +735,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
               fontWeight: 700,
               fontSize: { xs: 26, sm: 30 },
               lineHeight: 1.15,
-              color: "#1B2A4A",
+              color: TEXT,
               mb: 0.5,
               pr: 3,
               textAlign: "left",
@@ -731,7 +746,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
 
           {/* ── Mode toggle (Login / Signup) ── */}
           {mode !== "confirm" && (
-            <Box role="group" aria-label="Log in or sign up" sx={{ display: "flex", bgcolor: "#F0F4F5", borderRadius: 100, p: 0.5, mb: 3, mt: 2.5 }}>
+            <Box role="group" aria-label="Log in or sign up" sx={{ display: "flex", bgcolor: "var(--imaa-dm-surface-alt, #F0F4F5)", borderRadius: 100, p: 0.5, mb: 3, mt: 2.5 }}>
               {["login", "signup"].map((m) => (
                 <Box
                   key={m}
@@ -743,8 +758,9 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                     flex: 1, textAlign: "center", py: 0.75, borderRadius: 100,
                     border: 0, font: "inherit", fontFamily: "var(--imaa-font-sans)",
                     cursor: "pointer", fontSize: 14, fontWeight: mode === m ? 600 : 500,
-                    color: mode === m ? "#1B2A4A" : "#5A6070",
-                    bgcolor: mode === m ? "#FFFFFF" : "transparent",
+                    color: mode === m ? TEXT : TEXT_BODY,
+                    // Selected pill: white on the light track; a raised neutral fill on the dark track.
+                    bgcolor: mode === m ? "var(--imaa-dm-muted, #FFFFFF)" : "transparent",
                     boxShadow: mode === m ? "0 3px 10px rgba(27,42,74,0.10)" : "none",
                     transition: "all .18s ease",
                     userSelect: "none",
@@ -905,7 +921,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                     setError("");
                     setResendTimer(0);
                   }}
-                  sx={{ color: "#5A6070", textDecoration: "none", fontSize: 13, "&:hover": { textDecoration: "underline" } }}
+                  sx={{ color: TEXT_BODY, textDecoration: "none", fontSize: 13, "&:hover": { textDecoration: "underline" } }}
                 >
                   Change email address
                 </MuiLink>
@@ -918,7 +934,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                   sx={{
                     fontSize: 13,
                     fontWeight: 600,
-                    color: resendTimer > 0 ? "#B0B4BC" : "#E84C38",
+                    color: resendTimer > 0 ? TEXT_HINT : "#E84C38",
                     textTransform: "none",
                     "&:hover": { bgcolor: "transparent", textDecoration: "underline" }
                   }}
@@ -943,9 +959,9 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           {mode !== "confirm" && (
             <>
               <Box sx={{ display: "flex", alignItems: "center", my: 2.5, gap: 1.5 }}>
-                <Box sx={{ flex: 1, height: "1px", bgcolor: "#E2E4E8" }} />
-                <Typography variant="caption" sx={{ color: "#747A88", fontWeight: 600, whiteSpace: "nowrap" }}>Continue with</Typography>
-                <Box sx={{ flex: 1, height: "1px", bgcolor: "#E2E4E8" }} />
+                <Box sx={{ flex: 1, height: "1px", bgcolor: HAIRLINE }} />
+                <Typography variant="caption" sx={{ color: TEXT_META, fontWeight: 600, whiteSpace: "nowrap" }}>Continue with</Typography>
+                <Box sx={{ flex: 1, height: "1px", bgcolor: HAIRLINE }} />
               </Box>
               <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
                 {ENABLE_IMAA_SSO && (

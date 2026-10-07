@@ -129,6 +129,23 @@ body.qna-open rtk-controlbar-button[label="Q&A"] {
   font-size: 14px;
 }
 
+/* ── Dark mode: browser autofill ───────────────────────────────────────────────────────────
+   Chrome paints autofilled fields with its own fill, which does not follow the page's surfaces.
+   Inside a dark page the fill is replaced by the field's dark surface and text tokens (inset
+   box-shadow is the only way to override the autofill background). Light mode and force-light
+   pages keep the browser default. */
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) input:-webkit-autofill,
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) input:-webkit-autofill:hover,
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) input:-webkit-autofill:focus,
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) textarea:-webkit-autofill,
+:root[data-imaa-color-mode="dark"] body:not([data-imaa-color-mode="light"]) select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px var(--imaa-dm-surface-alt) inset;
+  box-shadow: 0 0 0 1000px var(--imaa-dm-surface-alt) inset;
+  -webkit-text-fill-color: var(--imaa-dm-text);
+  caret-color: var(--imaa-dm-text);
+  border-radius: inherit;
+}
+
 /* ── Dark mode: third-party widgets ─────────────────────────────────────────────────────────
    Only inside a dark page (html dark, body not force-light); light mode and force-light pages
    keep each library's own styles. Uses the libraries' CSS variables / class names only. */

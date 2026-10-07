@@ -1414,7 +1414,7 @@ function MergersAIWidget({ courseId, courseName }) {
                   {result.course_name}
                 </Typography>
                 {result.video_id && (
-                  <Typography variant="caption" sx={{ color: "#d97706", fontSize: "10px", display: "block", mb: 0.5, fontWeight: 500 }}>
+                  <Typography variant="caption" sx={{ color: "var(--imaa-dm-amber-text, #d97706)", fontSize: "10px", display: "block", mb: 0.5, fontWeight: 500 }}>
                     Video: {result.video_id}
                   </Typography>
                 )}
@@ -1474,7 +1474,7 @@ function MergersAIWidget({ courseId, courseName }) {
               {selectedResult.course_name}
             </Typography>
             {selectedResult.video_id && (
-              <Typography variant="caption" sx={{ color: "#d97706", fontSize: "10px", display: "block", mb: 1, fontWeight: 500 }}>
+              <Typography variant="caption" sx={{ color: "var(--imaa-dm-amber-text, #d97706)", fontSize: "10px", display: "block", mb: 1, fontWeight: 500 }}>
                 Video: {selectedResult.video_id}
               </Typography>
             )}

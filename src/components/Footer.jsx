@@ -3,6 +3,10 @@ import React from "react";
 import { Container, Box, Link as MLink, IconButton } from "@mui/material";
 import { colors, focus, layout } from "../styles/designTokens";
 
+// Brand navy footer with white text. The ground uses the navy CSS token (same #1B2A4A in light
+// mode) so dark mode gets the lifted navy from brand.css instead of vanishing into the page.
+const NAVY_BG = "var(--imaa-navy)";
+
 const footerLinkSx = {
   color: "rgba(255,255,255,.78)",
   fontSize: 14,
@@ -35,7 +39,7 @@ const socialButtonSx = {
 };
 
 const Footer = () => (
-  <Box component="footer" sx={{ bgcolor: colors.navy, color: colors.white, borderTop: "1px solid rgba(255,255,255,.12)" }}>
+  <Box component="footer" sx={{ bgcolor: NAVY_BG, color: colors.white, borderTop: "1px solid rgba(255,255,255,.12)" }}>
     <Container maxWidth={false} disableGutters>
       <Box sx={{ mx: "auto", maxWidth: layout.contentMax, px: { xs: 3, sm: 4 }, py: { xs: 4.5, md: 5.5 } }}>
         <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, alignItems: { md: "center" }, justifyContent: "space-between", gap: { xs: 3, md: 5 }, pb: 4, borderBottom: "1px solid rgba(255,255,255,.16)" }}>

@@ -446,7 +446,7 @@ function SaleorStaffTab({ currentUserId }) {
                         label={`${superusers.length} Superuser${superusers.length !== 1 ? "s" : ""}`}
                         size="small"
                         variant="outlined"
-                        sx={{ borderColor: "#0ea5a4", color: "#0ea5a4", fontWeight: 600 }}
+                        sx={{ borderColor: "#0ea5a4", color: "var(--imaa-dm-teal-text, #0ea5a4)", fontWeight: 600 }}
                     />
                 </Box>
                 <Button
@@ -817,7 +817,7 @@ function MarketingAccessTab({ currentUserId, navigate }) {
                         label={`${activeCount} Active`}
                         size="small"
                         variant="outlined"
-                        sx={{ borderColor: "#0ea5a4", color: "#0ea5a4", fontWeight: 600 }}
+                        sx={{ borderColor: "#0ea5a4", color: "var(--imaa-dm-teal-text, #0ea5a4)", fontWeight: 600 }}
                     />
                 </Box>
                 <Button

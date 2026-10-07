@@ -519,7 +519,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                               size="small"
                               onClick={() => handleReactivate(category.slug)}
                               disabled={saving || Boolean(actionKey)}
-                              sx={{ color: "#16a34a" }}
+                              sx={{ color: "var(--imaa-dm-green-text, #16a34a)" }}
                             >
                               {reactivating ? <CircularProgress size={18} /> : <RestoreRoundedIcon fontSize="small" />}
                             </IconButton>

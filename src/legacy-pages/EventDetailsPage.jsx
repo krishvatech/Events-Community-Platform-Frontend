@@ -3234,7 +3234,7 @@ export default function EventDetailsPage() {
                                       label={`▲ ${voteCount}`}
                                       sx={{
                                         bgcolor: 'rgba(245, 158, 11, 0.1)',
-                                        color: '#d97706',
+                                        color: 'var(--imaa-dm-amber-text, #d97706)',
                                         fontWeight: 700,
                                         fontSize: '0.65rem',
                                         height: 20

@@ -120,7 +120,8 @@ const darkPalette = {
   secondary: { main: '#D5DBE5' },
   background: { default: '#0E1626', paper: '#16213A', cool: '#121D33', member: '#0E1626' },
   text: { primary: '#E8ECF3', secondary: '#B3BCCB' },
-  divider: 'rgba(226, 232, 240, 0.14)',
+  // Same as --imaa-hairline (dark): ≈ #303D5E on the card surface.
+  divider: 'rgba(226, 232, 240, 0.16)',
   // Disabled text/icons: MUI's dark default (white at 30%) is about 2:1 on dark cards and reads as
   // missing; 40% stays clearly disabled but legible. Other action values keep MUI's dark defaults.
   action: { disabled: 'rgba(255, 255, 255, 0.4)' },
@@ -141,7 +142,14 @@ export const colorModeTheme = responsiveFontSizes(
           coral: theme.palette.coral,
         },
       },
-      dark: { palette: { ...darkPalette, navy: theme.palette.navy, coral: theme.palette.coral } },
+      // Brand navy is lifted on dark grounds (same value as --imaa-navy in brand.css dark block).
+      dark: {
+        palette: {
+          ...darkPalette,
+          navy: theme.palette.augmentColor({ color: { main: '#2F4675' }, name: 'navy' }),
+          coral: theme.palette.coral,
+        },
+      },
     },
     shape: { borderRadius: 12 },
     shadows: navyShadows,

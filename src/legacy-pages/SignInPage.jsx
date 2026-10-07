@@ -238,11 +238,12 @@ export default function SignInPage() {
 
   return (
     <Box
-      data-imaa-color-mode="light"
       sx={{
         minHeight: "100vh",
+        // Dark-mode aware: the two light ground stops follow the page / cool-section tokens (same
+        // alphas), so dark mode gets the same composition on dark grounds. Brand tints are unchanged.
         background:
-          "linear-gradient(115deg, rgba(255,255,255,0.94) 0%, rgba(240,244,245,0.88) 46%, rgba(232,76,56,0.08) 100%), radial-gradient(circle at 12% 18%, rgba(10,147,150,0.16), transparent 28%), radial-gradient(circle at 86% 82%, rgba(27,42,74,0.12), transparent 30%)",
+          "linear-gradient(115deg, rgb(var(--imaa-dm-page-rgb, 255 255 255) / 0.94) 0%, rgb(var(--imaa-dm-surface-alt-rgb, 240 244 245) / 0.88) 46%, rgba(232,76,56,0.08) 100%), radial-gradient(circle at 12% 18%, rgba(10,147,150,0.16), transparent 28%), radial-gradient(circle at 86% 82%, rgba(27,42,74,0.12), transparent 30%)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",

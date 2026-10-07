@@ -53,6 +53,20 @@ const ReviewQueueStats = ({ eventId, filters, refreshKey }) => {
     return <Alert severity="info">No statistics available</Alert>;
   }
 
+  // Stat colours are plain hex because they are used with hex-alpha tints (gradients, borders).
+  // For the icon and the value (text on the tinted card) use the same hue as a dark-mode-aware
+  // token; the light value is identical.
+  const STAT_TEXT_TONE = {
+    '#1976d2': 'var(--imaa-dm-blue-text, #1976d2)',
+    '#2196f3': 'var(--imaa-dm-blue-text, #2196f3)',
+    '#ff9800': 'var(--imaa-dm-amber-text, #ff9800)',
+    '#4caf50': 'var(--imaa-dm-green-text, #4caf50)',
+    '#f44336': 'var(--imaa-dm-red-text, #f44336)',
+    '#9c27b0': 'var(--imaa-dm-purple-text, #9c27b0)',
+    '#ff5722': 'var(--imaa-dm-orange-text, #ff5722)',
+    '#999': 'var(--imaa-dm-text-meta, #999)',
+  };
+
   const StatCard = ({ title, value, color = '#1976d2', icon: Icon = AssignmentIcon }) => (
     <Card
       sx={{
@@ -79,13 +93,13 @@ const ReviewQueueStats = ({ eventId, filters, refreshKey }) => {
               justifyContent: 'center'
             }}
           >
-            <Icon sx={{ color, fontSize: '24px' }} />
+            <Icon sx={{ color: STAT_TEXT_TONE[color] || color, fontSize: '24px' }} />
           </Box>
           <Typography variant="caption" sx={{ color: 'textSecondary', fontSize: '0.75rem', fontWeight: 600 }}>
             {title}
           </Typography>
         </Box>
-        <Typography variant="h4" sx={{ fontWeight: 700, color }}>
+        <Typography variant="h4" sx={{ fontWeight: 700, color: STAT_TEXT_TONE[color] || color }}>
           {value}
         </Typography>
       </CardContent>

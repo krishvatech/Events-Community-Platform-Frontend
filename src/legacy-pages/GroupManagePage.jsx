@@ -200,7 +200,7 @@ function ClampedText({ text = "", lines = 5, sx = {} }) {
                 <Button
                     size="small"
                     onClick={() => setExpanded((v) => !v)}
-                    sx={{ textTransform: "none", px: 0, mt: 0.5, color: "#0ea5a4" }}
+                    sx={{ textTransform: "none", px: 0, mt: 0.5, color: "var(--imaa-dm-teal-text, #0ea5a4)" }}
                 >
                     {expanded ? "See less" : "See more"}
                 </Button>
@@ -5250,7 +5250,7 @@ export default function GroupManagePage() {
                                         onClick={() => navigate(-1)}
                                         variant="outlined"
                                         className="rounded-xl"
-                                        sx={{ textTransform: "none", color: "#0ea5a4", borderColor: "#0ea5a4" }}
+                                        sx={{ textTransform: "none", color: "var(--imaa-dm-teal-text, #0ea5a4)", borderColor: "#0ea5a4" }}
                                     >
                                         Back
                                     </Button>
@@ -6474,7 +6474,7 @@ export default function GroupManagePage() {
                                                                                         href={toAbs(p.url)}
                                                                                         target="_blank"
                                                                                         rel="noreferrer"
-                                                                                        style={{ color: "#0ea5a4", wordBreak: "break-word" }}
+                                                                                        style={{ color: "var(--imaa-dm-teal-text, #0ea5a4)", wordBreak: "break-word" }}
                                                                                     >
                                                                                         <LinkRoundedIcon fontSize="small" /> {p.url}
                                                                                     </a>

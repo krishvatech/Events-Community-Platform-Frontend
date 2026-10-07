@@ -37,6 +37,16 @@ const INK_BODY = "var(--imaa-ink-body)";
 const BORDER = "var(--imaa-border)";
 const COOL = "var(--imaa-bg-cool)";
 
+// Dark-mode aware grounds and text. Each is the page's light value wrapped in its dark-mode
+// override token (src/styles/brand.css "Dark-mode override tokens"): identical in light mode,
+// readable on dark grounds in dark mode. BORDER, COOL, INK_BODY and TEAL_TEXT above already
+// follow the dark palette through their brand tokens.
+const PAGE_BG = "var(--imaa-dm-page, #FFFFFF)"; // white sections
+const CARD_BG = "var(--imaa-dm-surface, #FFFFFF)";
+const HEADING_TEXT = "var(--imaa-dm-text, #243E75)";
+// Hero photo scrim: white in light mode, the dark page colour in dark mode, same alpha stops.
+const heroScrim = (alpha) => `rgb(var(--imaa-dm-page-rgb, 255 255 255) / ${alpha})`;
+
 // Keep the public Home headings in the corporate sans-serif stack.
 const serifHeadingSx = { m: 0, fontFamily: "var(--imaa-font-sans)", fontWeight: 750, overflowWrap: "anywhere" };
 
@@ -75,7 +85,7 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
     sx={{
       width: "100%",
       minHeight: { xs: 204, md: 224 },
-      bgcolor: "#FFFFFF",
+      bgcolor: CARD_BG,
       border: `1px solid ${BORDER}`,
       borderRadius: "var(--imaa-radius-card)",
       boxShadow: "0 4px 16px rgba(27,42,74,.05)",
@@ -87,7 +97,7 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
       transition: "transform .2s ease, box-shadow .2s ease, border-color .2s ease",
       "&:hover": {
         transform: "translateY(-2px)",
-        borderColor: "rgba(27,42,74,.18)",
+        borderColor: "var(--imaa-dm-border-strong, rgba(27,42,74,.18))",
         boxShadow: "0 8px 22px rgba(27,42,74,.08)",
       },
       "@media (prefers-reduced-motion: reduce)": {
@@ -113,7 +123,7 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
       <Icon sx={{ position: "relative", color: iconColor, fontSize: 20 }} />
     </Box>
 
-    <Box component="h3" sx={{ ...serifHeadingSx, fontSize: "20px", lineHeight: 1.3, color: NAVY, mb: 1, fontWeight: 700 }}>
+    <Box component="h3" sx={{ ...serifHeadingSx, fontSize: "20px", lineHeight: 1.3, color: NAVY_TEXT, mb: 1, fontWeight: 700 }}>
       {title}
     </Box>
 
@@ -133,7 +143,7 @@ const StatBand = () => (
   <Box
     component="section"
     sx={{
-      bgcolor: "#FFFFFF",
+      bgcolor: PAGE_BG,
       borderTop: `1px solid ${BORDER}`,
       borderBottom: `1px solid ${BORDER}`,
     }}
@@ -156,7 +166,7 @@ const StatBand = () => (
           ["2000+", "Company connections"],
         ].map(([value, label]) => (
           <Box key={label} sx={{ py: { xs: 2, sm: 0 }, borderRight: { sm: `1px solid ${BORDER}` }, borderBottom: { xs: `1px solid ${BORDER}`, sm: 0 }, "&:last-of-type": { borderRight: 0, borderBottom: 0 } }}>
-            <Typography sx={{ color: NAVY, fontSize: { xs: 34, md: 42 }, lineHeight: 1, fontWeight: 600, letterSpacing: "-.02em" }}>
+            <Typography sx={{ color: NAVY_TEXT, fontSize: { xs: 34, md: 42 }, lineHeight: 1, fontWeight: 600, letterSpacing: "-.02em" }}>
               {value}
             </Typography>
             <Typography sx={{ mt: 1.25, color: INK_BODY, fontSize: 14, letterSpacing: ".01em" }}>
@@ -206,7 +216,7 @@ export default function HomePage() {
   const useLightHero = !heroImage;
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "#FFFFFF", color: NAVY, overflowX: "hidden" }}>
+    <Box sx={{ minHeight: "100vh", bgcolor: PAGE_BG, color: NAVY_TEXT, overflowX: "hidden" }}>
 
       {/* HERO */}
       <Box component="section" sx={{
@@ -216,7 +226,7 @@ export default function HomePage() {
         mt: { xs: -7.25, md: -8.25 },
         pt: { xs: 7.25, md: 8.25 },
         background: heroImage
-          ? `linear-gradient(90deg, rgba(255,255,255,.99) 0%, rgba(255,255,255,.95) 37%, rgba(255,255,255,.68) 57%, rgba(255,255,255,.12) 100%), url(${heroImage}) center/cover no-repeat`
+          ? `linear-gradient(90deg, ${heroScrim(".99")} 0%, ${heroScrim(".95")} 37%, ${heroScrim(".68")} 57%, ${heroScrim(".12")} 100%), url(${heroImage}) center/cover no-repeat`
           : COOL,
       }}>
         {useLightHero && <ChevronPattern />}
@@ -251,7 +261,7 @@ export default function HomePage() {
             <Box component="h1" sx={{
               ...serifHeadingSx,
               fontSize: { xs: 42, sm: 56, md: 68 }, lineHeight: 1.08,
-              color: NAVY, mb: 3, letterSpacing: "-.025em", textWrap: "balance",
+              color: NAVY_TEXT, mb: 3, letterSpacing: "-.025em", textWrap: "balance",
               fontWeight: 700,
             }}>
               {heroTitle}
@@ -291,8 +301,9 @@ export default function HomePage() {
                     sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" }, boxShadow: "none", borderRadius: 999, minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em" }}>
                     Get started
                   </Button>
+                  {/* Dark mode: the translucent white pill becomes a translucent card surface with light text. */}
                   <Button onClick={openLogin} variant="outlined" size="large"
-                    sx={{ borderColor: "rgba(27,42,74,.2)", bgcolor: "rgba(255,255,255,.94)", color: NAVY, "&:hover": { borderColor: NAVY, bgcolor: "#FFFFFF" }, borderRadius: 999, minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em", boxShadow: "none" }}>
+                    sx={{ borderColor: "var(--imaa-dm-border-strong, rgba(27,42,74,.2))", bgcolor: "rgb(var(--imaa-dm-surface-rgb, 255 255 255) / .94)", color: NAVY_TEXT, "&:hover": { borderColor: NAVY_TEXT, bgcolor: "var(--imaa-dm-surface-hover, #FFFFFF)" }, borderRadius: 999, minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em", boxShadow: "none" }}>
                     Log in
                   </Button>
                 </>
@@ -344,7 +355,7 @@ export default function HomePage() {
                   ...serifHeadingSx,
                   fontSize: { xs: 36, md: 50 },
                   lineHeight: 1.12,
-                  color: "#243E75",
+                  color: HEADING_TEXT,
                   fontWeight: 700,
                   maxWidth: 720,
                 }}
@@ -398,7 +409,7 @@ export default function HomePage() {
               },
               {
                 icon: LibraryIcon,
-                iconColor: NAVY,
+                iconColor: NAVY_TEXT, // navy icon in light; readable light icon on the dark card
                 title: "E-Library & Resources",
                 desc: "Access curated research, templates, and thought leadership from industry experts.",
               },
@@ -416,7 +427,7 @@ export default function HomePage() {
               },
               {
                 icon: GroupsIcon,
-                iconColor: NAVY,
+                iconColor: NAVY_TEXT, // navy icon in light; readable light icon on the dark card
                 title: "Private Groups",
                 desc: "Join invite-only groups, alumni networks, and deal communities.",
               },
@@ -433,7 +444,7 @@ export default function HomePage() {
           component="section"
           sx={{
             py: { xs: 7, md: 10 },
-            bgcolor: "#FFFFFF",
+            bgcolor: PAGE_BG,
           }}
         >
           <Container maxWidth="lg">
@@ -447,7 +458,7 @@ export default function HomePage() {
                 gridTemplateColumns: { xs: "1fr", md: featuredEvent.preview_image ? "1fr 1fr" : "1fr" },
                 gap: 0,
                 alignItems: "center",
-                backgroundColor: "#FFFFFF",
+                backgroundColor: CARD_BG,
                 borderRadius: "var(--imaa-radius-card)",
                 overflow: "hidden",
                 border: "1px solid var(--imaa-border)",
@@ -485,8 +496,8 @@ export default function HomePage() {
                     width: "fit-content",
                     mb: 2,
                     fontWeight: 600,
-                    bgcolor: "#FEF2EE",
-                    color: ORANGE_HOVER,
+                    bgcolor: "var(--imaa-dm-tint-orange, #FEF2EE)",
+                    color: "var(--imaa-dm-orange-text, var(--imaa-orange-hover))",
                     borderRadius: 999,
                   }}
                 />
@@ -495,7 +506,7 @@ export default function HomePage() {
                   sx={{
                     ...serifHeadingSx,
                     fontSize: { xs: 26, md: 36 },
-                    color: NAVY,
+                    color: NAVY_TEXT,
                     mb: 2,
                     lineHeight: 1.2,
                   }}

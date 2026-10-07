@@ -254,13 +254,15 @@ const getTabLabels = (event, isOwner) => {
 const MEMBERS_PER_PAGE = 10;
 const RESOURCES_PER_PAGE = 5;
 
+// `color` stays a plain hex (it is saved as the label colour and used with hex-alpha tints);
+// `textColor` is the same hue as readable text in dark mode (light value identical).
 const PREDEFINED_ROLES = [
-  { name: "Speaker", color: "#7c3aed" },
-  { name: "VIP", color: "#b45309" },
-  { name: "Sponsor", color: "#0369a1" },
-  { name: "Host", color: "#15803d" },
-  { name: "Moderator", color: "#dc2626" },
-  { name: "Chair", color: "#0891b2" },
+  { name: "Speaker", color: "#7c3aed", textColor: "var(--imaa-dm-purple-text, #7c3aed)" },
+  { name: "VIP", color: "#b45309", textColor: "var(--imaa-dm-amber-text, #b45309)" },
+  { name: "Sponsor", color: "#0369a1", textColor: "var(--imaa-dm-blue-text, #0369a1)" },
+  { name: "Host", color: "#15803d", textColor: "var(--imaa-dm-green-text, #15803d)" },
+  { name: "Moderator", color: "#dc2626", textColor: "var(--imaa-dm-red-text, #dc2626)" },
+  { name: "Chair", color: "#0891b2", textColor: "var(--imaa-dm-teal-text, #0891b2)" },
 ];
 
 
@@ -8363,7 +8365,7 @@ export default function EventManagePage() {
               {PREDEFINED_ROLES.map(role => {
                 const alreadyExists = companionLabels.some(l => l.name.toLowerCase() === role.name.toLowerCase());
                 return (
-                  <Chip key={role.name} label={role.name} size="small" disabled={alreadyExists || companionLabelSaving} onClick={() => !alreadyExists && createLabel(role.name, role.color)} sx={{ bgcolor: alreadyExists ? "var(--imaa-dm-surface-alt, #f5f5f5)" : role.color + "22", color: alreadyExists ? "text.disabled" : role.color, border: `1px solid ${alreadyExists ? "var(--imaa-dm-border, #e0e0e0)" : role.color + "66"}`, fontWeight: 600, cursor: alreadyExists ? "default" : "pointer", "&:hover": { bgcolor: alreadyExists ? "var(--imaa-dm-surface-hover, #f5f5f5)" : role.color + "33" } }} />
+                  <Chip key={role.name} label={role.name} size="small" disabled={alreadyExists || companionLabelSaving} onClick={() => !alreadyExists && createLabel(role.name, role.color)} sx={{ bgcolor: alreadyExists ? "var(--imaa-dm-surface-alt, #f5f5f5)" : role.color + "22", color: alreadyExists ? "text.disabled" : (role.textColor || role.color), border: `1px solid ${alreadyExists ? "var(--imaa-dm-border, #e0e0e0)" : role.color + "66"}`, fontWeight: 600, cursor: alreadyExists ? "default" : "pointer", "&:hover": { bgcolor: alreadyExists ? "var(--imaa-dm-surface-hover, #f5f5f5)" : role.color + "33" } }} />
                 );
               })}
             </Stack>

@@ -61,7 +61,7 @@ export default function ClampedText({
         <Button
           size="small"
           onClick={() => setExpanded((v) => !v)}
-          sx={{ textTransform: "none", px: 0, mt: 0.5, color: "#0ea5a4" }}
+          sx={{ textTransform: "none", px: 0, mt: 0.5, color: "var(--imaa-dm-teal-text, #0ea5a4)" }}
         >
           {expanded ? "See less" : "See more"}
         </Button>

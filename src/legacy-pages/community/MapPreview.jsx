@@ -96,7 +96,8 @@ export function MembersMapPreview({ tileUrl, onShowMap, minHeight = 300 }) {
         sx={{
           position: "absolute",
           inset: 0,
-          background: "radial-gradient(ellipse at center, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.35) 100%)",
+          // Vignette follows the page ground: white in light mode, the dark page colour in dark mode.
+          background: "radial-gradient(ellipse at center, rgb(var(--imaa-dm-page-rgb, 255 255 255) / 0.05) 0%, rgb(var(--imaa-dm-page-rgb, 255 255 255) / 0.35) 100%)",
         }}
       />
       <Box
