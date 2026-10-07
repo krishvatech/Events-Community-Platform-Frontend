@@ -17,7 +17,7 @@ const heroScrim = (alpha) => `rgb(var(--imaa-dm-page-rgb, 255 255 255) / ${alpha
 
 const headingSx = {
   m: 0,
-  fontFamily: "var(--imaa-font-sans)",
+  fontFamily: "var(--imaa-font-serif)",
   color: INK,
   fontWeight: 700,
   letterSpacing: "-.02em",

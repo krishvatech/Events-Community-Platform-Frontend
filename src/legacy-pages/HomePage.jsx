@@ -47,8 +47,8 @@ const HEADING_TEXT = "var(--imaa-dm-text, #243E75)";
 // Hero photo scrim: white in light mode, the dark page colour in dark mode, same alpha stops.
 const heroScrim = (alpha) => `rgb(var(--imaa-dm-page-rgb, 255 255 255) / ${alpha})`;
 
-// Keep the public Home headings in the corporate sans-serif stack.
-const serifHeadingSx = { m: 0, fontFamily: "var(--imaa-font-sans)", fontWeight: 750, overflowWrap: "anywhere" };
+// Keep public Home headings in the established IMAA display serif.
+const serifHeadingSx = { m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 750, overflowWrap: "anywhere" };
 
 // Retained for routes that inject no hero image, but the public home now uses
 // a local photographic fallback to mirror the parent IMAA homepage composition.
@@ -292,19 +292,19 @@ export default function HomePage() {
             >
               {authed ? (
                 <Button component={Link} to="/events" variant="contained" size="large"
-                  sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" }, boxShadow: "none", borderRadius: 999, minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                  sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                   Explore Events
                 </Button>
               ) : (
                 <>
                   {/* Keep the primary label white for readable contrast on coral. */}
                   <Button onClick={openSignup} variant="contained" size="large"
-                    sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" }, boxShadow: "none", borderRadius: 999, minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em" }}>
+                    sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C", boxShadow: "0 8px 18px rgba(169,54,28,.18)" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em" }}>
                     Get started
                   </Button>
                   {/* Dark mode: the translucent white pill becomes a translucent card surface with light text. */}
                   <Button onClick={openLogin} variant="outlined" size="large"
-                    sx={{ borderColor: "var(--imaa-dm-border-strong, rgba(27,42,74,.2))", bgcolor: "rgb(var(--imaa-dm-surface-rgb, 255 255 255) / .94)", color: NAVY_TEXT, "&:hover": { borderColor: NAVY_TEXT, bgcolor: "var(--imaa-dm-surface-hover, #FFFFFF)" }, borderRadius: 999, minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em", boxShadow: "none" }}>
+                    sx={{ borderColor: "var(--imaa-dm-border-strong, rgba(27,42,74,.2))", bgcolor: "rgb(var(--imaa-dm-surface-rgb, 255 255 255) / .94)", color: NAVY_TEXT, "&:hover": { borderColor: NAVY_TEXT, bgcolor: "var(--imaa-dm-surface-hover, #FFFFFF)" }, borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 4.5, py: 1.25, fontWeight: 700, fontSize: 14, textTransform: "uppercase", letterSpacing: ".02em", boxShadow: "none" }}>
                     Log in
                   </Button>
                 </>
@@ -374,7 +374,7 @@ export default function HomePage() {
                 justifySelf: { xs: "start", md: "end" },
                 bgcolor: ORANGE_HOVER,
                 color: "#FFFFFF",
-                borderRadius: 999,
+                borderRadius: "var(--imaa-radius-field)",
                 boxShadow: "none",
                 minHeight: 48,
                 px: 4.5,
@@ -551,7 +551,7 @@ export default function HomePage() {
                     justifyContent: "center",
                     bgcolor: ORANGE_HOVER,
                     color: "#FFFFFF",
-                    borderRadius: 999,
+                    borderRadius: "var(--imaa-radius-field)",
                     boxShadow: "none",
                     fontWeight: 700,
                     fontSize: "0.875rem",
@@ -585,11 +585,11 @@ export default function HomePage() {
             </Typography>
             <Box sx={{ display: "flex", justifyContent: "center", gap: 2, flexWrap: "wrap" }}>
               <Button onClick={openSignup} variant="contained" size="large"
-                sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: 999, minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                sx={{ bgcolor: ORANGE_HOVER, color: "#FFFFFF", "&:hover": { bgcolor: "#A9361C" }, boxShadow: "none", borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                 Create free account
               </Button>
               <Button onClick={openLogin} variant="outlined" size="large"
-                sx={{ borderColor: "rgba(255,255,255,.65)", color: "#FFFFFF", "&:hover": { borderColor: "#FFFFFF", bgcolor: "rgba(255,255,255,.08)" }, borderRadius: 999, minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
+                sx={{ borderColor: "rgba(255,255,255,.65)", color: "#FFFFFF", "&:hover": { borderColor: "#FFFFFF", bgcolor: "rgba(255,255,255,.08)" }, borderRadius: "var(--imaa-radius-field)", minHeight: 48, px: 5, py: 1.5, fontWeight: 700, fontSize: 15, textTransform: "none" }}>
                 Sign in
               </Button>
             </Box>
