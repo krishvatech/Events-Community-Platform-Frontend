@@ -242,13 +242,16 @@ const VirtualSpeakersPage = () => {
           alignItems: { xs: 'stretch', sm: 'center' },
           gap: { xs: 1.5, sm: 2 },
           p: { xs: 1.75, sm: 2 },
-          '&:not(:first-of-type)': { borderTop: `1px solid ${semanticColors.border}` },
+          minWidth: 0,
+          bgcolor: 'background.paper',
+          border: `1px solid ${semanticColors.border}`,
+          borderRadius: `${radii.card}px`,
         }}
       >
         <Avatar
           src={speaker.profile_image_url}
           alt={speaker.name || 'Virtual speaker'}
-          sx={{ width: 60, height: 60, flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'center' } }}
+          sx={{ width: 60, height: 60, flexShrink: 0, alignSelf: { xs: 'flex-start', sm: 'flex-start' } }}
         >
           {initials}
         </Avatar>
@@ -263,7 +266,7 @@ const VirtualSpeakersPage = () => {
             </Typography>
           )}
           {speaker.bio && (
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.65, lineHeight: 1.45, overflowWrap: 'anywhere' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: '-webkit-box', mt: 0.65, lineHeight: 1.45, overflowWrap: 'anywhere', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
               {speaker.bio}
             </Typography>
           )}
@@ -352,7 +355,7 @@ const VirtualSpeakersPage = () => {
                 : 'No virtual speakers created yet. Create one to get started!'
             }
           >
-            <Box component="ul" aria-label="Virtual speakers" sx={{ listStyle: 'none', m: 0, p: 0 }}>
+            <Box component="ul" aria-label="Virtual speakers" sx={{ listStyle: 'none', m: 0, p: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
               {filteredSpeakers.map(renderSpeakerCard)}
             </Box>
           </AdminTableShell>
