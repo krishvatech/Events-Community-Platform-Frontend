@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Box, Button, Chip, Skeleton, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Paper, Skeleton, Stack, Typography } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import { Helmet } from "react-helmet-async";
 import { Link as RouterLink, useLocation, useParams } from "#navigation";
@@ -231,6 +231,39 @@ function ContentChunkSentinel({ active, state, onVisible, onRetry }) {
   );
 }
 
+function BlogReadingRail({ post }) {
+  const author = getBlogAuthorName(post);
+  const date = formatBlogDate(post.published_at);
+  const categories = post.categories || [];
+  const tags = post.tags || [];
+
+  if (!author && !date && categories.length === 0 && tags.length === 0) return null;
+
+  return (
+    <Box component="aside" aria-label="Article details" sx={{ display: { xs: "none", md: "block" }, position: "sticky", top: 96, alignSelf: "start" }}>
+      <Paper variant="outlined" sx={{ p: 2.5, borderRadius: "var(--imaa-radius-card)", borderColor: BLOG_BORDER }}>
+        <Typography variant="overline" sx={{ display: "block", color: BLOG_MUTED, fontWeight: 700, letterSpacing: "0.12em", mb: 1 }}>
+          Article details
+        </Typography>
+        <Stack spacing={1.5}>
+          {author && <Typography variant="body2"><Box component="span" sx={{ color: BLOG_MUTED }}>Author</Box><br />{author}</Typography>}
+          {date && <Typography variant="body2"><Box component="span" sx={{ color: BLOG_MUTED }}>Published</Box><br /><time dateTime={post.published_at}>{date}</time></Typography>}
+          {categories.length > 0 && (
+            <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.75}>
+              {categories.map((category) => <Chip key={category.id} label={category.name} size="small" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #E8F7F7)", color: BLOG_TEAL, fontWeight: 700 }} />)}
+            </Stack>
+          )}
+          {tags.length > 0 && (
+            <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.75}>
+              {tags.map((tag) => <Chip key={tag.id} label={`#${tag.name}`} size="small" variant="outlined" />)}
+            </Stack>
+          )}
+        </Stack>
+      </Paper>
+    </Box>
+  );
+}
+
 /**
  * A link to #section in a chunk that is not loaded yet keeps loading chunks
  * until the target exists, then scrolls to it (heading IDs are preserved).
@@ -344,19 +377,22 @@ export default function BlogDetailPage() {
               {post.featured_image && <meta property="og:image" content={post.featured_image} />}
               <meta property="og:type" content="article" />
             </Helmet>
-            <BlogArticleView
-              post={post}
-              contentChunks={content.chunks.length ? content.chunks : null}
-              complete={!content.hasMore}
-              contentFooter={
-                <ContentChunkSentinel
-                  active={content.hasMore}
-                  state={content.state}
-                  onVisible={content.loadMore}
-                  onRetry={content.loadMore}
-                />
-              }
-            />
+            <Box sx={{ maxWidth: 1080, mx: "auto", display: "grid", gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 760px) 240px" }, gap: { xs: 0, md: 5 }, alignItems: "start" }}>
+              <BlogArticleView
+                post={post}
+                contentChunks={content.chunks.length ? content.chunks : null}
+                complete={!content.hasMore}
+                contentFooter={
+                  <ContentChunkSentinel
+                    active={content.hasMore}
+                    state={content.state}
+                    onVisible={content.loadMore}
+                    onRetry={content.loadMore}
+                  />
+                }
+              />
+              <BlogReadingRail post={post} />
+            </Box>
           </>
         )}
       </Box>

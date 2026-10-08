@@ -32,13 +32,13 @@ const API_URL = API.endsWith("/api") ? API : `${API}/api`;
 
 function ResourcesListSkeleton({ rows = 10, isMobile }) {
   return (
-    <List disablePadding aria-label="Loading resources" aria-busy="true" sx={{ display: "grid", gap: 1.5 }}>
+    <List disablePadding aria-label="Loading resources" aria-busy="true" sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" }, gap: 2 }}>
       {Array.from({ length: rows }).map((_, idx) => (
         <Paper
           component="li"
           variant="outlined"
           key={idx}
-          sx={{ listStyle: "none", p: { xs: 1.5, sm: 2 }, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)" }}
+          sx={{ listStyle: "none", p: { xs: 1.5, sm: 2 }, minHeight: 230, borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)" }}
         >
           <Stack direction="row" spacing={1.5} alignItems="center">
             <ListItemIcon sx={{ minWidth: 44 }}>
@@ -460,7 +460,7 @@ export default function MyResourcesPage() {
                   />
                 ) : (
                   <>
-                    <List disablePadding aria-label="Resources" sx={{ display: "grid", gap: 1.5 }}>
+                    <List disablePadding aria-label="Resources" sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" }, gap: 2 }}>
                       {resources.map((resource) => (
                         <React.Fragment key={resource.id}>
                           <ListItem
@@ -471,14 +471,27 @@ export default function MyResourcesPage() {
                               borderColor: "var(--imaa-border)",
                               boxShadow: "var(--imaa-shadow-sm)",
                               overflow: "hidden",
-                              pr: isMobile ? 6 : 20,
-                              py: { xs: 0.75, sm: 1 },
+                              minHeight: 250,
+                              alignItems: "stretch",
+                              flexDirection: "column",
+                              pr: 2,
+                              py: 2,
                               transition: "border-color 160ms ease, box-shadow 160ms ease",
                               '&:hover': {
                                 borderColor: "var(--imaa-border-hover)",
                                 boxShadow: "var(--imaa-shadow-md)",
                               },
                               '&:focus-within': { borderColor: "var(--imaa-teal)" },
+                              '& .MuiListItemSecondaryAction-root': {
+                                position: 'static',
+                                transform: 'none',
+                                width: '100%',
+                                mt: 'auto',
+                                pt: 1.5,
+                                borderTop: '1px solid var(--imaa-bg-cool)',
+                                display: 'flex',
+                                justifyContent: 'flex-end',
+                              },
                             }}
                             secondaryAction={
                               isMobile ? (
@@ -517,10 +530,11 @@ export default function MyResourcesPage() {
                             <ListItemIcon
                               aria-hidden="true"
                               sx={{
-                                minWidth: 48,
-                                width: 40,
-                                height: 40,
-                                mr: 1.5,
+                                minWidth: 0,
+                                width: "100%",
+                                height: 96,
+                                mr: 0,
+                                mb: 1.5,
                                 borderRadius: "var(--imaa-radius-card)",
                                 bgcolor: "var(--imaa-teal-light)",
                                 color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))",
@@ -531,7 +545,7 @@ export default function MyResourcesPage() {
                               {getResourceIcon(resource.type)}
                             </ListItemIcon>
                             <ListItemText
-                              sx={{ pr: isMobile ? 0 : 10 }}
+                              sx={{ pr: 0, width: "100%", flex: 1 }}
                               secondaryTypographyProps={{ component: "div" }}
                               primary={
                                 <Typography

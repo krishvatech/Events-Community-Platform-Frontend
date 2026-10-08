@@ -48,10 +48,10 @@ export default function BlogCard({
         borderRadius: admin ? "14px" : "var(--imaa-radius-card)",
         overflow: "hidden",
         minWidth: 0,
-        boxShadow: admin ? "none" : "0 1px 2px rgba(15, 23, 42, 0.04)",
-        transition: "border-color 160ms ease, box-shadow 160ms ease",
+        boxShadow: admin ? "none" : "var(--imaa-shadow-sm)",
+        transition: "border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease",
         ...(!admin && {
-          "&:hover": { borderColor: "rgba(10, 147, 150, 0.45)", boxShadow: "0 4px 14px rgba(15, 23, 42, 0.07)" },
+          "&:hover": { borderColor: BLOG_NAVY, boxShadow: "0 8px 20px rgba(27, 42, 74, 0.12)", transform: "translateY(-2px)" },
           "&:focus-within": { borderColor: BLOG_TEAL, boxShadow: "0 0 0 2px rgba(10, 147, 150, 0.18)" },
           "& h2 a:focus-visible": { outline: "2px solid", outlineColor: BLOG_TEAL, outlineOffset: 3, borderRadius: "2px" },
         }),
@@ -61,7 +61,7 @@ export default function BlogCard({
         <BlogFeaturedImage src={post.featured_image} alt={post.title} />
       </RouterLink>
 
-      <Box sx={{ p: 2, display: "flex", flexDirection: "column", flexGrow: 1, gap: 1 }}>
+      <Box sx={{ p: { xs: 2, sm: 2.25 }, display: "flex", flexDirection: "column", flexGrow: 1, gap: 1 }}>
         {badges && (
           <Stack direction="row" useFlexGap flexWrap="wrap" spacing={0.75} data-testid="blog-card-badges">
             {badges}
@@ -84,6 +84,7 @@ export default function BlogCard({
         <Typography
           component="h2"
           sx={{
+            fontFamily: admin ? "inherit" : "var(--imaa-font-serif)",
             fontSize: 18,
             fontWeight: 800,
             color: BLOG_NAVY,
@@ -144,7 +145,7 @@ export default function BlogCard({
           </Stack>
         )}
 
-        <Box sx={{ mt: "auto", pt: 1 }}>
+        <Box sx={{ mt: "auto", pt: 1.5, borderTop: admin ? "none" : "1px solid var(--imaa-bg-cool, #F0F4F5)" }}>
           {admin ? (
             <Stack direction="row" spacing={0.5} alignItems="center" data-testid="blog-card-actions">
               {actions}
