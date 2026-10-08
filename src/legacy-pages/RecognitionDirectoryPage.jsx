@@ -197,7 +197,6 @@ export default function RecognitionDirectoryPage() {
           <div className="hero-eyebrow">Recognition by IMAA · Public Register</div>
           <h1 className="hero-title">The institutions and programs that <em>meet the standards</em>.</h1>
           <p className="hero-lede">A public register of education providers whose curricula have been evaluated against the M&amp;A Competency Standards. Recognition is granted at two levels: the institution and the individual program.</p>
-          <p className="hero-lede">Every entry carries the date of its last review. Status and scope are listed openly.</p>
           <div className="hero-ctas">
             <a className="pill btn-coral" href="mailto:info@imaa.org">Apply for recognition</a>
             <a className="pill btn-ghost-light" href="#">Read the standards</a>
@@ -213,7 +212,6 @@ export default function RecognitionDirectoryPage() {
           <p className="top-notice"><strong>Under review</strong> indicates an institution or program is under active evaluation against the M&amp;A Competency Standards. A review in progress is not an endorsement, and recognition is not guaranteed.</p>
           <div className="meta-row">
             <div><span className="count">9 institutions</span> &nbsp;·&nbsp; <span className="count">10 published programs</span></div>
-            <div>Last updated 18 April 2026</div>
           </div>
         </div>
       </section>

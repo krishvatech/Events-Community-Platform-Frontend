@@ -3635,7 +3635,7 @@ export default function ProfilePage() {
                 // ================= NORMAL VIEW (YOUR EXISTING PREVIEW UI) ============
                 (<Box>
                   {/* --- HEADER CARD (Matching HomePage) --- */}
-                  <Card variant="outlined" sx={{ ...profileCardSx, width: "100%", p: 2, mb: 2 }}>
+                  <Card component="section" aria-labelledby="profile-identity-heading" variant="outlined" sx={{ ...profileCardSx, width: "100%", p: { xs: 2, sm: 2.5 }, mb: { xs: 2, md: 3 } }}>
                     <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "flex-start", sm: "center" }} sx={{ width: "100%" }}>
                       <Box sx={{ position: "relative", mr: { sm: 2 }, width: 72, height: 72 }}>
                         <Avatar src={form.avatar || ""} sx={{ width: 72, height: 72 }}>
@@ -3652,10 +3652,13 @@ export default function ProfilePage() {
                         </Tooltip>
                       </Box>
 
-                      <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, width: { xs: "100%", sm: "auto" } }}>
+                      <Box sx={{ flex: { xs: "0 0 auto", sm: 1 }, minWidth: 0, width: { xs: "100%", sm: "auto" } }}>
+                        <Typography variant="overline" sx={{ display: "block", color: "var(--imaa-ink-meta)", lineHeight: 1.2, mb: 0.5 }}>
+                          Account profile
+                        </Typography>
                         <Stack direction="row" alignItems="center" spacing={1}>
                           {/* Member's name is the page title (plain heading: index.css forces the sans font on Typography) */}
-                          <Box component="h1" sx={profileNameSx}>
+                          <Box id="profile-identity-heading" component="h1" sx={profileNameSx}>
                             {fullName}
                           </Box>
 
@@ -3676,7 +3679,7 @@ export default function ProfilePage() {
                       </Box>
 
                       {/* --- EDIT BUTTONS --- */}
-                      <Box sx={{ ml: "auto", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 1 }}>
+                      <Box sx={{ ml: { xs: 0, sm: "auto" }, width: { xs: "100%", sm: "auto" }, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: { xs: "flex-start", sm: "flex-end" }, gap: 1 }}>
                         <Button
                           variant="outlined"
                           size="small"
@@ -3733,9 +3736,14 @@ export default function ProfilePage() {
                     </Stack>
                   </Card>
                   {/* --- CONTENT GRID --- */}
-                  <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" } }}>
-                    {/* LEFT COLUMN */}
+                  <Grid container spacing={{ xs: 2, md: 2.5 }} sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1.2fr) minmax(280px, 0.8fr)" }, alignItems: "start" }}>
+                    {/* PROFESSIONAL SHOWCASE ZONE */}
                     <Grid item xs={12} lg={6}>
+                      <SectionHeader
+                        title="Professional profile"
+                        description="Your experience, expertise, education, and professional credentials."
+                        sx={{ mb: 2 }}
+                      />
                       <VerificationCard
                         status={form.kyc_status}
                         pendingRequest={form.pending_verification_request}
@@ -4168,14 +4176,24 @@ export default function ProfilePage() {
                         )}
                       </SectionCard>
 
-                      <Box sx={{ mt: 2 }}>
+                      <Box sx={{ mt: 3 }}>
+                        <SectionHeader
+                          title="Account & security"
+                          description="Account access and verification details."
+                          sx={{ mb: 1.5 }}
+                        />
                         <SecurityCard provider={form.provider} email={form.email} />
                       </Box>
 
                     </Grid>
 
-                    {/* RIGHT COLUMN */}
+                    {/* CONTACT, PRIVACY, AND PERSONAL DETAILS ZONE */}
                     <Grid item xs={12} lg={6}>
+                      <SectionHeader
+                        title="Contact & privacy"
+                        description="How members can reach you and where your profile is visible."
+                        sx={{ mb: 2 }}
+                      />
                       <SectionCard
                         title="E-Mail"
                         action={

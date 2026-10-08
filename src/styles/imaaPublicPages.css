@@ -469,7 +469,7 @@
 /* Program Grid */
 .imaa-public-page .program-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-5);
 }
 
@@ -481,6 +481,14 @@
   transition: box-shadow 0.2s, border-color 0.2s;
   display: flex;
   flex-direction: column;
+  min-width: 0;
+}
+
+.imaa-public-page .program-card-content {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .imaa-public-page .program-card:hover {
@@ -516,10 +524,26 @@
 }
 
 .imaa-public-page .program-formats {
+  margin-top: auto;
+  padding-top: var(--sp-4);
+  margin-bottom: var(--sp-5);
+}
+
+.imaa-public-page .program-meta-label {
+  display: block;
+  margin-bottom: var(--sp-2);
+  color: var(--meta);
+  font-family: var(--imaa-font-sans);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.imaa-public-page .program-format-tags {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: var(--sp-5);
 }
 
 .imaa-public-page .format-tag {
@@ -1167,6 +1191,12 @@
 }
 
 /* ─── Responsive ─────────────────────────────────────────── */
+
+@media (max-width: 1200px) {
+  .imaa-public-page .program-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 
 @media (max-width: 900px) {
   .imaa-public-page .program-grid {

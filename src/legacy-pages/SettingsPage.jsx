@@ -1,6 +1,6 @@
 import React from "react";
 import { useNavigate } from "#navigation";
-import { Button, Container } from "@mui/material";
+import { Box, Button, Container, Paper } from "@mui/material";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import { PageHeader, EmptyState } from "../components/page";
 
@@ -9,29 +9,31 @@ export default function SettingsPage() {
   const navigate = useNavigate();
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
-      <PageHeader title="Settings" sx={{ mb: 3 }} />
-
-      <EmptyState
-        icon={<SettingsRoundedIcon />}
-        title="Coming Soon"
-        description="We're working on something great. Account settings will be available here soon."
-        action={
-          <Button
-            variant="outlined"
-            onClick={() => navigate(-1)}
-            sx={{
-              textTransform: "none",
-              borderColor: "var(--imaa-dm-text-2, var(--imaa-navy))",
-              color: "var(--imaa-dm-text, var(--imaa-navy))",
-              // Darker teal on hover keeps the label at AA contrast
-              "&:hover": { borderColor: "var(--imaa-teal)", color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))" },
-            }}
-          >
-            Go Back
-          </Button>
-        }
-      />
-    </Container>
+    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member, #F7F8FA)" }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 } }}>
+        <PageHeader eyebrow="Account" title="Settings" sx={{ mb: 3 }} />
+        <Paper variant="outlined" sx={{ borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", boxShadow: "var(--imaa-shadow-sm)" }}>
+          <EmptyState
+            icon={<SettingsRoundedIcon />}
+            title="Coming Soon"
+            description="We're working on something great. Account settings will be available here soon."
+            action={
+              <Button
+                variant="outlined"
+                onClick={() => navigate(-1)}
+                sx={{
+                  textTransform: "none",
+                  borderColor: "var(--imaa-dm-text-2, var(--imaa-navy))",
+                  color: "var(--imaa-dm-text, var(--imaa-navy))",
+                  "&:hover": { borderColor: "var(--imaa-teal)", color: "var(--imaa-dm-teal-text, var(--imaa-teal-hover))" },
+                }}
+              >
+                Go Back
+              </Button>
+            }
+          />
+        </Paper>
+      </Container>
+    </Box>
   );
 }

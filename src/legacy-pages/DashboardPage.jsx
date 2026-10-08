@@ -87,6 +87,28 @@ function getEventHref(event) {
   return key ? `/events/${key}` : "/events";
 }
 
+// Dashboard-only event copy: prefer an API-provided short field, then derive a
+// readable preview from the real description without mutating the event data.
+function getEventPreview(event, limit = 280) {
+  const source = [event?.excerpt, event?.summary, event?.short_description, event?.description, event?.desc, event?.content]
+    .find((value) => typeof value === "string" && value.trim());
+  if (!source) return "";
+
+  // Render as text only. DOMParser also decodes entities; the fallback keeps
+  // this client-only legacy page safe if the DOM is unavailable during tooling.
+  const text = typeof DOMParser !== "undefined"
+    ? new DOMParser().parseFromString(source, "text/html").body.textContent || ""
+    : source.replace(/<[^>]*>/g, " ");
+  const normalized = text
+    .replace(/https?:\/\/[^\s]+/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  if (normalized.length <= limit) return normalized;
+
+  const boundary = normalized.lastIndexOf(" ", limit - 1);
+  return `${normalized.slice(0, boundary > 0 ? boundary : limit).trimEnd()}…`;
+}
+
 // ── FadeIn Animation ─────────────────────────────────────────────────────────
 function FadeIn({ children, delay = 0 }) {
   const ref = useRef(null);
@@ -407,6 +429,7 @@ function FeaturedHero({ event }) {
     : "";
   const eventLocation = getEventLocation(event);
   const href = getEventHref(event);
+  const preview = getEventPreview(event);
   return (
     // The whole card is one link (unchanged destination). Two columns from lg; stacked below.
     <Box component="a" href={href} sx={{
@@ -431,9 +454,11 @@ function FeaturedHero({ event }) {
         <Box component="h3" sx={{ fontFamily: SERIF, fontSize: { xs: 20, sm: 22 }, fontWeight: 700, color: INK, m: "0 0 10px", lineHeight: 1.3, overflowWrap: "anywhere" }}>
           {event?.title}
         </Box>
-        <Box component="p" sx={{ fontSize: 14, color: INK_BODY, lineHeight: 1.65, m: "0 0 16px", fontFamily: FONT }}>
-          {event?.description || event?.desc || event?.short_description}
-        </Box>
+        {preview && (
+          <Box component="p" sx={{ fontSize: 14, color: INK_BODY, lineHeight: 1.65, m: "0 0 16px", fontFamily: FONT, display: "-webkit-box", WebkitLineClamp: 4, WebkitBoxOrient: "vertical", overflow: "hidden" }}>
+            {preview}
+          </Box>
+        )}
         {(dateStr || eventLocation) && (
           <Box sx={{ fontSize: 13, color: INK_BODY, mb: 2.5, display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", fontFamily: FONT }}>
             <EventNoteIcon sx={{ fontSize: 15, color: INK_BODY }} />

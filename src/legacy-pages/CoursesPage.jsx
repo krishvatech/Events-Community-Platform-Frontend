@@ -102,6 +102,7 @@ function CourseCard({ course, enrollment = null }) {
       sx={{
         borderRadius: "var(--imaa-radius-card)",
         height: "100%",
+        minHeight: { xs: 330, sm: 350 },
         transition: "box-shadow 0.2s, border-color 0.2s",
         "&:hover": { boxShadow: "var(--imaa-shadow-md)", borderColor: "var(--imaa-border-hover)" },
       }}
@@ -148,9 +149,9 @@ function CourseCard({ course, enrollment = null }) {
       </Box>
 
       {/* Content area */}
-      <Box sx={{ p: 2, display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
+      <Box sx={{ p: { xs: 2, sm: 2.5 }, display: "flex", flexDirection: "column", gap: 1.25, flexGrow: 1 }}>
         {/* Category + Status row */}
-        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1, minHeight: 24 }}>
           {category && (
             <Chip
               label={category}
@@ -183,7 +184,7 @@ function CourseCard({ course, enrollment = null }) {
             overflow: "hidden",
             color: "var(--imaa-ink)",
             fontSize: { xs: 16, sm: 17 },
-            minHeight: "3em",
+            minHeight: "3.25em",
           }}
         >
           {name}
@@ -191,7 +192,7 @@ function CourseCard({ course, enrollment = null }) {
 
         {/* Progress bar (enrolled courses only) */}
         {progress !== null && !completed && (
-          <Box sx={{ mt: 0.5 }}>
+          <Box sx={{ mt: 0.5, minHeight: 38 }}>
             <Box sx={{ display: "flex", justifyContent: "space-between", mb: 0.5 }}>
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: 12 }}>
                 Progress
@@ -209,7 +210,7 @@ function CourseCard({ course, enrollment = null }) {
           </Box>
         )}
 
-        <Box sx={{ flexGrow: 1 }} />
+        <Box sx={{ flexGrow: 1, minHeight: 8 }} />
 
         {/* Launch button */}
         {playerPath ? (
@@ -222,6 +223,7 @@ function CourseCard({ course, enrollment = null }) {
               borderRadius: 1.5,
               fontSize: 13,
               fontWeight: 600,
+              minHeight: 36,
             }}
             fullWidth
           >
@@ -240,6 +242,7 @@ function CourseCard({ course, enrollment = null }) {
               borderRadius: 1.5,
               fontSize: 13,
               fontWeight: 600,
+              minHeight: 36,
             }}
             fullWidth
           >

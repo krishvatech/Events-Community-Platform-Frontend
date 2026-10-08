@@ -136,36 +136,41 @@ export default function TrainingProgramsPage() {
       )}
 
       {/* Hero */}
-      <div className="hero">
+      <section className="hero" aria-labelledby="training-page-title">
         <div className="hero-inner">
           <div className="hero-eyebrow">M&amp;A Training &amp; Certification</div>
-          <h1 className="hero-title">All IMAA M&amp;A Training Courses &amp; Programs</h1>
+          <h1 id="training-page-title" className="hero-title">All IMAA M&amp;A Training Courses &amp; Programs</h1>
           <p className="hero-lede">Build M&amp;A expertise through programs designed by practitioners and recognized internationally.</p>
           <a className="pill btn-teal" href="#programs">Explore Programs</a>
         </div>
-      </div>
+      </section>
 
       {/* Programs Grid */}
-      <div className="programs-section" id="programs">
-        <h2 className="section-title">Our Programs</h2>
+      <section className="programs-section" id="programs" aria-labelledby="programs-heading">
+        <h2 id="programs-heading" className="section-title">Our Programs</h2>
         <p className="section-lede">Each program combines practical frameworks with real-world application, delivered by faculty who have led and advised on M&amp;A transactions worldwide.</p>
 
         <div className="program-grid">
           {PROGRAMS.map((program, idx) => (
-            <div className="program-card" key={idx}>
-              <div className="program-abbr">{program.abbr}</div>
-              <h3 className="program-name">{program.name}</h3>
-              <p className="program-desc">{program.desc}</p>
-              <div className="program-formats">
-                {program.formats.map((format, i) => (
-                  <span className="format-tag" key={i}>{format}</span>
-                ))}
+            <article className="program-card" key={idx}>
+              <div className="program-card-content">
+                <div className="program-abbr">{program.abbr}</div>
+                <h3 className="program-name">{program.name}</h3>
+                <p className="program-desc">{program.desc}</p>
+                <div className="program-formats" aria-label={`Available study formats for ${program.name}`}>
+                  <span className="program-meta-label">Study formats</span>
+                  <div className="program-format-tags">
+                    {program.formats.map((format, i) => (
+                      <span className="format-tag" key={i}>{format}</span>
+                    ))}
+                  </div>
+                </div>
               </div>
               <a className="program-link" href={program.link}>
                 Learn more
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
               </a>
-            </div>
+            </article>
           ))}
         </div>
 
@@ -177,7 +182,7 @@ export default function TrainingProgramsPage() {
           </div>
           <a className="pill btn-teal" href="https://imaa-institute.org/in-house-training/">Request Info</a>
         </div>
-      </div>
+      </section>
 
       {/* Study Formats */}
       <div className="formats-section">
