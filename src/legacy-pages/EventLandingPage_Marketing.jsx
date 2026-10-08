@@ -40,10 +40,10 @@ const STRATEGIC_PARTNERS = [
 
 // Design System
 const C = {
-  deepBlue: "#284D61",
-  midBlue: "#37738D",
-  brightBlue: "#159AC9",
-  lightBlue: "#B9CED7",
+  deepBlue: "#1B2A4A",
+  midBlue: "#263B5F",
+  brightBlue: "#0A9396",
+  lightBlue: "#C9D6E0",
   bgBlue1: "#D7E3E8",
   bgBlue2: "#E6EDF0",
   cool10: "#F0F4F5",
@@ -54,7 +54,7 @@ const C = {
   cool80: "#3A4853",
   cool90: "#292F39",
   cool100: "#21262E",
-  coral: "#F05843",
+  coral: "#E84C38",
   green: "#76B82A",
   yellow: "#FED746",
   white: "#FFFFFF",
@@ -62,8 +62,8 @@ const C = {
 };
 
 const F = {
-  body: "'Roboto', Arial, sans-serif",
-  display: "'Roboto Slab', Georgia, serif",
+  body: "var(--imaa-font-sans, 'Inter', Arial, sans-serif)",
+  display: "var(--imaa-font-serif, 'Source Serif 4', Georgia, serif)",
 };
 
 // Mobile responsiveness hook
@@ -236,6 +236,7 @@ function ApplyStatusDisplay({ status, eventData, onJoinClick, style, buttonSize 
 function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const isMobile = useIsMobile();
+  const isCompactHero = useIsMobile(900);
 
   // Format event data from API response
   const formatEventData = (data) => {
@@ -398,7 +399,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
           <meta name="twitter:image" content={hero_image} />
         </Helmet>
       )}
-      <section style={{ background: C.deepBlue }}>
+      <section style={{ background: C.deepBlue }} aria-labelledby="landing-event-title">
       <div
         style={{
           maxWidth: 1100,
@@ -574,8 +575,11 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
           </div>
         </div>
       )}
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "52px 40px 72px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, alignItems: "center" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: isCompactHero ? "22px 20px 48px" : "22px 40px 72px" }}>
+        <nav aria-label="Breadcrumb" style={{ fontFamily: F.body, fontSize: 12, color: C.lightBlue, opacity: 0.78, marginBottom: 28 }}>
+          Events <span aria-hidden="true" style={{ margin: "0 8px", opacity: 0.6 }}>›</span> {title}
+        </nav>
+        <div style={{ display: "grid", gridTemplateColumns: isCompactHero ? "1fr" : "minmax(0, 1.25fr) minmax(280px, 0.75fr)", gap: isCompactHero ? 32 : 56, alignItems: "end" }}>
           <div>
             <div
               style={{
@@ -601,11 +605,12 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
               </span>
             </div>
             <h1
+              id="landing-event-title"
               style={{
                 fontFamily: F.display,
-                fontSize: 42,
-                fontWeight: 700,
-                lineHeight: 1.15,
+                fontSize: "clamp(2.35rem, 5vw, 4rem)",
+                fontWeight: 500,
+                lineHeight: 1.08,
                 color: C.white,
                 margin: "0 0 16px",
                 ...a(0.5),
@@ -626,7 +631,22 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
             >
               {subtitle}
             </p>
-            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", ...a(0.85) }}>
+            {description && description !== subtitle && (
+              <p
+                style={{
+                  fontFamily: F.body,
+                  fontSize: 16,
+                  lineHeight: 1.65,
+                  color: "rgba(255,255,255,0.76)",
+                  maxWidth: 620,
+                  margin: "16px 0 0",
+                  ...a(0.7),
+                }}
+              >
+                {description}
+              </p>
+            )}
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", alignItems: "center", marginTop: 20, ...a(0.85) }}>
               {!myApplication || myApplication.status === 'none' ? (
                 <button
                   onClick={onApplyClick}
@@ -667,7 +687,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12, ...a(0.7) }}>
             {hero_image && eventData.format !== 'virtual' && (
-              <div style={{ height: 200, borderRadius: 4, position: "relative", overflow: "hidden" }}>
+              <div style={{ height: "clamp(260px, 32vw, 420px)", borderRadius: 4, position: "relative", overflow: "hidden" }}>
                 <img
                   src={hero_image}
                   alt={venue_name}
@@ -723,7 +743,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
               </div>
             )}
             {hero_image && eventData.format === 'virtual' && (
-              <div style={{ height: 200, borderRadius: 4, position: "relative", overflow: "hidden" }}>
+              <div style={{ height: "clamp(260px, 32vw, 420px)", borderRadius: 4, position: "relative", overflow: "hidden" }}>
                 <img
                   src={hero_image}
                   alt="Event banner"

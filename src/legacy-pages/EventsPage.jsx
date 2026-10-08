@@ -1790,59 +1790,42 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   return (
     <MUICard
       elevation={0}
-      className="group rounded-lg border border-imaa-border bg-white shadow-[0_4px_16px_rgba(27,42,74,.05)]
-                 transition-all duration-200 hover:shadow-[0_8px_22px_rgba(27,42,74,.08)] hover:-translate-y-0.5 motion-reduce:hover:translate-y-0
-                 hover:border-imaa-border-hover overflow-hidden"
+      className="group border-x-0 border-t-0 border-b border-imaa-border bg-white shadow-none rounded-none
+                 transition-colors duration-150 hover:bg-imaa-member overflow-hidden"
     >
-      <div className="md:flex">
-        {/* Image / badges */}
-        <div className="relative md:w-2/5">
-          {(ev.cover_image || ev.image) ? (
-            <img
-              src={toAbs(ev.cover_image || ev.image)}
-              alt={ev.title}
-              className="w-full h-44 md:h-full object-cover transform-gpu transition-transform duration-500 ease-out group-hover:scale-[1.02] will-change-transform"
-            />
-          ) : (
-            <div className="w-full h-44 md:h-full object-cover">No image</div>
-          )}
-
-          {ev.topics?.[0] && (
-            <span className="absolute top-3 left-3 inline-flex items-center rounded-full bg-imaa-teal-dark text-white px-3 py-1 text-xs font-semibold shadow-sm">
-              {ev.topics[0]}
-            </span>
-          )}
-          {ev.topics?.[1] && (
-            <span className="absolute top-3 right-3 inline-flex items-center rounded-full bg-white text-imaa-ink px-3 py-1 text-xs font-semibold shadow-sm">
-              {ev.topics[1]}
-            </span>
-          )}
+      <div className="flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:gap-6">
+        {/* The row date replaces the generic image panel for the Events directory only. */}
+        <div className="shrink-0 lg:w-[132px]">
+          <div className="font-serif text-xl font-bold leading-tight text-imaa-ink">
+            {startDate.toString() === "Invalid Date" ? "Date TBA" : dayjs(ev.start).format("D MMM")}
+          </div>
+          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-imaa-meta">
+            {endDate && !Number.isNaN(endDate.getTime()) && !dayjs(ev.start).isSame(ev.end, "day")
+              ? `${dayjs(ev.start).format("ddd")}–${dayjs(ev.end).format("ddd")}`
+              : (startDate.toString() === "Invalid Date" ? "" : dayjs(ev.start).format("dddd"))}
+          </div>
         </div>
 
         {/* Details */}
-        <CardContent className="p-6 md:w-3/5">
-          <div className="flex items-start justify-between gap-4">
+        <CardContent className="min-w-0 flex-1 p-0">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-start gap-2 mb-1">
-                <h3 className="font-sans text-xl md:text-[22px] font-bold text-imaa-ink leading-snug flex-1">
+                <h3 className="font-serif text-lg sm:text-xl font-bold text-imaa-ink leading-snug flex-1">
                   {ev.title}
                 </h3>
                 {ev.isPinnedTopCopy && (
                   <PushPinIcon sx={{ color: "error.main", fontSize: 24, flexShrink: 0 }} />
                 )}
               </div>
-              {ev.description && (
-                <p className="mt-2 text-imaa-body text-sm md:text-base leading-relaxed">
-                  {truncate(ev.description, 220)}
-                </p>
-              )}
+              {ev.description && <p className="mt-1.5 text-imaa-body text-sm leading-relaxed line-clamp-2">{truncate(ev.description, 180)}</p>}
 
               <FeaturedParticipantsStrip
                 participants={ev.featured_participants}
                 total={ev.featured_participants_total}
               />
 
-              <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-neutral-800 text-sm">
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-imaa-body">
                 <span className="inline-flex items-center gap-2">
                   <CalendarMonthIcon fontSize="small" className="text-teal-700" />
                   {dayjs(ev.start).format("MMMM D, YYYY")}
@@ -1931,7 +1914,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
 
               </div>
 
-              <div className="mt-3 text-base font-semibold text-neutral-900">
+              <div className="mt-3 text-sm font-semibold text-imaa-ink">
                 {isPaymentPending ? (
                   <PaymentPendingSummary reg={reg} />
                 ) : (isEventOwner || isConfirmedRegistered) ? (
@@ -1942,7 +1925,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               </div>
             </div>
 
-            <div className="shrink-0">
+            <div className="shrink-0 sm:self-center">
               {/* Show Join button for owner OR registered user, but hide register/apply for owner */}
               {isPaymentPending ? (
                 <div className="flex flex-col items-end gap-2">
@@ -2199,20 +2182,21 @@ function EventCardSkeleton() {
 
 function EventRowSkeleton() {
   return (
-    <MUICard elevation={0} className="rounded-lg border border-imaa-border overflow-hidden">
-      <div className="flex flex-col md:flex-row">
-        <Box sx={{ width: { xs: "100%", md: 260 }, flexShrink: 0 }}>
-          <Skeleton variant="rectangular" height={170} />
+    <MUICard elevation={0} className="border-x-0 border-t-0 border-b border-imaa-border rounded-none shadow-none">
+      <div className="flex flex-col gap-4 p-5 sm:p-6 lg:flex-row lg:items-center lg:gap-6">
+        <Box sx={{ width: { xs: "100%", lg: 132 }, flexShrink: 0 }}>
+          <Skeleton variant="text" height={30} width={88} />
+          <Skeleton variant="text" height={18} width={62} />
         </Box>
 
-        <CardContent sx={{ flex: 1 }}>
+        <CardContent sx={{ flex: 1, p: 0 }}>
           <Skeleton variant="text" height={28} width="70%" />
           <Skeleton variant="text" width="90%" />
           <Skeleton variant="text" width="80%" />
-          <Skeleton variant="text" width="60%" />
+          <Skeleton variant="text" width="45%" />
         </CardContent>
 
-        <Box className="p-4 md:p-6 md:pl-0 shrink-0 w-full md:w-[240px]">
+        <Box className="shrink-0 w-[120px]">
           <Skeleton variant="text" height={28} width="40%" />
           <Skeleton variant="rounded" height={44} />
         </Box>
@@ -2251,7 +2235,9 @@ export default function EventsPage() {
   const [page, setPage] = useState(1);
   const [replayPage, setReplayPage] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [view, setView] = useState("grid"); // 'grid' | 'list'
+  // The public directory is intentionally row-first, matching the locked Events
+  // directory pattern. The existing grid preference remains available to users.
+  const [view, setView] = useState("list"); // 'grid' | 'list'
   const [selectedTab, setSelectedTab] = useState("upcoming"); // 'upcoming' | 'replays'
   const [dateRange, setDateRange] = useState(""); // "",
   const [topic, setTopic] = useState("");   // or "Topic/Industry" if you prefer
@@ -3391,7 +3377,6 @@ export default function EventsPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const heroBg = cmsPage?.hero_image_url || "/images/events-hero-bg.png";
   const heroTitle = cmsPage?.hero_title || "Explore M&A Events";
   const heroSubtitle =
     cmsPage?.hero_subtitle ||
@@ -3448,25 +3433,24 @@ export default function EventsPage() {
 
   return (
     <>
-      {/* Hero (background image) */}
-      <section className="relative border-b border-imaa-border bg-white">
+      {/* Directory header: restrained and content-led, matching the event-row reference. */}
+      <section className="relative border-b border-imaa-border bg-[#F0F4F5]">
         <div
           className="relative text-left"
           style={{
-            backgroundImage: `linear-gradient(90deg, rgba(255,255,255,.99) 0%, rgba(255,255,255,.96) 42%, rgba(255,255,255,.76) 62%, rgba(255,255,255,.28) 100%), url("${heroBg}")`,
-            backgroundSize: "cover",
-            backgroundPosition: "center",
+            background: "linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,0))",
           }}
         >
           <Container maxWidth={false} disableGutters>
-            <div className="relative mx-auto max-w-[1200px] px-6 py-12 md:py-14">
-              <h1 className="max-w-3xl font-sans text-4xl md:text-5xl font-bold tracking-[-0.025em] leading-[1.08] text-imaa-ink mb-4">
+            <div className="relative mx-auto max-w-[1200px] px-4 sm:px-6 py-9 md:py-11">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.16em] text-imaa-meta">Events &amp; programs</p>
+              <h1 className="max-w-3xl font-serif text-[32px] md:text-[38px] font-bold tracking-[-0.02em] leading-[1.15] text-imaa-ink mb-3">
                 {heroTitle}
               </h1>
-              <p className="max-w-2xl text-base md:text-lg leading-relaxed text-imaa-body">
+              <p className="max-w-2xl text-sm md:text-[15px] leading-relaxed text-imaa-body">
                 {heroSubtitle}
               </p>
-              <div className="mt-7 flex flex-wrap justify-start items-center gap-3">
+              <div className="mt-5 flex flex-wrap justify-start items-center gap-3">
                 {ctaButtons
                   .filter((btn) => (btn?.label || "").trim())
                   .map((btn) => {
@@ -3491,8 +3475,8 @@ export default function EventsPage() {
                           rel={isExternal ? "noreferrer" : undefined}
                           variant="contained"
                           sx={{
-                            minHeight: 48,
-                            px: 4.5,
+                            minHeight: 40,
+                            px: 3,
                             borderRadius: 999,
                             textTransform: "none",
                             fontWeight: 700,
@@ -3518,8 +3502,8 @@ export default function EventsPage() {
                           rel={isExternal ? "noreferrer" : undefined}
                           variant="outlined"
                           sx={{
-                            minHeight: 48,
-                            px: 4.5,
+                            minHeight: 40,
+                            px: 3,
                             borderRadius: 999,
                             textTransform: "none",
                             fontWeight: 700,
@@ -3545,8 +3529,8 @@ export default function EventsPage() {
                         rel={isExternal ? "noreferrer" : undefined}
                         variant="outlined"
                         sx={{
-                          minHeight: 48,
-                          px: 4.5,
+                          minHeight: 40,
+                          px: 3,
                           borderRadius: 999,
                           textTransform: "none",
                           fontWeight: 700,
@@ -3567,8 +3551,8 @@ export default function EventsPage() {
       </section>
 
       {/* Top filters / controls bar */}
-      <Container maxWidth={false} disableGutters className="mt-6 px-4 sm:px-6">
-        <div className="mx-auto w-full max-w-[1200px] rounded-lg border border-imaa-border bg-white p-3 sm:p-4 overflow-visible shadow-[0_4px_16px_rgba(27,42,74,.05)]">
+      <Container maxWidth={false} disableGutters className="mt-5 px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-[1200px] rounded-lg border border-imaa-border bg-white p-3 overflow-visible shadow-none">
           {/* Responsive grid: 1 col on xs, 2 cols on sm, 12-col layout on lg+ */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
 
@@ -3585,7 +3569,7 @@ export default function EventsPage() {
                   type="text"
                   placeholder="Search events by keyword..."
                   aria-label="Search events"
-                  className="w-full h-12 pl-12 pr-4 rounded-lg border border-imaa-border bg-white text-sm text-imaa-ink placeholder:text-slate-500 outline-none transition-colors hover:border-imaa-border-hover focus:border-imaa-teal focus:ring-2 focus:ring-imaa-teal/20"
+                  className="w-full h-10 pl-10 pr-3 rounded-full border border-imaa-border bg-white text-sm text-imaa-ink placeholder:text-slate-500 outline-none transition-colors hover:border-imaa-border-hover focus:border-imaa-teal focus:ring-2 focus:ring-imaa-teal/20"
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                 />
@@ -3604,8 +3588,8 @@ export default function EventsPage() {
                   {...getOpenProps("date")}
                   sx={{
                     ...selectSx,
-                    height: 48,
-                    borderRadius: "var(--imaa-radius-card)",
+                    height: 40,
+                    borderRadius: 999,
                     "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" },
                   }}
                 >
@@ -3628,8 +3612,8 @@ export default function EventsPage() {
                   {...getOpenProps("topic")}
                   sx={{
                     ...selectSx,
-                    height: 48,
-                    borderRadius: "var(--imaa-radius-card)",
+                    height: 40,
+                    borderRadius: 999,
                     "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" },
                   }}
                 >
@@ -3652,8 +3636,8 @@ export default function EventsPage() {
                   {...getOpenProps("format")}
                   sx={{
                     ...selectSx,
-                    height: 48,
-                    borderRadius: "var(--imaa-radius-card)",
+                    height: 40,
+                    borderRadius: 999,
                     "& .MuiSelect-select": { py: 0, display: "flex", alignItems: "center" }
                   }}
                 >
@@ -3671,7 +3655,7 @@ export default function EventsPage() {
                 onClick={() => setShowAdvanced((v) => !v)}
                 type="button"
                 aria-expanded={showAdvanced}
-                className="w-full h-12 inline-flex items-center justify-center gap-2 rounded-lg border border-imaa-border bg-white text-sm font-semibold text-imaa-ink transition-colors hover:border-imaa-border-hover hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-imaa-teal"
+                className="w-full h-10 inline-flex items-center justify-center gap-2 rounded-full border border-imaa-border bg-white text-sm font-semibold text-imaa-ink transition-colors hover:border-imaa-border-hover hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-imaa-teal"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="text-slate-600" aria-hidden="true">
                   <path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -3686,7 +3670,7 @@ export default function EventsPage() {
               className="hidden sm:block sm:col-span-2 lg:col-span-1 min-w-0"
               aria-hidden={false} // hidden only on xs due to Tailwind
             >
-              <div className="flex w-full h-12 rounded-lg overflow-hidden border border-imaa-border bg-white">
+              <div className="flex w-full h-10 rounded-full overflow-hidden border border-imaa-border bg-white">
                 <button
                   type="button"
                   aria-label="Grid view"
@@ -4260,7 +4244,7 @@ export default function EventsPage() {
                 }
               </Box>
             ) : (
-              <Grid container spacing={3} direction="column">
+              <Grid container spacing={0} direction="column" className="overflow-hidden rounded-lg border border-imaa-border bg-white">
                 {rawEvents.length === 0 && initialLoading
                   ? skeletonItems.map((i) => (
                     <Grid item key={`sk-list-${i}`} xs={12}>
@@ -4497,7 +4481,7 @@ export default function EventsPage() {
                   })}
               </Box>
             ) : (
-              <Grid container spacing={3} direction="column">
+              <Grid container spacing={0} direction="column" className="overflow-hidden rounded-lg border border-imaa-border bg-white">
                 {replayLoading
                   ? skeletonItems.map((i) => (
                     <Grid item key={`sk-replay-list-${i}`} xs={12}>

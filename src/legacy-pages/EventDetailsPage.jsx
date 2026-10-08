@@ -71,8 +71,8 @@ const eventTitleSx = {
   m: 0,
   fontFamily: "var(--imaa-font-serif)",
   fontWeight: 700,
-  fontSize: { xs: "1.5rem", sm: "1.75rem", md: "2rem" },
-  lineHeight: 1.2,
+  fontSize: { xs: "2rem", sm: "2.5rem", md: "3.125rem" },
+  lineHeight: 1.08,
   color: "var(--imaa-ink)",
   overflowWrap: "anywhere",
 };
@@ -494,7 +494,7 @@ function FeaturedParticipantsStrip({ participants = [], total = 0 }) {
 function EventDetailsSkeleton() {
   return (
     <div className="min-h-screen bg-imaa-member">
-      <Container maxWidth="xl" className="py-6 sm:py-8">
+      <Container maxWidth="lg" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
             <div className="flex flex-col gap-6">
@@ -1754,9 +1754,21 @@ export default function EventDetailsPage() {
           <main className="col-span-12">
             <div className="flex flex-col gap-6">
 
-              {/* Only show breadcrumbs to logged-in users */}
+              {!token && (
+                <Box component="nav" aria-label="Breadcrumb" sx={{ mb: 1 }}>
+                  <Breadcrumbs separator="›" sx={{ "& .MuiBreadcrumbs-li": { minWidth: 0 } }}>
+                    <Link to={backPath} style={{ textDecoration: "none", color: "var(--imaa-dm-text-body, #666)" }}>
+                      {backLabel}
+                    </Link>
+                    <Typography color="text.primary" noWrap sx={{ maxWidth: { xs: 250, sm: 480 } }}>
+                      {event?.title || "Event"}
+                    </Typography>
+                  </Breadcrumbs>
+                </Box>
+              )}
+
               {token && (
-                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
                   <Button
                     startIcon={<ArrowBackRoundedIcon />}
                     component={Link}
@@ -1766,8 +1778,8 @@ export default function EventDetailsPage() {
                       color: "text.primary",
                       fontWeight: 600,
                       minWidth: "auto",
-                      px: 1,
-                      "&:hover": { bgcolor: "var(--imaa-dm-overlay, rgba(0,0,0,0.04))" }
+                      px: 0,
+                      "&:hover": { bgcolor: "transparent", color: "primary.main" }
                     }}
                   >
                     Back
@@ -1785,7 +1797,7 @@ export default function EventDetailsPage() {
 
               {/* TABS HEADER - MOVED TO TOP */}
               {(showSpeedNetworkingTab || showSessionsTab || showQaTab) && (
-                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3, bgcolor: 'background.paper', px: { xs: 1, sm: 2 } }}>
                   <Tabs value={activeTab} onChange={handleTabChange} aria-label="event details tabs">
                     <Tab label="Overview" {...a11yProps(0)} />
                     {showSessionsTab && <Tab label="Sessions" {...a11yProps(1)} />}
@@ -1800,11 +1812,25 @@ export default function EventDetailsPage() {
               {/* TAB CONTENT: OVERVIEW */}
               {/* Only show when activeTab === 0 (or when no tabs exist) */}
               {((!showSpeedNetworkingTab && !showSessionsTab && !showQaTab) || activeTab === 0) && (
-                <Box>
-                  {/* EVENT HEADER CARD - NEW LAYOUT */}
-                  <Paper elevation={0} className="rounded-lg border border-imaa-border overflow-hidden mb-6">
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 340px' }, gap: { xs: 3, lg: 4 }, alignItems: 'start' }}>
+                  {/* EVENT HERO AND INFORMATION */}
+                  <Paper elevation={0} className="rounded-lg border border-imaa-border overflow-hidden" sx={{ minWidth: 0 }}>
+                    <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 }, pb: { xs: 2, md: 3 }, bgcolor: 'var(--imaa-dm-surface, #fff)' }}>
+                      <Stack spacing={1.5}>
+                        {event?.title ? (
+                          <Box component="h1" sx={eventTitleSx}>
+                            {event.title}
+                          </Box>
+                        ) : null}
+                        {desc?.trim() ? (
+                          <Typography variant="body1" color="text.secondary" sx={{ whiteSpace: "pre-wrap", maxWidth: '75ch', lineHeight: 1.7 }}>
+                            {desc}
+                          </Typography>
+                        ) : null}
+                      </Stack>
+                    </Box>
                     {/* Top section: Image + Details in a grid */}
-                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: { xs: 0, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 }, alignItems: 'start' }}>
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(0, 1.1fr) minmax(240px, 0.9fr)' }, gap: { xs: 2.5, md: 3 }, p: { xs: 2.5, sm: 3, md: 4 }, pt: { xs: 1, md: 1 }, alignItems: 'stretch', borderTop: '1px solid', borderColor: 'divider' }}>
                       {/* LEFT: Event Image */}
                       <Box
                         sx={{
@@ -1814,7 +1840,8 @@ export default function EventDetailsPage() {
                           display: "flex",
                           alignItems: "center",
                           justifyContent: "center",
-                          minHeight: "400px",
+                          minHeight: { xs: "220px", sm: "300px" },
+                          aspectRatio: { md: "4 / 3" },
                         }}
                       >
                         {(event.cover_image || event.preview_image) ? (
@@ -1826,8 +1853,9 @@ export default function EventDetailsPage() {
                             onLoad={handleImageLoad}
                             sx={{
                               width: "100%",
-                              maxHeight: "450px",
-                              objectFit: "contain",
+                              height: "100%",
+                              maxHeight: "100%",
+                              objectFit: "cover",
                               display: "block",
                               borderRadius: 1,
                             }}
@@ -1845,7 +1873,7 @@ export default function EventDetailsPage() {
                       </Box>
 
                       {/* RIGHT: Event Details */}
-                      <Stack spacing={2}>
+                      <Stack spacing={2} sx={{ p: { xs: 2, sm: 2.5 }, border: '1px solid', borderColor: 'divider', bgcolor: 'var(--imaa-dm-surface-alt, #f8fafc)', minWidth: 0 }}>
                         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
                           <Chip
                             size="small"
@@ -2168,34 +2196,14 @@ export default function EventDetailsPage() {
                       </Stack>
                     </Box>
 
-                    {/* Bottom section: Title + Description */}
-                    <Box sx={{ borderTop: '1px solid', borderColor: 'divider', p: { xs: 2.5, sm: 3, md: 4 }, pt: { xs: 2.5, sm: 3, md: 3 } }}>
-                      <Stack spacing={2}>
-                        {event?.title ? (
-                          // Page title: a plain heading element, since index.css forces the sans font on MUI Typography
-                          <Box component="h1" sx={eventTitleSx}>
-                            {event.title}
-                          </Box>
-                        ) : null}
-                        <Box>
-                          <SectionHeader title="About this event" sx={{ mb: 1 }} />
-                          {desc?.trim() ? (
-                            <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                              {desc}
-                            </Typography>
-                          ) : (
-                            <Typography variant="body1" color="text.secondary">
-                              Event details will be announced soon.
-                            </Typography>
-                          )}
-                        </Box>
-                      </Stack>
-                    </Box>
                   </Paper>
 
-                  {/* ATTEND CARD */}
-                  <Paper elevation={0} className="rounded-lg border border-imaa-border">
+                  {/* REGISTRATION AND MEMBER ACTIONS */}
+                  <Paper component="aside" elevation={0} className="rounded-lg border border-imaa-border" sx={{ position: { xs: 'static', lg: 'sticky' }, top: { lg: 96 }, minWidth: 0 }}>
                     <Box className="p-5">
+                      <Typography variant="overline" sx={{ color: 'primary.main', fontWeight: 700, letterSpacing: '0.12em' }}>
+                        Registration
+                      </Typography>
                       <SectionHeader title="Attend" sx={{ mb: 0 }} />
                       <Typography
                         variant="h5"

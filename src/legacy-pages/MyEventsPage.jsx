@@ -21,7 +21,6 @@ import {
 } from "@mui/material";
 import { Tooltip } from "@mui/material";
 import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
-import Grid from '@mui/material/Grid';
 import RegisteredActions from "../components/RegisteredActions.jsx";
 import { PageHeader, FilterToolbar, EmptyState } from "../components/page";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, willGoToWaitingRoom, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
@@ -183,6 +182,20 @@ function statusChip(status) {
   }
 }
 
+function compactEventDate(ev) {
+  if (!ev?.start_time) return { primary: "Date TBA", secondary: "" };
+  const organizerTimezone = normalizeTimezoneName(ev.timezone);
+  const start = organizerTimezone ? dayjs(ev.start_time).tz(organizerTimezone) : dayjs(ev.start_time);
+  const end = ev.end_time
+    ? (organizerTimezone ? dayjs(ev.end_time).tz(organizerTimezone) : dayjs(ev.end_time))
+    : null;
+  const hasRange = end && start.format("YYYY-MM-DD") !== end.format("YYYY-MM-DD");
+  const primary = hasRange
+    ? `${start.format("D MMM")} – ${end.format(start.year() === end.year() ? "D MMM" : "D MMM YYYY")}`
+    : start.format("D MMM YYYY");
+  return { primary, secondary: start.format("ddd") };
+}
+
 // ---------------------- Event Card (kept, with small MOD) ----------------------
 function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJoining, hideStatusChip }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -205,24 +218,28 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
     }
   }
   const chip = statusChip(status);
+  const compactDate = compactEventDate(ev);
 
   return (
     <Paper
+      component="article"
       elevation={0}
-      className="flex flex-col rounded-lg border border-imaa-border overflow-hidden"
+      className="overflow-hidden"
       sx={{
-        borderRadius: "var(--imaa-radius-card)",
-        // Let the card grow to fill grid item height
-        height: "100%",
+        borderRadius: 0,
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "130px minmax(0, 1fr)" },
+        gap: { xs: 1.5, sm: 3 },
+        p: { xs: 2, sm: "18px 24px" },
+        borderColor: "var(--imaa-dm-border, #E2E4E8)",
+        "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #F7F8FA)" },
       }}
     >
       {/* SAME IMAGE SIZE for all cards: 16:9 area that always covers */}
       <Box
         sx={{
-          position: "relative",
-          width: "100%",
-          aspectRatio: "16 / 9",
-          "@supports not (aspect-ratio: 1 / 1)": { height: 200 },
+          minWidth: 0,
+          "& > a, & > div": { display: "none" },
         }}
       >
         {(ev.cover_image || ev.preview_image) && !imgFailed ? (
@@ -250,11 +267,19 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             }}
           />
         )}
+        <Typography sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: { xs: "1.25rem", sm: "1.125rem" }, lineHeight: 1.2, color: "var(--imaa-ink)" }}>
+          {compactDate.primary}
+        </Typography>
+        {compactDate.secondary && (
+          <Typography variant="caption" sx={{ display: "block", mt: 0.25, color: "text.secondary", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+            {compactDate.secondary}
+          </Typography>
+        )}
       </Box>
 
 
       {/* Content area with fixed rhythm so cards line up */}
-      <Box sx={{ p: 1.75, display: "flex", flexDirection: "column", gap: 1, flexGrow: 1 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) auto" }, gap: 1, minWidth: 0, alignItems: "start" }}>
         <div className="flex items-center justify-between gap-2">
           <Chip size="small" label={chip.label} className={`${chip.className} font-medium`} />
           {ev.category && <span className="text-[11px] text-slate-500">{ev.category}</span>}
@@ -263,16 +288,18 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
         {/* Title: 2-line clamp + fixed block height so rows align */}
         <Typography
           variant="subtitle1"
+          component={Link}
+          to={isOwner ? `/admin/events/${encodeURIComponent(ev.slug)}` : `/events/${ev.slug || ev.id}?ref=my_events`}
+          state={{ event: ev }}
           className="text-slate-900"
           sx={{
             fontWeight: 800,
             lineHeight: 1.25,
-            display: "-webkit-box",
-            WebkitLineClamp: 2,
-            WebkitBoxOrient: "vertical",
-            overflow: "hidden",
-            fontSize: { xs: 15, sm: 16 },
-            minHeight: { xs: 0, md: '3.1em' },
+            textDecoration: "none",
+            color: "var(--imaa-ink)",
+            fontSize: { xs: 16, sm: 17 },
+            overflowWrap: "anywhere",
+            "&:hover": { color: "primary.main" },
           }}
         >
           {ev.title}
@@ -409,7 +436,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
         </div>
 
         {/* Actions stick to bottom to keep equal heights */}
-        <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
+        <Box sx={{ mt: { xs: 0.5, md: 0 }, gridColumn: { md: 2 }, gridRow: { md: "1 / span 3" }, alignSelf: { md: "center" }, justifyContent: { md: "flex-end" }, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
           {(() => {
             // derive simple flags from status
             if (status === "cancelled") {
@@ -598,41 +625,31 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
 function EventCardSkeleton() {
   return (
     <Paper
+      component="article"
       elevation={0}
-      className="flex flex-col rounded-lg border border-imaa-border overflow-hidden"
-      sx={{ borderRadius: "var(--imaa-radius-card)", height: "auto" }}
+      sx={{
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "130px minmax(0, 1fr)" },
+        gap: { xs: 1.5, sm: 3 },
+        p: { xs: 2, sm: "18px 24px" },
+        borderRadius: 0,
+      }}
     >
-      {/* 16:9 image skeleton */}
-      <Box
-        sx={{
-          position: "relative",
-          width: "100%",
-          aspectRatio: "16 / 9",
-          "@supports not (aspect-ratio: 1 / 1)": { height: 200 },
-        }}
-      >
-        <Skeleton
-          variant="rectangular"
-          sx={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-        />
+      <Box>
+        <Skeleton width={88} height={26} />
+        <Skeleton width={38} height={16} />
       </Box>
-
-      <Box sx={{ p: 1.75, display: "flex", flexDirection: "column", gap: 1 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2 }}>
           <Skeleton variant="rounded" width={70} height={22} />
           <Skeleton width={60} height={16} />
         </Box>
 
-        {/* title (2 lines) */}
-        <Skeleton height={20} width="92%" />
-        <Skeleton height={20} width="70%" />
-
-        {/* date/location */}
-        <Skeleton height={14} width="78%" />
+        <Skeleton height={24} width="72%" />
+        <Skeleton height={16} width="78%" />
         <Skeleton height={14} width="55%" />
 
-        {/* actions */}
-        <Box sx={{ mt: "auto", display: "flex", gap: 1 }}>
+        <Box sx={{ mt: "auto", display: "flex", flexWrap: "wrap", gap: 1 }}>
           <Skeleton variant="rounded" width={96} height={32} />
           <Skeleton variant="rounded" width={78} height={32} />
         </Box>
@@ -881,14 +898,14 @@ export default function MyEventsPage() {
 
   return (
     <div className="min-h-screen bg-imaa-member">
-      <Container maxWidth="xl" className="py-6 sm:py-8">
+      <Container maxWidth="lg" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
             <PageHeader
               title="My Events"
               subtitle="View, join, and manage events you’ve registered for."
             />
-            <Paper elevation={0} className="rounded-lg border border-imaa-border mb-4">
+            <Paper elevation={0} className="rounded-lg border border-imaa-border mb-4" sx={{ bgcolor: "var(--imaa-dm-surface, #fff)" }}>
               <Tabs
                 value={tab}
                 onChange={(_, v) => setTab(v)}
@@ -940,14 +957,10 @@ export default function MyEventsPage() {
 
             {loading ? (
               <>
-                <Box sx={{ flexGrow: 1 }}>
-                  <Grid container spacing={{ xs: 2, md: 3 }} columns={{ xs: 4, sm: 12, md: 12 }}>
-                    {Array.from({ length: PAGE_SIZE }).map((_, idx) => (
-                      <Grid key={`sk-${idx}`} size={{ xs: 4, sm: 4, md: 4 }}>
-                        <EventCardSkeleton />
-                      </Grid>
-                    ))}
-                  </Grid>
+                <Box sx={{ flexGrow: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: "var(--imaa-radius-card)", overflow: "hidden", "& > article:not(:last-child)": { borderBottom: "1px solid", borderColor: "divider" } }}>
+                  {Array.from({ length: PAGE_SIZE }).map((_, idx) => (
+                    <EventCardSkeleton key={`sk-${idx}`} />
+                  ))}
                 </Box>
 
                 {/* pagination row skeleton */}
@@ -974,39 +987,31 @@ export default function MyEventsPage() {
               />
             ) : (
               <>
-                {/* Events grid */}
-                <Box sx={{ flexGrow: 1 }}>
-                  <Grid
-                    container
-                    spacing={{ xs: 2, md: 3 }}
-                    columns={{ xs: 4, sm: 12, md: 12 }}
-                  >
-                    {paged.map((ev) => (
-                      <Grid key={ev.id ?? ev.slug} size={{ xs: 4, sm: 4, md: 4 }}>
-                        <EventCard
-                          ev={ev}
-                          reg={myRegistrations[ev.id]}
-                          onJoinLive={handleJoinLive}
-                          isJoining={joiningId === ev.id}
-                          hideStatusChip={true}
-                          onUnregistered={(eventId) => {
-                            setEvents(prev => prev.filter(e => e.id !== eventId));
-                            setMyRegistrations(prev => {
-                              const next = { ...prev };
-                              delete next[eventId];
-                              return next;
-                            });
-                          }}
-                          onCancelRequested={(eventId, updatedReg) => {
-                            setMyRegistrations(prev => ({
-                              ...prev,
-                              [eventId]: updatedReg
-                            }));
-                          }}
-                        />
-                      </Grid>
-                    ))}
-                  </Grid>
+                <Box sx={{ flexGrow: 1, bgcolor: "background.paper", border: "1px solid", borderColor: "divider", borderRadius: "var(--imaa-radius-card)", overflow: "hidden", "& > article:not(:last-child)": { borderBottom: "1px solid", borderColor: "divider" } }}>
+                  {paged.map((ev) => (
+                    <EventCard
+                      key={ev.id ?? ev.slug}
+                      ev={ev}
+                      reg={myRegistrations[ev.id]}
+                      onJoinLive={handleJoinLive}
+                      isJoining={joiningId === ev.id}
+                      hideStatusChip={true}
+                      onUnregistered={(eventId) => {
+                        setEvents(prev => prev.filter(e => e.id !== eventId));
+                        setMyRegistrations(prev => {
+                          const next = { ...prev };
+                          delete next[eventId];
+                          return next;
+                        });
+                      }}
+                      onCancelRequested={(eventId, updatedReg) => {
+                        setMyRegistrations(prev => ({
+                          ...prev,
+                          [eventId]: updatedReg
+                        }));
+                      }}
+                    />
+                  ))}
                 </Box>
 
 
