@@ -2245,8 +2245,44 @@ function EventCompanionDirectoryPage() {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
-        bgcolor: COLORS.bg,
+        bgcolor: 'var(--imaa-dm-bg, #F0F4F5)',
       }}>
+        <Box
+          component="header"
+          sx={{
+            bgcolor: 'background.paper',
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            px: { xs: 2, sm: 3, md: 4 },
+            py: { xs: 1.5, sm: 2 },
+          }}
+        >
+          <Box sx={{ maxWidth: 1200, mx: 'auto', display: 'flex', alignItems: { xs: 'flex-start', sm: 'center' }, justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ minWidth: 0 }}>
+              <Typography variant="overline" sx={{ display: 'block', color: COLORS.teal, fontWeight: 700, letterSpacing: '0.12em', lineHeight: 1.4 }}>
+                Event Companion
+              </Typography>
+              <Typography component="h1" sx={{ fontFamily: 'var(--imaa-font-serif)', color: COLORS.dark, fontSize: { xs: '1.45rem', sm: '1.75rem' }, fontWeight: 700, lineHeight: 1.2, overflowWrap: 'anywhere' }}>
+                {event?.title || 'Event Companion'}
+              </Typography>
+              {(event?.location || event?.location_city || event?.format || event?.event_format) && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
+                  {[event?.location_city || event?.location, event?.event_format || event?.format].filter(Boolean).join(' · ')}
+                </Typography>
+              )}
+            </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={() => navigate(`/events/${slug}`)}
+              startIcon={<ArrowLeft size={16} />}
+              sx={{ textTransform: 'none', flexShrink: 0, borderColor: 'divider', color: 'text.primary', '&:hover': { borderColor: COLORS.teal, bgcolor: 'rgba(10,147,150,0.04)' } }}
+            >
+              Back to event
+            </Button>
+          </Box>
+        </Box>
+
         {/* Tab Navigation - Always visible */}
         {networkingSettings?.enabled && (
           <Box sx={{
@@ -2255,6 +2291,7 @@ function EventCompanionDirectoryPage() {
             display: 'flex',
             alignItems: 'center',
             px: isMobile ? 2 : 3,
+            overflowX: 'auto',
           }}>
             <Tabs
               value={activeTab}
@@ -2279,7 +2316,10 @@ function EventCompanionDirectoryPage() {
                 }
               }}
               sx={{
+                maxWidth: 1200,
+                width: '100%',
                 '& .MuiTabs-indicator': { backgroundColor: COLORS.teal, height: 3 },
+                '& .MuiTab-root': { minWidth: 'max-content' },
               }}
             >
               <Tab
@@ -2319,7 +2359,7 @@ function EventCompanionDirectoryPage() {
         )}
 
         {/* Content */}
-        <Box sx={{ flex: 1, overflowY: 'auto', p: isMobile ? 0 : 2 }}>
+        <Box sx={{ flex: 1, overflowY: 'auto', p: { xs: 1.5, md: 2.5 } }}>
           {activeTab === 0 && flowStep > 1 ? (
             // Show flow views
             isMobile ? (

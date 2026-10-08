@@ -40,21 +40,8 @@ const PAGE_PX = { xs: 2, sm: 3, md: 5 }; // 16 / 24 / 40px side padding
 // Events grid: 1 column on phones, 2 on tablets, 3 from lg (room for the member sidebar)
 const EVENT_GRID_COLUMNS = { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(3, minmax(0, 1fr))" };
 
-const FALLBACK_IMGS = [
-  "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80",
-  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80",
-  "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80",
-  "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&q=80",
-];
 // Local SVG placeholder — works even when external images are blocked on staging
 const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='800' height='400' fill='%23F5F4F2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='28' fill='%23C0BAB4'%3EEvent%3C/text%3E%3C/svg%3E";
-
-const STATIC_EVENTS = [
-  { id: "evt-1", title: "The Annual M&A Summit", description: "Industry leaders gather to discuss the latest M&A trends and deal-making innovations.", start_date: null, location: "New York, NY", event_type: "Conference", image_url: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80" },
-  { id: "evt-2", title: "Networking Mixer for Dealmakers", description: "Connect with M&A professionals in a relaxed, informal setting.", start_date: null, location: "Chicago, IL", event_type: "Networking", image_url: "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=80" },
-  { id: "evt-3", title: "Advanced Valuation Techniques", description: "Hands-on workshop by experienced valuation experts.", start_date: null, location: "Online", event_type: "Workshop", image_url: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80" },
-  { id: "evt-4", title: "Cross-Border M&A: Navigating Complexity", description: "Strategies for successfully executing international deals.", start_date: null, location: "London, UK", event_type: "Webinar", image_url: "https://images.unsplash.com/photo-1560472354-b33ff0c44a43?w=800&q=80" },
-];
 
 const STATIC_DISCUSSIONS = [
   { id: 1, title: "Best practices for cross-border M&A due diligence", views: 284, comments_count: 14, reactions_count: 32, emoji: "🌐" },
@@ -413,7 +400,7 @@ function PendingFormsBanner({ forms }) {
 function FeaturedHero({ event }) {
   const accent = getAccent(getEventType(event));
   const heroLabel = event?.is_featured === true ? "Featured" : (event?.is_pinned === true ? "Pinned" : "Featured");
-  const imgSrc = event?.cover_image || event?.preview_image || event?.image_url || event?.image || FALLBACK_IMGS[0];
+  const imgSrc = event?.cover_image || event?.preview_image || event?.image_url || event?.image || PLACEHOLDER_IMG;
   const startValue = getEventStartValue(event);
   const dateStr = startValue
     ? new Date(startValue).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
@@ -445,7 +432,7 @@ function FeaturedHero({ event }) {
           {event?.title}
         </Box>
         <Box component="p" sx={{ fontSize: 14, color: INK_BODY, lineHeight: 1.65, m: "0 0 16px", fontFamily: FONT }}>
-          {event?.description || event?.desc || event?.short_description || "Join fellow M&A professionals at this premier industry event."}
+          {event?.description || event?.desc || event?.short_description}
         </Box>
         {(dateStr || eventLocation) && (
           <Box sx={{ fontSize: 13, color: INK_BODY, mb: 2.5, display: "flex", alignItems: "center", gap: 0.75, flexWrap: "wrap", fontFamily: FONT }}>
@@ -464,7 +451,7 @@ function FeaturedHero({ event }) {
             onError={(e) => {
               if (!e.target.dataset.err) {
                 e.target.dataset.err = "1";
-                e.target.src = FALLBACK_IMGS[0];
+                e.target.src = PLACEHOLDER_IMG;
               } else if (e.target.dataset.err === "1") {
                 e.target.dataset.err = "2";
                 e.target.src = PLACEHOLDER_IMG;
@@ -479,7 +466,7 @@ function FeaturedHero({ event }) {
 // ── Event Card (grid) ─────────────────────────────────────────────────────────
 function DashEventCard({ event, index }) {
   const accent = getAccent(getEventType(event));
-  const imgSrc = event?.cover_image || event?.preview_image || event?.image_url || event?.image || FALLBACK_IMGS[index % FALLBACK_IMGS.length];
+  const imgSrc = event?.cover_image || event?.preview_image || event?.image_url || event?.image || PLACEHOLDER_IMG;
   const startValue = getEventStartValue(event);
   const dateStr = startValue
     ? new Date(startValue).toLocaleDateString("en-US", { month: "short", day: "numeric" })
@@ -492,7 +479,7 @@ function DashEventCard({ event, index }) {
       textDecoration: "none", color: "inherit",
       borderRadius: CARD_RADIUS, overflow: "hidden", border: `1px solid ${BORDER}`, bgcolor: "var(--imaa-dm-surface, #fff)",
       boxShadow: "var(--imaa-shadow-sm)", cursor: "pointer", position: "relative",
-      transition: "box-shadow .2s, border-color .2s", display: "flex", flexDirection: "column", height: 280,
+      transition: "box-shadow .2s, border-color .2s", display: "flex", flexDirection: "column", minHeight: 0,
       "&:hover": { boxShadow: "var(--imaa-shadow-md)", borderColor: `${accent}50` },
     }}>
         {/* Event-type colour stripe (kept: it identifies the event type) */}
@@ -503,7 +490,7 @@ function DashEventCard({ event, index }) {
             onError={(e) => {
               if (!e.target.dataset.err) {
                 e.target.dataset.err = "1";
-                e.target.src = FALLBACK_IMGS[index % FALLBACK_IMGS.length];
+                e.target.src = PLACEHOLDER_IMG;
               } else if (e.target.dataset.err === "1") {
                 e.target.dataset.err = "2";
                 e.target.src = PLACEHOLDER_IMG;
@@ -687,19 +674,18 @@ export default function DashboardPage() {
   const profileCompletion = profile.profile_completion_percentage ?? 0;
   const firstName = user?.first_name || user?.username || "there";
   const isMember = profile.is_member || user?.is_member || false;
-  // Keep real API events first. Use STATIC_EVENTS only as filler/fallback,
-  // never as a replacement for real featured/pinned events.
+  // Event presentation uses only the landing endpoint's real event data.
   const displayEvents = events;
 
-  // Select static fallback only. Real hero comes from backend as: featured > pinned fallback.
+  // Prefer the backend's featured/pinned hero; otherwise use the first real event.
   const selectStaticHero = (eventList) => {
     if (!Array.isArray(eventList) || eventList.length === 0) return null;
     return eventList.find(e => e.is_featured === true) || eventList[0];
   };
 
-  const featuredEvent = landingHero || selectStaticHero(STATIC_EVENTS);
+  const featuredEvent = landingHero || selectStaticHero(events);
 
-  // Sort grid events: real pinned/upcoming first, then static filler when real events are less than 3.
+  // Sort real grid events: pinned first, then upcoming by start time.
   const sortGridEvents = (eventList, excludeEvent) => {
     // Exclude featured/hero event only. Keep other real pinned events in the grid.
     const excludeKey = excludeEvent?.id || excludeEvent?.slug;
@@ -737,8 +723,7 @@ export default function DashboardPage() {
   };
 
   const realGridEvents = sortGridEvents(events, featuredEvent).slice(0, 3);
-  const staticGridEvents = sortGridEvents(STATIC_EVENTS, featuredEvent).slice(0, Math.max(0, 3 - realGridEvents.length));
-  const gridEvents = [...realGridEvents, ...staticGridEvents];
+  const gridEvents = realGridEvents;
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: BG, fontFamily: FONT }}>
@@ -771,9 +756,6 @@ export default function DashboardPage() {
                 <Box sx={{ height: 16, width: 360, maxWidth: "100%", bgcolor: BORDER, borderRadius: 1, mt: 1.25 }} />
               ) : (
                 <Box component="p" sx={{ fontSize: 14, color: INK_BODY, m: "8px 0 0", lineHeight: 1.7, fontFamily: FONT }}>
-                  You are part of a global network of{" "}
-                  <strong style={{ color: INK }}>4,000+ M&A professionals</strong> across{" "}
-                  <strong style={{ color: INK }}>100+ countries</strong>.
                   {kycApproved && <> <span aria-hidden="true">✅</span> Your identity is verified.</>}
                   {" "}Explore events, connect with peers, and grow your career.
                 </Box>
@@ -787,7 +769,7 @@ export default function DashboardPage() {
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         {showProfileBanner && !loading && profileCompletion < 100 && (
           <FadeIn delay={80}>
-            <ProfileBanner completion={profile.profile_completion_percentage ?? 40} onDismiss={() => setShowProfileBanner(false)} profile={user?.profile} />
+            <ProfileBanner completion={profileCompletion} onDismiss={() => setShowProfileBanner(false)} profile={user?.profile} />
           </FadeIn>
         )}
         {showVerifyBanner && !loading && !kycApproved && (
@@ -805,7 +787,8 @@ export default function DashboardPage() {
       {/* Events Section */}
       <FadeIn delay={200}>
         <Box component="section" aria-labelledby="dashboard-upcoming-events" sx={{ pt: 1.5, pb: 6, px: PAGE_PX, maxWidth: 1200, mx: "auto" }}>
-          <Box sx={{ textAlign: "center", mb: 3.5 }}>
+          <Box sx={{ bgcolor: "var(--imaa-dm-surface, #fff)", border: `1px solid ${BORDER}`, borderRadius: CARD_RADIUS, boxShadow: "var(--imaa-shadow-sm)", p: { xs: 2, sm: 3, md: 4 } }}>
+          <Box sx={{ textAlign: "left", mb: 3.5 }}>
             <Box component="span" sx={{ fontSize: 11, fontWeight: 800, color: TEAL_DARK_TEXT, textTransform: "uppercase", letterSpacing: 2, display: "block", mb: 0.75, fontFamily: FONT }}>
               WHAT'S HAPPENING
             </Box>
@@ -818,21 +801,28 @@ export default function DashboardPage() {
                 <Box key={i} sx={{ height: 240, borderRadius: CARD_RADIUS, bgcolor: BORDER, opacity: 0.5 }} />
               ))}
             </Box>
-          ) : (
+          ) : featuredEvent ? (
             <>
               <FeaturedHero event={featuredEvent} />
-              <Box sx={{ display: "grid", gridTemplateColumns: EVENT_GRID_COLUMNS, gap: 2.5 }}>
-                {gridEvents.map((ev, i) => (
-                  <DashEventCard key={ev.id || i} event={ev} index={i} />
-                ))}
-              </Box>
+              {gridEvents.length > 0 && (
+                <Box sx={{ display: "grid", gridTemplateColumns: EVENT_GRID_COLUMNS, gap: 2.5 }}>
+                  {gridEvents.map((ev, i) => (
+                    <DashEventCard key={ev.id || i} event={ev} index={i} />
+                  ))}
+                </Box>
+              )}
             </>
+          ) : (
+            <Box role="status" sx={{ border: `1px dashed ${BORDER}`, borderRadius: CARD_RADIUS, px: 2.5, py: 4, textAlign: "center", color: INK_BODY, fontSize: 14, lineHeight: 1.6 }}>
+              There are no upcoming events to show right now.
+            </Box>
           )}
           <Box sx={{ textAlign: "center", mt: 3.5 }}>
             {/* Navy outline: the orange text/border was below AA contrast */}
             <Box component="a" href="/events" sx={{ display: "inline-block", fontSize: 13, fontWeight: 700, color: INK, textDecoration: "none", border: `1.5px solid ${INK}`, px: 2.75, py: 1.125, borderRadius: FIELD_RADIUS, fontFamily: FONT, "&:hover": { bgcolor: "var(--imaa-dm-surface, #fff)" } }}>
               Browse All Events →
             </Box>
+          </Box>
           </Box>
         </Box>
       </FadeIn>
@@ -865,9 +855,6 @@ export default function DashboardPage() {
         </div>
       </FadeIn>
       */}
-
-      {/* USP Strip */}
-      <FadeIn delay={400}><USPStrip /></FadeIn>
 
       {/* Footer CTA */}
       <FadeIn delay={500}><FooterCTA isMember={isMember} /></FadeIn>

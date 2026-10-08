@@ -3533,7 +3533,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
   // Page ground: slate-50 (#f8fafc) in light mode, the member page background in dark mode.
   return (
     <div className="min-h-screen bg-[var(--imaa-dm-page,#f8fafc)]">
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3 } }}>
         <div className="flex flex-col gap-4 md:gap-6">
           <main className="w-full">
             {loadingBase && <LinearProgress />}
@@ -3562,17 +3562,35 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                 </Box>
 
                 {/* Header Card */}
-                <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-                  <Box className="flex items-center gap-3">
-                    <Avatar sx={{ width: 56, height: 56 }} src={pickAvatarUrl(userItem)}>
+                <Paper
+                  variant="outlined"
+                  sx={{
+                    p: { xs: 2, sm: 3 },
+                    borderRadius: "var(--imaa-radius-card)",
+                    boxShadow: "var(--imaa-shadow-sm)",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      display: "flex",
+                      alignItems: { xs: "flex-start", sm: "center" },
+                      flexDirection: { xs: "column", sm: "row" },
+                      gap: { xs: 1.5, sm: 2 },
+                    }}
+                  >
+                    <Avatar
+                      alt={fullName}
+                      sx={{ width: { xs: 64, sm: 76 }, height: { xs: 64, sm: 76 } }}
+                      src={pickAvatarUrl(userItem)}
+                    >
                       {(fullName || "?").slice(0, 1).toUpperCase()}
                     </Avatar>
-                    <Box sx={{ minWidth: 0 }}>
+                    <Box sx={{ minWidth: 0, flex: 1, width: { xs: "100%", sm: "auto" } }}>
                       <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
                         <Typography
-                          variant="h6"
-                          sx={{ fontWeight: 700 }}
-                          className="truncate"
+                          component="h1"
+                          variant="h4"
+                          sx={{ fontWeight: 700, overflowWrap: "anywhere" }}
                         >
                           {fullName}
                         </Typography>
@@ -3594,7 +3612,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
                     {/* Right-side actions */}
                     {!isMe && !viewAsPublic && (
-                      <Box sx={{ mt: 1.5, display: "flex", justifyContent: "flex-end", ml: "auto", gap: 1 }}>
+                      <Box sx={{ mt: { xs: 0.5, sm: 0 }, display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: { xs: "flex-start", sm: "flex-end" }, ml: { xs: 0, sm: "auto" }, gap: 1, width: { xs: "100%", sm: "auto" } }}>
                         <IconButton
                           size="small"
                           onClick={(e) => setMenuAnchor(e.currentTarget)}
@@ -3730,7 +3748,9 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
                     onChange={(e, v) => setTab(v)}
                     indicatorColor="primary"
                     textColor="primary"
-                    variant="fullWidth"
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    aria-label="Profile sections"
                   >
                     <Tab label="Posts" />
                     <Tab label="About" />

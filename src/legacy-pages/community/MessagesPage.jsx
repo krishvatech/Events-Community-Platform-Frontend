@@ -62,6 +62,7 @@ import { useNavigate, useLocation } from "#navigation";
 import { fetchEventSummaryCached } from "../../utils/entityCache.js";
 import { connectToConversation } from "../../utils/websocketMessaging.js";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import PageHeader from "../../components/page/PageHeader.jsx";
 
 
 const BORDER = "var(--imaa-dm-border, #e2e8f0)";
@@ -1014,14 +1015,20 @@ function ConversationRow({ thread, active, onClick, online, onContextMenu }) {
       onClick={onClick}
       onContextMenu={onContextMenu} // <--- Handle Right Click
       sx={{
-        px: 1,
-        py: 1,
-        borderRadius: 2,
+        px: 1.25,
+        py: 1.1,
+        borderRadius: "var(--imaa-radius-card)",
         cursor: "pointer",
+        border: "1px solid transparent",
+        transition: "background-color 160ms ease, border-color 160ms ease",
         bgcolor: thread.is_pinned ? "var(--imaa-dm-surface-alt, #f8fafc)" : "transparent", // Slight background for pinned
         ...(active
-          ? { bgcolor: "var(--imaa-dm-surface-alt, #f6fffe)", border: `1px solid ${BORDER}` }
-          : { "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #fafafa)" } }),
+          ? {
+            bgcolor: "var(--imaa-bg-cool, #f6fffe)",
+            borderColor: "var(--imaa-border, #e2e8f0)",
+            boxShadow: "inset 3px 0 0 var(--imaa-teal-hover, #0a9396)",
+          }
+          : { "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #fafafa)", borderColor: "var(--imaa-border, #e2e8f0)" } }),
       }}
     >
       <ListItemAvatar sx={{ minWidth: 48 }}>
@@ -3695,9 +3702,15 @@ export default function MessagesPage() {
           if (newId) setActiveId(newId);
         }}
       />
+      <Box sx={{ width: "100%", maxWidth: 1240, mx: "auto" }}>
+        <PageHeader
+          eyebrow="Community"
+          title="Messages"
+          subtitle="Continue conversations with your IMAA community."
+        />
       <Grid
         container
-        rowSpacing={2}
+        rowSpacing={1.5}
         columnSpacing={{ xs: 0, md: 2 }}   // 🔹 no side gap on mobile/tablet
         sx={{
           width: "100%",
@@ -3726,6 +3739,7 @@ export default function MessagesPage() {
               p: 1.5,
               border: `1px solid ${BORDER}`,
               borderRadius: "var(--imaa-radius-card)",
+              boxShadow: "var(--imaa-shadow-sm)",
               height: PANEL_H,
               display: "flex",
               flexDirection: "column",
@@ -3757,8 +3771,8 @@ export default function MessagesPage() {
               }}
             />
 
-            <Typography variant="caption" sx={{ mt: 1, mb: 0.5, display: "block", color: "text.secondary" }}>
-              All Message
+            <Typography variant="caption" sx={{ mt: 1.25, mb: 0.5, display: "block", color: "text.secondary", fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+              Conversations
             </Typography>
             <List dense sx={{ flex: 1, overflowY: "auto" }}>
               {filtered.map((t) => {
@@ -3865,7 +3879,7 @@ export default function MessagesPage() {
             ) : (
               <>
                 {/* Top bar */}
-                <Paper sx={{ p: 1.5, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", mb: 1 }}>
+                <Paper sx={{ p: { xs: 1.25, sm: 1.5 }, border: `1px solid ${BORDER}`, borderRadius: "var(--imaa-radius-card)", boxShadow: "var(--imaa-shadow-sm)", mb: 1 }}>
                   <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={2}>
                     {/* CLICKABLE: group avatar + name */}
                     <Stack
@@ -3961,6 +3975,7 @@ export default function MessagesPage() {
                     p: 2,
                     border: `1px solid ${BORDER}`,
                     borderRadius: "var(--imaa-radius-card)",
+                  boxShadow: "var(--imaa-shadow-sm)",
                     flex: 1,
                     minHeight: 0,
                     display: "flex",
@@ -4489,6 +4504,7 @@ export default function MessagesPage() {
           </Paper>
         </Grid> */}
       </Grid>
+      </Box>
       {/* 🔹 Details popup for mobile / tablet / laptop */}
       <Dialog
         open={detailsOpen}

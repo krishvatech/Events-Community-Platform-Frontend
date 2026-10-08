@@ -6,22 +6,22 @@ import virtualImage from "../assets/virtual.png";
 import onlineImage from "../assets/online.png";
 
 const C = {
-  deepBlue: "#284D61", midBlue: "#37738D", brightBlue: "#159AC9", lightBlue: "#B9CED7",
+  deepBlue: "#1B2A4A", midBlue: "#263B5F", brightBlue: "#0A9396", lightBlue: "#C9D6E0",
   bgBlue1: "#D7E3E8", bgBlue2: "#E6EDF0",
   cool10: "#F0F4F5", cool20: "#D9DFE1", cool30: "#C7CDD0", cool50: "#93A6B0",
   cool60: "#5E7A88", cool80: "#3A4853", cool90: "#292F39", cool100: "#21262E",
-  coral: "#F05843", green: "#76B82A", yellow: "#FED746", white: "#FFFFFF",
+  coral: "#E84C38", green: "#76B82A", yellow: "#FED746", white: "#FFFFFF",
 };
-const F = { body: "'Roboto', Arial, sans-serif", display: "'Roboto Slab', Georgia, serif", mono: "'Roboto Mono', monospace" };
+const F = { body: "var(--imaa-font-sans, 'Inter', Arial, sans-serif)", display: "var(--imaa-font-serif, 'Source Serif 4', Georgia, serif)", mono: "'Roboto Mono', monospace" };
 
 // Mobile detection hook
-function useIsMobile() {
-  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < breakpoint);
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    const handleResize = () => setIsMobile(window.innerWidth < breakpoint);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
+  }, [breakpoint]);
   return isMobile;
 }
 
@@ -42,6 +42,7 @@ function Hero({ eventData = {}, eventId }) {
   const [otpSentEmail, setOtpSentEmail] = useState("");
   const valid = form.first && form.last && form.email;
   const isMobile = useIsMobile();
+  const isCompactHero = useIsMobile(900);
 
   const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
   const API_BASE = RAW_BASE.replace(/\/+$/, "");
@@ -163,7 +164,7 @@ function Hero({ eventData = {}, eventId }) {
   const Ck = ({ children }) => <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 7 }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg><span style={{ fontFamily: F.body, fontSize: isMobile ? 13 : 14, color: C.white }}>{children}</span></div>;
 
   return (
-    <section style={{ background: C.deepBlue }}>
+    <section style={{ background: C.deepBlue }} aria-labelledby="landing-event-title">
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "16px 20px" : "20px 40px", display: "flex", justifyContent: "space-between", alignItems: "center", opacity: ld ? 1 : 0, transition: "opacity 0.7s ease 0.2s", borderBottom: `1px solid ${C.midBlue}` }}>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 10 : 14 }}>
           <div style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 4, background: C.coral, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
@@ -179,8 +180,13 @@ function Hero({ eventData = {}, eventId }) {
           </a>
         )}
       </div>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile ? "24px 20px 48px" : "40px 40px 80px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 350px", gap: isMobile ? 24 : 48, alignItems: "start" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: isCompactHero ? "22px 20px 48px" : "28px 40px 80px" }}>
+        <nav aria-label="Breadcrumb" style={{ fontFamily: F.body, fontSize: 12, color: C.lightBlue, marginBottom: 28 }}>
+          <a href="/events" style={{ color: C.lightBlue, textDecoration: "none" }}>Events</a>
+          <span aria-hidden="true" style={{ margin: "0 8px", opacity: 0.6 }}>›</span>
+          <span>{eventData.title}</span>
+        </nav>
+        <div style={{ display: "grid", gridTemplateColumns: isCompactHero ? "1fr" : "minmax(0, 1.25fr) minmax(280px, 0.75fr)", gap: isCompactHero ? 32 : 56, alignItems: "start" }}>
           {/* Left: Event info + benefits */}
           <div>
             <div style={{ ...a(0.4), display: "inline-flex", gap: 12, marginBottom: 24 }}>
@@ -188,10 +194,10 @@ function Hero({ eventData = {}, eventId }) {
                 <span key={i} style={{ padding: "5px 12px", borderRadius: 3, background: `${badge.color}18`, fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: badge.color, fontFamily: F.body }}>{badge.label}</span>
               ))}
             </div>
-            <h1 style={{ fontFamily: F.display, fontSize: isMobile ? 28 : 42, fontWeight: 700, lineHeight: 1.15, color: C.white, margin: "0 0 6px", ...a(0.5) }}>
+            <h1 id="landing-event-title" style={{ fontFamily: F.display, fontSize: isMobile ? 32 : "clamp(2.75rem, 5vw, 4rem)", fontWeight: 500, lineHeight: 1.08, color: C.white, margin: "0 0 6px", ...a(0.5) }}>
               {eventData.title}
             </h1>
-            <div style={{ fontFamily: F.display, fontSize: isMobile ? 24 : 42, fontWeight: 700, color: C.coral, margin: "0 0 20px", ...a(0.55) }}>
+            <div style={{ fontFamily: F.display, fontSize: isMobile ? 24 : 32, fontWeight: 500, color: C.coral, margin: "0 0 20px", ...a(0.55) }}>
               {eventData.subtitle}
             </div>
             <p style={{ fontFamily: F.body, fontSize: isMobile ? 14 : 16, lineHeight: 1.7, color: C.lightBlue, margin: "0 0 24px", maxWidth: 480, ...a(0.6) }}>

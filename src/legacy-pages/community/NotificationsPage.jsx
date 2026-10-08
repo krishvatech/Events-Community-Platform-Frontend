@@ -366,7 +366,7 @@ function NotificationSkeleton() {
     <Paper
       elevation={0}
       sx={{
-        p: 1.25,
+        p: { xs: 1.25, sm: 1.5 },
         mb: 1,
         width: "100%",
         border: `1px solid ${BORDER}`,
@@ -1004,7 +1004,8 @@ function NotificationRow({
         borderLeft: unread ? "4px solid var(--imaa-teal-hover)" : "1px solid var(--imaa-border)",
         borderRadius: "var(--imaa-radius-card)",
         bgcolor: unread ? "var(--imaa-bg-cool)" : "background.paper",
-        boxShadow: "var(--imaa-shadow-sm)",
+        boxShadow: "none",
+        transition: "background-color 160ms ease, border-color 160ms ease",
         cursor: (
           isPaymentNotification(item) ||
           item.kind === "forum_enabled" ||
@@ -1031,7 +1032,7 @@ function NotificationRow({
           item.context?.groupSlug ||
           item.data?.group_slug
         ) ? {
-          bgcolor: unread ? "var(--imaa-bg-cool)" : "background.paper",
+          bgcolor: unread ? "var(--imaa-bg-cool)" : "var(--imaa-dm-surface-hover, #fafafa)",
         } : {},
       }}
     >
@@ -1594,11 +1595,11 @@ export default function NotificationsPage({
   };
 
   return (
-    <Grid container spacing={2} sx={{ width: "100%", maxWidth: "100%", minWidth: 0 }}>
-      <Grid item xs={12} sm={12} md={9} sx={{ width: '100%', minWidth: 0 }}>
+    <Grid container spacing={2} sx={{ width: "100%", maxWidth: 1080, mx: "auto", minWidth: 0 }}>
+      <Grid item xs={12} sx={{ width: '100%', minWidth: 0 }}>
         {/* Header */}
         <PageHeader eyebrow="Community" title="Notifications" subtitle="Review account activity and connection updates." />
-        <Paper sx={{ p: { xs: 1.5, sm: 2 }, border: "1px solid var(--imaa-border)", borderRadius: "var(--imaa-radius-card)", boxShadow: "var(--imaa-shadow-sm)", mb: 2 }}>
+        <Paper sx={{ p: { xs: 1.5, sm: 2 }, border: "1px solid var(--imaa-border)", borderRadius: "var(--imaa-radius-card)", boxShadow: "none", mb: 2 }}>
           <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" }, alignItems: "center", gap: 1 }}>
             <Stack direction="row" spacing={1.25} alignItems="center">
               <Badge badgeContent={unreadCount} color="primary"><NotificationsNoneOutlinedIcon /></Badge>
@@ -1612,7 +1613,7 @@ export default function NotificationsPage({
                   size="small"
                   value={kind}
                   onChange={(e) => setKind(e.target.value)}
-                  sx={{ minWidth: 160 }}
+                  sx={{ minWidth: 160, width: { xs: "100%", sm: "auto" } }}
                 >
                   <MenuItem value="All">All</MenuItem>
                   <MenuItem value="Requests">Contact Requests (Inbox)</MenuItem>
