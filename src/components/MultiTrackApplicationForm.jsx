@@ -24,6 +24,12 @@ import {
 } from '@mui/material';
 import { apiClient } from '../utils/api';
 import {
+  LINKEDIN_URL_ERROR_MESSAGE,
+  formatFieldErrors,
+  getLinkedinUrlError,
+  normalizeLinkedinUrl,
+} from '../utils/linkedinUrl';
+import {
   formatSubmissionMode,
   getTrackDescription,
   getApplicationIntroText,
@@ -54,6 +60,7 @@ const MultiTrackApplicationForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [emailError, setEmailError] = useState('');
+  const [linkedinError, setLinkedinError] = useState('');
   const [submittedApplication, setSubmittedApplication] = useState(null);
 
   // Applicant data (shared)
@@ -346,6 +353,9 @@ const MultiTrackApplicationForm = ({
     if (field === 'email' && emailError) {
       setEmailError('');
     }
+    if (field === 'linkedin_url' && linkedinError) {
+      setLinkedinError('');
+    }
   };
 
   const handleTrackDataChange = (trackId, field, value) => {
@@ -383,7 +393,16 @@ const MultiTrackApplicationForm = ({
       return false;
     }
 
+    const linkedinUrlError = getLinkedinUrlError(applicantData.linkedin_url);
+    if (linkedinUrlError) {
+      setEmailError('');
+      setLinkedinError(linkedinUrlError);
+      setSubmitError(linkedinUrlError);
+      return false;
+    }
+
     setEmailError('');
+    setLinkedinError('');
     setSubmitError(null);
     return true;
   };
@@ -567,6 +586,8 @@ const MultiTrackApplicationForm = ({
 
   const handleSubmit = async () => {
     if (!validateApplicantData()) {
+      // Applicant fields live on step 0; take the user back there to fix them.
+      setActiveStep(0);
       return;
     }
     const invalidTrack = selectedTracks.find((trackId) => !validateTrackStep(trackId));
@@ -611,7 +632,7 @@ const MultiTrackApplicationForm = ({
         company_name: applicantData.company_name,
         location: applicantData.location,
         phone: applicantData.phone,
-        linkedin_url: applicantData.linkedin_url,
+        linkedin_url: normalizeLinkedinUrl(applicantData.linkedin_url),
         comments: applicantData.comments,
         // Event-level optional checkbox. Backend re-gates this on the event's
         // attendee_marker_enabled flag, so it is safe to always include.
@@ -732,12 +753,19 @@ const MultiTrackApplicationForm = ({
       } else if (detail) {
         // Use backend error message if available
         errorMessage = detail;
+      } else if (status === 400 && responseData?.linkedin_url) {
+        // Serializer rejected the LinkedIn URL: point the user back to that field.
+        // All entered data stays in state; the user corrects it and resubmits.
+        errorMessage = LINKEDIN_URL_ERROR_MESSAGE;
+        setLinkedinError(LINKEDIN_URL_ERROR_MESSAGE);
+        setActiveStep(0);
       } else if (status === 409) {
         // Fallback for 409 Conflict (deprecated, using 400 now)
         errorMessage = 'You have already applied to this event. Please check your application status.';
       } else if (status === 400) {
-        // Handle 400 errors - could be validation or duplicate application
-        errorMessage = 'Unable to submit application. ' + (detail || 'Please check your information and try again.');
+        // Handle 400 errors - show serializer field messages when present
+        errorMessage = formatFieldErrors(responseData)
+          || 'Unable to submit application. Please check your information and try again.';
       } else if (status === 401) {
         errorMessage = detail || 'You must be logged in to apply for this event.';
       } else if (status === 404) {
@@ -749,7 +777,6 @@ const MultiTrackApplicationForm = ({
         status,
         detail,
         missingFields,
-        payload,
         error: error.response?.data,
       });
     } finally {
@@ -1200,8 +1227,11 @@ const MultiTrackApplicationForm = ({
                     fullWidth
                     label="LinkedIn URL"
                     type="url"
+                    placeholder="https://www.linkedin.com/in/your-profile"
                     value={applicantData.linkedin_url}
                     onChange={(e) => handleApplicantChange('linkedin_url', e.target.value)}
+                    error={Boolean(linkedinError)}
+                    helperText={linkedinError}
                   />
                 </Grid>
                 <Grid item xs={12}>

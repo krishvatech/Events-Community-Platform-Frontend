@@ -628,7 +628,12 @@ function SaleorStaffTab({ currentUserId }) {
 // Only ECP superusers are eligible, and only the backend decides who actually
 // has access: this tab renders the state the backend reports and never derives
 // it from is_superuser alone. No Mautic credential is ever shown or requested.
-function MarketingAccessTab({ currentUserId, navigate }) {
+const MARKETING_IDENTITY_CONFLICT_MESSAGE =
+    "Marketing Access could not be added because a Mautic account already exists for this email. " +
+    "Please contact the system administrator to resolve the account mapping.";
+
+// Named export for the Marketing Access tab's DOM tests.
+export function MarketingAccessTab({ currentUserId, navigate }) {
     const [rows, setRows] = React.useState([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState(null);
@@ -678,9 +683,13 @@ function MarketingAccessTab({ currentUserId, navigate }) {
             await fetchMarketingAccess();
         } catch (err) {
             // Backend errors are already safe, actionable text: no provider
-            // internals or traces are surfaced here.
+            // internals or traces are surfaced here. A Mautic identity conflict
+            // is resolved administratively, never from this screen, so its
+            // backend wording ("link ... explicitly") is replaced.
             const msg =
-                err.response?.data?.detail || err.message || "Failed to grant Marketing access";
+                err.response?.data?.code === "marketing_identity_conflict"
+                    ? MARKETING_IDENTITY_CONFLICT_MESSAGE
+                    : err.response?.data?.detail || err.message || "Failed to grant Marketing access";
             setSnack({ open: true, severity: "error", message: `❌ ${msg}` });
         } finally {
             setActionLoading(null);

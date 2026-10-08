@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "#navigation";
 import {
   Alert,
@@ -28,6 +28,7 @@ import {
   Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
@@ -35,10 +36,12 @@ import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 
 import {
   deleteNewsletterMauticCampaign,
+  duplicateNativeMauticCampaign,
   getNewsletterMauticCampaign,
   listNewsletterMauticCampaigns,
   updateNewsletterMauticCampaign,
 } from "../services/newsletterService";
+import { duplicateFailureMessage, duplicateSuccessMessage } from "./mauticCampaignDuplicate";
 
 const PAGE_SIZE = 25;
 
@@ -303,6 +306,27 @@ export default function AdminNewsletterMauticCampaignsPanel() {
         message: getErrorMessage(err, "We could not load this native Mautic Campaign."),
       });
       return null;
+    }
+  };
+
+  // One click is one copy: the ref closes the gap before React re-renders the
+  // disabled button, so a double click cannot start a second request.
+  const [duplicatingId, setDuplicatingId] = useState(null);
+  const duplicateInFlight = useRef(false);
+  const duplicateCampaign = async (campaign) => {
+    if (!campaign?.id || duplicateInFlight.current) return;
+    duplicateInFlight.current = true;
+    setDuplicatingId(String(campaign.id));
+    try {
+      const copy = await duplicateNativeMauticCampaign(campaign.id);
+      setSnack({ open: true, severity: "success", message: duplicateSuccessMessage(copy) });
+      navigate(`/admin/newsletter/builder/${copy.id}`);
+    } catch (err) {
+      // The list stays as it is; only the message reports the failure.
+      setSnack({ open: true, severity: "error", message: duplicateFailureMessage(err) });
+    } finally {
+      duplicateInFlight.current = false;
+      setDuplicatingId(null);
     }
   };
 
@@ -573,6 +597,26 @@ export default function AdminNewsletterMauticCampaignsPanel() {
                           >
                             <EditRoundedIcon fontSize="small" />
                           </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Duplicate Campaign as an unpublished copy">
+                          {/* A disabled button lets clicks through to this wrapper;
+                              they must not reach the row and open the source. */}
+                          <span onClick={(event) => event.stopPropagation()}>
+                            <IconButton
+                              aria-label="Duplicate Campaign"
+                              disabled={Boolean(duplicatingId)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                duplicateCampaign(campaign);
+                              }}
+                            >
+                              {duplicatingId === String(campaign.id) ? (
+                                <CircularProgress size={18} />
+                              ) : (
+                                <ContentCopyRoundedIcon fontSize="small" />
+                              )}
+                            </IconButton>
+                          </span>
                         </Tooltip>
                         <Tooltip title="Delete Campaign">
                           <IconButton

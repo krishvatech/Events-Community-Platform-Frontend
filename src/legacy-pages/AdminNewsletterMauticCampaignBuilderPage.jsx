@@ -67,17 +67,26 @@ import {
   toCanvasEdge,
   toMauticCanvas,
 } from "./mauticCampaignGraph";
-import { isRemoteChoiceField } from "./mauticCampaignChoices";
+import {
+  appendChoicePage,
+  choiceRequestParams,
+  isRemoteChoiceField,
+  normalizeChoiceResults,
+  selectedValueList,
+} from "./mauticCampaignChoices";
 import {
   getEventPropertyFields,
   getNestedValue,
   optionLabel,
   optionValue,
   setNestedValue,
+  withSavedChoices,
 } from "./mauticCampaignFields";
 import {
   CAMPAIGN_PUBLISH,
   CAMPAIGN_SAVE,
+  legacyValueIssues,
+  remoteEntityIdLookups,
   validateCampaignAction,
   validateWorkflowEvent,
   workflowEventStatus,
@@ -88,12 +97,14 @@ import {
   requiresProviderDeletion,
 } from "./mauticCampaignEventRemoval";
 import MauticRemoteChoiceField from "./MauticRemoteChoiceField";
+import { duplicateFailureMessage, duplicateSuccessMessage } from "./mauticCampaignDuplicate";
 import {
   createNativeMauticCampaign,
   deleteNativeMauticCampaignEvent,
   deleteNewsletterMauticCampaign,
   duplicateNativeMauticCampaign,
   getMauticCampaignCapabilities,
+  getMauticCampaignChoices,
   getNativeMauticCampaignBuilder,
   updateNativeMauticCampaign,
 } from "../services/newsletterService";
@@ -159,7 +170,7 @@ const workflowEventId = () =>
 
 const isEventConfigurationComplete = (event) => validateWorkflowEvent(event).length === 0;
 
-const getConfigurationStatus = (event, { capabilitiesLoading = false } = {}) => {
+const getConfigurationStatus = (event, { capabilitiesLoading = false, remoteChoices } = {}) => {
   // A saved event only becomes configurable once it has been rejoined with the
   // current provider capability, so never claim it has no fields before then.
   if (isProviderMetadataUnavailable(event)) {
@@ -180,7 +191,7 @@ const getConfigurationStatus = (event, { capabilitiesLoading = false } = {}) => 
   }
 
   // One source of truth: the badge reports what the save-time validator sees.
-  return workflowEventStatus(event);
+  return workflowEventStatus(event, { remoteChoices });
 };
 
 const statusChipColor = (status) =>
@@ -375,6 +386,7 @@ function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading 
               }
 
               if (field.kind === "select") {
+                const options = withSavedChoices(field.choices, selectedValueList(value, field.multiple));
                 return (
                   <FormControl key={field.path} fullWidth error={fieldError}>
                     <InputLabel id={`${event.id}-${field.path}-label`}>
@@ -397,7 +409,7 @@ function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading 
                           })
                           .join(", ") : undefined}
                     >
-                      {field.choices.map((choice, index) => (
+                      {options.map((choice, index) => (
                         <MenuItem
                           key={`${field.path}-${optionValue(choice)}-${index}`}
                           value={optionValue(choice)}
@@ -406,6 +418,11 @@ function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading 
                             <Checkbox checked={asArray(value).map(String).includes(String(optionValue(choice)))} />
                           )}
                           {optionLabel(choice)}
+                          {choice.unresolved && (
+                            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                              Saved value — not offered by Mautic
+                            </Typography>
+                          )}
                         </MenuItem>
                       ))}
                     </Select>
@@ -679,6 +696,12 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   // Structures of the loaded Mautic workflow the builder cannot represent
   // faithfully. While any exist, Save and Publish are refused.
   const [graphBlockers, setGraphBlockers] = useState([]);
+  // Rows the provider resolved for saved values of tag-style fields served by
+  // reference, per source: what proves a saved "24" is an old tag ID. Kept in a
+  // ref so a save validates against what has just resolved, not the last render.
+  const remoteChoicesRef = useRef({});
+  const remoteLookupsRef = useRef(new Map());
+  const [remoteChoicesRevision, setRemoteChoicesRevision] = useState(0);
 
   const capabilityIndex = useMemo(
     () => buildCapabilityIndex(capabilities),
@@ -725,9 +748,64 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     [form.events, selectedCanvasNode]
   );
 
+  // Resolve, once per value, any saved value of a field served by reference that
+  // could be an old entity ID. Only whole-number values are asked about, all of
+  // a source's in one request, so a workflow whose tags are names asks nothing.
+  // A failed lookup proves nothing and blocks nothing; it is retried later.
+  const resolveRemoteLegacyValues = useCallback(async (events) => {
+    const pending = [];
+    remoteEntityIdLookups(events).forEach(({ sourceKey, source, values }) => {
+      const lookupKey = (value) => `${sourceKey}::${value}`;
+      const missing = values.filter((value) => !remoteLookupsRef.current.has(lookupKey(value)));
+      values
+        .filter((value) => !missing.includes(value))
+        .forEach((value) => pending.push(remoteLookupsRef.current.get(lookupKey(value))));
+      if (!missing.length) return;
+
+      const params = choiceRequestParams(source, { values: missing });
+      if (!params) return;
+      const request = getMauticCampaignChoices(params)
+        .then((payload) => {
+          remoteChoicesRef.current = {
+            ...remoteChoicesRef.current,
+            [sourceKey]: appendChoicePage(
+              remoteChoicesRef.current[sourceKey],
+              normalizeChoiceResults(payload)
+            ),
+          };
+          setRemoteChoicesRevision((current) => current + 1);
+        })
+        .catch(() => {
+          missing.forEach((value) => remoteLookupsRef.current.delete(lookupKey(value)));
+        });
+      missing.forEach((value) => remoteLookupsRef.current.set(lookupKey(value), request));
+      pending.push(request);
+    });
+    await Promise.all(pending);
+  }, []);
+
+  useEffect(() => {
+    resolveRemoteLegacyValues(form.events);
+  }, [form.events, resolveRemoteLegacyValues]);
+
+  const legacyValueBlockers = useMemo(
+    () =>
+      legacyValueIssues(form.events, { remoteChoices: remoteChoicesRef.current }).map(
+        (issue) => issue.message
+      ),
+    // remoteChoicesRevision is what brings newly resolved rows into this check.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [form.events, remoteChoicesRevision]
+  );
+
   const eventConfigurationStatus = useCallback(
-    (event) => getConfigurationStatus(event, { capabilitiesLoading: loading }),
-    [loading]
+    (event) =>
+      getConfigurationStatus(event, {
+        capabilitiesLoading: loading,
+        remoteChoices: remoteChoicesRef.current,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [loading, remoteChoicesRevision]
   );
 
   const loadCapabilities = useCallback(async () => {
@@ -848,6 +926,8 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   const createCampaign = async (event) => {
     event.preventDefault();
     const name = form.name.trim();
+    // A save never races the lookup that could prove a saved value is an old ID.
+    await resolveRemoteLegacyValues(form.events);
     const validation = campaignValidation(CAMPAIGN_SAVE);
     if (!validation.valid) {
       reportValidationErrors(validation.errors);
@@ -1185,6 +1265,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       events: form.events,
       canvasNodes,
       canvasEdges: form.canvasSettings?.edges || [],
+      remoteChoices: remoteChoicesRef.current,
     });
 
   const reportValidationErrors = (errors) => {
@@ -1236,6 +1317,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   const publishCampaign = async () => {
     if (!isEditMode || !campaignId) return;
 
+    await resolveRemoteLegacyValues(form.events);
     const validation = campaignValidation(CAMPAIGN_PUBLISH);
     if (!validation.valid) {
       reportValidationErrors(validation.errors);
@@ -1316,25 +1398,21 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     }
   };
 
+  // One click is one copy (the ref closes the gap before the button disables).
+  // The copy is made from the campaign as saved in Mautic, not from unsaved edits.
+  const duplicateInFlight = useRef(false);
   const duplicateCampaign = async () => {
-    if (!isEditMode || !campaignId) return;
+    if (!isEditMode || !campaignId || duplicateInFlight.current) return;
+    duplicateInFlight.current = true;
     setIsDuplicating(true);
-    setFormError("");
     try {
-      const duplicated = await duplicateNativeMauticCampaign(campaignId);
-      setSnack({
-        open: true,
-        severity: "success",
-        message: `Campaign duplicated. New ID: ${duplicated?.id}`,
-      });
-      setTimeout(() => {
-        navigate(`/admin/newsletter/builder/${duplicated?.id}`);
-      }, 1500);
+      const copy = await duplicateNativeMauticCampaign(campaignId);
+      setSnack({ open: true, severity: "success", message: duplicateSuccessMessage(copy) });
+      navigate(`/admin/newsletter/builder/${copy.id}`);
     } catch (err) {
-      setFormError(
-        getErrorMessage(err, "We could not duplicate this native Mautic Campaign.")
-      );
+      setSnack({ open: true, severity: "error", message: duplicateFailureMessage(err) });
     } finally {
+      duplicateInFlight.current = false;
       setIsDuplicating(false);
     }
   };
@@ -1391,22 +1469,35 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                   <Button
                     startIcon={form.isPublished ? <UnpublishedRoundedIcon /> : <PublishRoundedIcon />}
                     onClick={form.isPublished ? unpublishCampaign : publishCampaign}
-                    disabled={saving || campaignLoading || isDuplicating || (!form.isPublished && graphBlockers.length > 0)}
+                    disabled={
+                      saving ||
+                      campaignLoading ||
+                      isDuplicating ||
+                      (!form.isPublished && (graphBlockers.length > 0 || legacyValueBlockers.length > 0))
+                    }
                     variant="outlined"
                     sx={{ textTransform: "none" }}
                   >
                     {form.isPublished ? "Unpublish" : "Publish"}
                   </Button>
                 </Tooltip>
-                <Tooltip title="Create a copy of this campaign">
-                  <Button
-                    startIcon={isDuplicating ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />}
-                    onClick={duplicateCampaign}
-                    disabled={saving || campaignLoading || isDuplicating}
-                    sx={{ textTransform: "none" }}
-                  >
-                    Duplicate
-                  </Button>
+                <Tooltip
+                  title={
+                    graphBlockers.length || legacyValueBlockers.length
+                      ? "This campaign cannot be copied until the problem shown above is fixed"
+                      : "Copy the campaign as saved into a new unpublished campaign"
+                  }
+                >
+                  <span>
+                    <Button
+                      startIcon={isDuplicating ? <CircularProgress size={18} color="inherit" /> : <ContentCopyRoundedIcon />}
+                      onClick={duplicateCampaign}
+                      disabled={saving || campaignLoading || isDuplicating || graphBlockers.length > 0 || legacyValueBlockers.length > 0}
+                      sx={{ textTransform: "none" }}
+                    >
+                      Duplicate
+                    </Button>
+                  </span>
                 </Tooltip>
                 <Tooltip title="Delete this campaign">
                   <Button
@@ -1498,6 +1589,14 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               This campaign contains workflow structure that the builder cannot safely edit, so
               Update and Publish are disabled and nothing will be saved. Unpublishing is still
               possible. {graphBlockers.join(" ")}
+            </Alert>
+          )}
+          {legacyValueBlockers.length > 0 && (
+            <Alert severity="error">
+              Some steps hold an old tag ID where Mautic expects the tag itself; run as they
+              are, Mautic would create a new tag named after the number. Update and Publish
+              are disabled until each is replaced. Unpublishing is still possible.{" "}
+              {legacyValueBlockers.join(" ")}
             </Alert>
           )}
 
@@ -1900,7 +1999,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               type="submit"
               variant="contained"
               startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />}
-              disabled={saving || campaignLoading || graphBlockers.length > 0}
+              disabled={saving || campaignLoading || graphBlockers.length > 0 || legacyValueBlockers.length > 0}
             >
               {isEditMode ? "Update Campaign" : "Create Campaign"}
             </Button>

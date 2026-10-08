@@ -18,6 +18,12 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CancelIcon from "@mui/icons-material/Cancel";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import { useNavigate } from "react-router-dom";
+import {
+  LINKEDIN_URL_ERROR_MESSAGE,
+  formatFieldErrors,
+  getLinkedinUrlError,
+  normalizeLinkedinUrl,
+} from "../utils/linkedinUrl";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.replace(/\/+$/, "");
@@ -203,6 +209,11 @@ export default function GuestApplyModal({ open, onClose, event, livePath }) {
       setError("Company name is required");
       return false;
     }
+    const linkedinUrlError = getLinkedinUrlError(form.linkedin_url);
+    if (linkedinUrlError) {
+      setError(linkedinUrlError);
+      return false;
+    }
     return true;
   };
 
@@ -266,7 +277,7 @@ export default function GuestApplyModal({ open, onClose, event, livePath }) {
           email: form.email.trim().toLowerCase(),
           job_title: form.job_title.trim(),
           company_name: form.company_name.trim(),
-          linkedin_url: form.linkedin_url.trim(),
+          linkedin_url: normalizeLinkedinUrl(form.linkedin_url),
           attendee_marker_value: !!form.attendee_marker_value,
           comments: form.comments?.trim() || "",
           preapproved_code: form.preapproved_code?.trim() || "",
@@ -287,11 +298,17 @@ export default function GuestApplyModal({ open, onClose, event, livePath }) {
           return;
         }
         if (res.status === 400) {
-          setError(data.detail || "Unable to submit application. Please check your information.");
+          setError(
+            data.detail
+            || (data.linkedin_url && LINKEDIN_URL_ERROR_MESSAGE)
+            || formatFieldErrors(data)
+            || "Unable to submit application. Please check your information."
+          );
           return;
         }
+        // Raw response text is not shown: a server error page can carry internals.
         throw new Error(
-          data.detail || data.error || data.message || text || `Failed to submit application (${res.status})`
+          data.detail || data.error || data.message || `Failed to submit application (${res.status})`
         );
       }
 
