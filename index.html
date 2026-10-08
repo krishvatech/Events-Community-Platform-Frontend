@@ -26,7 +26,7 @@
           document.documentElement.setAttribute(attr, mode === "dark" ? "dark" : "light");
           var path = window.location.pathname;
           var alwaysLight = /^\/(m-and-a-trainings|recognition)(\/|$)|^\/(public|staging|landing)\/|^\/live(\/|$)|\/companion(\/|$)/;
-          var darkReady = /^\/($|about\/?$|signin\/?$|signup\/?$|forgot-password\/?$|reset-password\/?$|auth\/|cognito\/|oauth\/|sso\/|kyc\/|events(\/|$)|account(\/|$)|community(\/|$)|groups(\/|$)|forms(\/|$)|series(\/|$)|blogs(\/|$)|resource(\/|$)|newsletter(\/|$)|cms(\/|$)|admin(\/|$)|AdminEvents(\/|$))/;
+          var darkReady = /^\/($|about\/?$|signin\/?$|signup\/?$|forgot-password\/?$|reset-password\/?$|auth\/|cognito\/|oauth\/|sso\/|kyc\/|events(\/|$)|account(\/|$)|community(\/|$)|groups(\/|$)|forms(\/|$)|series(\/|$)|blogs(\/|$)|resource(\/|$)|newsletter(\/|$)|cms(\/|$)|admin(\/|$)|AdminEvents(\/|$)|frequently-asked-questions\/?$|references\/?$|terms-and-conditions\/?$|privacy-policy\/?$|imprint\/?$)/;
           if (alwaysLight.test(path) || !darkReady.test(path)) {
             document.body.setAttribute(attr, "light");
           }

@@ -1,7 +1,7 @@
 // src/components/Footer.jsx
 import React from "react";
 import { Container, Box, Link as MLink, IconButton } from "@mui/material";
-import { Link } from "#navigation";
+import { Link, PUBLIC_CMS_ROUTES_AVAILABLE } from "#navigation";
 import { colors, focus, layout, semanticColors } from "../styles/designTokens";
 import imaaLogo from "../assets/IMAA-logo130.svg";
 
@@ -64,17 +64,44 @@ const publicLinkSx = {
   },
 };
 
+// Public CMS pages (FAQ, References and the legal pages): a published Wagtail StandardPage, or
+// the approved default content while no page exists (src/app/(site), src/content/public-pages).
+// Only the Next.js build has these routes; the Vite build's catch-all would send the reader to
+// Home, so there the links keep pointing to the pages on imaa-institute.org.
+const publicPageHref = (slug) =>
+  PUBLIC_CMS_ROUTES_AVAILABLE ? `/${slug}` : `https://imaa-institute.org/${slug}/`;
+
 const PUBLIC_FOOTER_COLUMNS = [
   { title: "Explore Connect", links: [["Events & webinars", "/events"], ["Community", "/community"], ["Resources", "/account/resources"]] },
-  { title: "About IMAA", links: [["About us", "/about"], ["IMAA Institute", "https://imaa-institute.org/"], ["Contact us", "https://imaa-institute.org/contact-us/"]] },
+  {
+    title: "About IMAA",
+    links: [
+      ["About us", "/about"],
+      ["FAQ", publicPageHref("frequently-asked-questions")],
+      ["References", publicPageHref("references")],
+      ["IMAA Institute", "https://imaa-institute.org/"],
+      ["Contact us", "https://imaa-institute.org/contact-us/"],
+    ],
+  },
 ];
 
-const PublicFooter = () => (
+const LEGAL_LINKS = [
+  ["Privacy Policy", publicPageHref("privacy-policy")],
+  ["Terms & Conditions", publicPageHref("terms-and-conditions")],
+  ["Imprint", publicPageHref("imprint")],
+];
+
+// Footer links sit at the bottom of the page: internal ones open the destination at its top
+// (`resetScroll`) instead of keeping the old scroll offset.
+const linkProps = (href) => (href.startsWith("/") ? { component: Link, to: href, resetScroll: true } : { component: "a", href });
+
+// Also rendered by the server-rendered public shell (src/components/public/PublicSiteShell.jsx).
+export const PublicFooter = () => (
   <Box component="footer" sx={{ bgcolor: semanticColors.surface, borderTop: `1px solid ${semanticColors.border}`, color: PUBLIC_INK }}>
     <Container maxWidth="lg" sx={{ py: { xs: 5, md: 7 } }}>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1.5fr 1fr 1fr" }, gap: { xs: 4, md: 7 } }}>
         <Box>
-          <Box component={Link} to="/" aria-label="IMAA Connect home" sx={{ display: "inline-flex", ...publicLinkSx }}>
+          <Box component={Link} to="/" resetScroll aria-label="IMAA Connect home" sx={{ display: "inline-flex", ...publicLinkSx }}>
             {/* Navy logo on a white plate in dark mode (brand.css .imaa-logo-plate); no effect in light mode. */}
             <Box component="img" src={imaaLogoSrc} alt="IMAA" className="imaa-logo-plate" sx={{ width: 150, height: "auto" }} />
           </Box>
@@ -89,8 +116,7 @@ const PublicFooter = () => (
               {links.map(([label, href]) => (
                 <MLink
                   key={label}
-                  component={href.startsWith("/") ? Link : "a"}
-                  {...(href.startsWith("/") ? { to: href } : { href })}
+                  {...linkProps(href)}
                   sx={{ ...publicLinkSx, display: "inline-flex", alignItems: "center", minHeight: 36 }}
                 >
                   {label}
@@ -103,8 +129,9 @@ const PublicFooter = () => (
       <Box sx={{ mt: 5, pt: 3, borderTop: `1px solid ${semanticColors.border}`, display: "flex", flexDirection: { xs: "column", md: "row" }, justifyContent: "space-between", alignItems: { md: "center" }, gap: 2 }}>
         <Box component="p" sx={{ m: 0, fontSize: 13, color: semanticColors.textBody }}>© {new Date().getFullYear()} IMAA Connect. All rights reserved.</Box>
         <Box component="nav" aria-label="Legal information" sx={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-          <MLink href="https://imaa-institute.org/privacy-policy/" sx={publicLinkSx}>Privacy Policy</MLink>
-          <MLink href="https://imaa-institute.org/terms-and-conditions/" sx={publicLinkSx}>Terms & Conditions</MLink>
+          {LEGAL_LINKS.map(([label, href]) => (
+            <MLink key={href} {...linkProps(href)} sx={publicLinkSx}>{label}</MLink>
+          ))}
         </Box>
       </Box>
     </Container>
@@ -120,8 +147,10 @@ const Footer = ({ instituteTheme = false }) => instituteTheme ? <PublicFooter />
           <Box component="nav" aria-label="Footer navigation" sx={{ display: "flex", flexWrap: "wrap", columnGap: { xs: 3, sm: 5 }, rowGap: 2 }}>
             <MLink href="/#about" underline="none" sx={footerLinkSx}>About Us</MLink>
             <MLink href="#" underline="none" sx={footerLinkSx}>Contact</MLink>
-            <MLink href="#" underline="none" sx={footerLinkSx}>Privacy Policy</MLink>
-            <MLink href="#" underline="none" sx={footerLinkSx}>Terms of Service</MLink>
+            {/* Legal pages are public CMS pages in this platform (src/app/(site)); see publicPageHref. */}
+            <MLink {...linkProps(publicPageHref("privacy-policy"))} underline="none" sx={footerLinkSx}>Privacy Policy</MLink>
+            <MLink {...linkProps(publicPageHref("terms-and-conditions"))} underline="none" sx={footerLinkSx}>Terms of Service</MLink>
+            <MLink {...linkProps(publicPageHref("imprint"))} underline="none" sx={footerLinkSx}>Imprint</MLink>
           </Box>
 
           <Box role="group" aria-label="Social media" sx={{ display: "flex", gap: 1 }}>

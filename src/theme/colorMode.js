@@ -46,7 +46,9 @@ export const FORCE_LIGHT_PATH_PATTERN =
 export const DARK_READY_PATH_PATTERN =
   "^/($|about/?$|signin/?$|signup/?$|forgot-password/?$|reset-password/?$|auth/|cognito/|oauth/|sso/|kyc/|" +
   "events(/|$)|account(/|$)|community(/|$)|groups(/|$)|forms(/|$)|series(/|$)|blogs(/|$)|resource(/|$)|" +
-  "newsletter(/|$)|cms(/|$)|admin(/|$)|AdminEvents(/|$))";
+  "newsletter(/|$)|cms(/|$)|admin(/|$)|AdminEvents(/|$)|" +
+  // Server-rendered public CMS pages (src/app/(site)), built on the dark-aware utilities.
+  "frequently-asked-questions/?$|references/?$|terms-and-conditions/?$|privacy-policy/?$|imprint/?$)";
 
 export function isForceLightPath(pathname = "") {
   return (

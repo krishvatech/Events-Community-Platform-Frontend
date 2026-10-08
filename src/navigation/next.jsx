@@ -20,6 +20,7 @@ import {
   useSearchParams as useNextSearchParams,
 } from "next/navigation";
 import * as RR from "react-router-dom";
+import { isPlainNavigationClick } from "./reactRouter.js";
 import {
   clearPendingNavigation,
   getPendingNavigation,
@@ -126,15 +127,27 @@ export function useSearchParams() {
   return [current, setSearchParams];
 }
 
+// This build has the server-rendered public CMS pages (src/app/(site)); the Vite build does not.
+export const PUBLIC_CMS_ROUTES_AVAILABLE = true;
+
 // Like React Router's <Link>, the computed href always wins: callers such as
 // `<Button component={isExternal ? "a" : Link} href={isExternal ? url : undefined} to={url}>`
 // pass `href={undefined}` alongside `to`, which must not override it.
+//
+// `resetScroll` (opt-in, e.g. footer links): the destination starts at the top of the page.
+// Every other link keeps the scroll position, as React Router does.
 export const Link = forwardRef(function Link(
-  { to, replace, state, reloadDocument, onClick, href: _ignoredHref, as: _ignoredAs, ...rest },
+  { to, replace, state, reloadDocument, onClick, resetScroll = false, href: _ignoredHref, as: _ignoredAs, ...rest },
   ref
 ) {
   if (useInReactRouter()) {
-    return <RR.Link ref={ref} {...rest} to={to} replace={replace} state={state} reloadDocument={reloadDocument} onClick={onClick} />;
+    const handleClick = (event) => {
+      onClick?.(event);
+      if (resetScroll && isPlainNavigationClick(event, rest.target)) {
+        window.requestAnimationFrame(() => window.scrollTo(0, 0));
+      }
+    };
+    return <RR.Link ref={ref} {...rest} to={to} replace={replace} state={state} reloadDocument={reloadDocument} onClick={handleClick} />;
   }
   const href = resolveHref(to);
   if (reloadDocument) {
@@ -146,7 +159,8 @@ export const Link = forwardRef(function Link(
       {...rest}
       href={href}
       replace={replace}
-      scroll={false}
+      // Next scrolls to the top after the new page has rendered (no jump on the old page).
+      scroll={resetScroll === true}
       onClick={(event) => {
         onClick?.(event);
         if (!event.defaultPrevented) {
