@@ -1,3 +1,5 @@
+import referenceStyles from "./ReferenceGallery.module.css";
+
 // src/components/public/StandardPageArticle.jsx
 // Server Component: the one renderer for public StandardPage content (title + rich-text body),
 // whether it comes from the CMS or from the approved defaults.
@@ -17,7 +19,7 @@
 
 const BODY_CLASS = [
   // break-words: long URLs and e-mail addresses wrap instead of widening the page on phones.
-  "max-w-3xl break-words text-base leading-relaxed text-imaa-body md:text-lg",
+  "break-words text-base leading-relaxed text-imaa-body md:text-lg",
   "[&_p]:mt-4 [&_p:first-child]:mt-0",
   "[&_h2]:mt-10 [&_h2]:font-sans [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:tracking-[-0.02em] [&_h2]:text-imaa-ink",
   "[&_h3]:mt-8 [&_h3]:font-sans [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-imaa-ink",
@@ -32,13 +34,6 @@ const BODY_CLASS = [
   "[&_table]:mt-6 [&_table]:w-full [&_table]:border-collapse [&_table]:text-sm",
   "[&_th]:border [&_th]:border-imaa-border [&_th]:bg-imaa-cool [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-imaa-ink",
   "[&_td]:border [&_td]:border-imaa-border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top",
-  // Logo walls (References): images in Wagtail's "logo" rich-text format (ecp-backend
-  // cms/image_formats.py) are laid out as a grid of 2/3/4/6 columns with 88px cells, like the
-  // mockup's logo grid. Only bodies that contain logos become a grid; every other block spans
-  // the full row. Cells are white in both colour modes so dark logos stay visible.
-  "has-[>img.logo]:grid has-[>img.logo]:grid-cols-2 sm:has-[>img.logo]:grid-cols-3 md:has-[>img.logo]:grid-cols-4 lg:has-[>img.logo]:grid-cols-6 has-[>img.logo]:gap-x-3",
-  "[&>:not(img.logo)]:col-span-full",
-  "[&>img.logo]:mt-3 [&>img.logo]:h-[88px] [&>img.logo]:w-full [&>img.logo]:max-w-none [&>img.logo]:rounded-lg [&>img.logo]:border [&>img.logo]:border-imaa-border [&>img.logo]:bg-[#ffffff] [&>img.logo]:object-contain [&>img.logo]:p-3",
 ].join(" ");
 
 // Images in the (already sanitised) body load lazily: the References logo wall has 258 of them.
@@ -46,7 +41,9 @@ const BODY_CLASS = [
 const withLazyImages = (html) => html.replace(/<img(?![^>]*\bloading=)/g, '<img loading="lazy" decoding="async"');
 
 export default function StandardPageArticle({ page, source = "cms" }) {
-  const body = typeof page?.body_html === "string" ? withLazyImages(page.body_html.trim()) : "";
+  const rawBody = typeof page?.body_html === "string" ? page.body_html.trim() : "";
+  const isReferences = page?.slug === "references";
+  const body = withLazyImages(rawBody);
 
   return (
     <article
@@ -64,7 +61,10 @@ export default function StandardPageArticle({ page, source = "cms" }) {
 
       {body ? (
         <div className="mx-auto w-full max-w-[1200px] px-6 py-12 md:py-16">
-          <div className={BODY_CLASS} dangerouslySetInnerHTML={{ __html: body }} />
+          <div
+            className={`${BODY_CLASS} ${isReferences ? referenceStyles.gallery : "max-w-3xl"}`}
+            dangerouslySetInnerHTML={{ __html: body }}
+          />
         </div>
       ) : null}
     </article>

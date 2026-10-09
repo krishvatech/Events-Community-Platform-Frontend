@@ -1,0 +1,73 @@
+/* Only the References rich-text body uses the WordPress-style open logo wall.
+   All other StandardPages retain their existing compact article typography. */
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 18px;
+  row-gap: 22px;
+  max-width: none;
+}
+
+/* Intro, section headings, links, and any future editor content remain full-width. */
+.gallery > * {
+  grid-column: 1 / -1;
+}
+
+.gallery > p {
+  max-width: 780px;
+}
+
+.gallery > h2 {
+  margin-top: 36px;
+  margin-bottom: 0;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #cad4dd;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+/* Logos remain plain, non-clickable images in the wide WordPress-style grid. */
+.gallery > :global(img.logo) {
+  grid-column: auto;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 148px;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 12px 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  cursor: default;
+  filter: grayscale(100%);
+  transition: filter 300ms ease-in-out;
+}
+
+/* WordPress-style grayscale-to-color effect; logos remain non-clickable. */
+@media (hover: hover) and (pointer: fine) {
+  .gallery > :global(img.logo:hover) {
+    filter: grayscale(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gallery > :global(img.logo) {
+    transition: none;
+  }
+}
+
+@media (min-width: 640px) {
+  .gallery { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 768px) {
+  .gallery { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+@media (min-width: 1024px) {
+  .gallery { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
