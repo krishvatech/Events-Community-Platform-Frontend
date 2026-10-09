@@ -1,4 +1,6 @@
 import referenceStyles from "./ReferenceGallery.module.css";
+import FaqAccordion from "./FaqAccordion.jsx";
+import { FAQ_CONTACT_URL, FAQ_SLUG, splitFaqSections } from "@/lib/faqSections";
 
 // src/components/public/StandardPageArticle.jsx
 // Server Component: the one renderer for public StandardPage content (title + rich-text body),
@@ -44,6 +46,8 @@ export default function StandardPageArticle({ page, source = "cms" }) {
   const rawBody = typeof page?.body_html === "string" ? page.body_html.trim() : "";
   const isReferences = page?.slug === "references";
   const body = withLazyImages(rawBody);
+  // FAQ: the same CMS body, shown as one toggle per <h2> question (src/lib/faqSections.js).
+  const faq = page?.slug === FAQ_SLUG ? splitFaqSections(body) : null;
 
   return (
     <article
@@ -59,7 +63,35 @@ export default function StandardPageArticle({ page, source = "cms" }) {
         </div>
       </header>
 
-      {body ? (
+      {faq ? (
+        <div className="mx-auto w-full max-w-[1200px] px-6 py-12 md:py-16">
+          <div className="max-w-3xl">
+            {faq.introHtml ? (
+              <div className={`${BODY_CLASS} mb-8`} dangerouslySetInnerHTML={{ __html: faq.introHtml }} />
+            ) : null}
+            <FaqAccordion items={faq.items} answerClassName={BODY_CLASS} />
+            <aside
+              aria-labelledby="faq-contact-heading"
+              className="mt-12 flex flex-col gap-5 rounded-2xl border border-imaa-border bg-imaa-cool p-6 sm:flex-row sm:items-center sm:justify-between md:p-8"
+            >
+              <div>
+                <h2 id="faq-contact-heading" className="m-0 font-sans text-xl font-bold tracking-[-0.01em] text-imaa-ink md:text-2xl">
+                  Contact Us
+                </h2>
+                <p className="mt-2 text-base leading-relaxed text-imaa-body">
+                  Didn&apos;t find your answer? Send the IMAA team a message and we&apos;ll get back to you.
+                </p>
+              </div>
+              <a
+                href={FAQ_CONTACT_URL}
+                className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full bg-imaa-teal-dark px-6 py-2.5 font-sans text-base font-semibold text-white no-underline transition-colors hover:bg-imaa-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-imaa-teal"
+              >
+                Contact us
+              </a>
+            </aside>
+          </div>
+        </div>
+      ) : body ? (
         <div className="mx-auto w-full max-w-[1200px] px-6 py-12 md:py-16">
           <div
             className={`${BODY_CLASS} ${isReferences ? referenceStyles.gallery : "max-w-3xl"}`}
