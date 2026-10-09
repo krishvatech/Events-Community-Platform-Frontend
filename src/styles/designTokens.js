@@ -1,6 +1,6 @@
 // IMAA design foundations: shared design values for JavaScript.
 //
-// Source: the IMAA design-system mockup `_foundations.css` v1.65 (2026-06-07).
+// Source: KT IMAA design-system `foundations.css` v1.66 (2026-10-08).
 // Used by src/muiTheme.js and tailwind.config.js. CSS code should use the matching
 // custom properties in src/styles/brand.css (`--imaa-*`). Keep the two in sync.
 //
@@ -8,11 +8,11 @@
 
 export const colors = {
   navy: "#1B2A4A",
-  coral: "#E84C38",
-  teal: "#0A9396",
-  // Existing --imaa-teal-hover. White text on it passes WCAG AA (≈5:1); on `teal` it is ≈3.7:1.
+  coral: "#D24533",
+  teal: "#087C7F",
+  // Existing --imaa-teal-hover; its darker hover state preserves white-label contrast.
   tealDark: "#077B7E",
-  link: "#4A7DB5",
+  link: "#4472A6",
 
   // Grounds
   bgCool: "#F0F4F5", // public alternating sections
@@ -22,7 +22,7 @@ export const colors = {
   // Text ladder
   ink: "#1B2A4A", // headings / primary text
   inkBody: "#5A6070", // body text
-  inkMeta: "#747A88", // metadata; below AA for small text on white, so use for ≥14px or non-essential text
+  inkMeta: "#6A6F7C", // AA on white and cool grounds
   inkHint: "#B0B4BC", // placeholders, disabled text
 
   // Borders

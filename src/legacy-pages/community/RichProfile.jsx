@@ -53,6 +53,7 @@ import ReplyRoundedIcon from "@mui/icons-material/ReplyRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import LinkedInIcon from "@mui/icons-material/LinkedIn";
 import TwitterIcon from "@mui/icons-material/Twitter";
+import "../../styles/communityParity.css";
 import FacebookIcon from "@mui/icons-material/Facebook";
 import InstagramIcon from "@mui/icons-material/Instagram";
 import GitHubIcon from "@mui/icons-material/GitHub";
@@ -3532,7 +3533,7 @@ export default function RichProfile({ userId: propUserId, viewAsPublic, onBack }
 
   // Page ground: slate-50 (#f8fafc) in light mode, the member page background in dark mode.
   return (
-    <div className="min-h-screen bg-[var(--imaa-dm-page,#f8fafc)]">
+    <div className="ecp-community-surface ecp-community-members min-h-screen bg-[var(--imaa-dm-page,#f8fafc)]">
       <Container maxWidth="lg" sx={{ py: { xs: 2, sm: 3 } }}>
         <div className="flex flex-col gap-4 md:gap-6">
           <main className="w-full">

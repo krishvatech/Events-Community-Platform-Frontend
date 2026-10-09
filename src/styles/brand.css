@@ -7,7 +7,7 @@
   --imaa-orange: #E8532F;
   --imaa-orange-hover: #CC4422;
   --imaa-orange-light: #FEF2EE;
-  --imaa-teal: #0A9396;
+  --imaa-teal: #087C7F;
   --imaa-teal-hover: #077B7E;
   --imaa-teal-light: #E8F7F7;
   --imaa-navy: #1B2A4A;
@@ -38,16 +38,16 @@
   --topbar-height: 50px;
 
   /* ── IMAA design foundations ─────────────────────────────────────────────
-     Source: IMAA design-system mockup `_foundations.css` v1.65 (2026-06-07).
+     Source: KT IMAA design-system `foundations.css` v1.66 (2026-10-08).
      JS mirror for the MUI theme and Tailwind: src/styles/designTokens.js — keep in sync.
      Additive only: the variables above are unchanged. */
-  --imaa-coral: #E84C38;
-  --imaa-link: #4A7DB5;
+  --imaa-coral: #D24533;
+  --imaa-link: #4472A6;
   --imaa-bg-cool: #F0F4F5;    /* public alternating sections */
   --imaa-bg-member: #F7F8FA;  /* member (Connect) area */
   --imaa-ink: #1B2A4A;
   --imaa-ink-body: #5A6070;
-  --imaa-ink-meta: #747A88;   /* below AA for small text on white */
+  --imaa-ink-meta: #6A6F7C;   /* AA on white and cool grounds */
   --imaa-ink-hint: #B0B4BC;   /* placeholders / disabled only */
   --imaa-border: #E2E4E8;
   --imaa-border-hover: #D1CFC9;

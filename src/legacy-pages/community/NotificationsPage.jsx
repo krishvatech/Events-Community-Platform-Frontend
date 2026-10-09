@@ -1595,7 +1595,7 @@ export default function NotificationsPage({
   };
 
   return (
-    <Grid container spacing={2} sx={{ width: "100%", maxWidth: 1080, mx: "auto", minWidth: 0 }}>
+    <Grid className="ecp-community-notifications" container spacing={2} sx={{ width: "100%", maxWidth: 1080, mx: "auto", minWidth: 0 }}>
       <Grid item xs={12} sx={{ width: '100%', minWidth: 0 }}>
         {/* Header */}
         <PageHeader eyebrow="Community" title="Notifications" subtitle="Review account activity and connection updates." />

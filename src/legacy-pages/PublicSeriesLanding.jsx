@@ -202,7 +202,7 @@ const PublicSeriesLanding = () => {
       )}
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-12 sm:px-6 lg:px-8">
+      <div className="max-w-[1200px] mx-auto px-4 py-12 sm:px-6 lg:px-8">
         {/* Header Section */}
         <div className={`${series.cover_image ? '-mt-24 relative z-10' : ''} mb-12`}>
           <div className={`${series.cover_image ? 'bg-white rounded-lg border border-imaa-border shadow-imaa-md p-5 sm:p-8' : ''}`}>
@@ -313,7 +313,7 @@ const PublicSeriesLanding = () => {
           {events.length === 0 ? (
             <EmptyState titleComponent="h3" title="No events added to this series yet" />
           ) : (
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {events
                 .sort((a, b) => (a.series_order || 0) - (b.series_order || 0))
                 .map((event, idx) => (

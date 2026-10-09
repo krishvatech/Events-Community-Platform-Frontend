@@ -422,14 +422,14 @@ const Header = ({ instituteTheme = false }) => {
                 <Button
                   onClick={() => openAuthModal("login")}
                   variant="text"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, minHeight: 44, color: semanticColors.text, borderRadius: `${radii.field}px`, px: 2, "&:hover": { color: "var(--imaa-dm-orange-text, #CC4422)", bgcolor: "rgba(232,76,56,.05)" } }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 600, minHeight: 44, color: semanticColors.text, borderRadius: `${radii.field}px`, px: 2, "&:hover": { color: "var(--imaa-dm-orange-text, #D24533)", bgcolor: "rgba(210,69,51,.05)" } }}
                 >
                   Log in
                 </Button>
                 <Button
                   onClick={() => openAuthModal("signup")}
                   variant="contained"
-                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: radii.pill, px: instituteTheme ? 3.25 : 3, bgcolor: "#CC4422", color: colors.white, "&:hover": { bgcolor: "#A9361C", boxShadow: "0 6px 14px rgba(169,54,28,.16)" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${semanticColors.text}`, outlineOffset: "3px" }, boxShadow: "none" }}
+                  sx={{ textTransform: "none", fontSize: 14, fontWeight: 700, minHeight: 44, borderRadius: radii.pill, px: instituteTheme ? 3.25 : 3, bgcolor: colors.coral, color: colors.white, "&:hover": { bgcolor: "#B53A2C", boxShadow: "0 6px 14px rgba(181,58,44,.16)" }, "&:focus-visible, &.Mui-focusVisible": { outline: `2px solid ${semanticColors.text}`, outlineOffset: "3px" }, boxShadow: "none" }}
                 >
                   Sign up
                 </Button>
@@ -499,7 +499,7 @@ const Header = ({ instituteTheme = false }) => {
                 <ListItemText primary="Log in" />
               </ListItemButton>
               <ListItemButton onClick={() => openAuthModal("signup")}>
-                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 700, color: "var(--imaa-dm-orange-text, #CC4422)" }} />
+                <ListItemText primary="Sign up" primaryTypographyProps={{ fontWeight: 700, color: "var(--imaa-dm-orange-text, #D24533)" }} />
               </ListItemButton>
             </List>
           )}

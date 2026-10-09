@@ -1585,7 +1585,7 @@ export default function EventDetailsPage() {
   if (notFound) {
     return (
       <div className="min-h-screen bg-imaa-member">
-        <Container maxWidth="xl" className="py-6 sm:py-8">
+        <Container maxWidth="lg" className="py-6 sm:py-8">
           <Paper elevation={0} className="rounded-lg border border-imaa-border p-8">
             <Typography variant="h4" fontWeight={800} sx={{ mb: 1 }}>
               404
@@ -1749,7 +1749,7 @@ export default function EventDetailsPage() {
         </Helmet>
       )}
       {/* BODY with LEFT NAV + MAIN */}
-      <Container maxWidth="xl" className="py-6 sm:py-8">
+      <Container maxWidth="lg" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           <main className="col-span-12">
             <div className="flex flex-col gap-6">
@@ -1812,7 +1812,7 @@ export default function EventDetailsPage() {
               {/* TAB CONTENT: OVERVIEW */}
               {/* Only show when activeTab === 0 (or when no tabs exist) */}
               {((!showSpeedNetworkingTab && !showSessionsTab && !showQaTab) || activeTab === 0) && (
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 340px' }, gap: { xs: 3, lg: 4 }, alignItems: 'start' }}>
+                  <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: 'minmax(0, 1fr) 320px' }, gap: { xs: 3, lg: 4 }, alignItems: 'start' }}>
                   {/* EVENT HERO AND INFORMATION */}
                   <Paper elevation={0} className="rounded-lg border border-imaa-border overflow-hidden" sx={{ minWidth: 0 }}>
                     <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 }, pb: { xs: 2, md: 3 }, bgcolor: 'var(--imaa-dm-surface, #fff)' }}>

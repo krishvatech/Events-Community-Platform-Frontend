@@ -3702,7 +3702,7 @@ export default function MessagesPage() {
           if (newId) setActiveId(newId);
         }}
       />
-      <Box sx={{ width: "100%", maxWidth: 1240, mx: "auto" }}>
+      <Box className="ecp-community-messages" sx={{ width: "100%", maxWidth: 1240, mx: "auto" }}>
         <PageHeader
           eyebrow="Community"
           title="Messages"

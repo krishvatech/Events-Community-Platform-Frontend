@@ -2076,7 +2076,7 @@ export default function MyPostsPage() {
 
 
   return (
-    <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", pl: 0, pt: 0, pr: { xs: 0, sm: 1 }, pb: 3, overflow: "hidden" }}>
+    <Box className="ecp-community-posts" sx={{ width: "100%", minWidth: 0, maxWidth: "100%", pl: 0, pt: 0, pr: { xs: 0, sm: 1 }, pb: 3, overflow: "hidden" }}>
       <PageHeader
         eyebrow="Community"
         title="My Posts"

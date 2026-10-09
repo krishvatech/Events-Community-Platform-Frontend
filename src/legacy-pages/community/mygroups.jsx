@@ -35,6 +35,7 @@ import {
 } from "../../components/CommunityGroupCard.jsx";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 import { colors, layout, radii, shadows, semanticColors } from "../../styles/designTokens";
+import "../../styles/communityParity.css";
 
 const BORDER = "#e2e8f0";
 const JOIN_POLICY_LABELS = {
@@ -841,7 +842,7 @@ export default function MyGroupsPage() {
     };
 
     return (
-        <Box sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: semanticColors.page, minHeight: "100vh" }}>
+        <Box className="ecp-community-surface" sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: semanticColors.page, minHeight: "100vh" }}>
             <Box
                 sx={{
                     display: "flex",

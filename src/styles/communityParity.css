@@ -1,0 +1,99 @@
+/* K3 community presentation layer. Scoped so it cannot affect non-community routes. */
+.ecp-community-surface {
+  --community-navy: #1B2A4A;
+  --community-teal: #087C7F;
+  --community-coral: #D24533;
+  --community-cool: #F0F4F5;
+  color: var(--imaa-ink, var(--community-navy));
+}
+
+.ecp-community-surface .MuiPaper-root:not(.MuiDialog-paper):not(.MuiPopover-paper),
+.ecp-community-surface .MuiCard-root {
+  border-color: var(--imaa-dm-border, #E2E4E8) !important;
+  border-radius: var(--imaa-radius-card, 8px) !important;
+}
+
+.ecp-community-surface .MuiPaper-outlined,
+.ecp-community-surface .MuiCard-outlined {
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27, 42, 74, .08));
+}
+
+.ecp-community-surface .MuiTypography-h3,
+.ecp-community-surface .MuiTypography-h4,
+.ecp-community-surface .MuiTypography-h5,
+.ecp-community-surface .MuiTypography-h6 {
+  font-family: var(--imaa-font-serif, Georgia, serif);
+  color: var(--imaa-ink, var(--community-navy));
+}
+
+.ecp-community-surface .MuiTabs-root {
+  min-height: 42px;
+  padding: 4px;
+  border: 1px solid var(--imaa-dm-border, #E2E4E8);
+  border-radius: 999px;
+  background: var(--imaa-dm-surface, #fff);
+}
+
+.ecp-community-surface .MuiTab-root {
+  min-height: 34px;
+  min-width: 0;
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: var(--imaa-ink-body, #5A6070);
+  font-weight: 700;
+  text-transform: none;
+}
+
+.ecp-community-surface .MuiTab-root.Mui-selected {
+  color: #fff;
+  background: var(--community-navy);
+}
+
+.ecp-community-surface .MuiTabs-indicator { display: none; }
+
+.ecp-community-surface .MuiOutlinedInput-root {
+  border-radius: var(--imaa-radius-input, 6px);
+  background: var(--imaa-dm-surface, #fff);
+}
+
+.ecp-community-surface .MuiButton-containedPrimary {
+  background-color: var(--community-coral);
+}
+
+.ecp-community-surface .MuiButton-containedPrimary:hover {
+  background-color: #B53A2C;
+}
+
+.ecp-community-surface .MuiChip-root {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.ecp-community-directory .MuiCard-root,
+.ecp-community-members .MuiCard-root {
+  overflow: hidden;
+  transition: box-shadow .18s ease, transform .18s ease;
+}
+
+@media (hover: hover) {
+  .ecp-community-directory .MuiCard-root:hover,
+  .ecp-community-members .MuiCard-root:hover {
+    box-shadow: var(--imaa-shadow-md, 0 10px 24px rgba(27, 42, 74, .12));
+    transform: translateY(-2px);
+  }
+}
+
+.ecp-community-feed .MuiCard-root,
+.ecp-community-posts .MuiCard-root,
+.ecp-community-notifications .MuiListItem-root > .MuiPaper-root {
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27, 42, 74, .08));
+}
+
+.ecp-community-messages .MuiPaper-root {
+  background-image: linear-gradient(180deg, rgba(240, 244, 245, .32), transparent 76px);
+}
+
+@media (max-width: 600px) {
+  .ecp-community-surface .MuiTabs-flexContainer { overflow-x: auto; }
+  .ecp-community-surface .MuiTab-root { padding-inline: 11px; font-size: .78rem; }
+}

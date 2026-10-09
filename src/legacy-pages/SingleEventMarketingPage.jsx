@@ -6,11 +6,11 @@ import virtualImage from "../assets/virtual.png";
 import onlineImage from "../assets/online.png";
 
 const C = {
-  deepBlue: "#1B2A4A", midBlue: "#263B5F", brightBlue: "#0A9396", lightBlue: "#C9D6E0",
+  deepBlue: "#1B2A4A", midBlue: "#263B5F", brightBlue: "#087C7F", lightBlue: "#C9D6E0",
   bgBlue1: "#D7E3E8", bgBlue2: "#E6EDF0",
   cool10: "#F0F4F5", cool20: "#D9DFE1", cool30: "#C7CDD0", cool50: "#93A6B0",
   cool60: "#5E7A88", cool80: "#3A4853", cool90: "#292F39", cool100: "#21262E",
-  coral: "#E84C38", green: "#76B82A", yellow: "#FED746", white: "#FFFFFF",
+  coral: "#D24533", green: "#76B82A", yellow: "#FED746", white: "#FFFFFF",
 };
 const F = { body: "var(--imaa-font-sans, 'Inter', Arial, sans-serif)", display: "var(--imaa-font-serif, 'Source Serif 4', Georgia, serif)", mono: "'Roboto Mono', monospace" };
 
@@ -27,7 +27,7 @@ function useIsMobile(breakpoint = 768) {
 
 function useInView(ref, th = 0.12) { const [v, sV] = useState(false); useEffect(() => { if (!ref.current) return; const o = new IntersectionObserver(([e]) => { if (e.isIntersecting) sV(true); }, { threshold: th }); o.observe(ref.current); return () => o.disconnect(); }, [ref, th]); return v; }
 function FadeIn({ children, delay = 0 }) { const r = useRef(null); const v = useInView(r); return <div ref={r} style={{ opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(24px)", transition: `all 0.7s cubic-bezier(0.22,1,0.36,1) ${delay}s` }}>{children}</div>; }
-function Section({ children, bg = C.white, id, style: s = {} }) { const isMobile = useIsMobile(); return <section id={id} style={{ background: bg, padding: isMobile ? "48px 0" : "80px 0", ...s }}><div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile ? "0 20px" : "0 40px" }}>{children}</div></section>; }
+function Section({ children, bg = C.white, id, style: s = {} }) { const isMobile = useIsMobile(); return <section id={id} style={{ background: bg, padding: isMobile ? "48px 0" : "80px 0", ...s }}><div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "0 20px" : "0 40px" }}>{children}</div></section>; }
 
 
 // HERO – Registration above the fold
@@ -186,7 +186,7 @@ function Hero({ eventData = {}, eventId }) {
           <span aria-hidden="true" style={{ margin: "0 8px", opacity: 0.6 }}>›</span>
           <span>{eventData.title}</span>
         </nav>
-        <div style={{ display: "grid", gridTemplateColumns: isCompactHero ? "1fr" : "minmax(0, 1.25fr) minmax(280px, 0.75fr)", gap: isCompactHero ? 32 : 56, alignItems: "start" }}>
+        <div style={{ display: "grid", gridTemplateColumns: isCompactHero ? "1fr" : "minmax(0, 1fr) minmax(280px, 320px)", gap: isCompactHero ? 32 : 56, alignItems: "start" }}>
           {/* Left: Event info + benefits */}
           <div>
             <div style={{ ...a(0.4), display: "inline-flex", gap: 12, marginBottom: 24 }}>
@@ -612,7 +612,7 @@ function GoDeeper({ eventData = {} }) {
   const isMobile = useIsMobile();
   return (
     <section style={{ background: C.deepBlue, padding: isMobile ? "48px 0" : "72px 0" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: isMobile ? "0 20px" : "0 40px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: isMobile ? "0 20px" : "0 40px" }}>
         <FadeIn>
           <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 400px", gap: isMobile ? 24 : 48, alignItems: "start" }}>
             <div>

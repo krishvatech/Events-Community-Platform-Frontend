@@ -50,6 +50,7 @@ import CommunityProfileCard from "../../components/CommunityProfileCard.jsx";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
 import InviteEmailsDialog from "../../components/InviteEmailsDialog";
 import InviteGroupUsersDialog from "../../components/InviteGroupUsersDialog";
+import "../../styles/communityParity.css";
 
 // -----------------------------------------------------------------------------
 // 1. CONSTANTS & API HELPERS
@@ -4764,7 +4765,7 @@ export default function GroupDetailsPage() {
   });
 
   return (
-    <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 3 } }}>
+    <Box className="ecp-community-surface" sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 3 } }}>
       <Box
         sx={{
           display: "flex",

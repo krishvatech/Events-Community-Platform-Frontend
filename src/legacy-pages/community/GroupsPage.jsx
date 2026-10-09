@@ -980,7 +980,7 @@ export default function GroupsPage({ onJoinGroup = async () => { }, user }) {
   };
 
   return (
-    <Box sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: semanticColors.page, minHeight: "100vh" }}>
+    <Box className="ecp-community-directory" sx={{ width: "100%", py: { xs: 3, md: 5 }, bgcolor: semanticColors.page, minHeight: "100vh" }}>
       <Box
         sx={{
           display: "flex",

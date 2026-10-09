@@ -447,7 +447,7 @@ function EventCompanionAccessPage() {
           }}
         >
           <Container maxWidth="sm">
-            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: "var(--imaa-radius-popup)" }}>
               <Box sx={{ textAlign: 'center', mb: 4 }}>
                 <EventNoteIcon sx={{ fontSize: 48, color: '#1976d2', mb: 2 }} />
                 <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
@@ -575,7 +575,7 @@ function EventCompanionAccessPage() {
           }}
         >
           <Container maxWidth="sm">
-            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: "var(--imaa-radius-popup)" }}>
               <Box sx={{ textAlign: 'center', mb: 4 }}>
                 <EventNoteIcon sx={{ fontSize: 48, color: '#FF9800', mb: 2 }} />
                 <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
@@ -626,7 +626,7 @@ function EventCompanionAccessPage() {
           }}
         >
           <Container maxWidth="sm">
-            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: "var(--imaa-radius-popup)" }}>
               <Box sx={{ textAlign: 'center', mb: 4 }}>
                 <EventNoteIcon sx={{ fontSize: 48, color: '#F44336', mb: 2 }} />
                 <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
@@ -678,9 +678,9 @@ function EventCompanionAccessPage() {
                 Back to Event
               </Button>
 
-              <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: 2 }}>
+              <Paper elevation={3} sx={{ p: { xs: 2, sm: 4 }, borderRadius: "var(--imaa-radius-popup)" }}>
                 <Box sx={{ textAlign: 'center', mb: 4 }}>
-                  <EventNoteIcon sx={{ fontSize: 48, color: '#E8532F', mb: 2 }} />
+                  <EventNoteIcon sx={{ fontSize: 48, color: 'var(--imaa-coral)', mb: 2 }} />
                   <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
                     Apply to Event Companion
                   </Typography>
@@ -741,10 +741,10 @@ function EventCompanionAccessPage() {
           }}
         >
           <Container maxWidth="sm">
-            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
+            <Paper elevation={3} sx={{ p: { xs: 3, sm: 4 }, borderRadius: "var(--imaa-radius-popup)" }}>
               {/* Header */}
               <Box sx={{ textAlign: 'center', mb: 4 }}>
-                <EventNoteIcon sx={{ fontSize: 48, color: '#E8532F', mb: 2 }} />
+                <EventNoteIcon sx={{ fontSize: 48, color: 'var(--imaa-coral)', mb: 2 }} />
                 <Typography variant="h5" sx={{ fontWeight: 700, mb: 1, color: '#1B2A4A' }}>
                   Event Companion
                 </Typography>
@@ -776,7 +776,7 @@ function EventCompanionAccessPage() {
                   onClick={handleRegisterClick}
                   disabled={registering}
                   sx={{
-                    bgcolor: '#E8532F',
+                    bgcolor: 'var(--imaa-coral)',
                     '&:hover': { bgcolor: '#D64020' },
                     textTransform: 'none',
                     fontWeight: 600,

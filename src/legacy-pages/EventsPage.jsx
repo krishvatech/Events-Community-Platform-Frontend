@@ -1019,7 +1019,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       </Box>
       <CardContent className="p-4 sm:p-5 flex-1 flex flex-col min-h-[250px] sm:min-h-[270px] md:min-h-[286px]">
         <div className="flex items-start gap-2 mb-1">
-          <h3 className="font-sans text-xl sm:text-[22px] font-bold text-imaa-ink leading-snug two-line flex-1">
+          <h3 className="font-serif text-xl sm:text-[22px] font-bold text-imaa-ink leading-snug two-line flex-1">
             {ev.title}
           </h3>
           {ev.isPinnedTopCopy && (
@@ -1332,7 +1332,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     size="medium"
                     onClick={handleJoinCard}
                     disabled={!canJoinNow}
-                    className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
+                    className="normal-case rounded-full px-4 bg-[var(--imaa-coral)] hover:bg-[#B53A2C]"
                   >
                     {effectiveJoinLabel}
                   </Button>
@@ -1404,7 +1404,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           size="medium"
                           color="primary"
                           onClick={openApplyModalAfterProfileCheck}
-                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
+                          className="normal-case rounded-full px-4 bg-[var(--imaa-coral)] hover:bg-[#B53A2C]"
                         >
                           {applicationStatus === 'declined'
                             ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
@@ -1524,7 +1524,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           size="medium"
                           color="primary"
                           onClick={(e) => { e.stopPropagation(); handleRegisterCard(false); }}
-                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
+                          className="normal-case rounded-full px-4 bg-[var(--imaa-coral)] hover:bg-[#B53A2C]"
                         >
                           {getReplayCtaText(ev, isAuthenticatedUser)}
                         </Button>
@@ -1543,7 +1543,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         size="medium"
                         color="primary"
                         onClick={(e) => { e.stopPropagation(); handleRegisterCard(false); }}
-                        className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
+                        className="normal-case rounded-full px-4 bg-[var(--imaa-coral)] hover:bg-[#B53A2C]"
                       >
                         Register Now
                       </Button>
@@ -1958,7 +1958,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           size="medium"
                           onClick={handleJoinRow}
                           disabled={!canJoinNow}
-                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
+                          className="normal-case rounded-full px-4 bg-[var(--imaa-coral)] hover:bg-[#B53A2C]"
                         >
                           {effectiveJoinLabel}
                         </Button>
@@ -2026,7 +2026,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           size="medium"
                           color="primary"
                           onClick={openApplyModalAfterProfileCheck}
-                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
+                          className="normal-case rounded-full px-4 bg-[var(--imaa-coral)] hover:bg-[#B53A2C]"
                         >
                           {applicationStatus === 'declined'
                             ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
@@ -2094,7 +2094,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             size="medium"
                             color="primary"
                             onClick={(e) => { e.stopPropagation(); handleRegisterRow(false); }}
-                            className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
+                            className="normal-case rounded-full px-4 bg-[var(--imaa-coral)] hover:bg-[#B53A2C]"
                           >
                             {getReplayCtaText(ev, isAuthenticatedUser)}
                           </Button>
@@ -2113,7 +2113,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           size="medium"
                           color="primary"
                           onClick={(e) => { e.stopPropagation(); handleRegisterRow(false); }}
-                          className="normal-case rounded-full px-4 bg-[#CC4422] hover:bg-[#A9361C]"
+                          className="normal-case rounded-full px-4 bg-[var(--imaa-coral)] hover:bg-[#B53A2C]"
                         >
                           Register Now
                         </Button>
@@ -2235,9 +2235,10 @@ export default function EventsPage() {
   const [page, setPage] = useState(1);
   const [replayPage, setReplayPage] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  // The public directory is intentionally row-first, matching the locked Events
-  // directory pattern. The existing grid preference remains available to users.
-  const [view, setView] = useState("list"); // 'grid' | 'list'
+  // KT's event directory is card-grid first. Keep the existing list control and
+  // state intact for members who prefer it, but present the directory in the
+  // canonical card composition on first load.
+  const [view, setView] = useState("grid"); // 'grid' | 'list'
   const [selectedTab, setSelectedTab] = useState("upcoming"); // 'upcoming' | 'replays'
   const [dateRange, setDateRange] = useState(""); // "",
   const [topic, setTopic] = useState("");   // or "Topic/Industry" if you prefer
@@ -3968,7 +3969,7 @@ export default function EventsPage() {
                     </div>
                   </div>
 
-                  <button className="w-full h-11 rounded-full bg-[#CC4422] hover:bg-[#A9361C] text-white font-semibold transition-colors">
+                  <button className="w-full h-11 rounded-full bg-[var(--imaa-coral)] hover:bg-[#B53A2C] text-white font-semibold transition-colors">
                     Apply Filters
                   </button>
 
@@ -4080,10 +4081,14 @@ export default function EventsPage() {
                   mt: 2.5,
                   display: "grid",
                   gap: 3,
-                  // As many >=320px columns as fit the results column (which narrows with the sidebar and
-                  // the Advanced Filters panel); one column on small screens. auto-fill keeps a single card
-                  // at one column's width instead of stretching it across the row.
-                  gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 320px), 1fr))",
+                  // KT directory rhythm: one card on phones, two on tablets and
+                  // a three-card directory at desktop width. The existing filter
+                  // rail remains able to narrow this safely through minmax().
+                  gridTemplateColumns: {
+                    xs: "1fr",
+                    sm: "repeat(2, minmax(0, 1fr))",
+                    lg: "repeat(3, minmax(0, 1fr))",
+                  },
                 }}
               >
                 {rawEvents.length === 0 && initialLoading
@@ -4166,7 +4171,7 @@ export default function EventsPage() {
                           {/* Content */}
                           <div className="p-4 sm:p-5 md:p-6 flex flex-col flex-grow">
                             {/* Title */}
-                            <h3 className="font-sans text-xl sm:text-[22px] font-bold text-imaa-ink mb-2 leading-snug">
+                            <h3 className="font-serif text-xl sm:text-[22px] font-bold text-imaa-ink mb-2 leading-snug">
                               {series.title}
                             </h3>
 
@@ -4205,7 +4210,7 @@ export default function EventsPage() {
                             <div className="flex gap-2 mt-auto pt-2">
                               <button
                                 onClick={() => navigate(`/series/${series.slug}`)}
-                                className="rounded-full bg-[#CC4422] hover:bg-[#A9361C] text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                                className="rounded-full bg-[var(--imaa-coral)] hover:bg-[#B53A2C] text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
                               >
                                 View Series
                               </button>
@@ -4323,7 +4328,7 @@ export default function EventsPage() {
                               {/* Details */}
                               <div className="p-6 md:w-3/5 flex flex-col">
                                 <div className="min-w-0">
-                                  <h3 className="font-sans text-xl md:text-[22px] font-bold text-imaa-ink leading-snug">
+                                  <h3 className="font-serif text-xl md:text-[22px] font-bold text-imaa-ink leading-snug">
                                     {series.title}
                                   </h3>
                                   {series.description && (
@@ -4354,7 +4359,7 @@ export default function EventsPage() {
                                 <div className="mt-6 flex flex-wrap gap-3">
                                   <button
                                     onClick={() => navigate(`/series/${series.slug}`)}
-                                    className="rounded-full bg-[#CC4422] hover:bg-[#A9361C] text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
+                                    className="rounded-full bg-[var(--imaa-coral)] hover:bg-[#B53A2C] text-white text-sm font-semibold px-5 py-2 whitespace-nowrap transition-colors"
                                   >
                                     View Series
                                   </button>

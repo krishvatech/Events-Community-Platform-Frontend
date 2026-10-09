@@ -43,6 +43,18 @@ const EVENT_GRID_COLUMNS = { xs: "1fr", sm: "repeat(2, minmax(0, 1fr))", lg: "re
 // Local SVG placeholder — works even when external images are blocked on staging
 const PLACEHOLDER_IMG = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='400'%3E%3Crect width='800' height='400' fill='%23F5F4F2'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='28' fill='%23C0BAB4'%3EEvent%3C/text%3E%3C/svg%3E";
 
+// Recovered verbatim from the pre-M2 Dashboard (99e0711). This is a separate,
+// approved Dashboard feature -- it is not a substitute for landing API events.
+const STATIC_FEATURED_EVENT = {
+  id: "evt-1",
+  title: "The Annual M&A Summit",
+  description: "Industry leaders gather to discuss the latest M&A trends and deal-making innovations.",
+  start_date: null,
+  location: "New York, NY",
+  event_type: "Conference",
+  image_url: "https://images.unsplash.com/photo-1511578314322-379afb476865?w=800&q=80",
+};
+
 const STATIC_DISCUSSIONS = [
   { id: 1, title: "Best practices for cross-border M&A due diligence", views: 284, comments_count: 14, reactions_count: 32, emoji: "🌐" },
   { id: 2, title: "How are you valuing tech targets in 2025?", views: 195, comments_count: 9, reactions_count: 28, emoji: "💻" },
@@ -85,6 +97,15 @@ function getEventType(event) {
 function getEventHref(event) {
   const key = event?.slug || event?.id || "";
   return key ? `/events/${key}` : "/events";
+}
+
+function isStaticFeaturedEvent(event) {
+  const featuredId = String(STATIC_FEATURED_EVENT.id);
+  if (event?.id != null && String(event.id) === featuredId) return true;
+
+  // A matching canonical destination is also safe. Do not deduplicate by title.
+  const eventKey = event?.slug || event?.id;
+  return Boolean(eventKey && getEventHref(event) === getEventHref(STATIC_FEATURED_EVENT));
 }
 
 // Dashboard-only event copy: prefer an API-provided short field, then derive a
@@ -659,7 +680,6 @@ function FooterCTA({ isMember }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 export default function DashboardPage() {
   const [user, setUser] = useState(null);
-  const [landingHero, setLandingHero] = useState(null);
   const [events, setEvents] = useState([]);
   // const [discussions, setDiscussions] = useState([]); // COMMENTED OUT - will restore when community section is re-enabled
   // const [groups, setGroups] = useState([]); // COMMENTED OUT - will restore when community section is re-enabled
@@ -681,10 +701,6 @@ export default function DashboardPage() {
       if (!active) return;
       setUser(userData);
 
-      const apiHero = eventsData?.hero_event || null;
-      // Accept backend hero only when it is an admin featured event or pinned fallback.
-      // This protects the UI from old cached responses that promoted a normal event to hero.
-      setLandingHero(apiHero?.is_featured === true || apiHero?.is_pinned === true ? apiHero : null);
       setEvents(Array.isArray(eventsData?.upcoming_events) ? eventsData.upcoming_events.slice(0, 10) : []);
 
       setPendingForms(formsData); // Show all pending forms
@@ -699,17 +715,6 @@ export default function DashboardPage() {
   const profileCompletion = profile.profile_completion_percentage ?? 0;
   const firstName = user?.first_name || user?.username || "there";
   const isMember = profile.is_member || user?.is_member || false;
-  // Event presentation uses only the landing endpoint's real event data.
-  const displayEvents = events;
-
-  // Prefer the backend's featured/pinned hero; otherwise use the first real event.
-  const selectStaticHero = (eventList) => {
-    if (!Array.isArray(eventList) || eventList.length === 0) return null;
-    return eventList.find(e => e.is_featured === true) || eventList[0];
-  };
-
-  const featuredEvent = landingHero || selectStaticHero(events);
-
   // Sort real grid events: pinned first, then upcoming by start time.
   const sortGridEvents = (eventList, excludeEvent) => {
     // Exclude featured/hero event only. Keep other real pinned events in the grid.
@@ -747,7 +752,10 @@ export default function DashboardPage() {
     });
   };
 
-  const realGridEvents = sortGridEvents(events, featuredEvent).slice(0, 3);
+  // Keep real landing events below the restored feature block. The static
+  // feature never consumes the first API event; only a matching stable ID or
+  // canonical destination is omitted to prevent a duplicate.
+  const realGridEvents = sortGridEvents(events.filter(event => !isStaticFeaturedEvent(event))).slice(0, 3);
   const gridEvents = realGridEvents;
 
   return (
@@ -826,21 +834,21 @@ export default function DashboardPage() {
                 <Box key={i} sx={{ height: 240, borderRadius: CARD_RADIUS, bgcolor: BORDER, opacity: 0.5 }} />
               ))}
             </Box>
-          ) : featuredEvent ? (
+          ) : (
             <>
-              <FeaturedHero event={featuredEvent} />
-              {gridEvents.length > 0 && (
+              <FeaturedHero event={STATIC_FEATURED_EVENT} />
+              {gridEvents.length > 0 ? (
                 <Box sx={{ display: "grid", gridTemplateColumns: EVENT_GRID_COLUMNS, gap: 2.5 }}>
                   {gridEvents.map((ev, i) => (
                     <DashEventCard key={ev.id || i} event={ev} index={i} />
                   ))}
                 </Box>
+              ) : (
+                <Box role="status" sx={{ border: `1px dashed ${BORDER}`, borderRadius: CARD_RADIUS, px: 2.5, py: 4, textAlign: "center", color: INK_BODY, fontSize: 14, lineHeight: 1.6 }}>
+                  There are no upcoming events to show right now.
+                </Box>
               )}
             </>
-          ) : (
-            <Box role="status" sx={{ border: `1px dashed ${BORDER}`, borderRadius: CARD_RADIUS, px: 2.5, py: 4, textAlign: "center", color: INK_BODY, fontSize: 14, lineHeight: 1.6 }}>
-              There are no upcoming events to show right now.
-            </Box>
           )}
           <Box sx={{ textAlign: "center", mt: 3.5 }}>
             {/* Navy outline: the orange text/border was below AA contrast */}

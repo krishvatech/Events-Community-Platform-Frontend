@@ -17,6 +17,7 @@ import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import { API_BASE, getToken } from "../../utils/api";
+import "../../styles/communityParity.css";
 
 const API_ORIGIN = API_BASE.replace(/\/api\/?$/, "");
 
@@ -103,7 +104,7 @@ export default function PublicGroupLandingPage() {
   const encodedNext = encodeURIComponent(groupPath);
 
   return (
-    <Box sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", minHeight: "100vh", pb: 8 }}>
+    <Box className="ecp-community-surface" sx={{ bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", minHeight: "100vh", pb: 8 }}>
       <Box
         sx={{
           minHeight: { xs: 240, md: 360 },

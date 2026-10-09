@@ -47,7 +47,7 @@ const socialButtonSx = {
 // Light surface with three columns. Colours are dark-mode aware (light values unchanged; see
 // designTokens.semanticColors and the `var(--imaa-dm-*, light)` tokens in brand.css).
 const PUBLIC_INK = "var(--imaa-dm-text, #243E75)";
-const PUBLIC_ACCENT = "var(--imaa-dm-orange-text, #CC4422)";
+const PUBLIC_ACCENT = "var(--imaa-dm-orange-text, #D24533)";
 
 const publicLinkSx = {
   color: semanticColors.textBody,

@@ -44,6 +44,7 @@ import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 import InviteGroupUsersDialog from "../components/InviteGroupUsersDialog";
+import "../styles/communityParity.css";
 
 
 // Number of members shown per page in the Members tab list.
@@ -5131,7 +5132,7 @@ export default function GroupManagePage() {
     const onUpdated = (updated) => setGroup(updated);
 
     return (
-        <div className="max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0 overflow-hidden">
+        <div className="ecp-community-surface max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0 overflow-hidden">
             <div className="grid grid-cols-12 gap-4">
 
                 {/* RIGHT: your original page content unchanged */}

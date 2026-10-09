@@ -13,6 +13,7 @@ import MembersPage from "./community/MembersPage.jsx";
 import MessagesPage from "./community/MessagesPage.jsx";
 import MyPostsPage from "./community/MyPostsPage";
 import MyContacts from "./community/mycontacts.jsx";
+import "../styles/communityParity.css";
 
 export default function CommunityHubPage() {
   const location = useLocation();
@@ -55,6 +56,7 @@ export default function CommunityHubPage() {
 
   return (
     <Box
+      className="ecp-community-surface"
       sx={{
         width: "100%",
         maxWidth: view === "home" ? "100%" : 1200,

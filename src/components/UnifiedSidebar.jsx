@@ -735,14 +735,14 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             <Box sx={{ px: 2.5, py: 2, display: "flex", alignItems: "center", gap: 1.5, borderBottom: `1px solid ${CARD_BORDER}` }}>
                 <Box sx={{ width: 36, height: 36, borderRadius: 2, bgcolor: "#1B2A4A", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="10" stroke="#0A9396" strokeWidth="1.5" />
-                        <ellipse cx="12" cy="12" rx="4" ry="10" stroke="#E8532F" strokeWidth="1.5" />
-                        <line x1="2" y1="12" x2="22" y2="12" stroke="#0A9396" strokeWidth="1.5" />
+                        <circle cx="12" cy="12" r="10" stroke="var(--imaa-teal)" strokeWidth="1.5" />
+                        <ellipse cx="12" cy="12" rx="4" ry="10" stroke="var(--imaa-coral)" strokeWidth="1.5" />
+                        <line x1="2" y1="12" x2="22" y2="12" stroke="var(--imaa-teal)" strokeWidth="1.5" />
                     </svg>
                 </Box>
                 <Box>
                     <Typography sx={{ fontWeight: 800, fontSize: 14, color: "var(--imaa-ink)", lineHeight: 1.2, letterSpacing: "-0.01em" }}>IMAA</Typography>
-                    <Typography sx={{ fontWeight: 700, fontSize: 10, color: "var(--imaa-dm-teal-text, #0A9396)", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>CONNECT</Typography>
+                    <Typography sx={{ fontWeight: 700, fontSize: 10, color: "var(--imaa-dm-teal-text, #087C7F)", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>CONNECT</Typography>
                 </Box>
                 {/* Dark mode switch (feature flag VITE_ENABLE_DARK_MODE), right-aligned in the brand row.
                     Native button with role="switch" + aria-checked; its label and tooltip say what a click

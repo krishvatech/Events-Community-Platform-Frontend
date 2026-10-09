@@ -42,7 +42,7 @@ const STRATEGIC_PARTNERS = [
 const C = {
   deepBlue: "#1B2A4A",
   midBlue: "#263B5F",
-  brightBlue: "#0A9396",
+  brightBlue: "#087C7F",
   lightBlue: "#C9D6E0",
   bgBlue1: "#D7E3E8",
   bgBlue2: "#E6EDF0",
@@ -54,7 +54,7 @@ const C = {
   cool80: "#3A4853",
   cool90: "#292F39",
   cool100: "#21262E",
-  coral: "#E84C38",
+  coral: "#D24533",
   green: "#76B82A",
   yellow: "#FED746",
   white: "#FFFFFF",
@@ -128,7 +128,7 @@ const Ic = {
 function Section({ bg, children, style, id }) {
   return (
     <section id={id} style={{ background: bg, ...style }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 40px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 40px" }}>
         {children}
       </div>
     </section>
@@ -402,7 +402,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
       <section style={{ background: C.deepBlue }} aria-labelledby="landing-event-title">
       <div
         style={{
-          maxWidth: 1100,
+          maxWidth: 1200,
           margin: "0 auto",
           padding: "20px 40px",
           display: "flex",
@@ -2106,7 +2106,7 @@ function FinalCTA({ onApplyClick, onJoinClick, eventData = {}, myApplication }) 
 function Footer() {
   return (
     <footer style={{ background: C.cool100, padding: "48px 0" }}>
-      <div style={{ maxWidth: 1100, margin: "0 auto", padding: "0 40px" }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "0 40px" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <span style={{ fontSize: 11, color: C.cool60, fontFamily: F.body }}>© 2026 Oxford M&A Symposium</span>
           <div style={{ display: "flex", gap: 20 }}>

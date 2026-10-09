@@ -226,13 +226,14 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
       elevation={0}
       className="overflow-hidden"
       sx={{
-        borderRadius: 0,
+        borderRadius: "var(--imaa-radius-card)",
         display: "grid",
         gridTemplateColumns: { xs: "1fr", sm: "130px minmax(0, 1fr)" },
         gap: { xs: 1.5, sm: 3 },
         p: { xs: 2, sm: "18px 24px" },
-        borderColor: "var(--imaa-dm-border, #E2E4E8)",
-        "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #F7F8FA)" },
+        border: "1px solid var(--imaa-dm-border, #E2E4E8)",
+        boxShadow: "var(--imaa-shadow-sm)",
+        "&:hover": { bgcolor: "var(--imaa-dm-surface-hover, #F7F8FA)", boxShadow: "var(--imaa-shadow-md)" },
       }}
     >
       {/* SAME IMAGE SIZE for all cards: 16:9 area that always covers */}
@@ -293,7 +294,8 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
           state={{ event: ev }}
           className="text-slate-900"
           sx={{
-            fontWeight: 800,
+            fontFamily: "var(--imaa-font-serif)",
+            fontWeight: 700,
             lineHeight: 1.25,
             textDecoration: "none",
             color: "var(--imaa-ink)",

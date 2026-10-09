@@ -4060,6 +4060,7 @@ export default function LiveFeedPage({
 
   return (
     <Grid
+      className="ecp-community-feed"
       container
       rowSpacing={2}
       sx={{ width: "100%", maxWidth: "100%", minWidth: 0, m: 0 }}
