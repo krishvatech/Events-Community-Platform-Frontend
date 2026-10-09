@@ -38,9 +38,11 @@ import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "react-router-dom";
 
+import ContactImportDialog from "../components/marketing/ContactImportDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 
 import {
@@ -94,6 +96,7 @@ export default function AdminNewsletterContactsPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkMessage, setBulkMessage] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [customFieldDefs, setCustomFieldDefs] = useState([]);
   const [customFieldValues, setCustomFieldValues] = useState({});
   const [createForm, setCreateForm] = useState({
@@ -318,6 +321,14 @@ export default function AdminNewsletterContactsPage() {
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
           <Button variant="contained" onClick={() => setCreateOpen(true)} sx={{ textTransform: "none" }}>
             Create Contact
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<UploadFileRoundedIcon />}
+            onClick={() => setImportOpen(true)}
+            sx={{ textTransform: "none" }}
+          >
+            Import CSV
           </Button>
           <Button
             startIcon={<RefreshRoundedIcon />}
@@ -694,6 +705,23 @@ export default function AdminNewsletterContactsPage() {
           </Stack>
         </Stack>
       </Paper>
+
+      <ContactImportDialog
+        open={importOpen}
+        onClose={(result) => {
+          setImportOpen(false);
+          if (result?.viewContacts) {
+            setSearchInput("");
+            setSearch("");
+            setStageFilter("");
+            setPage(1);
+            loadContacts({ nextPage: 1, nextSearch: "", nextStageFilter: "", refresh: true });
+          }
+        }}
+        onFinished={() =>
+          loadContacts({ nextPage: page, nextSearch: search, nextStageFilter: stageFilter, refresh: true })
+        }
+      />
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>Create Mautic Contact</DialogTitle>

@@ -261,6 +261,58 @@ export const listNewsletterStages = (params = {}) =>
 export const bulkUpdateNewsletterAdminContactStage = (payload) =>
   unwrap(apiClient.post(`${adminContactsEndpoint}bulk-stage/`, payload));
 
+// CSV contact import. The file is sent again at every step: ECP never stores it.
+const adminContactImportsEndpoint = `${adminContactsEndpoint}imports/`;
+
+const contactImportForm = (file, fields = {}) => {
+  const form = new FormData();
+  form.append("file", file);
+  Object.entries(fields).forEach(([key, value]) => {
+    form.append(key, typeof value === "string" ? value : JSON.stringify(value));
+  });
+  return form;
+};
+
+const multipart = { headers: { "Content-Type": "multipart/form-data" } };
+
+export const getContactImportFields = () =>
+  unwrap(apiClient.get(`${adminContactImportsEndpoint}fields/`));
+
+export const previewContactImport = (file) =>
+  unwrap(apiClient.post(`${adminContactImportsEndpoint}preview/`, contactImportForm(file), multipart));
+
+export const validateContactImport = (file, { mapping, options }) =>
+  unwrap(
+    apiClient.post(
+      `${adminContactImportsEndpoint}validate/`,
+      contactImportForm(file, { mapping, options }),
+      multipart
+    )
+  );
+
+export const startContactImport = (file, { mapping, options, validationToken }) =>
+  unwrap(
+    apiClient.post(
+      `${adminContactImportsEndpoint}start/`,
+      contactImportForm(file, {
+        mapping,
+        options,
+        validation_token: validationToken,
+        confirm: "true",
+      }),
+      multipart
+    )
+  );
+
+export const listContactImports = (params = {}) =>
+  unwrap(apiClient.get(adminContactImportsEndpoint, { params }));
+
+export const getContactImport = (importId) =>
+  unwrap(apiClient.get(`${adminContactImportsEndpoint}${importId}/`));
+
+export const listContactImportErrors = (importId, params = {}) =>
+  unwrap(apiClient.get(`${adminContactImportsEndpoint}${importId}/errors/`, { params }));
+
 export const getNewsletterStage = (stageId) =>
   unwrap(apiClient.get(`${adminStagesEndpoint}${stageId}/`));
 
