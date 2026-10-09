@@ -1,6 +1,8 @@
 import referenceStyles from "./ReferenceGallery.module.css";
 import FaqAccordion from "./FaqAccordion.jsx";
 import { FAQ_CONTACT_URL, FAQ_SLUG, splitFaqSections } from "@/lib/faqSections";
+import { LegalSectionNavMobile, LegalSectionNavSidebar } from "./LegalSectionNav.jsx";
+import { LEGAL_TOC_SLUGS, addLegalSectionAnchors } from "@/lib/legalSections";
 
 // src/components/public/StandardPageArticle.jsx
 // Server Component: the one renderer for public StandardPage content (title + rich-text body),
@@ -19,11 +21,19 @@ import { FAQ_CONTACT_URL, FAQ_SLUG, splitFaqSections } from "@/lib/faqSections";
 // token-based body text, teal list markers and link colour. The Tailwind colour utilities
 // follow the dark palette through tailwind.config.js, so no inline colours are needed.
 
-const BODY_CLASS = [
+const DEFAULT_H2 = "[&_h2]:mt-10 [&_h2]:font-sans [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:tracking-[-0.02em] [&_h2]:text-imaa-ink";
+// Legal pages: numbered, capitalised "SECTION n – …" headings read better smaller with a little
+// letter-spacing, each section separated by a rule; scroll-mt keeps an #anchor below the header.
+const LEGAL_H2 = [
+  "[&_h2]:mt-12 [&_h2]:scroll-mt-24 [&_h2]:border-t [&_h2]:border-imaa-border [&_h2]:pt-8",
+  "[&_h2]:font-sans [&_h2]:text-base [&_h2]:font-bold [&_h2]:leading-snug [&_h2]:tracking-[0.02em] [&_h2]:text-imaa-ink md:[&_h2]:text-lg",
+].join(" ");
+
+const bodyClass = (h2Rule) => [
   // break-words: long URLs and e-mail addresses wrap instead of widening the page on phones.
   "break-words text-base leading-relaxed text-imaa-body md:text-lg",
   "[&_p]:mt-4 [&_p:first-child]:mt-0",
-  "[&_h2]:mt-10 [&_h2]:font-sans [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:tracking-[-0.02em] [&_h2]:text-imaa-ink",
+  h2Rule,
   "[&_h3]:mt-8 [&_h3]:font-sans [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-imaa-ink",
   "[&_h4]:mt-6 [&_h4]:font-sans [&_h4]:text-lg [&_h4]:font-semibold [&_h4]:text-imaa-ink",
   "[&_ul]:mt-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mt-4 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:mt-1.5 [&_li::marker]:text-imaa-teal",
@@ -38,6 +48,9 @@ const BODY_CLASS = [
   "[&_td]:border [&_td]:border-imaa-border [&_td]:px-3 [&_td]:py-2 [&_td]:align-top",
 ].join(" ");
 
+const BODY_CLASS = bodyClass(DEFAULT_H2);
+const LEGAL_BODY_CLASS = bodyClass(LEGAL_H2);
+
 // Images in the (already sanitised) body load lazily: the References logo wall has 258 of them.
 // Every image carries width and height, so lazy loading causes no layout shift.
 const withLazyImages = (html) => html.replace(/<img(?![^>]*\bloading=)/g, '<img loading="lazy" decoding="async"');
@@ -48,6 +61,8 @@ export default function StandardPageArticle({ page, source = "cms" }) {
   const body = withLazyImages(rawBody);
   // FAQ: the same CMS body, shown as one toggle per <h2> question (src/lib/faqSections.js).
   const faq = page?.slug === FAQ_SLUG ? splitFaqSections(body) : null;
+  // Long legal pages: the same CMS body with anchored section headings and a contents list.
+  const legal = LEGAL_TOC_SLUGS.includes(page?.slug) ? addLegalSectionAnchors(body) : null;
 
   return (
     <article
@@ -90,6 +105,14 @@ export default function StandardPageArticle({ page, source = "cms" }) {
               </a>
             </aside>
           </div>
+        </div>
+      ) : legal ? (
+        <div className="mx-auto grid w-full max-w-[1200px] gap-10 px-6 py-10 md:py-14 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-14">
+          <div className="min-w-0 max-w-3xl">
+            <LegalSectionNavMobile sections={legal.sections} />
+            <div className={LEGAL_BODY_CLASS} dangerouslySetInnerHTML={{ __html: legal.html }} />
+          </div>
+          <LegalSectionNavSidebar sections={legal.sections} />
         </div>
       ) : body ? (
         <div className="mx-auto w-full max-w-[1200px] px-6 py-12 md:py-16">
