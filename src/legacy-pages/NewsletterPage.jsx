@@ -133,7 +133,7 @@ export default function NewsletterPage() {
   };
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
+    <Container className="ecp-k4-surface" maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
       <Stack spacing={3}>
         <Box>
           <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 800, color: "var(--imaa-ink)", mb: 0.75 }}>

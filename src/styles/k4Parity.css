@@ -1,0 +1,210 @@
+/* K4 content, member, and commerce presentation layer. Every selector is route-scoped. */
+.ecp-k4-surface {
+  --k4-navy: #1B2A4A;
+  --k4-coral: #D24533;
+  --k4-teal: #087C7F;
+  background: var(--imaa-dm-page, #F7F8FA);
+}
+
+.ecp-k4-surface .MuiPaper-root:not(.MuiDialog-paper):not(.MuiPopover-paper),
+.ecp-k4-surface .MuiCard-root {
+  border-color: var(--imaa-border, #E2E4E8) !important;
+  border-radius: var(--imaa-radius-card, 8px) !important;
+}
+
+.ecp-k4-surface .MuiPaper-outlined,
+.ecp-k4-surface .MuiCard-outlined {
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27, 42, 74, .08));
+}
+
+.ecp-k4-surface .MuiTypography-h3,
+.ecp-k4-surface .MuiTypography-h4,
+.ecp-k4-surface .MuiTypography-h5,
+.ecp-k4-surface .MuiTypography-h6 {
+  color: var(--imaa-ink, var(--k4-navy));
+  font-family: var(--imaa-font-serif, Georgia, serif);
+}
+
+.ecp-k4-surface .MuiOutlinedInput-root {
+  border-radius: var(--imaa-radius-input, 6px);
+  background: var(--imaa-dm-surface, #fff);
+}
+
+.ecp-k4-surface .MuiTabs-root {
+  padding: 4px;
+  border: 1px solid var(--imaa-border, #E2E4E8);
+  border-radius: 999px;
+  background: var(--imaa-dm-surface, #fff);
+}
+
+.ecp-k4-surface .MuiTab-root {
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  color: var(--imaa-ink-body, #5A6070);
+  font-weight: 700;
+  text-transform: none;
+}
+
+.ecp-k4-surface .MuiTab-root.Mui-selected {
+  background: var(--k4-navy);
+  color: #fff;
+}
+
+.ecp-k4-surface .MuiTabs-indicator { display: none; }
+.ecp-k4-surface .MuiButton-containedPrimary { background-color: var(--k4-coral); }
+.ecp-k4-surface .MuiButton-containedPrimary:hover { background-color: #B53A2C; }
+.ecp-k4-surface .MuiChip-root { border-radius: 999px; font-weight: 700; }
+
+.ecp-k4-content .MuiCard-root { overflow: hidden; }
+.ecp-k4-content .MuiCardMedia-root,
+.ecp-k4-content img.MuiCardMedia-root { aspect-ratio: 16 / 9; object-fit: cover; }
+.ecp-k4-course .MuiLinearProgress-root { border-radius: 999px; height: 7px; }
+.ecp-k4-commerce .MuiPaper-root { background-image: linear-gradient(180deg, rgba(240, 244, 245, .38), transparent 80px); }
+
+/* Training: retain the existing programme data and links, refine only its custom presentation. */
+.ecp-k4-surface.imaa-training-page .hero,
+.ecp-k4-surface.imaa-recognition-page .hero {
+  background: linear-gradient(120deg, var(--k4-navy), #263B5F);
+}
+
+.ecp-k4-surface.imaa-training-page .hero-inner,
+.ecp-k4-surface.imaa-recognition-page .hero-inner,
+.ecp-k4-surface.imaa-training-page .programs-section,
+.ecp-k4-surface.imaa-training-page .formats-inner,
+.ecp-k4-surface.imaa-recognition-page .context-inner,
+.ecp-k4-surface.imaa-recognition-page .filter-bar-inner,
+.ecp-k4-surface.imaa-recognition-page .directory-inner,
+.ecp-k4-surface.imaa-recognition-page .legend-inner {
+  max-width: 1200px;
+  margin-inline: auto;
+}
+
+.ecp-k4-surface.imaa-training-page .hero-title,
+.ecp-k4-surface.imaa-training-page .section-title,
+.ecp-k4-surface.imaa-training-page .program-name,
+.ecp-k4-surface.imaa-recognition-page .hero-title,
+.ecp-k4-surface.imaa-recognition-page .context-title,
+.ecp-k4-surface.imaa-recognition-page .inst-name {
+  font-family: var(--imaa-font-serif, Georgia, serif);
+}
+
+.ecp-k4-surface.imaa-training-page .program-card,
+.ecp-k4-surface.imaa-training-page .format-card,
+.ecp-k4-surface.imaa-training-page .inhouse-banner,
+.ecp-k4-surface.imaa-recognition-page .institution {
+  border: 1px solid var(--imaa-border, #E2E4E8);
+  border-radius: var(--imaa-radius-card, 8px);
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27, 42, 74, .08));
+}
+
+.ecp-k4-surface.imaa-training-page .program-card,
+.ecp-k4-surface.imaa-training-page .format-card { overflow: hidden; }
+.ecp-k4-surface.imaa-training-page .program-abbr { color: var(--k4-coral); }
+.ecp-k4-surface.imaa-training-page .format-tag,
+.ecp-k4-surface.imaa-recognition-page .chip {
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+.ecp-k4-surface.imaa-training-page .program-link,
+.ecp-k4-surface.imaa-recognition-page .chip.active,
+.ecp-k4-surface.imaa-recognition-page .view-toggle .active {
+  color: var(--k4-teal);
+}
+
+.ecp-k4-surface.imaa-training-page .btn-coral,
+.ecp-k4-surface.imaa-recognition-page .btn-coral { background: var(--k4-coral); }
+.ecp-k4-surface.imaa-training-page .btn-teal { background: var(--k4-teal); }
+
+/* Recognition directory controls retain their existing filters and result state. */
+.ecp-k4-surface.imaa-recognition-page .filter-bar {
+  border-block: 1px solid var(--imaa-border, #E2E4E8);
+  background: var(--imaa-dm-surface, #fff);
+}
+
+.ecp-k4-surface.imaa-recognition-page .search-field input {
+  border-radius: var(--imaa-radius-input, 6px);
+  border-color: var(--imaa-border, #E2E4E8);
+}
+
+.ecp-k4-surface.imaa-recognition-page .institution {
+  overflow: hidden;
+  background: var(--imaa-dm-surface, #fff);
+}
+
+.ecp-k4-surface.imaa-recognition-page .comp-cell.on { background: var(--k4-teal); }
+
+/* Assignment forms: all controls stay semantic and wired to their current field handlers. */
+.ecp-k4-surface.form-page { padding: clamp(20px, 4vw, 56px) 16px; }
+.ecp-k4-surface.form-page .form-container {
+  max-width: 860px;
+  margin-inline: auto;
+  padding: clamp(20px, 4vw, 40px);
+  border: 1px solid var(--imaa-border, #E2E4E8);
+  border-radius: var(--imaa-radius-card, 8px);
+  background: var(--imaa-dm-surface, #fff);
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27, 42, 74, .08));
+}
+
+.ecp-k4-surface.form-page .form-header h1,
+.ecp-k4-surface.form-page .section-title {
+  color: var(--imaa-ink, var(--k4-navy));
+  font-family: var(--imaa-font-serif, Georgia, serif);
+}
+
+.ecp-k4-surface.form-page .form-section {
+  padding-block: 24px;
+  border-top: 1px solid var(--imaa-border, #E2E4E8);
+}
+
+.ecp-k4-surface.form-page .field-wrapper { margin-top: 18px; }
+.ecp-k4-surface.form-page .field-wrapper input:not([type="checkbox"]):not([type="radio"]),
+.ecp-k4-surface.form-page .field-wrapper textarea,
+.ecp-k4-surface.form-page .field-wrapper select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--imaa-border, #E2E4E8);
+  border-radius: var(--imaa-radius-input, 6px);
+  padding: 11px 12px;
+  background: var(--imaa-dm-surface, #fff);
+  color: var(--imaa-ink, var(--k4-navy));
+}
+
+.ecp-k4-surface.form-page .field-wrapper input:focus,
+.ecp-k4-surface.form-page .field-wrapper textarea:focus,
+.ecp-k4-surface.form-page .field-wrapper select:focus {
+  outline: 2px solid color-mix(in srgb, var(--k4-teal) 45%, transparent);
+  outline-offset: 1px;
+  border-color: var(--k4-teal);
+}
+
+.ecp-k4-surface.form-page .privacy-notice,
+.ecp-k4-surface.form-page .restricted-notice,
+.ecp-k4-surface.form-page .draft-saved-message {
+  border-radius: var(--imaa-radius-input, 6px);
+}
+
+.ecp-k4-surface.form-page .file-upload-area,
+.ecp-k4-surface.form-page .file-upload-multiple-area {
+  border: 1px dashed var(--k4-teal);
+  border-radius: var(--imaa-radius-input, 6px);
+  background: color-mix(in srgb, var(--k4-teal) 5%, #fff);
+}
+
+.ecp-k4-surface.form-page .form-actions { gap: 12px; flex-wrap: wrap; }
+.ecp-k4-surface.form-page .btn { border-radius: 999px; }
+.ecp-k4-surface.form-page .btn-primary { background: var(--k4-coral); }
+
+@media (max-width: 700px) {
+  .ecp-k4-surface.imaa-training-page .program-grid,
+  .ecp-k4-surface.imaa-training-page .formats-grid { grid-template-columns: 1fr; }
+  .ecp-k4-surface.imaa-recognition-page .filter-bar-inner { align-items: stretch; }
+  .ecp-k4-surface.imaa-recognition-page .filter-group { flex-wrap: wrap; }
+  .ecp-k4-surface.form-page .form-container { padding: 20px; }
+}
+
+@media (max-width: 600px) {
+  .ecp-k4-surface .MuiTabs-flexContainer { overflow-x: auto; }
+  .ecp-k4-surface .MuiTab-root { padding-inline: 11px; font-size: .78rem; }
+}

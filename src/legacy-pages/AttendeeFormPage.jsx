@@ -509,7 +509,7 @@ export default function AttendeeFormPage() {
 
 
   return (
-    <div className="form-page">
+    <div className="ecp-k4-surface form-page">
       <div className="form-container">
         <div className="form-header">
           <h1>{assignment.form_template?.title || 'Form'}</h1>

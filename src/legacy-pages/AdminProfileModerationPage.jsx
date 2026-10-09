@@ -194,7 +194,7 @@ export default function AdminProfileModerationPage({ embedded = false }) {
   }
 
   return (
-    <Box
+    <Box className="ecp-admin-moderation"
       sx={{
         px: embedded ? 0 : { xs: 2, md: 3 },
         py: embedded ? 0 : { xs: 2, md: 3 },

@@ -191,7 +191,7 @@ export default function AdminModerationPage() {
   }
 
   return (
-    <Box sx={{ px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 }, minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
+    <Box className="ecp-admin-moderation" sx={{ px: { xs: 2, md: 3 }, py: { xs: 2, md: 3 }, minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
       <Tabs value={viewMode} onChange={(_, v) => setViewMode(v)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile aria-label="Moderation areas" sx={{ mb: 2, borderBottom: "1px solid var(--imaa-border)" }}>
         <Tab label="Content Reports" />
         <Tab label="Profile Reports" />

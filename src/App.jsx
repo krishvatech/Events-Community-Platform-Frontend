@@ -7,6 +7,7 @@ import { isOwnerUser, isStaffUser } from "./utils/adminRole";
 import AppChrome from "./components/layout/AppChrome.jsx";
 import MarketingHubLayout from "./components/marketing/MarketingHubLayout.jsx";
 import { blogAdminRoutes, blogReaderRoutes } from "./routes/blogRoutes.jsx";
+import "./styles/k4Parity.css";
 
 import HomePage from "./legacy-pages/HomePage.jsx";
 import SignInPage from "./legacy-pages/SignInPage.jsx";

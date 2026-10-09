@@ -4653,7 +4653,7 @@ export default function DashbAdminEventsoard() {
 
   // Page ground: slate-50 (#f8fafc) in light mode, the member page background in dark mode.
   return (
-    <Box className="min-h-screen bg-[var(--imaa-dm-page,#f8fafc)]">
+    <Box className="ecp-admin-events min-h-screen bg-[var(--imaa-dm-page,#f8fafc)]">
       <Container
         maxWidth="xl"
         sx={{

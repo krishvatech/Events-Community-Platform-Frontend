@@ -352,7 +352,7 @@ export default function MyBlogsPage() {
   const notify = useCallback((msg, type = "success") => setToast({ open: true, type, msg }), []);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: "auto", width: "100%", minWidth: 0 }}>
+    <Box className="ecp-admin-blogs" sx={{ p: { xs: 2, md: 3 }, maxWidth: 1400, mx: "auto", width: "100%", minWidth: 0 }}>
       <Typography variant="h4" component="h1" sx={{ fontWeight: 800, mb: 2, color: semanticColors.text }}>
         My Blogs
       </Typography>

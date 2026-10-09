@@ -721,7 +721,7 @@ export default function AdminRecordingDetailsPage() {
     };
 
     return (
-        <Container maxWidth="xl" className="py-8" sx={{ minWidth: 0 }}>
+        <Container maxWidth="xl" className="ecp-admin-recordings py-8" sx={{ minWidth: 0 }}>
             {/* Header */}
             <Box className="flex items-center gap-4 mb-6 flex-wrap">
                 <IconButton onClick={handleBack}>

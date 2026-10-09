@@ -307,7 +307,7 @@ export default function AdminRecordingsPage() {
   );
 
   return (
-    <Container
+    <Container className="ecp-admin-recordings"
       maxWidth="lg"
       disableGutters
       className="pt-6 pb-6 sm:pt-6 sm:pb-8"

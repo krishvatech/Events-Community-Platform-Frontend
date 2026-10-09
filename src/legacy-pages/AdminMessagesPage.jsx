@@ -1872,6 +1872,7 @@ export default function AdminMessagesPage() {
 
   return (
     <Container
+      className="ecp-admin-messages"
       maxWidth="xl"
       sx={{
         // reduced top + left padding vs previous version

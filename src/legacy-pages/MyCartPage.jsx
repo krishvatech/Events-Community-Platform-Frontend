@@ -754,7 +754,7 @@ export default function MyCartPage() {
   };
 
   return (
-    <div className="min-h-screen bg-imaa-member">
+    <div className="ecp-k4-surface ecp-k4-commerce min-h-screen bg-imaa-member">
       <Container maxWidth="xl" className="py-6 sm:py-8">
         <div className="grid grid-cols-12 gap-3 md:gap-4 items-start">
           {/* MAIN */}

@@ -9,7 +9,7 @@ export default function SettingsPage() {
   const navigate = useNavigate();
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member, #F7F8FA)" }}>
+    <Box className="ecp-k4-surface" sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member, #F7F8FA)" }}>
       <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 4 }, px: { xs: 2, sm: 3 } }}>
         <PageHeader eyebrow="Account" title="Settings" sx={{ mb: 3 }} />
         <Paper variant="outlined" sx={{ borderRadius: "var(--imaa-radius-card)", borderColor: "var(--imaa-border)", boxShadow: "var(--imaa-shadow-sm)" }}>

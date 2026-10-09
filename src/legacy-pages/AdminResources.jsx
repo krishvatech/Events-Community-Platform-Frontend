@@ -895,7 +895,7 @@ export default function MyResourcesAdmin() {
   );
 
   return (
-    <Container
+    <Container className="ecp-admin-resources"
       maxWidth="lg"
       disableGutters
       sx={{ py: 4, minWidth: 0 }}

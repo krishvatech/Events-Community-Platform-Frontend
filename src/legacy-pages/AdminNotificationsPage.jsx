@@ -1016,7 +1016,7 @@ export default function AdminNotificationsPage() {
   };
 
   return (
-    <Container maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6, minWidth: 0 }}>
+    <Container className="ecp-admin-notifications" maxWidth="xl" disableGutters sx={{ px: { xs: 0, sm: 0 }, pt: 6, pb: 6, minWidth: 0 }}>
       {/* Header */}
       <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ xs: "flex-start", sm: "center" }} justifyContent="space-between" spacing={2} sx={{ mb: 4 }}>
         <Stack direction="row" alignItems="center" spacing={2}>

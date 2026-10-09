@@ -256,7 +256,7 @@ export default function AdminGuidePage() {
   };
 
   return (
-    <Box
+    <Box className="ecp-admin-guide"
       id="admin-guide-top"
       sx={{
         width: "100%",

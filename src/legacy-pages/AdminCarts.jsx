@@ -359,7 +359,7 @@ export default function AdminCarts() {
 
 
   return (
-    <Container maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
+    <Container className="ecp-admin-carts" maxWidth="lg" sx={{ py: { xs: 2.5, md: 4 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
       <Box
         sx={{
           mb: 3,

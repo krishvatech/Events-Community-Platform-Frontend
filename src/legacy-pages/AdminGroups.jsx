@@ -2415,7 +2415,7 @@ export default function AdminGroups() {
     <Container
       maxWidth="lg"
       disableGutters
-      className="py-6 sm:py-8"
+      className="ecp-admin-groups py-6 sm:py-8"
     >
       {/* Header */}
       < Box className="flex items-center gap-3 mb-4" sx={{ flexWrap: "wrap", minWidth: 0 }} >

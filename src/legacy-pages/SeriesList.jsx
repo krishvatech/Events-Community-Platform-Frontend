@@ -208,7 +208,7 @@ const SeriesList = () => {
   );
 
   return (
-    <Box sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
+    <Box className="ecp-admin-series" sx={{ p: 3, maxWidth: 1400, mx: 'auto' }}>
       <Typography variant="h4" sx={{ fontWeight: 800, mb: 3 }}>
         My Series
       </Typography>

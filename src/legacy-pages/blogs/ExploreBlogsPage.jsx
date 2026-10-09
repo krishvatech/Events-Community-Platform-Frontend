@@ -131,7 +131,7 @@ export default function ExploreBlogsPage() {
   };
 
   return (
-    <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 3 }, bgcolor: BLOG_PAGE_BG, minHeight: "100vh" }}>
+    <Box className="ecp-k4-surface ecp-k4-content" sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 3 }, bgcolor: BLOG_PAGE_BG, minHeight: "100vh" }}>
       <Box sx={{ px: { xs: 2, md: 2.5, lg: 3 }, maxWidth: { xs: "100%", lg: "1200px" }, mx: "auto", minWidth: 0 }}>
         <PageHeader
           eyebrow="Explore"

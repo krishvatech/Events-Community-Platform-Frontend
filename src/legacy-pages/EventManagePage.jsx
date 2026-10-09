@@ -9009,7 +9009,7 @@ export default function EventManagePage() {
 
   // ---- render ----
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
+    <Box className="ecp-admin-event-manage" sx={{ minHeight: "100vh", bgcolor: "var(--imaa-dm-surface-alt, #fafafa)" }}>
       <Container
         maxWidth="xl"
         sx={{

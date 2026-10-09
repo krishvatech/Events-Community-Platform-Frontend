@@ -452,7 +452,7 @@ export default function BlogEditorPage() {
   }
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto", width: "100%", minWidth: 0 }}>
+    <Box className="ecp-admin-blogs" sx={{ p: { xs: 2, md: 3 }, maxWidth: 1100, mx: "auto", width: "100%", minWidth: 0 }}>
       <Button component={RouterLink} to={MY_BLOGS_PATH} startIcon={<ArrowBackRoundedIcon />} sx={{ textTransform: "none", mb: 1, px: 0 }}>
         My Blogs
       </Button>

@@ -1438,7 +1438,7 @@ export default function AdminStaffPage() {
     const paginatedRows = rows;
 
     return (
-        <Container maxWidth="lg" sx={{ py: { xs: 2, md: 3 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
+        <Container className="ecp-admin-members" maxWidth="lg" sx={{ py: { xs: 2, md: 3 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
             <Box className="grid grid-cols-12 gap-6">
                 <Box
                     className="col-span-12"

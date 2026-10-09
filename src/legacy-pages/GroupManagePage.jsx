@@ -5132,7 +5132,7 @@ export default function GroupManagePage() {
     const onUpdated = (updated) => setGroup(updated);
 
     return (
-        <div className="ecp-community-surface max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0 overflow-hidden">
+        <div className="ecp-admin-group-manage ecp-community-surface max-w-screen-xl mx-auto px-3 md:px-4 lg:px-6 py-0 overflow-hidden">
             <div className="grid grid-cols-12 gap-4">
 
                 {/* RIGHT: your original page content unchanged */}

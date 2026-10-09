@@ -143,7 +143,7 @@ export default function RecognitionDirectoryPage() {
   };
 
   return (
-    <div className="imaa-public-page imaa-recognition-page">
+    <div className="ecp-k4-surface imaa-public-page imaa-recognition-page">
       <Helmet>
         <title>The IMAA Recognition Directory</title>
         <meta name="description" content="A public register of education providers whose curricula have been evaluated against the M&A Competency Standards." />

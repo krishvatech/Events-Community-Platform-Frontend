@@ -561,7 +561,7 @@ export default function CoursesPage() {
   const [tab, setTab] = useState(0);
 
   return (
-    <Container maxWidth="xl" sx={{ py: 4 }}>
+    <Container className="ecp-k4-surface ecp-k4-course" maxWidth="xl" sx={{ py: 4 }}>
       <PageHeader
         title="My Courses & Trainings"
         subtitle={'Your IMAA courses synced via Edwiser Bridge. Click "Continue" to open a course in the platform.'}

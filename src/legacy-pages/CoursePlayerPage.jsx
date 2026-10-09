@@ -1739,7 +1739,7 @@ export default function CoursePlayerPage() {
     // lg+: fixed-height three-column player (as before). Below lg: curriculum, content and the
     // Mergers.AI panel stack (no fixed side columns on phones/tablets); the content region keeps
     // its own bounded scroll so the existing scroll behaviour still works.
-    <Box sx={{ display: "flex", flexDirection: "column", height: { lg: "100vh" }, minHeight: { xs: "100vh", lg: 0 }, overflow: { lg: "hidden" }, bgcolor: SURFACE_MUTED }}>
+    <Box className="ecp-k4-surface ecp-k4-course" sx={{ display: "flex", flexDirection: "column", height: { lg: "100vh" }, minHeight: { xs: "100vh", lg: 0 }, overflow: { lg: "hidden" }, bgcolor: SURFACE_MUTED }}>
       {/* Top bar */}
       <PlayerTopBar
         course={course}

@@ -3203,7 +3203,7 @@ export default function AdminUserProfileEditPage() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", width: "100%", minWidth: 0, overflow: "hidden" }}>
+    <Box className="ecp-admin-members" sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", width: "100%", minWidth: 0, overflow: "hidden" }}>
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 }, px: { xs: 2, sm: 3 }, minWidth: 0 }}>
         {/* Back Button */}
         <Box sx={{ mb: 2 }}>

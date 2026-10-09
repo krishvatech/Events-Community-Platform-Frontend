@@ -89,7 +89,7 @@ export default function TrainingProgramsPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="imaa-public-page imaa-training-page">
+    <div className="ecp-k4-surface imaa-public-page imaa-training-page">
       <Helmet>
         <title>All IMAA M&A Training Courses & Programs</title>
         <meta name="description" content="Explore IMAA's comprehensive M&A training and certification programs." />

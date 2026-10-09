@@ -1,0 +1,86 @@
+/* K5 core-admin presentation layer. Every selector requires the admin-only surface. */
+.ecp-admin-surface {
+  --admin-navy: #1B2A4A;
+  --admin-coral: #D24533;
+  --admin-teal: #087C7F;
+  background: var(--imaa-dm-page, #F7F8FA);
+}
+
+/* K5A shell: presentation-only route-aware chrome for core Admin outlets. */
+.ecp-admin-surface .ecp-admin-shell { min-height: 100dvh; display: grid; grid-template-columns: 252px minmax(0, 1fr); }
+.ecp-admin-surface .ecp-admin-sidebar { position: sticky; top: 0; height: 100dvh; overflow-y: auto; border-right: 1px solid var(--imaa-border, #E2E4E8); background: #fff; }
+.ecp-admin-surface .ecp-admin-navigation { min-height: 100%; padding: 20px 14px; display: flex; flex-direction: column; }
+.ecp-admin-surface .ecp-admin-brand { padding: 4px 8px 22px; color: var(--admin-navy); }
+.ecp-admin-surface .ecp-admin-brand strong { display: block; font-family: var(--imaa-font-serif, Georgia, serif); font-size: 1.3rem; letter-spacing: .05em; }
+.ecp-admin-surface .ecp-admin-brand span { display: block; color: var(--imaa-ink-body, #5A6070); font-size: .74rem; }
+.ecp-admin-surface .ecp-admin-nav-group { margin: 0 0 18px; }
+.ecp-admin-surface .ecp-admin-nav-label { display: block; padding: 0 10px 7px; color: var(--imaa-ink-body, #5A6070); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.ecp-admin-surface .ecp-admin-navigation .MuiListItemButton-root { min-height: 38px; margin: 2px 0; border-radius: 7px; color: var(--imaa-ink-body, #5A6070); }
+.ecp-admin-surface .ecp-admin-navigation .MuiListItemButton-root.Mui-selected { color: #fff; background: var(--admin-navy); }
+.ecp-admin-surface .ecp-admin-navigation .MuiListItemButton-root.Mui-selected:hover { background: var(--admin-navy); }
+.ecp-admin-surface .ecp-admin-navigation .MuiListItemText-primary { font-size: .86rem; font-weight: 700; }
+.ecp-admin-surface .ecp-admin-workspace { min-width: 0; }
+.ecp-admin-surface .ecp-admin-topbar { min-height: 60px; padding: 0 30px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid var(--imaa-border, #E2E4E8); background: rgba(255,255,255,.94); }
+.ecp-admin-surface .ecp-admin-topbar .MuiTypography-root { color: var(--admin-navy); font-size: .82rem; font-weight: 800; letter-spacing: .04em; }
+.ecp-admin-surface .ecp-admin-topbar .MuiIconButton-root, .ecp-admin-surface .ecp-admin-drawer-close { display: none; }
+.ecp-admin-surface .ecp-admin-main { max-width: 1440px; margin: 0 auto; padding: 28px 30px 44px; }
+.ecp-admin-surface .ecp-admin-mobile-drawer .MuiDrawer-paper { width: min(290px, 86vw); }
+
+/* Page-specific roots make existing MUI and custom-card structures consistently legible. */
+.ecp-admin-surface .ecp-admin-events, .ecp-admin-surface .ecp-admin-event-manage, .ecp-admin-surface .ecp-admin-members, .ecp-admin-surface .ecp-admin-groups, .ecp-admin-surface .ecp-admin-group-manage, .ecp-admin-surface .ecp-admin-moderation { min-width: 0; }
+.ecp-admin-surface .ecp-admin-events > :first-child, .ecp-admin-surface .ecp-admin-event-manage > :first-child, .ecp-admin-surface .ecp-admin-members > :first-child, .ecp-admin-surface .ecp-admin-groups > :first-child, .ecp-admin-surface .ecp-admin-group-manage > :first-child, .ecp-admin-surface .ecp-admin-moderation > :first-child { margin-top: 0; }
+.ecp-admin-surface .ecp-admin-groups .rounded-2xl, .ecp-admin-surface .ecp-admin-groups .rounded-xl, .ecp-admin-surface .ecp-admin-group-manage .rounded-2xl, .ecp-admin-surface .ecp-admin-group-manage .rounded-xl, .ecp-admin-surface .ecp-admin-event-manage .rounded-2xl { border-color: var(--imaa-border, #E2E4E8); box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08)); }
+.ecp-admin-surface .ecp-admin-events .MuiDialog-paper, .ecp-admin-surface .ecp-admin-event-manage .MuiDialog-paper, .ecp-admin-surface .ecp-admin-members .MuiDialog-paper, .ecp-admin-surface .ecp-admin-groups .MuiDialog-paper, .ecp-admin-surface .ecp-admin-moderation .MuiDialog-paper { border-radius: var(--imaa-radius-card, 8px); }
+.ecp-admin-surface .ecp-admin-events .MuiTypography-h4, .ecp-admin-surface .ecp-admin-event-manage .MuiTypography-h4, .ecp-admin-surface .ecp-admin-members .MuiTypography-h5, .ecp-admin-surface .ecp-admin-groups .MuiTypography-h4, .ecp-admin-surface .ecp-admin-moderation .MuiTypography-h5 { letter-spacing: -.02em; }
+.ecp-admin-surface .ecp-admin-events .MuiTableContainer-root, .ecp-admin-surface .ecp-admin-event-manage .MuiTableContainer-root, .ecp-admin-surface .ecp-admin-members .MuiTableContainer-root { background: #fff; overflow-x: auto; }
+.ecp-admin-surface .ecp-admin-events .MuiButton-contained, .ecp-admin-surface .ecp-admin-event-manage .MuiButton-contained, .ecp-admin-surface .ecp-admin-members .MuiButton-contained, .ecp-admin-surface .ecp-admin-groups .MuiButton-contained, .ecp-admin-surface .ecp-admin-moderation .MuiButton-contained { border-radius: 6px; font-weight: 800; text-transform: none; }
+.ecp-admin-surface .ecp-admin-groups .rounded-2xl .text-slate-500, .ecp-admin-surface .ecp-admin-group-manage .text-slate-500 { color: var(--imaa-ink-body, #5A6070); }
+.ecp-admin-surface .ecp-admin-groups .rounded-2xl:hover { border-color: rgba(8,124,127,.38); transform: translateY(-1px); transition: border-color .18s ease, transform .18s ease; }
+.ecp-admin-surface .ecp-admin-moderation .MuiPaper-root { background: #fff; }
+@media (max-width: 1024px) { .ecp-admin-surface .ecp-admin-shell { grid-template-columns: 1fr; } .ecp-admin-surface .ecp-admin-sidebar { display: none; } .ecp-admin-surface .ecp-admin-topbar .MuiIconButton-root { display: inline-flex; } .ecp-admin-surface .ecp-admin-drawer-close { display: inline-flex; } }
+@media (max-width: 600px) { .ecp-admin-surface .ecp-admin-main { padding: 18px 14px 28px; } .ecp-admin-surface .ecp-admin-topbar { padding-inline: 14px; } .ecp-admin-surface .ecp-admin-navigation { padding: 18px 12px; } }
+
+.ecp-admin-surface .MuiPaper-root:not(.MuiDialog-paper):not(.MuiPopover-paper),
+.ecp-admin-surface .MuiCard-root {
+  border-color: var(--imaa-border, #E2E4E8) !important;
+  border-radius: var(--imaa-radius-card, 8px) !important;
+}
+
+.ecp-admin-surface .MuiPaper-outlined,
+.ecp-admin-surface .MuiCard-outlined {
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27, 42, 74, .08));
+}
+
+.ecp-admin-surface .MuiTypography-h3,
+.ecp-admin-surface .MuiTypography-h4,
+.ecp-admin-surface .MuiTypography-h5,
+.ecp-admin-surface .MuiTypography-h6 {
+  color: var(--imaa-ink, var(--admin-navy));
+  font-family: var(--imaa-font-serif, Georgia, serif);
+}
+
+.ecp-admin-surface .MuiOutlinedInput-root { border-radius: var(--imaa-radius-input, 6px); background: #fff; }
+.ecp-admin-surface .MuiTabs-root { padding: 4px; border: 1px solid var(--imaa-border, #E2E4E8); border-radius: 999px; background: #fff; }
+.ecp-admin-surface .MuiTab-root { min-height: 34px; padding: 7px 14px; border-radius: 999px; font-weight: 700; text-transform: none; }
+.ecp-admin-surface .MuiTab-root.Mui-selected { color: #fff; background: var(--admin-navy); }
+.ecp-admin-surface .MuiTabs-indicator { display: none; }
+.ecp-admin-surface .MuiChip-root { border-radius: 999px; font-weight: 700; }
+.ecp-admin-surface .MuiButton-containedPrimary { background-color: var(--admin-coral); }
+.ecp-admin-surface .MuiButton-containedPrimary:hover { background-color: #B53A2C; }
+
+.ecp-admin-surface .MuiTableContainer-root { border: 1px solid var(--imaa-border, #E2E4E8); border-radius: var(--imaa-radius-card, 8px); }
+.ecp-admin-surface .MuiTableHead-root .MuiTableCell-root { color: var(--imaa-ink-body, #5A6070); font-size: .72rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; background: var(--imaa-dm-surface-alt, #F7F8FA); }
+.ecp-admin-surface .MuiTableRow-root:hover .MuiTableCell-root { background: rgba(8, 124, 127, .035); }
+
+@media (max-width: 600px) {
+  .ecp-admin-surface .MuiTabs-flexContainer { overflow-x: auto; }
+  .ecp-admin-surface .MuiTab-root { padding-inline: 11px; font-size: .78rem; }
+  .ecp-admin-surface .MuiTableContainer-root { overflow-x: auto; }
+}
+
+/* K5B: scoped presentation for actual remaining Admin page roots. */
+.ecp-admin-surface .ecp-admin-series, .ecp-admin-surface .ecp-admin-resources, .ecp-admin-surface .ecp-admin-recordings, .ecp-admin-surface .ecp-admin-posts, .ecp-admin-surface .ecp-admin-carts, .ecp-admin-surface .ecp-admin-settings, .ecp-admin-surface .ecp-admin-messages, .ecp-admin-surface .ecp-admin-notifications, .ecp-admin-surface .ecp-admin-name-requests, .ecp-admin-surface .ecp-admin-guide, .ecp-admin-surface .ecp-admin-virtual-speakers, .ecp-admin-surface .ecp-admin-saleor, .ecp-admin-surface .ecp-admin-blogs { min-width: 0; }
+.ecp-admin-surface .ecp-admin-series .rounded-lg, .ecp-admin-surface .ecp-admin-series .bg-white, .ecp-admin-surface .ecp-admin-resources .rounded-xl, .ecp-admin-surface .ecp-admin-recordings .rounded-xl { border-color: var(--imaa-border, #E2E4E8); }
+.ecp-admin-surface .ecp-admin-series .bg-white, .ecp-admin-surface .ecp-admin-resources .bg-white, .ecp-admin-surface .ecp-admin-recordings .bg-white { box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08)); }
+.ecp-admin-surface .ecp-admin-posts .MuiPaper-root, .ecp-admin-surface .ecp-admin-carts .MuiPaper-root, .ecp-admin-surface .ecp-admin-settings .MuiPaper-root, .ecp-admin-surface .ecp-admin-messages .MuiPaper-root, .ecp-admin-surface .ecp-admin-notifications .MuiPaper-root, .ecp-admin-surface .ecp-admin-name-requests .MuiPaper-root, .ecp-admin-surface .ecp-admin-guide .MuiPaper-root, .ecp-admin-surface .ecp-admin-virtual-speakers .MuiPaper-root, .ecp-admin-surface .ecp-admin-saleor .MuiPaper-root, .ecp-admin-surface .ecp-admin-blogs .MuiPaper-root { background: #fff; }
+.ecp-admin-surface .ecp-admin-series .MuiButton-contained, .ecp-admin-surface .ecp-admin-resources .MuiButton-contained, .ecp-admin-surface .ecp-admin-recordings .MuiButton-contained, .ecp-admin-surface .ecp-admin-posts .MuiButton-contained, .ecp-admin-surface .ecp-admin-carts .MuiButton-contained, .ecp-admin-surface .ecp-admin-settings .MuiButton-contained, .ecp-admin-surface .ecp-admin-messages .MuiButton-contained, .ecp-admin-surface .ecp-admin-notifications .MuiButton-contained, .ecp-admin-surface .ecp-admin-name-requests .MuiButton-contained, .ecp-admin-surface .ecp-admin-virtual-speakers .MuiButton-contained, .ecp-admin-surface .ecp-admin-saleor .MuiButton-contained, .ecp-admin-surface .ecp-admin-blogs .MuiButton-contained { border-radius: 6px; font-weight: 800; text-transform: none; }

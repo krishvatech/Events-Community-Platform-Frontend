@@ -2703,7 +2703,7 @@ export default function AdminPostsPage() {
   const handleCreated = (p) => setItems((prev) => [p, ...prev]);
 
   return (
-    <Box sx={{ py: 3, minWidth: 0 }}>
+    <Box className="ecp-admin-posts" sx={{ py: 3, minWidth: 0 }}>
       <Container maxWidth="lg" disableGutters>
         <Stack
           direction={{ xs: "column", sm: "row" }}

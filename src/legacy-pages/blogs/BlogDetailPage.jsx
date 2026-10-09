@@ -321,7 +321,7 @@ export default function BlogDetailPage() {
   const seo = post ? getBlogSeoMeta(post, window.location.origin) : null;
 
   return (
-    <Box sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 4 }, bgcolor: BLOG_PAGE_BG, minHeight: "100vh" }}>
+    <Box className="ecp-k4-surface ecp-k4-content" sx={{ width: "100%", minWidth: 0, maxWidth: "100%", overflow: "hidden", py: { xs: 2, md: 4 }, bgcolor: BLOG_PAGE_BG, minHeight: "100vh" }}>
       <Box sx={{ px: { xs: 2, md: 3 }, minWidth: 0 }}>
         {status === "loading" && (
           <Box sx={{ maxWidth: 760, mx: "auto" }} aria-busy="true" aria-label="Loading blog">

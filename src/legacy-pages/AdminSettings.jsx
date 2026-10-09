@@ -2921,7 +2921,7 @@ export default function AdminSettings() {
 
   // ---------- RENDER ----------
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", width: "100%", minWidth: 0, overflow: "hidden" }}>
+    <Box className="ecp-admin-settings" sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", width: "100%", minWidth: 0, overflow: "hidden" }}>
       {loadError ? (
         <Container maxWidth="md" sx={{ py: { xs: 3, md: 4 }, px: { xs: 2, sm: 3 } }}>
           <Alert severity="error" role="alert" sx={{ borderRadius: "var(--imaa-radius-card)" }}>{loadError}</Alert>

@@ -286,7 +286,7 @@ const VirtualSpeakersPage = () => {
 
   return (
     <>
-    <Box sx={{ width: '100%', minWidth: 0, p: { xs: 2, md: 3 } }}>
+    <Box className="ecp-admin-virtual-speakers" sx={{ width: '100%', minWidth: 0, p: { xs: 2, md: 3 } }}>
         {/* Header */}
         <Box
           sx={{

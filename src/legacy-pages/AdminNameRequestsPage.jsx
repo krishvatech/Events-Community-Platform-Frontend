@@ -415,7 +415,7 @@ export default function AdminNameRequestsPage() {
   };
 
   return (
-    <Box sx={{ p: { xs: 0, sm: 1, md: 2 }, width: "100%", minWidth: 0, overflowX: "hidden" }}>
+    <Box className="ecp-admin-name-requests" sx={{ p: { xs: 0, sm: 1, md: 2 }, width: "100%", minWidth: 0, overflowX: "hidden" }}>
       {/* Header */}
       <Box
         className="mb-4"

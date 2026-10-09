@@ -3520,7 +3520,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-imaa-member">
+    <div className="ecp-k4-surface min-h-screen bg-imaa-member">
       <Container maxWidth="xl" sx={{ py: { xs: 2, md: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">

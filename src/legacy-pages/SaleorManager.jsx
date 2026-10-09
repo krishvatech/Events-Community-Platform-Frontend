@@ -1569,7 +1569,7 @@ export default function SaleorManager() {
   }
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 }, width: "100%", minWidth: 0, overflowX: "hidden" }}>
+    <Box className="ecp-admin-saleor" sx={{ minHeight: "100vh", bgcolor: "var(--imaa-bg-member)", py: { xs: 2.5, md: 4 }, width: "100%", minWidth: 0, overflowX: "hidden" }}>
       <Container maxWidth="lg" sx={{ px: { xs: 2, sm: 3 }, minWidth: 0 }}>
         {/* Header Section */}
         <Paper

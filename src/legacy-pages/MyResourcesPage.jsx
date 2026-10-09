@@ -315,7 +315,7 @@ export default function MyResourcesPage() {
 
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "var(--imaa-dm-page, #f7f8fa)", width: "100%", minWidth: 0, overflow: "hidden" }}>
+    <Box className="ecp-k4-surface ecp-k4-content" sx={{ minHeight: "100vh", bgcolor: "var(--imaa-dm-page, #f7f8fa)", width: "100%", minWidth: 0, overflow: "hidden" }}>
       <Container maxWidth="lg" sx={{ py: { xs: 2.5, sm: 3.5 }, px: { xs: 2, sm: 3 } }}>
         <div className="grid grid-cols-12 gap-3 md:gap-4">
           <main className="col-span-12">
