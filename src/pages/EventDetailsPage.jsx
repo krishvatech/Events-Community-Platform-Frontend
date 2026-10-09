@@ -840,6 +840,7 @@ export default function EventDetailsPage() {
       setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
       setParticipantTotalRegisteredCount(
         Number(
+          data?.public_participant_count ??
           data?.total_registered ??
           (
             Number(data?.public_registered_count ?? data?.total_registered_count ?? 0) +
@@ -876,10 +877,14 @@ export default function EventDetailsPage() {
       const newParticipants = Array.isArray(data) ? data : (data.participants || []);
 
       setParticipantList((prev) => {
-        const existingIds = new Set(prev.map((p) => p.registration_id || p.user_id));
-        const uniqueNewParticipants = newParticipants.filter(
-          (p) => !existingIds.has(p.registration_id || p.user_id)
-        );
+        const getKey = (p) => p.participant_key || p.registration_id || p.user_id || p.participant_id || p.display_name;
+        const existingIds = new Set(prev.map(getKey));
+        const uniqueNewParticipants = newParticipants.filter((p) => {
+          const key = getKey(p);
+          if (existingIds.has(key)) return false;
+          existingIds.add(key);
+          return true;
+        });
         return [...prev, ...uniqueNewParticipants];
       });
 
@@ -2011,6 +2016,7 @@ export default function EventDetailsPage() {
                         {/* Participant Count */}
                         {(() => {
                           const totalRegisteredCount = Number(
+                            event.public_participant_count ??
                             event.total_registered ??
                             (
                               Number(event.public_registered_count ?? event.registrations_count ?? event.attending_count ?? 0) +
@@ -2021,7 +2027,7 @@ export default function EventDetailsPage() {
                           const owner = isOwnerUser();
                           const staff = isStaffUser();
                           const canView = canViewParticipants(event, owner, staff);
-                          const label = `${Math.max(0, totalRegisteredCount)} registered`;
+                          const label = `${Math.max(0, totalRegisteredCount)} participants`;
 
                           if (canView) {
                             return (

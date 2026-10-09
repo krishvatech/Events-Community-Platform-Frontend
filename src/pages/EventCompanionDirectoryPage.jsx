@@ -171,7 +171,7 @@ function DesktopView({
               Conference Attendees
             </Typography>
             <Typography sx={{ fontSize: 13, color: '#999', mb: 2 }}>
-              {allParticipants.length} attendees · Tap ☕ to request a 1:1 at the networking tables
+              {allParticipants.length} participants · Registered members can receive 1:1 requests
             </Typography>
             <Box sx={{
               display: 'flex', alignItems: 'center', gap: 1, p: '10px 14px',
@@ -202,16 +202,16 @@ function DesktopView({
               <Stack spacing={0.5}>
                 {allParticipants.map((p, i) => (
                   <Box
-                    key={`${p.registration_id || 'v'}-${p.user_id || p.display_name}`}
+                    key={p.participant_key || `${p.registration_id || 'v'}-${p.user_id || p.display_name}`}
                     onMouseEnter={() => onHoveredAttendee(i)}
                     onMouseLeave={() => onHoveredAttendee(null)}
-                    onClick={() => p.user_id && navigate(`/community/rich-profile/${p.user_id}`)}
+                    onClick={() => p.user_id && p.registration_id && navigate(`/community/rich-profile/${p.user_id}`)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 2,
                       p: '14px 16px', borderRadius: 1.5, transition: 'all 0.15s',
                       background: hoveredAttendee === i ? COLORS.bg : 'transparent',
                       border: '1px solid ' + (hoveredAttendee === i ? '#E8E4DF' : 'transparent'),
-                      cursor: 'pointer',
+                      cursor: p.user_id && p.registration_id ? 'pointer' : 'default',
                       '&:active': { opacity: 0.9 },
                     }}
                   >
@@ -229,7 +229,10 @@ function DesktopView({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25, flexWrap: 'wrap' }}>
                         <Typography sx={{ fontSize: 15, fontWeight: 640, color: COLORS.dark }}>
                           {p.display_name}
-                          {p.user_id === currentUserId && (
+                          {['accepted_application', 'verified_guest'].includes(p.source) && (
+                            <Chip component="span" label={p.source === 'accepted_application' ? 'Accepted application' : 'Verified guest'} size="small" variant="outlined" sx={{ ml: 0.75, height: 18, fontSize: '0.65rem' }} />
+                          )}
+                          {Boolean(p.user_id) && p.user_id === currentUserId && (
                             <Typography component="span" sx={{ fontSize: 13, color: '#999', fontWeight: 400, ml: 0.75 }}>
                               (me)
                             </Typography>
@@ -277,7 +280,7 @@ function DesktopView({
                         setSelectedDuration(1);
                         setSelectedSlot(null);
                       }}
-                      disabled={!networkingSettings?.enabled || currentUserId === p.user_id}
+                      disabled={!networkingSettings?.enabled || !p.registration_id || !p.user_id || currentUserId === p.user_id}
                       sx={{
                         display: 'flex', alignItems: 'center', gap: 1, p: '10px 18px',
                         borderRadius: 1.25, border: `1.5px solid ${COLORS.teal}30`, background: COLORS.teal + '06',
@@ -1036,8 +1039,8 @@ function MobileView({
               <Stack spacing={0.5}>
                 {allParticipants.map((p) => (
                   <Box
-                    key={`${p.registration_id || 'v'}-${p.user_id}`}
-                    onClick={() => p.user_id && navigate(`/community/rich-profile/${p.user_id}`)}
+                    key={p.participant_key || `${p.registration_id || 'v'}-${p.user_id || p.display_name}`}
+                    onClick={() => p.user_id && p.registration_id && navigate(`/community/rich-profile/${p.user_id}`)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 1.25,
                       p: 1.5, borderRadius: 1.5, bgcolor: '#fff',
@@ -1061,7 +1064,10 @@ function MobileView({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25, flexWrap: 'wrap' }}>
                         <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
                           {p.display_name}
-                          {p.user_id === currentUserId && (
+                          {['accepted_application', 'verified_guest'].includes(p.source) && (
+                            <Chip component="span" label={p.source === 'accepted_application' ? 'Accepted application' : 'Verified guest'} size="small" variant="outlined" sx={{ ml: 0.75, height: 18, fontSize: '0.65rem' }} />
+                          )}
+                          {Boolean(p.user_id) && p.user_id === currentUserId && (
                             <Typography component="span" sx={{ fontSize: 12, color: '#999', fontWeight: 400, ml: 0.625 }}>
                               (me)
                             </Typography>
@@ -1105,7 +1111,7 @@ function MobileView({
                         setSelectedDuration(1);
                         setSelectedSlot(null);
                       }}
-                      disabled={!networkingSettings?.enabled || currentUserId === p.user_id}
+                      disabled={!networkingSettings?.enabled || !p.registration_id || !p.user_id || currentUserId === p.user_id}
                       sx={{
                         width: 38, height: 38, borderRadius: 1.25,
                         border: `1.5px solid ${COLORS.teal}25`, background: COLORS.teal + '06',
@@ -1647,6 +1653,7 @@ function EventCompanionDirectoryPage() {
   // Existing state
   const [event, setEvent] = useState(null);
   const [allParticipants, setAllParticipants] = useState([]);
+  const [eligibleParticipantCount, setEligibleParticipantCount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1878,6 +1885,7 @@ function EventCompanionDirectoryPage() {
 
         const data = await res.json();
         setAllParticipants(data.participants || []);
+        setEligibleParticipantCount(data.public_participant_count ?? null);
         setError(null);
       } catch (err) {
         setError(err.message);
@@ -2318,6 +2326,12 @@ function EventCompanionDirectoryPage() {
           </Box>
         )}
 
+        {/* Eligible event participants can exceed networking-enabled registered profiles. */}
+        {activeTab === 0 && eligibleParticipantCount != null && (
+          <Typography variant="caption" sx={{ display: "block", px: 2, pt: 1, color: "text.secondary" }}>
+            {eligibleParticipantCount} event participants · {allParticipants.filter(p => p.registration_id && p.user_id).length} networking profiles
+          </Typography>
+        )}
         {/* Content */}
         <Box sx={{ flex: 1, overflowY: 'auto', p: isMobile ? 0 : 2 }}>
           {activeTab === 0 && flowStep > 1 ? (

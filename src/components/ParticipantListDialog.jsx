@@ -90,10 +90,15 @@ export default function ParticipantListDialog({
                     </Box>
                 ) : participants.length === 0 ? (
                     <Box sx={{ p: 2, textAlign: 'center' }}>
-                        <Typography color="text.secondary">No participants registered yet.</Typography>
+                        <Typography color="text.secondary">No eligible participant profiles are available to display.</Typography>
                     </Box>
                 ) : (
                     <List>
+                        {participants.some((p) => p.source === 'accepted_application' || p.source === 'verified_guest') && (
+                          <Typography variant="caption" sx={{ display: "block", px: 2, pb: 1 }} color="text.secondary">
+                            Accepted applicants without platform profiles have no public email or profile link.
+                          </Typography>
+                        )}
                         {hiddenRolesCount > 0 && (
                             <Box sx={{ px: 2, pb: 1 }}>
                                 <Typography variant="caption" color="text.secondary">
@@ -104,7 +109,7 @@ export default function ParticipantListDialog({
                         )}
                         {participants.map((reg) => (
                             <ListItem
-                                key={reg.registration_id || reg.user_id || reg.display_name}
+                                key={reg.participant_key || reg.registration_id || reg.user_id || reg.participant_id || reg.display_name}
                                 secondaryAction={
                                     reg.is_profile_clickable ? (
                                         <Tooltip title="Open profile">
@@ -152,6 +157,14 @@ export default function ParticipantListDialog({
                                                     <VerifiedIcon sx={{ fontSize: 16, color: '#22d3ee' }} />
                                                 </Tooltip>
                                             )}
+                                            {['accepted_application', 'verified_guest'].includes(reg.source) && (
+                                                <Chip
+                                                    label={reg.source === 'accepted_application' ? 'Accepted application' : 'Verified guest'}
+                                                    size="small"
+                                                    variant="outlined"
+                                                    sx={{ height: 20, fontSize: '0.7rem' }}
+                                                />
+                                            )}
                                             {reg.primary_role && !reg.is_hidden_from_public_role_display && (
                                                 <Chip
                                                     label={ROLE_CHIP_PROPS[reg.primary_role]?.label || reg.role_labels?.[0] || "Participant"}
@@ -162,7 +175,7 @@ export default function ParticipantListDialog({
                                             )}
                                         </Box>
                                     }
-                                    secondary={reg.email || reg.user_email || ""}
+                                    secondary={reg.source === "accepted_application" || reg.source === "verified_guest" ? "" : (reg.email || reg.user_email || "")}
                                 />
                             </ListItem>
                         ))}

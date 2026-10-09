@@ -437,9 +437,11 @@ function normalizeSession(session = {}) {
 
 function getTotalRegisteredCount(ev = {}) {
   // For event cards: use the public participant count (excludes creator/host/hidden organizer roles)
-  // Check total_registered FIRST (= public_registered_count + public_guest_count)
-  // confirmed_registered_count is for internal tracking, not for public card display
+  // New additive public_participant_count includes eligible accepted applicants.
+  // Legacy total_registered stays unchanged for existing API consumers.
+  // confirmed_registered_count is separate payment/registration status.
   return Number(
+    ev.public_participant_count ??
     ev.total_registered ??
     (
       Number(ev.public_registered_count ?? ev.registrations_count ?? ev.total_registered_count ?? ev.attending_count ?? 0) +
@@ -527,6 +529,7 @@ function toCard(ev, isPinnedTopCopy = false) {
     topics: [ev.category, humanizeFormat(ev.event_format || ev.format)].filter(Boolean),// ["Strategy", "In-Person"]
     attendees: Math.max(0, Number.isFinite(totalRegisteredCount) ? totalRegisteredCount : 0),
     confirmed_registered_count: ev.confirmed_registered_count,
+    public_participant_count: ev.public_participant_count,
     user_status: ev.user_status || null,
     payment_pending: !!ev.payment_pending,
     is_confirmed_registered: !!ev.is_confirmed_registered,
@@ -920,7 +923,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               // bump whichever field is present so toCard() shows the new number
               registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
               public_registered_count: Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) + 1,
-              total_registered: getTotalRegisteredCount(e) + 1,
+              total_registered: Number(e?.total_registered ?? 0) + 1,
             }
             : e
         )
@@ -1165,7 +1168,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                   const isGuest = localStorage.getItem("is_guest") === "true";
                   const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
-                  const label = `${Math.max(0, Number(ev.attendees) || 0)} registered`;
+                  const label = `${Math.max(0, Number(ev.attendees) || 0)} participants`;
 
                   if (canOpenParticipants) {
                     return (
@@ -1371,7 +1374,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                               ),
                               total_registered: Math.max(
                                 0,
-                                getTotalRegisteredCount(e) - 1
+                                Number(e?.total_registered ?? 0) - 1
                               ),
                             }
                             : e
@@ -1735,7 +1738,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               ...e,
               registrations_count: Number(e?.registrations_count ?? e?.attending_count ?? 0) + 1,
               public_registered_count: Number(e?.public_registered_count ?? e?.registrations_count ?? e?.attending_count ?? 0) + 1,
-              total_registered: getTotalRegisteredCount(e) + 1,
+              total_registered: Number(e?.total_registered ?? 0) + 1,
             }
             : e
         )
@@ -1900,7 +1903,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                   const isGuest = localStorage.getItem("is_guest") === "true";
                   const canOpenParticipants = canView && Boolean(token) && !isGuest;
 
-                  const label = `${Math.max(0, Number(ev.attendees) || 0)} registered`;
+                  const label = `${Math.max(0, Number(ev.attendees) || 0)} participants`;
 
                   if (canOpenParticipants) {
                     return (
@@ -2014,7 +2017,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                                     ),
                                     total_registered: Math.max(
                                       0,
-                                      getTotalRegisteredCount(e) - 1
+                                      Number(e?.total_registered ?? 0) - 1
                                     ),
                                   }
                                   : e
@@ -2341,7 +2344,7 @@ export default function EventsPage() {
       const data = await res.json();
       setParticipantList(Array.isArray(data) ? data : (data.participants || []));
       setParticipantHiddenRolesCount(Number(data?.hidden_roles_count || 0));
-      setParticipantTotalRegisteredCount(getTotalRegisteredCount(data));
+      setParticipantTotalRegisteredCount(Number(data.public_participant_count ?? getTotalRegisteredCount(data)));
       setParticipantNextOffset(data?.next_offset || null);
       setParticipantHasMore(data?.has_next || false);
     } catch (err) {
@@ -2381,10 +2384,14 @@ export default function EventsPage() {
       const newParticipants = Array.isArray(data) ? data : (data.participants || []);
 
       setParticipantList((prev) => {
-        const existingIds = new Set(prev.map((p) => p.registration_id || p.user_id));
-        const uniqueNewParticipants = newParticipants.filter(
-          (p) => !existingIds.has(p.registration_id || p.user_id)
-        );
+        const getKey = (p) => p.participant_key || p.registration_id || p.user_id || p.participant_id || p.display_name;
+        const existingIds = new Set(prev.map(getKey));
+        const uniqueNewParticipants = newParticipants.filter((p) => {
+          const key = getKey(p);
+          if (existingIds.has(key)) return false;
+          existingIds.add(key);
+          return true;
+        });
         return [...prev, ...uniqueNewParticipants];
       });
 

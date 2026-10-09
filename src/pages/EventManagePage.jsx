@@ -438,6 +438,7 @@ export default function EventManagePage() {
   const [companionBulkSaving, setCompanionBulkSaving] = useState(false);
   const [companionBulkMode, setCompanionBulkMode] = useState("add");
   const [companionRegs, setCompanionRegs] = useState([]);
+  const [companionPublicCount, setCompanionPublicCount] = useState(null);
   const [companionRegsLoading, setCompanionRegsLoading] = useState(false);
   const [companionRegsError, setCompanionRegsError] = useState("");
   const [companionSearch, setCompanionSearch] = useState("");
@@ -1407,13 +1408,14 @@ export default function EventManagePage() {
     (async () => {
       try {
         const res = await fetch(
-          `${API_ROOT}/events/${event?.id}/registrations/?limit=100`,
+          `${API_ROOT}/events/${event?.id}/companion-roster/`,
           { headers: { Authorization: `Bearer ${getToken()}` }, signal: controller.signal }
         );
         const json = await res.json().catch(() => ({}));
         if (!res.ok) throw new Error(json?.detail || `HTTP ${res.status}`);
         const data = Array.isArray(json) ? json : (json.results || []);
         setCompanionRegs(data);
+        setCompanionPublicCount(json.public_participant_count ?? null);
       } catch (e) {
         if (e.name === "AbortError") return;
         setCompanionRegsError(e.message || "Failed to load participants");
@@ -3075,13 +3077,14 @@ export default function EventManagePage() {
                       {`${Math.max(
                         0,
                         Number(
+                          event.public_participant_count ??
                           event.total_registered ??
                           (
                             Number(event.public_registered_count ?? event.registrations_count ?? event.attending_count ?? 0) +
                             Number(event.public_guest_count ?? 0)
                           )
                         )
-                      )} registered`}
+                      )} participants`}
                     </strong>
                   </Typography>
                 </Stack>
@@ -7693,7 +7696,8 @@ export default function EventManagePage() {
       return !q || (r.user_name || "").toLowerCase().includes(q) || (r.user_email || "").toLowerCase().includes(q);
     });
 
-    const allBulkSelected = filteredCompanionRegs.length > 0 && filteredCompanionRegs.every(r => companionBulkSelected.includes(r.id));
+    const assignableCompanionRegs = filteredCompanionRegs.filter(r => r.can_assign_labels !== false);
+    const allBulkSelected = assignableCompanionRegs.length > 0 && assignableCompanionRegs.every(r => companionBulkSelected.includes(r.id));
 
     const saveNetworkingSettings = async () => {
       setNetworkingSettingsSaving(true);
@@ -8401,7 +8405,7 @@ export default function EventManagePage() {
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }} flexWrap="wrap" gap={1}>
             <Box>
               <Typography variant="subtitle1" sx={{ fontWeight: 700, mb: 0.25 }}>Assign Labels to Participants</Typography>
-              <Typography variant="body2" sx={{ color: "text.secondary" }}>Select participants and assign badge labels individually or in bulk.</Typography>
+              <Typography variant="body2" sx={{ color: "text.secondary" }}>{companionRegs.length} admin roster entries{companionPublicCount != null ? ` · ${companionPublicCount} publicly eligible participants` : ""}. Accepted applicants without registrations are read-only; only registered users can receive badge labels.</Typography>
             </Box>
             <Stack direction="row" spacing={1} alignItems="center">
               {companionBulkSelected.length > 0 && <Button variant="contained" size="small" onClick={() => setCompanionBulkAssignOpen(true)} sx={{ textTransform: "none", borderRadius: 999 }}>Bulk Assign ({companionBulkSelected.length})</Button>}
@@ -8422,7 +8426,7 @@ export default function EventManagePage() {
                   <TableRow sx={{ bgcolor: "grey.50", "& th": { fontSize: 13, color: "text.secondary" } }}>
                     <TableCell padding="checkbox">
                       <Checkbox size="small" checked={allBulkSelected} indeterminate={companionBulkSelected.length > 0 && !allBulkSelected} onChange={e => {
-                        if (e.target.checked) setCompanionBulkSelected(filteredCompanionRegs.map(r => r.id));
+                        if (e.target.checked) setCompanionBulkSelected(assignableCompanionRegs.map(r => r.id));
                         else setCompanionBulkSelected([]);
                       }} />
                     </TableCell>
@@ -8443,13 +8447,16 @@ export default function EventManagePage() {
                     filteredCompanionRegs.map(reg => (
                       <TableRow key={reg.id} hover>
                         <TableCell padding="checkbox">
-                          <Checkbox size="small" checked={companionBulkSelected.includes(reg.id)} onChange={e => {
+                          <Checkbox size="small" disabled={reg.can_assign_labels === false} checked={companionBulkSelected.includes(reg.id)} onChange={e => {
                             if (e.target.checked) setCompanionBulkSelected(prev => [...prev, reg.id]);
                             else setCompanionBulkSelected(prev => prev.filter(id => id !== reg.id));
                           }} />
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ fontWeight: 500 }}>{reg.user_name || "—"}</Typography>
+                          {reg.source === "accepted_application" && <Chip size="small" label="Accepted application" color="success" variant="outlined" sx={{ mt: 0.5 }} />}
+                          {reg.source === "verified_guest" && <Chip size="small" label="Verified guest" variant="outlined" sx={{ mt: 0.5 }} />}
+                          {reg.track_labels?.length > 0 && <Typography variant="caption" display="block" color="text.secondary">{reg.track_labels.join(", ")}</Typography>}
                         </TableCell>
                         <TableCell>
                           <Typography variant="body2" sx={{ color: "text.secondary" }}>{reg.user_email || "—"}</Typography>
@@ -8465,12 +8472,12 @@ export default function EventManagePage() {
                           </Stack>
                         </TableCell>
                         <TableCell align="right">
-                          <Button size="small" variant="outlined" sx={{ textTransform: "none", borderRadius: 999, borderColor: "divider", color: "text.primary" }} onClick={() => {
+                          <Button size="small" disabled={reg.can_assign_labels === false} variant="outlined" sx={{ textTransform: "none", borderRadius: 999, borderColor: "divider", color: "text.primary" }} onClick={() => {
                             setCompanionAssignTarget(reg);
                             setCompanionAssignSelected((reg.badge_labels || []).map(bl => bl.id));
                             setCompanionAssignOpen(true);
                           }}>
-                            Edit Labels
+                            {reg.can_assign_labels === false ? "Account required" : "Edit Labels"}
                           </Button>
                         </TableCell>
                       </TableRow>
