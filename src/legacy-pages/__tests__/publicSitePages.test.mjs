@@ -544,13 +544,16 @@ test("the route raises Next's 404 for unavailable pages (References drafts inclu
 
 test("default and CMS content render through the same article renderer", async () => {
   const { PublicStandardPage } = await loadRoute();
-  const { data } = readContent("privacy-policy");
+  // Imprint: a text-only page with a default and no page-specific layout (Privacy Policy and
+  // Terms get the legal section navigation, FAQ the accordion; see their own tests).
+  const { data } = readContent("imprint");
+  const cmsImprint = cmsPage({ title: "Imprint", slug: "imprint", path: "/imprint/" });
 
   const defaultHtml = await withMockedFetch(() => ABSENT_404(), async () =>
-    renderToStaticMarkup(await PublicStandardPage({ params: Promise.resolve({ slug: "privacy-policy" }) }))
+    renderToStaticMarkup(await PublicStandardPage({ params: Promise.resolve({ slug: "imprint" }) }))
   );
-  const cmsHtml = await withMockedFetch(() => jsonResponse(200, cmsPage()), async () =>
-    renderToStaticMarkup(await PublicStandardPage({ params: Promise.resolve({ slug: "privacy-policy" }) }))
+  const cmsHtml = await withMockedFetch(() => jsonResponse(200, cmsImprint), async () =>
+    renderToStaticMarkup(await PublicStandardPage({ params: Promise.resolve({ slug: "imprint" }) }))
   );
 
   const parse = (html) => new JSDOM(`<body>${html}</body>`).window.document;
@@ -560,7 +563,7 @@ test("default and CMS content render through the same article renderer", async (
   const defaultArticle = defaultDoc.querySelector("article");
   assert.equal(defaultArticle.getAttribute("data-public-content"), "default");
   assert.equal(defaultArticle.getAttribute("data-content-sha256"), data.content_sha256);
-  assert.equal(defaultDoc.querySelector("h1").textContent, "Privacy Policy");
+  assert.equal(defaultDoc.querySelector("h1").textContent, "Imprint");
   assert.ok(defaultHtml.includes(data.body_html.join("\n")), "default body is not rendered verbatim");
 
   const cmsArticle = cmsDoc.querySelector("article");

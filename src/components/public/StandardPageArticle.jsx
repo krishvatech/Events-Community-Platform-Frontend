@@ -50,6 +50,16 @@ const bodyClass = (h2Rule) => [
 
 const BODY_CLASS = bodyClass(DEFAULT_H2);
 const LEGAL_BODY_CLASS = bodyClass(LEGAL_H2);
+// Legal pages whose sections are below h2 (the Privacy Policy's <h4> and numbered bold
+// paragraphs): src/lib/legalSections.js marks each section start with data-legal-section.
+const LEGAL_SECTION_BODY_CLASS = [
+  BODY_CLASS,
+  "[&_[data-legal-section]]:mt-12 [&_[data-legal-section]]:scroll-mt-24 [&_[data-legal-section]]:border-t [&_[data-legal-section]]:border-imaa-border [&_[data-legal-section]]:pt-8",
+  "[&_[data-legal-section]]:font-sans [&_[data-legal-section]]:text-base [&_[data-legal-section]]:font-bold [&_[data-legal-section]]:leading-snug [&_[data-legal-section]]:text-imaa-ink md:[&_[data-legal-section]]:text-lg",
+  // The editor saves these headings as <b> runs; `bolder` inside a bold heading would be 900.
+  // Semibold, as the bold runs in the Terms headings (BODY_CLASS's strong rule).
+  "[&_[data-legal-section]_b]:font-semibold [&_[data-legal-section]_strong]:font-semibold",
+].join(" ");
 
 // Images in the (already sanitised) body load lazily: the References logo wall has 258 of them.
 // Every image carries width and height, so lazy loading causes no layout shift.
@@ -110,7 +120,10 @@ export default function StandardPageArticle({ page, source = "cms" }) {
         <div className="mx-auto grid w-full max-w-[1200px] gap-10 px-6 py-10 md:py-14 lg:grid-cols-[minmax(0,1fr)_280px] lg:gap-14">
           <div className="min-w-0 max-w-3xl">
             <LegalSectionNavMobile sections={legal.sections} />
-            <div className={LEGAL_BODY_CLASS} dangerouslySetInnerHTML={{ __html: legal.html }} />
+            <div
+              className={legal.level === "h2" ? LEGAL_BODY_CLASS : LEGAL_SECTION_BODY_CLASS}
+              dangerouslySetInnerHTML={{ __html: legal.html }}
+            />
           </div>
           <LegalSectionNavSidebar sections={legal.sections} />
         </div>

@@ -1,5 +1,5 @@
-// Terms and Conditions page layout (src/lib/legalSections.js, src/components/public/LegalSectionNav.jsx
-// and the legal branch of StandardPageArticle.jsx).
+// Terms and Conditions and Privacy Policy page layout (src/lib/legalSections.js,
+// src/components/public/LegalSectionNav.jsx and the legal branch of StandardPageArticle.jsx).
 //
 // node:test + jsdom. The real renderer is bundled on the fly with esbuild (as in
 // publicSitePages.test.mjs); node_modules stay external so React resolves normally.
@@ -20,10 +20,12 @@ import { LEGAL_TOC_SLUGS, addLegalSectionAnchors } from "../../lib/legalSections
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "../../..");
 const TERMS = "terms-and-conditions";
+const PRIVACY = "privacy-policy";
 
 const defaultPage = (slug) =>
   toDefaultPage(JSON.parse(fs.readFileSync(path.join(ROOT, `src/content/public-pages/${slug}.json`), "utf8")));
 const withoutIds = (html) => html.replace(/<h2 id="[^"]*"/g, "<h2");
+const withoutAnchors = (html) => html.replace(/ id="section-\d+" data-legal-section=""/g, "");
 const parse = (html) => new JSDOM(`<body>${html}</body>`).window.document;
 
 let StandardPageArticle;
@@ -141,9 +143,9 @@ test("a short Terms body renders as an ordinary article", async () => {
 });
 
 test("other public pages are not given the legal layout", async () => {
-  assert.deepEqual([...LEGAL_TOC_SLUGS], [TERMS]);
+  assert.deepEqual([...LEGAL_TOC_SLUGS], [TERMS, PRIVACY]);
   const body = "<h2>SECTION 1 – A</h2><p>a</p><h2>SECTION 2 – B</h2><p>b</p><h2>SECTION 3 – C</h2><p>c</p>";
-  for (const slug of ["privacy-policy", "imprint", "references"]) {
+  for (const slug of ["imprint", "references"]) {
     const doc = await renderArticle({ title: "Page", slug, body_html: body });
     assert.equal(doc.querySelector("nav[aria-label='On this page']"), null, slug);
     assert.equal(doc.querySelector("style"), null, slug);
@@ -152,4 +154,73 @@ test("other public pages are not given the legal layout", async () => {
   const faq = await renderArticle({ title: "FAQ", slug: "frequently-asked-questions", body_html: body });
   assert.equal(faq.querySelector("nav[aria-label='On this page']"), null);
   assert.equal(faq.querySelectorAll("[data-faq-accordion] button").length, 3);
+});
+
+// ------------------------------------------------------------------ privacy policy --
+
+// The shape of the published local Privacy Policy (Wagtail editor output, as served by the API):
+// section 1 saved as a bold paragraph, sections 2+ as <h4><b>…</b></h4>, plain <br> in the text.
+const CMS_PRIVACY = [
+  "<p><b>Data Privacy, Data Protection &amp; Cookie Policy</b></p>",
+  "<p>BY VISITING [<a href=\"https://imaa-institute.org/\">imaa-institute.org</a>] (THE “SITE”)</p>",
+  "<p><b>1. Who we are (Controllers)</b></p>",
+  "<p>You may contact us at info@imaa-institute.org.</p>",
+  "<h4><b>2. Information we may collect from you</b></h4>",
+  "<ul><li>Line one<br>line two</li></ul>",
+  "<h4><b>3. How your information may be used</b></h4>",
+  "<p><b>Legal Basis</b></p>",
+  "<p>Art. 6 (<a href=\"https://gdpr-info.eu/art-6-gdpr/\">https://gdpr-info.eu/art-6-gdpr/</a>).</p>",
+  "<h4><b>14. Information about Our Use of cookies</b></h4>",
+  "<p>Cookies.</p>",
+].join("");
+
+test("h4 sections and a numbered bold paragraph become anchored sections; other bold text does not", () => {
+  const result = addLegalSectionAnchors(CMS_PRIVACY);
+  assert.equal(result.level, "h4");
+  assert.deepEqual(result.sections, [
+    { id: "section-1", labelHtml: "1. Who we are (Controllers)" },
+    { id: "section-2", labelHtml: "2. Information we may collect from you" },
+    { id: "section-3", labelHtml: "3. How your information may be used" },
+    { id: "section-14", labelHtml: "14. Information about Our Use of cookies" },
+  ]);
+  assert.ok(result.html.includes('<p id="section-1" data-legal-section=""><b>1. Who we are (Controllers)</b></p>'));
+  assert.ok(result.html.includes('<h4 id="section-2" data-legal-section=""><b>2. Information'));
+  assert.ok(result.html.includes("<p><b>Legal Basis</b></p>"), "unnumbered bold paragraphs are not sections");
+  assert.equal(withoutAnchors(result.html), CMS_PRIVACY);
+});
+
+test("numbered bold paragraphs only count below h2, and the highest heading level wins", () => {
+  const h2Body = "<p><b>1. Intro</b></p><h2>A</h2><h2>B</h2><h2>C</h2><h4>Sub</h4>";
+  const h2 = addLegalSectionAnchors(h2Body);
+  assert.equal(h2.level, "h2");
+  assert.deepEqual(h2.sections.map((section) => section.id), ["a", "b", "c"]);
+  assert.ok(h2.html.startsWith("<p><b>1. Intro</b></p>"));
+  assert.ok(h2.html.includes("<h4>Sub</h4>"));
+  assert.ok(!h2.html.includes("data-legal-section"));
+});
+
+test("the CMS Privacy Policy renders with 14-section style anchors, contents and its links", async () => {
+  const doc = await renderArticle({ title: "Privacy Policy", slug: PRIVACY, body_html: CMS_PRIVACY });
+  for (const nav of doc.querySelectorAll("nav[aria-label='On this page']")) {
+    const hrefs = [...nav.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+    assert.deepEqual(hrefs, ["#section-1", "#section-2", "#section-3", "#section-14"]);
+    for (const href of hrefs) assert.ok(doc.querySelector(href), href);
+  }
+  const body = doc.querySelector("#section-1").parentElement;
+  assert.match(body.className, /\[&_\[data-legal-section\]\]:border-t/);
+  assert.equal(withoutAnchors(body.innerHTML), parse(CMS_PRIVACY).body.innerHTML);
+  assert.deepEqual(
+    [...body.querySelectorAll("a[href]")].map((a) => a.getAttribute("href")),
+    ["https://imaa-institute.org/", "https://gdpr-info.eu/art-6-gdpr/"]
+  );
+});
+
+test("the approved Privacy Policy default (h2 sections) gets all 14 WordPress sections", async () => {
+  const page = defaultPage(PRIVACY);
+  const result = addLegalSectionAnchors(page.body_html);
+  assert.equal(result.level, "h2");
+  assert.deepEqual(result.sections.map((section) => section.id), Array.from({ length: 14 }, (_, i) => `section-${i + 1}`));
+  assert.equal(withoutIds(result.html), page.body_html);
+  const doc = await renderArticle({ ...page, slug: PRIVACY });
+  assert.equal(doc.querySelectorAll("aside nav[aria-label='On this page'] a").length, 14);
 });
