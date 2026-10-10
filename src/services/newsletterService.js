@@ -313,6 +313,30 @@ export const getContactImport = (importId) =>
 export const listContactImportErrors = (importId, params = {}) =>
   unwrap(apiClient.get(`${adminContactImportsEndpoint}${importId}/errors/`, { params }));
 
+// Bulk delete: prepare a server-side plan (never deletes), then confirm it
+// batch by batch with the exact contact count.
+const adminContactDeleteEndpoint = `${adminContactsEndpoint}delete/`;
+
+export const prepareContactDeleteSelected = (contactIds) =>
+  unwrap(apiClient.post(`${adminContactDeleteEndpoint}prepare/`, { mode: "selected", contact_ids: contactIds }));
+
+export const prepareContactDeleteCsv = (file, emailColumn = "") => {
+  const form = new FormData();
+  form.append("mode", "csv");
+  form.append("file", file);
+  if (emailColumn) form.append("email_column", emailColumn);
+  return unwrap(
+    apiClient.post(`${adminContactDeleteEndpoint}prepare/`, form, { headers: { "Content-Type": "multipart/form-data" } })
+  );
+};
+
+export const getContactDeletePlan = (planId) => unwrap(apiClient.get(`${adminContactDeleteEndpoint}${planId}/`));
+
+export const executeContactDeleteBatch = (planId, confirmCount) =>
+  unwrap(apiClient.post(`${adminContactDeleteEndpoint}${planId}/execute/`, { confirm_count: confirmCount }));
+
+export const cancelContactDelete = (planId) => unwrap(apiClient.post(`${adminContactDeleteEndpoint}${planId}/cancel/`));
+
 export const getNewsletterStage = (stageId) =>
   unwrap(apiClient.get(`${adminStagesEndpoint}${stageId}/`));
 

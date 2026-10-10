@@ -42,6 +42,7 @@ import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "react-router-dom";
 
+import ContactDeleteDialog from "../components/marketing/ContactDeleteDialog.jsx";
 import ContactImportDialog from "../components/marketing/ContactImportDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 
@@ -97,6 +98,8 @@ export default function AdminNewsletterContactsPage() {
   const [bulkMessage, setBulkMessage] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  // null, "selected" (ticked contacts on this page) or "csv".
+  const [deleteMode, setDeleteMode] = useState(null);
   const [customFieldDefs, setCustomFieldDefs] = useState([]);
   const [customFieldValues, setCustomFieldValues] = useState({});
   const [createForm, setCreateForm] = useState({
@@ -331,6 +334,14 @@ export default function AdminNewsletterContactsPage() {
             Import CSV
           </Button>
           <Button
+            variant="outlined"
+            color="error"
+            onClick={() => setDeleteMode("csv")}
+            sx={{ textTransform: "none" }}
+          >
+            Bulk Delete by CSV
+          </Button>
+          <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() =>
               loadContacts({
@@ -488,6 +499,15 @@ export default function AdminNewsletterContactsPage() {
               sx={{ textTransform: "none" }}
             >
               Clear Stage
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => setDeleteMode("selected")}
+              disabled={bulkLoading || !selectedIds.length}
+              sx={{ textTransform: "none" }}
+            >
+              Delete selected ({selectedIds.length})
             </Button>
           </Stack>
         )}
@@ -721,6 +741,18 @@ export default function AdminNewsletterContactsPage() {
         onFinished={() =>
           loadContacts({ nextPage: page, nextSearch: search, nextStageFilter: stageFilter, refresh: true })
         }
+      />
+
+      <ContactDeleteDialog
+        open={Boolean(deleteMode)}
+        mode={deleteMode || "selected"}
+        contactIds={selectedIds}
+        onClose={(result) => {
+          setDeleteMode(null);
+          if (result?.changed) {
+            loadContacts({ nextPage: page, nextSearch: search, nextStageFilter: stageFilter, refresh: true });
+          }
+        }}
       />
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="md">
