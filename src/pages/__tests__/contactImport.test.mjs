@@ -600,3 +600,9 @@ test("a manual choice survives step navigation and one import is started", async
   await waitFor(() => assert.equal(posts("start/").length, 1));
   assert.equal(JSON.parse(posts("start/")[0].form.get("options")).tag_separator, "|");
 });
+
+test("the upload step shows the server's row and size limits", async () => {
+  await openWizard();
+  // The test API reports max_rows 20,000 and max_bytes 1 MB; the copy follows the server.
+  await waitFor(() => assert.equal(hasText("UTF-8 CSV with a header row: up to 20,000 contacts and 1.0 MB per file."), true));
+});

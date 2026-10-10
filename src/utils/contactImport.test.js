@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 
 import {
   DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_ROWS,
   checkCsvFile,
   detectTagSeparator,
   duplicateTargets,
@@ -29,7 +30,7 @@ test("client-side file checks", () => {
   assert.equal(checkCsvFile(null), "Choose a CSV file to upload.");
   assert.equal(checkCsvFile(file("contacts.xlsx", 10)), "Only .csv files can be imported.");
   assert.equal(checkCsvFile(file("contacts.CSV", 0)), "The file is empty.");
-  assert.match(checkCsvFile(file("contacts.csv", DEFAULT_MAX_BYTES + 1)), /larger than the 10\.0 MB limit/);
+  assert.match(checkCsvFile(file("contacts.csv", DEFAULT_MAX_BYTES + 1)), /larger than the 25\.0 MB limit/);
   assert.equal(checkCsvFile(file("contacts.csv", 10)), "");
 });
 
@@ -123,4 +124,9 @@ test("initial separator: one kind auto-selects, none keeps Pipe, mixed stays unr
   assert.equal(initialTagSeparator(countTagSeparators([])), "|");
   assert.equal(initialTagSeparator(countTagSeparators(["webinar,newsletter", "member|vip"])), "");
   assert.equal(initialTagSeparator({ "|": 0, ",": 3, ";": 1 }), "");
+});
+
+test("fallback limits match the server defaults (50,000 contacts, 25 MiB)", () => {
+  assert.equal(DEFAULT_MAX_ROWS, 50000);
+  assert.equal(DEFAULT_MAX_BYTES, 25 * 1024 * 1024);
 });

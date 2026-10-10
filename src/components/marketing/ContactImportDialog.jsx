@@ -49,6 +49,7 @@ import {
 } from "../../services/newsletterService";
 import {
   DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_ROWS,
   STATE_COLORS,
   STATE_LABELS,
   checkCsvFile,
@@ -128,6 +129,7 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
   const [dragActive, setDragActive] = useState(false);
   const [targets, setTargets] = useState([]);
   const [maxBytes, setMaxBytes] = useState(DEFAULT_MAX_BYTES);
+  const [maxRows, setMaxRows] = useState(DEFAULT_MAX_ROWS);
   const [fieldsError, setFieldsError] = useState("");
   const [busy, setBusy] = useState("");
   const [error, setError] = useState(null);
@@ -203,6 +205,7 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
         if (!active) return;
         setTargets(Array.isArray(data?.results) ? data.results : []);
         if (data?.limits?.max_bytes) setMaxBytes(Number(data.limits.max_bytes));
+        if (data?.limits?.max_rows) setMaxRows(Number(data.limits.max_rows));
       })
       .catch((err) => {
         if (active) setFieldsError(importErrorMessage(err, "We could not load Mautic contact fields."));
@@ -442,7 +445,7 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
         <UploadFileRoundedIcon sx={{ fontSize: 40, color: "#64748B" }} aria-hidden="true" />
         <Typography sx={{ fontWeight: 700, mt: 1 }}>Drag a CSV file here</Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          UTF-8 CSV with a header row, up to {formatBytes(maxBytes)}.
+          UTF-8 CSV with a header row: up to {formatCount(maxRows)} contacts and {formatBytes(maxBytes)} per file.
         </Typography>
         <input
           ref={inputRef}

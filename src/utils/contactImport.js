@@ -1,6 +1,8 @@
 // Pure helpers for the Marketing Hub CSV contact import wizard.
 
-export const DEFAULT_MAX_BYTES = 10 * 1024 * 1024;
+// Fallbacks until the server's limits load (fields endpoint `limits`).
+export const DEFAULT_MAX_BYTES = 25 * 1024 * 1024;
+export const DEFAULT_MAX_ROWS = 50000;
 export const SKIP_TARGET = "";
 export const ACTIVE_IMPORT_STORAGE_KEY = "ecp.contactImport.activeImportId";
 
