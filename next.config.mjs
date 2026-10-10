@@ -98,6 +98,15 @@ const nextConfig = {
   // static-image import returns an object. Keep Vite semantics for shared code.
   images: { disableStaticImages: true },
 
+  // Former About URLs (WordPress /about-us/ and its variant) lead to the Connect About page.
+  // Neither path has a page or route of its own. Trailing slashes are normalised by Next first.
+  async redirects() {
+    return [
+      { source: "/about-us", destination: "/about", permanent: true },
+      { source: "/aboutus", destination: "/about", permanent: true },
+    ];
+  },
+
   webpack(config, { dev, isServer, webpack }) {
     // Shared components import navigation from "#navigation" (package.json
     // "imports" -> React Router). Under Next.js it resolves to the Next adapter.
