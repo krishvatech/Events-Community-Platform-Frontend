@@ -48,12 +48,13 @@ export const checkCsvFile = (file, maxBytes = DEFAULT_MAX_BYTES) => {
   return "";
 };
 
-/** Destination aliases chosen by more than one column. */
-export const duplicateTargets = (mapping) => {
+/** Destination aliases chosen by more than one column (fallback columns excluded). */
+export const duplicateTargets = (mapping, fallbackColumns = []) => {
   const seen = new Set();
   const duplicates = new Set();
-  Object.values(mapping || {}).forEach((alias) => {
-    if (!alias) return;
+  const fallbacks = new Set(fallbackColumns);
+  Object.entries(mapping || {}).forEach(([header, alias]) => {
+    if (!alias || fallbacks.has(header)) return;
     if (seen.has(alias)) duplicates.add(alias);
     seen.add(alias);
   });
@@ -98,4 +99,94 @@ export const importErrorMessage = (err, fallback = "Something went wrong. Please
   if (!data) return err?.message || fallback;
   if (typeof data === "string") return fallback;
   return data.detail || fallback;
+};
+
+export const TAG_SEPARATORS = ["|", ",", ";"];
+export const SEPARATOR_NAMES = { "|": "Pipe", ",": "Comma", ";": "Semicolon" };
+// Fields that never take a fallback column (the backend refuses them too).
+export const FALLBACK_BLOCKED_TARGETS = ["email", "tags"];
+
+/** Same rules as the backend: split, trim, drop empties, case-insensitive dedupe. */
+export const splitTags = (value, separator) => {
+  const seen = new Set();
+  const tags = [];
+  String(value || "")
+    .split(separator)
+    .map((tag) => tag.trim())
+    .forEach((tag) => {
+      if (!tag || seen.has(tag.toLowerCase())) return;
+      seen.add(tag.toLowerCase());
+      tags.push(tag);
+    });
+  return tags;
+};
+
+/** The one separator the values use, or null when none or several appear. */
+export const detectTagSeparator = (values) => {
+  const used = TAG_SEPARATORS.filter((separator) =>
+    (values || []).some((value) => String(value || "").includes(separator))
+  );
+  return used.length === 1 ? used[0] : null;
+};
+
+/** Values that contain a separator other than the selected one. */
+export const tagSeparatorConflicts = (values, selected) =>
+  (values || []).filter((value) =>
+    TAG_SEPARATORS.some((separator) => separator !== selected && String(value || "").includes(separator))
+  ).length;
+
+/**
+ * Fallback flags that still have a primary: another, non-fallback column mapped
+ * to the same field. Others are dropped, so the column becomes an ordinary
+ * mapping again (or a visible duplicate) instead of a hidden stale flag.
+ */
+export const pruneFallbacks = (headers, mapping, fallbacks) => {
+  const flagged = new Set(fallbacks || []);
+  const primaries = (headers || []).filter((header) => mapping?.[header] && !flagged.has(header));
+  return (fallbacks || []).filter((header) => {
+    const alias = mapping?.[header];
+    return (
+      alias &&
+      !FALLBACK_BLOCKED_TARGETS.includes(alias) &&
+      primaries.some((other) => other !== header && mapping[other] === alias)
+    );
+  });
+};
+
+export const MAX_TAG_LENGTH = 191;
+
+/** Why the backend would reject this Tags value, or "" (mirrors its rules). */
+export const tagProblem = (value, separator) => {
+  const text = String(value || "");
+  if (separator !== "|" && text.includes("|")) return "contains '|' but a different separator is selected";
+  const tags = text.split(separator).map((tag) => tag.trim()).filter(Boolean);
+  if (tags.some((tag) => tag.startsWith("-"))) return "a tag starts with '-'";
+  if (tags.some((tag) => tag.length > MAX_TAG_LENGTH)) return `a tag is longer than ${MAX_TAG_LENGTH} characters`;
+  return "";
+};
+
+/** Values the backend would accept but import as one tag containing another separator. */
+export const tagSeparatorConflictsAccepted = (values, selected) =>
+  (values || []).filter((value) => !tagProblem(value, selected)).filter((value) =>
+    TAG_SEPARATORS.some((separator) => separator !== selected && String(value || "").includes(separator))
+  ).length;
+
+/** How many values contain each separator character. */
+export const countTagSeparators = (values) =>
+  Object.fromEntries(
+    TAG_SEPARATORS.map((separator) => [
+      separator,
+      (values || []).filter((value) => String(value || "").includes(separator)).length,
+    ])
+  );
+
+/**
+ * The separator to start with for a Tags column, from per-separator counts:
+ * one kind in use -> that one; none -> Pipe (every value is a single tag either
+ * way); several -> "" (unresolved: the administrator must choose).
+ */
+export const initialTagSeparator = (counts) => {
+  const used = TAG_SEPARATORS.filter((separator) => Number(counts?.[separator]) > 0);
+  if (used.length > 1) return "";
+  return used[0] || "|";
 };

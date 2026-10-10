@@ -101,9 +101,13 @@ const job = (overrides = {}) => ({
 let requests;
 let startResponse;
 let jobResponses;
+let previewData;
+let validationData;
 
 function installApi({ history = [] } = {}) {
   requests = [];
+  previewData = PREVIEW;
+  validationData = VALIDATION;
   startResponse = async () => ({ data: { import: job(), duplicate: false } });
   jobResponses = [job({ state: "completed", terminal: true, processed: 2, created: 2, progress_percentage: 100 })];
   globalThis.__testApiClient = {
@@ -121,8 +125,8 @@ function installApi({ history = [] } = {}) {
     },
     post: async (url, form) => {
       requests.push({ method: "post", url, form });
-      if (url === `${IMPORTS}preview/`) return { data: PREVIEW };
-      if (url === `${IMPORTS}validate/`) return { data: VALIDATION };
+      if (url === `${IMPORTS}preview/`) return { data: previewData };
+      if (url === `${IMPORTS}validate/`) return { data: validationData };
       if (url === `${IMPORTS}start/`) return startResponse();
       throw new Error(`unexpected POST ${url}`);
     },
@@ -230,7 +234,11 @@ test("validation sends the full mapping and options, and Start needs explicit co
   await goToReview();
   const form = posts("validate/")[0].form;
   assert.deepEqual(JSON.parse(form.get("mapping")), { Email: "email", "First Name": "firstname", City: "city" });
-  assert.deepEqual(JSON.parse(form.get("options")), { existing_mode: "skip_existing", tag_separator: "|" });
+  assert.deepEqual(JSON.parse(form.get("options")), {
+    existing_mode: "skip_existing",
+    tag_separator: "|",
+    fallback_columns: [],
+  });
   assert.equal(hasText("New contacts to create"), true);
   assert.equal(hasText(/already have email Do Not Contact/), true);
 
@@ -324,4 +332,271 @@ test("a stalled import explains what happens next instead of spinning silently",
   jobResponses = [job({ state: "processing", processed: 1, progress_percentage: 50, stalled: true })];
   await openWizard();
   await waitFor(() => assert.equal(hasText(/Mautic has not reported progress for over 15 minutes/), true));
+});
+
+// --------------------------------------------------- client CSV format --
+const CLIENT_PREVIEW = {
+  ...PREVIEW,
+  total_rows: 3,
+  total_columns: 4,
+  headers: ["Email", "Organization", "*Company Name", "Tags"],
+  sample_rows: [
+    { row: 2, cells: ["a@example.test", "Primary Org", "Alt Org", "demo-contact,local-import"] },
+    { row: 3, cells: ["b@example.test", "", "Fallback Org", "demo-contact"] },
+    { row: 4, cells: ["c@example.test", "Org C", "", ""] },
+  ],
+  missing_values: { Email: 0, Organization: 1, "*Company Name": 1, Tags: 1 },
+  suggested_mapping: { Email: "email", Organization: "company", "*Company Name": "", Tags: "tags" },
+  suggested_fallbacks: { "*Company Name": "company" },
+  tag_separator_hint: { column: "Tags", suggested: ",", counts: { "|": 0, ",": 1, ";": 0 }, values: 2 },
+};
+const CLIENT_TARGETS = [
+  ...TARGETS,
+  { alias: "company", label: "Primary company", type: "text", group: "core", importable: true, special: false, reason: "" },
+];
+
+async function clientMapping(preview = CLIENT_PREVIEW) {
+  previewData = preview;
+  const api = globalThis.__testApiClient;
+  const get = api.get;
+  api.get = async (url, config) => {
+    const response = await get(url, config); // keeps the request log
+    return url === `${IMPORTS}fields/` ? { data: { results: CLIENT_TARGETS, limits: { max_bytes: 1024 * 1024 } } } : response;
+  };
+  await openWizard();
+  await selectFile(document.getElementById("contact-import-file"), csvFile());
+  await click(button("Upload and preview"));
+  await waitFor(() => assert.equal(Boolean(button("Map fields")), true));
+  await click(button("Map fields"));
+  await waitFor(() => assert.equal(Boolean(button("Validate all rows")), true));
+}
+
+const fallbackBox = () =>
+  all("[role='dialog'] label").find((label) => /Use only when “Organization” is empty/.test(label.textContent))?.querySelector("input");
+
+test("suggested fallback and detected tag separator are applied visibly and sent with the mapping", async () => {
+  await clientMapping();
+  assert.equal(fallbackBox()?.checked, true);
+  assert.equal(button("Validate all rows").disabled, false);
+  assert.equal(hasText("Detected from the file: Comma."), true);
+  const chips = all("[aria-label='Tags preview'] .MuiChip-label").map((chip) => chip.textContent);
+  assert.deepEqual(chips, ["demo-contact", "local-import", "demo-contact"]);
+
+  await click(button("Validate all rows"));
+  await waitFor(() => assert.equal(posts("validate/").length, 1));
+  const form = posts("validate/")[0].form;
+  assert.deepEqual(JSON.parse(form.get("mapping")), {
+    Email: "email",
+    Organization: "company",
+    "*Company Name": "company",
+    Tags: "tags",
+  });
+  assert.deepEqual(JSON.parse(form.get("options")), {
+    existing_mode: "skip_existing",
+    tag_separator: ",",
+    fallback_columns: ["*Company Name"],
+  });
+});
+
+test("unticking a fallback makes it a duplicate and blocks validation", async () => {
+  await clientMapping();
+  await click(fallbackBox());
+  await waitFor(() => assert.equal(hasText(/Use this one as a fallback or skip it/), true));
+  assert.equal(button("Validate all rows").disabled, true);
+});
+
+test("choosing pipe for comma-separated tags warns and previews single tags", async () => {
+  await clientMapping();
+  const separator = all("[role='dialog'] [role='combobox']").find((el) => /Comma/.test(el.textContent));
+  await chooseSelectOption(separator, /^Pipe/);
+  await waitFor(() => assert.equal(hasText(/so each of those values becomes a\s+single tag\./), true));
+  const chips = all("[aria-label='Tags preview'] .MuiChip-label").map((chip) => chip.textContent);
+  assert.deepEqual(chips, ["demo-contact,local-import", "demo-contact"]);
+});
+
+test("review lists unmapped columns with data and flags skipped consent columns", async () => {
+  validationData = {
+    ...VALIDATION,
+    mapping: [
+      ...VALIDATION.mapping,
+      { column: "*Company Name", field: "company", label: "Primary company", type: "text", fallback_for: "Organization" },
+    ],
+    summary: {
+      ...VALIDATION.summary,
+      valid_rows: 3,
+      existing_rows: 1,
+      mapped_columns: 4,
+      tag_separator: ",",
+      unmapped_columns: [
+        { column: "*Subscribe to Newsletter", populated: 2 },
+        { column: "*Industry", populated: 0 },
+      ],
+    },
+    warnings: ["'*Subscribe to Newsletter' has 2 values but is not mapped, so those consent or preference values will not be imported."],
+  };
+  await openWizard();
+  await goToReview();
+  assert.equal(hasText("Eligible contacts"), true);
+  assert.equal(hasText(/4 columns mapped · 2 not imported \(1 with data\) · Tags separator: Comma/), true);
+  assert.equal(hasText("*Subscribe to Newsletter (2)"), true);
+  assert.equal(hasText(/\*Industry \(/), false);
+  assert.equal(hasText(/\*Company Name → Primary company when “Organization” is empty/), true);
+  const alert = all("[role='alert']").find((el) => /Subscribe to Newsletter/.test(el.textContent));
+  assert.equal(alert?.className.includes("Warning"), true);
+});
+
+test("removing a primary mapping clears its fallback so the wizard cannot get stuck", async () => {
+  await clientMapping();
+  const organization = all("[role='dialog'] [role='combobox']")[1];
+  await chooseSelectOption(organization, /^Skip this column/);
+  await waitFor(() => assert.equal(Boolean(fallbackBox()), false));
+  assert.equal(button("Validate all rows").disabled, false);
+  await click(button("Validate all rows"));
+  await waitFor(() => assert.equal(posts("validate/").length, 1));
+  const form = posts("validate/")[0].form;
+  assert.deepEqual(JSON.parse(form.get("options")).fallback_columns, []);
+  assert.equal(JSON.parse(form.get("mapping"))["*Company Name"], "company");
+});
+
+test("re-mapping the primary back offers the fallback again, unticked, as a visible duplicate", async () => {
+  await clientMapping();
+  await chooseSelectOption(all("[role='dialog'] [role='combobox']")[1], /^Skip this column/);
+  await waitFor(() => assert.equal(Boolean(fallbackBox()), false));
+  await chooseSelectOption(all("[role='dialog'] [role='combobox']")[1], /^Primary company/);
+  // "*Company Name" is now the earlier primary, so Organization is the one offered as fallback.
+  const box = () =>
+    all("[role='dialog'] label").find((label) => /Use only when “\*Company Name” is empty/.test(label.textContent))?.querySelector("input");
+  await waitFor(() => assert.equal(box()?.checked, false));
+  assert.equal(button("Validate all rows").disabled, true);
+  await click(box());
+  await waitFor(() => assert.equal(button("Validate all rows").disabled, false));
+});
+
+test("tag preview flags values the backend will reject instead of showing chips", async () => {
+  await clientMapping({
+    ...CLIENT_PREVIEW,
+    sample_rows: [
+      { row: 2, cells: ["a@example.test", "", "", "ok,-removed"] },
+      { row: 3, cells: ["b@example.test", "", "", "x|y"] },
+    ],
+  });
+  await waitFor(() => assert.equal(hasText(/Row will be rejected: a tag starts with '-'\./), true));
+  assert.equal(hasText(/Row will be rejected: contains '\|' but a different separator is selected\./), true);
+  assert.equal(all("[aria-label='Tags preview'] .MuiChip-label").length, 0);
+  // Rejected values are not also described as "a single tag".
+  assert.equal(hasText(/becomes a\s+single tag/), false);
+});
+
+// ------------------------------------------- Tags separator must be explicit --
+const tagsPreview = (values, counts) => ({
+  ...CLIENT_PREVIEW,
+  sample_rows: values.map((tags, index) => ({ row: index + 2, cells: [`t${index}@example.test`, "Org", "", tags] })),
+  tag_separator_hint: {
+    column: "Tags",
+    suggested: Object.values(counts).filter(Boolean).length === 1 ? Object.keys(counts).find((k) => counts[k]) : null,
+    counts: { "|": 0, ",": 0, ";": 0, ...counts },
+    values: values.length,
+  },
+});
+const MIXED = tagsPreview(["webinar,newsletter", "member|vip"], { ",": 1, "|": 1 });
+const separatorCombo = () =>
+  all("[role='dialog'] [role='combobox']").find((el) => /Select a separator|Comma \( , \)|Pipe \( \| \)/.test(el.textContent));
+const chipTexts = () => all("[aria-label='Tags preview'] .MuiChip-label").map((chip) => chip.textContent);
+const mixedWarning = () => hasText(/Mixed Tags separators detected\. Please select Comma or Pipe before validating this CSV\./);
+const lastOptions = () => JSON.parse(posts("validate/").at(-1).form.get("options"));
+
+test("comma-only Tags auto-select Comma and validation is available", async () => {
+  await clientMapping(tagsPreview(["webinar,newsletter", "member,vip"], { ",": 2 }));
+  assert.equal(separatorCombo().textContent, "Comma ( , )");
+  assert.deepEqual(chipTexts(), ["webinar", "newsletter", "member", "vip"]);
+  assert.equal(mixedWarning(), false);
+  assert.equal(button("Validate all rows").disabled, false);
+});
+
+test("pipe-only Tags auto-select Pipe and validation is available", async () => {
+  await clientMapping(tagsPreview(["webinar|newsletter", "member|vip"], { "|": 2 }));
+  assert.equal(separatorCombo().textContent, "Pipe ( | )");
+  assert.deepEqual(chipTexts(), ["webinar", "newsletter", "member", "vip"]);
+  assert.equal(button("Validate all rows").disabled, false);
+});
+
+test("mixed separators leave the choice unresolved and block validation", async () => {
+  await clientMapping(MIXED);
+  assert.equal(separatorCombo().textContent, "Select a separator");
+  assert.equal(mixedWarning(), true);
+  assert.equal(chipTexts().length, 0);
+  assert.equal(button("Validate all rows").disabled, true);
+  await click(button("Validate all rows"));
+  assert.equal(posts("validate/").length + posts("start/").length, 0);
+});
+
+test("explicit Comma updates the preview and is sent to validation", async () => {
+  await clientMapping(MIXED);
+  await chooseSelectOption(separatorCombo(), /^Comma/);
+  await waitFor(() => assert.equal(mixedWarning(), false));
+  assert.deepEqual(chipTexts(), ["webinar", "newsletter"]);
+  // Pipe stays inside a value under Comma, which the backend rejects: shown, not hidden.
+  assert.equal(hasText(/Row will be rejected: contains '\|' but a different separator is selected\./), true);
+  await click(button("Validate all rows"));
+  await waitFor(() => assert.equal(posts("validate/").length, 1));
+  assert.equal(lastOptions().tag_separator, ",");
+});
+
+test("explicit Pipe updates the preview, warns about commas and is sent to validation", async () => {
+  await clientMapping(MIXED);
+  await chooseSelectOption(separatorCombo(), /^Pipe/);
+  await waitFor(() => assert.deepEqual(chipTexts(), ["webinar,newsletter", "member", "vip"]));
+  assert.equal(hasText(/so each of those values becomes a\s+single tag\./), true);
+  await click(button("Validate all rows"));
+  await waitFor(() => assert.equal(posts("validate/").length, 1));
+  assert.equal(lastOptions().tag_separator, "|");
+});
+
+test("a new upload does not reuse the previous file's separator choice", async () => {
+  await clientMapping(MIXED);
+  await chooseSelectOption(separatorCombo(), /^Comma/);
+  await click(button("Back"));
+  await click(button("Back"));
+  await waitFor(() => assert.equal(Boolean(button("Upload and preview")), true));
+  await selectFile(document.getElementById("contact-import-file"), csvFile("second.csv"));
+  await click(button("Upload and preview"));
+  await waitFor(() => assert.equal(Boolean(button("Map fields")), true));
+  await click(button("Map fields"));
+  await waitFor(() => assert.equal(separatorCombo()?.textContent, "Select a separator"));
+  assert.equal(button("Validate all rows").disabled, true);
+});
+
+test("unmapping Tags lifts the requirement; remapping requires a choice again", async () => {
+  await clientMapping(MIXED);
+  const tagsCombo = () => all("[role='dialog'] [role='combobox']")[3];
+  await chooseSelectOption(tagsCombo(), /^Skip this column/);
+  await waitFor(() => assert.equal(Boolean(separatorCombo()), false));
+  assert.equal(mixedWarning(), false);
+  assert.equal(button("Validate all rows").disabled, false);
+  await click(button("Validate all rows"));
+  await waitFor(() => assert.equal(posts("validate/").length, 1));
+  assert.equal(lastOptions().tag_separator, "|"); // usual default when Tags is not imported
+  await click(button("Back to mapping"));
+  await chooseSelectOption(tagsCombo(), /^Tags/);
+  await waitFor(() => assert.equal(separatorCombo()?.textContent, "Select a separator"));
+  assert.equal(button("Validate all rows").disabled, true);
+});
+
+test("a manual choice survives step navigation and one import is started", async () => {
+  await clientMapping(MIXED);
+  await chooseSelectOption(separatorCombo(), /^Pipe/);
+  await click(button("Validate all rows"));
+  await waitFor(() => assert.equal(Boolean(button("Start import")), true));
+  await click(button("Back to mapping"));
+  await waitFor(() => assert.equal(separatorCombo()?.textContent, "Pipe ( | )"));
+  await click(button("Back"));
+  await click(button("Map fields"));
+  await waitFor(() => assert.equal(separatorCombo()?.textContent, "Pipe ( | )"));
+  await click(button("Validate all rows"));
+  await waitFor(() => assert.equal(posts("validate/").length, 2));
+  assert.deepEqual(posts("validate/").map((p) => JSON.parse(p.form.get("options")).tag_separator), ["|", "|"]);
+  await click(confirmBox());
+  await click(button("Start import"));
+  await waitFor(() => assert.equal(posts("start/").length, 1));
+  assert.equal(JSON.parse(posts("start/")[0].form.get("options")).tag_separator, "|");
 });

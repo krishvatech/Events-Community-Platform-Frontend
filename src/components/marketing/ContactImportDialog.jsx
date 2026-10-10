@@ -58,6 +58,15 @@ import {
   importErrorMessage,
   isTerminalState,
   mappingPayload,
+  FALLBACK_BLOCKED_TARGETS,
+  SEPARATOR_NAMES,
+  detectTagSeparator,
+  splitTags,
+  countTagSeparators,
+  initialTagSeparator,
+  pruneFallbacks,
+  tagProblem,
+  tagSeparatorConflictsAccepted,
   nextPollDelay,
   readStoredImportId,
   storeImportId,
@@ -66,7 +75,7 @@ import {
 
 const STEPS = ["Upload CSV", "Preview data", "Map fields", "Validate & review", "Import progress", "Results"];
 const STEP = { upload: 0, preview: 1, mapping: 2, review: 3, progress: 4, results: 5 };
-const DEFAULT_OPTIONS = { existing_mode: "skip_existing", tag_separator: "|" };
+const DEFAULT_OPTIONS = { existing_mode: "skip_existing", tag_separator: "|", fallback_columns: [] };
 const ERROR_PAGE_SIZE = 25;
 const cellSx = { maxWidth: 220, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
 
@@ -125,6 +134,10 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
   const [preview, setPreview] = useState(null);
   const [mapping, setMapping] = useState({});
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
+  // The Tags column the current separator was decided for (null: not yet).
+  // When the mapped Tags column changes, the separator is decided again; a
+  // manual choice stands until then.
+  const [tagSeparatorColumn, setTagSeparatorColumn] = useState(null);
   const [validation, setValidation] = useState(null);
   const [validatedFor, setValidatedFor] = useState("");
   const [confirmed, setConfirmed] = useState(false);
@@ -143,9 +156,14 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
     () => Object.fromEntries(targets.map((target) => [target.alias, target])),
     [targets]
   );
-  const duplicates = useMemo(() => duplicateTargets(mapping), [mapping]);
+  const fallbackColumns = options.fallback_columns || [];
+  const duplicates = useMemo(() => duplicateTargets(mapping, fallbackColumns), [mapping, fallbackColumns]);
   const emailMapped = Object.values(mapping).includes("email");
   const tagsMapped = Object.values(mapping).includes("tags");
+  // Mixed separators leave the choice unresolved ("") until the admin picks one.
+  const separatorRequired = tagsMapped && !options.tag_separator;
+  // Without a Tags column the separator is irrelevant; send the usual default.
+  const requestOptions = { ...options, tag_separator: options.tag_separator || DEFAULT_OPTIONS.tag_separator };
   const currentKey = validationKey(file, headers, mapping, options);
   const validationCurrent = Boolean(validation && validatedFor === currentKey);
 
@@ -157,6 +175,7 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
     setPreview(null);
     setMapping({});
     setOptions(DEFAULT_OPTIONS);
+    setTagSeparatorColumn(null);
     setValidation(null);
     setValidatedFor("");
     setConfirmed(false);
@@ -267,7 +286,14 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
     try {
       const data = await previewContactImport(file);
       setPreview(data);
-      setMapping(data?.suggested_mapping || {});
+      // Suggested fallbacks (e.g. "*Company Name" after "Organization") are
+      // pre-selected but shown on the mapping step as "used only when … is empty".
+      const fallbacks = data?.suggested_fallbacks || {};
+      setMapping({ ...(data?.suggested_mapping || {}), ...fallbacks });
+      // The separator is decided for this file's Tags column below; nothing
+      // carries over from a previous file.
+      setOptions({ ...DEFAULT_OPTIONS, tag_separator: "", fallback_columns: Object.keys(fallbacks) });
+      setTagSeparatorColumn(null);
       setStep(STEP.preview);
     } catch (err) {
       setError({ message: importErrorMessage(err, "We could not read this file."), errors: err?.response?.data?.errors });
@@ -277,10 +303,37 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
   };
 
   const updateMapping = (header, alias) => {
-    setMapping((current) => ({ ...current, [header]: alias }));
+    const nextMapping = { ...mapping, [header]: alias };
+    setMapping(nextMapping);
+    // A column re-mapped elsewhere is no longer anyone's fallback, and a
+    // fallback whose primary was re-mapped or skipped has nothing to fall back
+    // to: both flags are cleared so the checkbox and the payload stay in step.
+    setOptions((current) => ({
+      ...current,
+      fallback_columns: pruneFallbacks(
+        headers,
+        nextMapping,
+        (current.fallback_columns || []).filter((item) => item !== header)
+      ),
+    }));
     setValidation(null);
     setConfirmed(false);
   };
+
+  const setFallback = (header, enabled) => {
+    setOptions((current) => {
+      const rest = (current.fallback_columns || []).filter((item) => item !== header);
+      return { ...current, fallback_columns: enabled ? [...rest, header] : rest };
+    });
+    setValidation(null);
+    setConfirmed(false);
+  };
+
+  // The non-fallback column already mapped to this field, if it is not `header`.
+  const primaryColumnFor = (header, alias) =>
+    headers.find(
+      (other) => other !== header && mapping[other] === alias && !fallbackColumns.includes(other)
+    ) || "";
 
   const updateOption = (key, value) => {
     setOptions((current) => ({ ...current, [key]: value }));
@@ -294,7 +347,7 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
     try {
       const data = await validateContactImport(file, {
         mapping: mappingPayload(headers, mapping),
-        options,
+        options: requestOptions,
       });
       setValidation(data);
       setValidatedFor(currentKey);
@@ -316,7 +369,7 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
     try {
       const data = await startContactImport(file, {
         mapping: mappingPayload(headers, mapping),
-        options,
+        options: requestOptions,
         validationToken: validation.validation_token,
       });
       const started = data?.import;
@@ -536,6 +589,70 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
     return row ? row.cells[index] : "";
   };
 
+  const tagsHeader = headers.find((header) => mapping[header] === "tags") || "";
+  const tagSamples = useMemo(() => {
+    if (!tagsHeader) return [];
+    const index = headers.indexOf(tagsHeader);
+    return (preview?.sample_rows || [])
+      .map((row) => String(row.cells[index] || "").trim())
+      .filter(Boolean);
+  }, [preview, headers, tagsHeader]);
+
+  useEffect(() => {
+    if (!preview || tagSeparatorColumn === tagsHeader) return;
+    const hint = preview.tag_separator_hint;
+    // Whole-file counts when the hint is for this column, else the sample rows.
+    const counts = hint?.column === tagsHeader && hint?.values ? hint.counts : countTagSeparators(tagSamples);
+    setOptions((current) => ({ ...current, tag_separator: tagsHeader ? initialTagSeparator(counts) : "" }));
+    setTagSeparatorColumn(tagsHeader);
+  }, [preview, tagsHeader, tagSeparatorColumn, tagSamples]);
+
+  const renderTagPreview = () => {
+    const hint = preview?.tag_separator_hint;
+    // Whole-file detection when it is for this column, else the sample rows.
+    const detected = hint?.column === tagsHeader && hint?.values ? hint.suggested : detectTagSeparator(tagSamples);
+    if (separatorRequired) return null; // the selector carries the message
+    const conflicts = tagSeparatorConflictsAccepted(tagSamples, options.tag_separator);
+    const examples = tagSamples.filter((value, index, all) => all.indexOf(value) === index).slice(0, 3);
+    return (
+      <Box sx={{ mt: 1.5 }}>
+        {detected && detected === options.tag_separator && (
+          <Typography variant="caption" color="text.secondary" component="div">
+            Detected from the file: {SEPARATOR_NAMES[detected]}.
+          </Typography>
+        )}
+        {conflicts > 0 && (
+          <Alert severity="warning" sx={{ my: 1 }}>
+            Some Tags values contain {detected ? SEPARATOR_NAMES[detected].toLowerCase() : "another separator"} characters
+            but the separator is {SEPARATOR_NAMES[options.tag_separator].toLowerCase()}, so each of those values becomes a
+            single tag.
+          </Alert>
+        )}
+        {examples.length > 0 && (
+          <Stack spacing={0.75} sx={{ mt: 1 }} aria-label="Tags preview">
+            {examples.map((value) => {
+              const problem = tagProblem(value, options.tag_separator);
+              return (
+                <Stack key={value} direction="row" spacing={0.75} alignItems="center" useFlexGap flexWrap="wrap">
+                  <Typography variant="caption" sx={{ color: "text.secondary", maxWidth: 260, ...cellSx }} title={value}>
+                    {value} →
+                  </Typography>
+                  {problem ? (
+                    <Typography variant="caption" color="error">
+                      Row will be rejected: {problem}.
+                    </Typography>
+                  ) : (
+                    splitTags(value, options.tag_separator).map((tag) => <Chip key={tag} size="small" label={tag} />)
+                  )}
+                </Stack>
+              );
+            })}
+          </Stack>
+        )}
+      </Box>
+    );
+  };
+
   const renderMapping = () => (
     <Stack spacing={2.5}>
       <Typography color="text.secondary">
@@ -555,7 +672,10 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
           <TableBody>
             {headers.map((header) => {
               const alias = mapping[header] || "";
-              const isDuplicate = alias && duplicates.has(alias);
+              const isFallback = fallbackColumns.includes(header);
+              const primary = alias ? primaryColumnFor(header, alias) : "";
+              const canFallback = Boolean(primary) && !FALLBACK_BLOCKED_TARGETS.includes(alias);
+              const isDuplicate = alias && !isFallback && duplicates.has(alias);
               const labelId = `map-${headers.indexOf(header)}`;
               return (
                 <TableRow key={header}>
@@ -576,9 +696,35 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
                       >
                         {targetMenu}
                       </Select>
-                      {isDuplicate && <FormHelperText>Another column is mapped to this field.</FormHelperText>}
-                      {alias === "doNotEmail" && (
-                        <FormHelperText>Only "true" values add Do Not Contact. Existing records are never removed.</FormHelperText>
+                      {canFallback && (
+                        <FormControlLabel
+                          sx={{ mt: 0.5 }}
+                          control={
+                            <Checkbox
+                              size="small"
+                              checked={isFallback}
+                              onChange={(event) => setFallback(header, event.target.checked)}
+                            />
+                          }
+                          label={
+                            <Typography variant="caption">
+                              {alias === "doNotEmail"
+                                ? `Also add Do Not Contact when this column is true (as well as “${primary}”)`
+                                : `Use only when “${primary}” is empty`}
+                            </Typography>
+                          }
+                        />
+                      )}
+                      {isDuplicate && !canFallback && (
+                        <FormHelperText>Another column is mapped to this field.</FormHelperText>
+                      )}
+                      {isDuplicate && canFallback && (
+                        <FormHelperText>Another column is mapped to this field. Use this one as a fallback or skip it.</FormHelperText>
+                      )}
+                      {alias === "doNotEmail" && !isFallback && (
+                        <FormHelperText>
+                          true, yes, 1 or "Do Not Contact" add Do Not Contact. Existing records are never removed.
+                        </FormHelperText>
                       )}
                     </FormControl>
                   </TableCell>
@@ -610,14 +756,16 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
           />
         </RadioGroup>
         {tagsMapped && (
-          <FormControl size="small" sx={{ mt: 1.5, minWidth: 240 }}>
+          <FormControl size="small" sx={{ mt: 1.5, minWidth: 240 }} error={separatorRequired} required={separatorRequired}>
             <Typography id="tag-separator-label" variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
               Tags are separated by
             </Typography>
             <Select
               value={options.tag_separator}
+              displayEmpty
               onChange={(event) => updateOption("tag_separator", event.target.value)}
-              inputProps={{ "aria-labelledby": "tag-separator-label" }}
+              inputProps={{ "aria-labelledby": "tag-separator-label", "aria-describedby": separatorRequired ? "tag-separator-required" : undefined }}
+              renderValue={(value) => (value ? `${SEPARATOR_NAMES[value]} ( ${value} )` : <em>Select a separator</em>)}
             >
               <MenuItem value="|">Pipe ( | )</MenuItem>
               <MenuItem value=",">Comma ( , )</MenuItem>
@@ -625,6 +773,13 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
             </Select>
           </FormControl>
         )}
+        {separatorRequired && (
+          <Alert id="tag-separator-required" severity="warning" role="alert" sx={{ mt: 1 }}>
+            Mixed Tags separators detected. Please select Comma or Pipe before validating this CSV. Your selection
+            determines how Tags will be imported.
+          </Alert>
+        )}
+        {tagsMapped && renderTagPreview()}
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5 }}>
           Imported contacts are not added to any segment or campaign and no email is sent. Contacts never become ECP
           platform users.
@@ -633,6 +788,39 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
       <ErrorAlert error={error} />
     </Stack>
   );
+
+  const renderMappingSummary = (summary) => {
+    const unmapped = Array.isArray(summary.unmapped_columns) ? summary.unmapped_columns : [];
+    const withData = unmapped.filter((item) => item.populated > 0);
+    const fallbacks = (validation?.mapping || []).filter((item) => item.fallback_for);
+    return (
+      <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+        <Typography sx={{ fontWeight: 800, mb: 0.5 }}>Fields</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {formatCount(summary.mapped_columns)} columns mapped · {formatCount(unmapped.length)} not imported
+          ({formatCount(withData.length)} with data) · Tags separator:{" "}
+          {SEPARATOR_NAMES[summary.tag_separator] || summary.tag_separator || "—"}
+        </Typography>
+        {fallbacks.length > 0 && (
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Fallbacks: {fallbacks.map((item) => `${item.column} → ${item.label} when “${item.fallback_for}” is empty`).join("; ")}
+          </Typography>
+        )}
+        {withData.length > 0 && (
+          <Box sx={{ mt: 1 }}>
+            <Typography variant="caption" color="text.secondary" component="div" sx={{ mb: 0.5 }}>
+              Columns with data that will not be imported:
+            </Typography>
+            <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap" aria-label="Unmapped columns with data">
+              {withData.map((item) => (
+                <Chip key={item.column} size="small" variant="outlined" label={`${item.column} (${formatCount(item.populated)})`} />
+              ))}
+            </Stack>
+          </Box>
+        )}
+      </Paper>
+    );
+  };
 
   const renderReview = () => {
     const summary = validation?.summary || {};
@@ -644,7 +832,9 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
         )}
         <StatGrid>
           <StatTile label="Total rows" value={summary.total_rows} />
+          <StatTile label="Eligible contacts" value={summary.valid_rows} />
           <StatTile label={`New contacts to create${estimate}`} value={summary.to_create} tone="#15803D" />
+          <StatTile label={`Existing contacts${estimate}`} value={summary.existing_rows} />
           <StatTile
             label={summary.existing_mode === "fill_empty" ? `Existing to fill${estimate}` : `Existing to skip${estimate}`}
             value={summary.existing_mode === "fill_empty" ? summary.to_update : summary.to_skip}
@@ -656,10 +846,11 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
           <StatTile label="Rows to send to Mautic" value={summary.to_import} tone="#1D4ED8" />
         </StatGrid>
         {(validation?.warnings || []).map((warning) => (
-          <Alert key={warning} severity="info">
+          <Alert key={warning} severity={/not mapped|not be imported|single tag/.test(warning) ? "warning" : "info"}>
             {warning}
           </Alert>
         ))}
+        {renderMappingSummary(summary)}
         {validation?.issue_count > 0 && (
           <Box>
             <Typography sx={{ fontWeight: 800, mb: 1 }}>
@@ -895,7 +1086,7 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
           <Button
             variant="contained"
             onClick={handleValidate}
-            disabled={!emailMapped || duplicates.size > 0 || busy === "validate"}
+            disabled={!emailMapped || duplicates.size > 0 || separatorRequired || busy === "validate"}
             startIcon={busy === "validate" ? <CircularProgress size={16} color="inherit" /> : null}
             sx={{ textTransform: "none" }}
           >
@@ -911,7 +1102,7 @@ export default function ContactImportDialog({ open, onClose, onFinished }) {
             Back to mapping
           </Button>
           {!validationCurrent ? (
-            <Button variant="contained" onClick={handleValidate} disabled={busy === "validate"} sx={{ textTransform: "none" }}>
+            <Button variant="contained" onClick={handleValidate} disabled={separatorRequired || busy === "validate"} sx={{ textTransform: "none" }}>
               Validate again
             </Button>
           ) : (
