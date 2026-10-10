@@ -199,7 +199,7 @@ test("a FAQ body without <h2> questions renders as an ordinary article", async (
 });
 
 test("other StandardPages with <h2> headings are not turned into an accordion", async () => {
-  for (const slug of ["privacy-policy", "terms-and-conditions", "imprint", "references"]) {
+  for (const slug of ["privacy-policy", "terms-and-conditions", "references"]) {
     const doc = await renderArticle({ title: "Page", slug, body_html: "<h2>Section</h2><p>Text</p>" });
     assert.equal(doc.querySelector("[data-faq-accordion]"), null, slug);
     assert.equal(doc.querySelector("aside"), null, slug);

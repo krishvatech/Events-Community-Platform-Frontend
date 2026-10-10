@@ -3,6 +3,7 @@ import FaqAccordion from "./FaqAccordion.jsx";
 import { FAQ_CONTACT_URL, FAQ_SLUG, splitFaqSections } from "@/lib/faqSections";
 import { LegalSectionNavMobile, LegalSectionNavSidebar } from "./LegalSectionNav.jsx";
 import { LEGAL_TOC_SLUGS, addLegalSectionAnchors } from "@/lib/legalSections";
+import { IMPRINT_SLUG, splitImprintSections } from "@/lib/imprintSections";
 
 // src/components/public/StandardPageArticle.jsx
 // Server Component: the one renderer for public StandardPage content (title + rich-text body),
@@ -61,6 +62,17 @@ const LEGAL_SECTION_BODY_CLASS = [
   "[&_[data-legal-section]_b]:font-semibold [&_[data-legal-section]_strong]:font-semibold",
 ].join(" ");
 
+// Imprint cards: the same rich-text rules at a size that suits address blocks in a card.
+const IMPRINT_CARD_BODY_CLASS = [
+  "break-words text-[15px] leading-relaxed text-imaa-body",
+  "[&_p]:mt-3 [&_p:first-child]:mt-0",
+  "[&_ul]:mt-3 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:mt-3 [&_ol]:list-decimal [&_ol]:pl-5 [&_li]:mt-1 [&_li::marker]:text-imaa-teal",
+  "[&_a]:text-imaa-link [&_a]:underline [&_a]:underline-offset-2 [&_a:hover]:text-imaa-teal-dark",
+  "[&_strong]:font-semibold [&_strong]:text-imaa-ink [&_b]:font-semibold [&_b]:text-imaa-ink",
+  "[&_h3]:mt-6 [&_h3]:font-sans [&_h3]:text-base [&_h3]:font-semibold [&_h3]:text-imaa-ink",
+  "[&_h4]:mt-5 [&_h4]:font-sans [&_h4]:text-base [&_h4]:font-semibold [&_h4]:text-imaa-ink",
+].join(" ");
+
 // Images in the (already sanitised) body load lazily: the References logo wall has 258 of them.
 // Every image carries width and height, so lazy loading causes no layout shift.
 const withLazyImages = (html) => html.replace(/<img(?![^>]*\bloading=)/g, '<img loading="lazy" decoding="async"');
@@ -73,6 +85,8 @@ export default function StandardPageArticle({ page, source = "cms" }) {
   const faq = page?.slug === FAQ_SLUG ? splitFaqSections(body) : null;
   // Long legal pages: the same CMS body with anchored section headings and a contents list.
   const legal = LEGAL_TOC_SLUGS.includes(page?.slug) ? addLegalSectionAnchors(body) : null;
+  // Imprint: one card per <h2> (each company / region), from the CMS body.
+  const imprint = page?.slug === IMPRINT_SLUG ? splitImprintSections(body) : null;
 
   return (
     <article
@@ -126,6 +140,30 @@ export default function StandardPageArticle({ page, source = "cms" }) {
             />
           </div>
           <LegalSectionNavSidebar sections={legal.sections} />
+        </div>
+      ) : imprint ? (
+        <div className="mx-auto w-full max-w-[1200px] px-6 py-12 md:py-16">
+          {imprint.introHtml ? (
+            <div className={`${BODY_CLASS} mb-10 max-w-3xl`} dangerouslySetInnerHTML={{ __html: imprint.introHtml }} />
+          ) : null}
+          <div className="grid items-start gap-6 lg:grid-cols-3">
+            {imprint.sections.map(({ id, headingHtml, bodyHtml }) => (
+              <section
+                key={id}
+                aria-labelledby={id}
+                className="min-w-0 rounded-2xl border border-imaa-border bg-white p-6 md:p-7"
+              >
+                <h2
+                  id={id}
+                  className="m-0 scroll-mt-28 border-b border-imaa-border pb-4 font-sans text-xl font-bold tracking-[-0.01em] text-imaa-ink"
+                  dangerouslySetInnerHTML={{ __html: headingHtml }}
+                />
+                {bodyHtml ? (
+                  <div className={`${IMPRINT_CARD_BODY_CLASS} mt-4`} dangerouslySetInnerHTML={{ __html: bodyHtml }} />
+                ) : null}
+              </section>
+            ))}
+          </div>
         </div>
       ) : body ? (
         <div className="mx-auto w-full max-w-[1200px] px-6 py-12 md:py-16">

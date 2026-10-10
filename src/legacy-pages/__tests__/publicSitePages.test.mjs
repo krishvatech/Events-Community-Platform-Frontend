@@ -544,8 +544,8 @@ test("the route raises Next's 404 for unavailable pages (References drafts inclu
 
 test("default and CMS content render through the same article renderer", async () => {
   const { PublicStandardPage } = await loadRoute();
-  // Imprint: a text-only page with a default and no page-specific layout (Privacy Policy and
-  // Terms get the legal section navigation, FAQ the accordion; see their own tests).
+  // Imprint: a text-only page with a default (its regional cards, like the FAQ accordion and
+  // the legal section navigation, have their own tests).
   const { data } = readContent("imprint");
   const cmsImprint = cmsPage({ title: "Imprint", slug: "imprint", path: "/imprint/" });
 
@@ -564,12 +564,16 @@ test("default and CMS content render through the same article renderer", async (
   assert.equal(defaultArticle.getAttribute("data-public-content"), "default");
   assert.equal(defaultArticle.getAttribute("data-content-sha256"), data.content_sha256);
   assert.equal(defaultDoc.querySelector("h1").textContent, "Imprint");
-  assert.ok(defaultHtml.includes(data.body_html.join("\n")), "default body is not rendered verbatim");
+  // Every block between the default's <h2> headings is rendered verbatim (inside its card).
+  for (const block of data.body_html.join("\n").split(/<h2>[^<]*<\/h2>/).map((part) => part.trim()).filter(Boolean)) {
+    assert.ok(defaultHtml.includes(block), `default body is not rendered verbatim: ${block.slice(0, 60)}`);
+  }
 
   const cmsArticle = cmsDoc.querySelector("article");
   assert.equal(cmsArticle.getAttribute("data-public-content"), "cms");
   assert.equal(cmsArticle.hasAttribute("data-content-sha256"), false);
-  assert.ok(cmsHtml.includes("<h2>Edited in Wagtail</h2><p>Published CMS text.</p>"));
+  assert.equal(cmsDoc.querySelector("article section h2").textContent, "Edited in Wagtail");
+  assert.ok(cmsHtml.includes("<p>Published CMS text.</p>"));
 
   // Same markup structure around the content: one renderer.
   assert.equal(defaultArticle.className, cmsArticle.className);

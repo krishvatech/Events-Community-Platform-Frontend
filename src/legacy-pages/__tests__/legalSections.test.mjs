@@ -145,7 +145,7 @@ test("a short Terms body renders as an ordinary article", async () => {
 test("other public pages are not given the legal layout", async () => {
   assert.deepEqual([...LEGAL_TOC_SLUGS], [TERMS, PRIVACY]);
   const body = "<h2>SECTION 1 – A</h2><p>a</p><h2>SECTION 2 – B</h2><p>b</p><h2>SECTION 3 – C</h2><p>c</p>";
-  for (const slug of ["imprint", "references"]) {
+  for (const slug of ["references"]) {
     const doc = await renderArticle({ title: "Page", slug, body_html: body });
     assert.equal(doc.querySelector("nav[aria-label='On this page']"), null, slug);
     assert.equal(doc.querySelector("style"), null, slug);
