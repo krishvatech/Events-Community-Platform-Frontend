@@ -307,10 +307,10 @@ export default function AdminRecordingsPage() {
   );
 
   return (
-    <Container className="ecp-admin-recordings"
+    <Container
       maxWidth="lg"
       disableGutters
-      className="pt-6 pb-6 sm:pt-6 sm:pb-8"
+      className="ecp-admin-recordings pt-6 pb-6 sm:pt-6 sm:pb-8"
       sx={{ minWidth: 0 }}
     >
       {/* Header */}

@@ -1,0 +1,113 @@
+/* K6 email-template presentation layer. All rules are local to this feature. */
+.ecp-email-templates {
+  --ect-ink: var(--imaa-ink, #1B2A4A);
+  --ect-teal: var(--imaa-teal, #087C7F);
+  --ect-border: var(--imaa-border, #E2E4E8);
+  --ect-surface: var(--imaa-dm-surface, #fff);
+  --ect-subtle: var(--imaa-dm-surface-alt, #F7F8FA);
+  --ect-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08));
+}
+
+.ecp-email-templates .ect-page-header .MuiTypography-h4 {
+  color: var(--ect-ink);
+  font-family: var(--imaa-font-serif, Georgia, serif);
+  letter-spacing: -.025em;
+}
+.ecp-email-templates .MuiPaper-root {
+  border-color: var(--ect-border);
+  box-shadow: var(--ect-shadow);
+}
+.ecp-email-templates .ect-template-toolbar {
+  background: var(--ect-surface);
+  border-top: 3px solid var(--ect-teal);
+}
+.ecp-email-templates .ect-template-toolbar .MuiInputBase-root,
+.ecp-email-templates .ect-template-settings .MuiInputBase-root,
+.ecp-email-templates .ect-fallback-fields .MuiInputBase-root {
+  background: var(--ect-surface);
+}
+.ecp-email-templates .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--ect-teal);
+  border-width: 2px;
+}
+.ecp-email-templates .MuiButton-contained {
+  border-radius: 6px;
+  font-weight: 800;
+  text-transform: none;
+}
+.ecp-email-templates .MuiButton-containedPrimary {
+  background: var(--admin-coral, #D24533);
+}
+.ecp-email-templates .MuiButton-containedPrimary:hover { background: #B53A2C; }
+.ecp-email-templates .MuiButton-outlined {
+  border-radius: 6px;
+  font-weight: 700;
+  text-transform: none;
+}
+.ecp-email-templates .ect-editor-workspace {
+  background: var(--ect-surface);
+  border-top: 3px solid var(--ect-ink);
+}
+.ecp-email-templates .ect-editor-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--ect-border);
+}
+.ecp-email-templates .ect-action-group .MuiButton-root { box-shadow: none; }
+.ecp-email-templates .ect-template-settings {
+  background: var(--ect-subtle);
+  border-color: var(--ect-border) !important;
+}
+.ecp-email-templates .ect-merge-tags {
+  padding: 14px 16px;
+  border: 1px solid var(--ect-border);
+  border-radius: var(--imaa-radius-card, 8px);
+  background: var(--ect-surface);
+}
+.ecp-email-templates .ect-merge-tags .MuiChip-root {
+  max-width: 100%;
+  font-weight: 700;
+}
+.ecp-email-templates .ect-merge-tags .MuiChip-label {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.ecp-email-templates .ect-visual-editor-panel,
+.ecp-email-templates .ect-inline-preview-panel {
+  border-color: var(--ect-border) !important;
+  box-shadow: var(--ect-shadow);
+}
+.ecp-email-templates .ect-visual-editor-panel > .MuiBox-root:first-child,
+.ecp-email-templates .ect-inline-preview-panel > .MuiStack-root:first-child {
+  background: var(--ect-subtle);
+}
+.ecp-email-templates .ect-inline-preview-panel iframe {
+  background: #F4F7FB;
+}
+.ecp-email-templates-dialog .MuiDialog-paper {
+  border: 1px solid var(--imaa-border, #E2E4E8);
+  box-shadow: 0 18px 48px rgba(27,42,74,.20);
+}
+.ecp-email-templates-dialog .MuiDialogTitle-root {
+  font-family: var(--imaa-font-serif, Georgia, serif);
+  letter-spacing: -.015em;
+}
+.ecp-email-templates-dialog .MuiDialogActions-root {
+  padding: 14px 20px;
+  border-top: 1px solid var(--imaa-border, #E2E4E8);
+}
+
+@media (min-width: 1200px) {
+  .ecp-email-templates .ect-editor-columns {
+    grid-template-columns: minmax(0, 1.12fr) minmax(340px, .88fr) !important;
+  }
+}
+
+@media (max-width: 767px) {
+  .ecp-email-templates .ect-page-header .MuiTypography-h4 { font-size: 2rem; }
+  .ecp-email-templates .ect-template-toolbar,
+  .ecp-email-templates .ect-editor-workspace { padding: 14px !important; }
+  .ecp-email-templates .ect-editor-header { padding-bottom: 14px; }
+  .ecp-email-templates .ect-action-group .MuiButton-root { width: 100%; }
+  .ecp-email-templates .ect-merge-tags { padding: 12px; }
+  .ecp-email-templates .ect-visual-editor-panel [role="region"] { overflow-x: auto; }
+}

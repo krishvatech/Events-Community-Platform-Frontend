@@ -66,3 +66,97 @@
 .ecp-admin-surface .ecp-admin-series .bg-white, .ecp-admin-surface .ecp-admin-resources .bg-white, .ecp-admin-surface .ecp-admin-recordings .bg-white { box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08)); }
 .ecp-admin-surface .ecp-admin-posts .MuiPaper-root, .ecp-admin-surface .ecp-admin-carts .MuiPaper-root, .ecp-admin-surface .ecp-admin-settings .MuiPaper-root, .ecp-admin-surface .ecp-admin-messages .MuiPaper-root, .ecp-admin-surface .ecp-admin-notifications .MuiPaper-root, .ecp-admin-surface .ecp-admin-name-requests .MuiPaper-root, .ecp-admin-surface .ecp-admin-guide .MuiPaper-root, .ecp-admin-surface .ecp-admin-virtual-speakers .MuiPaper-root, .ecp-admin-surface .ecp-admin-saleor .MuiPaper-root, .ecp-admin-surface .ecp-admin-blogs .MuiPaper-root { background: #fff; }
 .ecp-admin-surface .ecp-admin-series .MuiButton-contained, .ecp-admin-surface .ecp-admin-resources .MuiButton-contained, .ecp-admin-surface .ecp-admin-recordings .MuiButton-contained, .ecp-admin-surface .ecp-admin-posts .MuiButton-contained, .ecp-admin-surface .ecp-admin-carts .MuiButton-contained, .ecp-admin-surface .ecp-admin-settings .MuiButton-contained, .ecp-admin-surface .ecp-admin-messages .MuiButton-contained, .ecp-admin-surface .ecp-admin-notifications .MuiButton-contained, .ecp-admin-surface .ecp-admin-name-requests .MuiButton-contained, .ecp-admin-surface .ecp-admin-virtual-speakers .MuiButton-contained, .ecp-admin-surface .ecp-admin-saleor .MuiButton-contained, .ecp-admin-surface .ecp-admin-blogs .MuiButton-contained { border-radius: 6px; font-weight: 800; text-transform: none; }
+
+/* K5B final pass: retain each page's existing workflow while tightening its KT-like
+   content hierarchy, surfaces, and responsive density. */
+.ecp-admin-surface .ecp-admin-series > .MuiTypography-h4,
+.ecp-admin-surface .ecp-admin-series > .MuiBox-root > .MuiTypography-h4 {
+  margin-bottom: 8px;
+  letter-spacing: -.025em;
+}
+.ecp-admin-surface .ecp-admin-series > .MuiPaper-root {
+  border: 1px solid var(--imaa-border, #E2E4E8);
+  border-radius: var(--imaa-radius-card, 8px);
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08));
+}
+.ecp-admin-surface .ecp-admin-series .MuiCard-root {
+  overflow: hidden;
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.ecp-admin-surface .ecp-admin-series .MuiCard-root:hover {
+  border-color: rgba(8,124,127,.42) !important;
+  box-shadow: 0 8px 20px rgba(27,42,74,.11) !important;
+  transform: translateY(-1px);
+}
+.ecp-admin-surface .ecp-admin-series table:not(.MuiTable-root) th {
+  color: var(--imaa-ink-body, #5A6070);
+  font-size: .72rem;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+.ecp-admin-surface .ecp-admin-series table:not(.MuiTable-root) td,
+.ecp-admin-surface .ecp-admin-series table:not(.MuiTable-root) th { border-color: var(--imaa-border, #E2E4E8); }
+
+.ecp-admin-surface .ecp-admin-resources > .MuiBox-root:first-of-type,
+.ecp-admin-surface .ecp-admin-recordings > .MuiBox-root:first-of-type {
+  padding-bottom: 4px;
+}
+.ecp-admin-surface .ecp-admin-resources > .MuiStack-root,
+.ecp-admin-surface .ecp-admin-recordings > .MuiPaper-root {
+  border-color: var(--imaa-border, #E2E4E8) !important;
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08));
+}
+.ecp-admin-surface .ecp-admin-resources .MuiTableRow-root .MuiTableCell-root,
+.ecp-admin-surface .ecp-admin-recordings .MuiCardContent-root { vertical-align: middle; }
+.ecp-admin-surface .ecp-admin-resources .MuiTableRow-root .MuiTableCell-root { padding-top: 13px; padding-bottom: 13px; }
+.ecp-admin-surface .ecp-admin-recordings .MuiCard-root {
+  border-radius: var(--imaa-radius-card, 8px) !important;
+  border-color: var(--imaa-border, #E2E4E8) !important;
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08));
+}
+.ecp-admin-surface .ecp-admin-recordings .MuiCard-root:hover { border-color: rgba(8,124,127,.42) !important; }
+
+.ecp-admin-surface .ecp-admin-messages .MuiPaper-root {
+  border-color: var(--imaa-border, #E2E4E8) !important;
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08));
+}
+.ecp-admin-surface .ecp-admin-messages .MuiListItemButton-root {
+  border-radius: 6px;
+  margin: 2px 6px;
+  min-height: 58px;
+}
+.ecp-admin-surface .ecp-admin-messages .MuiListItemButton-root.Mui-selected,
+.ecp-admin-surface .ecp-admin-messages .MuiListItemButton-root.Mui-selected:hover {
+  background: rgba(8,124,127,.10);
+}
+.ecp-admin-surface .ecp-admin-messages .MuiTextField-root .MuiOutlinedInput-root { background: #fff; }
+
+.ecp-admin-surface .ecp-admin-carts .MuiPaper-root,
+.ecp-admin-surface .ecp-admin-saleor .MuiPaper-root,
+.ecp-admin-surface .ecp-admin-blogs .MuiPaper-root {
+  border-color: var(--imaa-border, #E2E4E8) !important;
+  box-shadow: var(--imaa-shadow-sm, 0 2px 8px rgba(27,42,74,.08));
+}
+.ecp-admin-surface .ecp-admin-carts .MuiTableCell-root { vertical-align: middle; }
+.ecp-admin-surface .ecp-admin-carts .MuiTableBody-root .MuiTableCell-root { padding-top: 14px; padding-bottom: 14px; }
+.ecp-admin-surface .ecp-admin-saleor .MuiTab-root { letter-spacing: .005em; }
+.ecp-admin-surface .ecp-admin-saleor .MuiTableContainer-root,
+.ecp-admin-surface .ecp-admin-blogs .MuiPaper-root { overflow-x: auto; }
+.ecp-admin-surface .ecp-admin-blogs > header .MuiTypography-h4 { letter-spacing: -.025em; }
+.ecp-admin-surface .ecp-admin-blogs form > .MuiStack-root > .MuiPaper-root:first-child { border-top: 3px solid var(--admin-teal); }
+.ecp-admin-surface .ecp-admin-blogs .MuiAccordion-root {
+  border: 1px solid var(--imaa-border, #E2E4E8);
+  border-radius: var(--imaa-radius-card, 8px) !important;
+  overflow: hidden;
+}
+.ecp-admin-surface .ecp-admin-blogs .MuiAccordion-root:before { display: none; }
+
+@media (max-width: 767px) {
+  .ecp-admin-surface .ecp-admin-series { padding: 18px 0 28px !important; }
+  .ecp-admin-surface .ecp-admin-series > .MuiPaper-root { gap: 12px; }
+  .ecp-admin-surface .ecp-admin-series > .MuiPaper-root .MuiBox-root:last-child { width: 100%; margin-left: 0; justify-content: flex-end; }
+  .ecp-admin-surface .ecp-admin-resources > .MuiStack-root { padding: 14px; }
+  .ecp-admin-surface .ecp-admin-recordings .MuiCardContent-root { padding: 14px; }
+  .ecp-admin-surface .ecp-admin-carts .MuiTable-root { min-width: 580px; }
+  .ecp-admin-surface .ecp-admin-blogs > header .MuiBox-root:last-child { width: 100%; }
+}

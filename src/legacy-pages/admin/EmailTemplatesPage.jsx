@@ -39,6 +39,7 @@ import { renderToMjml } from "@templatical/renderer";
 import AdminEmptyState from "../../components/admin/AdminEmptyState";
 import TemplaticalEmailEditor from "../../components/admin/TemplaticalEmailEditor";
 import { colors, focus, radii, shadows, semanticColors } from "../../styles/designTokens";
+import "../../styles/emailTemplateParity.css";
 import {
   getEmailTemplate,
   listEmailTemplates,
@@ -155,7 +156,17 @@ export default function EmailTemplatesPage() {
   };
 
   const loadTemplate = async (key) => {
-    if (!key) return;
+    if (!key) {
+      // A cleared/absent selection must resolve to the existing empty state,
+      // including after a list refresh races an in-flight detail request.
+      selectedKeyRef.current = "";
+      setDetailLoading(false);
+      setSelected(null);
+      setInlinePreview(null);
+      setEditorContent(null);
+      setEditorDirty(false);
+      return;
+    }
     selectedKeyRef.current = key;
     setDetailLoading(true);
     setError("");
@@ -356,9 +367,10 @@ export default function EmailTemplatesPage() {
   };
 
   return (
-    <Box sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 }, width: "100%", minWidth: 0, pb: 2 }}>
+    <Box className="ecp-email-templates" sx={{ display: "flex", flexDirection: "column", gap: { xs: 2, md: 2.5 }, width: "100%", minWidth: 0, pb: 2 }}>
       <Stack
         component="header"
+        className="ect-page-header"
         direction={{ xs: "column", sm: "row" }}
         alignItems={{ xs: "stretch", sm: "flex-start" }}
         justifyContent="space-between"
@@ -399,6 +411,7 @@ export default function EmailTemplatesPage() {
 
       <Paper
         component="section"
+        className="ect-template-toolbar"
         aria-label="Find an email template"
         variant="outlined"
         sx={{
@@ -497,12 +510,13 @@ export default function EmailTemplatesPage() {
 
       <Paper
         component="section"
+        className="ect-editor-workspace"
         aria-label="Email template editor"
-        aria-busy={loading || detailLoading || undefined}
+        aria-busy={detailLoading || undefined}
         variant="outlined"
         sx={{ ...surfaceSx, p: { xs: 1.5, sm: 2, md: 2.5 }, minWidth: 0, overflow: "hidden" }}
       >
-          {loading || detailLoading ? (
+          {detailLoading ? (
             <Box role="status" aria-label="Loading email template" sx={{ display: "grid", placeItems: "center", minHeight: 420 }}>
               <Stack alignItems="center" gap={1.5}>
                 <CircularProgress />
@@ -518,8 +532,8 @@ export default function EmailTemplatesPage() {
               sx={{ border: 0, boxShadow: "none" }}
             />
           ) : (
-            <Stack gap={{ xs: 2, md: 2.5 }}>
-              <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" gap={2}>
+            <Stack className="ect-editor-content" gap={{ xs: 2, md: 2.5 }}>
+              <Stack className="ect-editor-header" direction={{ xs: "column", md: "row" }} justifyContent="space-between" gap={2}>
                 <Box sx={{ minWidth: 0 }}>
                   <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
                     <Typography component="h2" variant="h5" sx={{ fontWeight: 750, color: semanticColors.text, overflowWrap: "anywhere" }}>
@@ -532,6 +546,7 @@ export default function EmailTemplatesPage() {
                   </Typography>
                 </Box>
                 <Box
+                  className="ect-action-group"
                   sx={{
                     display: "grid",
                     gridTemplateColumns: { xs: "minmax(0, 1fr)", sm: "repeat(2, minmax(0, 1fr))", lg: "repeat(4, auto)" },
@@ -556,6 +571,7 @@ export default function EmailTemplatesPage() {
               </Stack>
 
               <Box
+                className="ect-template-settings"
                 sx={{
                   display: "grid",
                   gridTemplateColumns: { xs: "minmax(0, 1fr)", md: "minmax(0, 1fr) 220px" },
@@ -586,7 +602,7 @@ export default function EmailTemplatesPage() {
                 </Stack>
               </Box>
 
-              <Box component="section" aria-labelledby="required-variables-heading">
+              <Box className="ect-merge-tags" component="section" aria-labelledby="required-variables-heading">
                 <Typography id="required-variables-heading" variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: semanticColors.text }}>
                   Required variables
                 </Typography>
@@ -604,7 +620,7 @@ export default function EmailTemplatesPage() {
                 </Alert>
               )}
 
-              <Box component="section" aria-labelledby="available-variables-heading">
+              <Box className="ect-merge-tags" component="section" aria-labelledby="available-variables-heading">
                 <Typography id="available-variables-heading" variant="subtitle2" sx={{ fontWeight: 700, mb: 1, color: semanticColors.text }}>
                   Available variables
                 </Typography>
@@ -622,6 +638,7 @@ export default function EmailTemplatesPage() {
               )}
 
               <Box
+                className="ect-editor-columns"
                 sx={{
                   display: "grid",
                   gridTemplateColumns: "1fr",
@@ -630,6 +647,7 @@ export default function EmailTemplatesPage() {
                 }}
               >
                 <Box
+                  className="ect-visual-editor-panel"
                   component="section"
                   aria-labelledby="visual-editor-heading"
                   sx={{
@@ -682,6 +700,7 @@ export default function EmailTemplatesPage() {
                 </Box>
 
                 <Box
+                  className="ect-inline-preview-panel"
                   component="section"
                   aria-labelledby="email-view-heading"
                   sx={{
@@ -743,6 +762,7 @@ export default function EmailTemplatesPage() {
               </Box>
 
               <Box
+                className="ect-fallback-fields"
                 sx={{
                   display: "grid",
                   gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1.2fr) minmax(280px, 0.8fr)" },
@@ -775,6 +795,7 @@ export default function EmailTemplatesPage() {
       </Paper>
 
       <Dialog
+        className="ecp-email-templates-dialog"
         open={previewOpen}
         onClose={() => setPreviewOpen(false)}
         maxWidth="md"
@@ -809,7 +830,7 @@ export default function EmailTemplatesPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={testOpen} onClose={() => setTestOpen(false)} maxWidth="xs" fullWidth aria-labelledby="send-test-email-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
+      <Dialog className="ecp-email-templates-dialog" open={testOpen} onClose={() => setTestOpen(false)} maxWidth="xs" fullWidth aria-labelledby="send-test-email-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
         <DialogTitle id="send-test-email-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>Send Test Email</DialogTitle>
         <DialogContent>
           <TextField
@@ -832,7 +853,7 @@ export default function EmailTemplatesPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={resetOpen} onClose={() => setResetOpen(false)} maxWidth="sm" fullWidth aria-labelledby="reset-template-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
+      <Dialog className="ecp-email-templates-dialog" open={resetOpen} onClose={() => setResetOpen(false)} maxWidth="sm" fullWidth aria-labelledby="reset-template-title" PaperProps={{ sx: { m: 1.5, borderRadius: `${radii.popup}px` } }}>
         <DialogTitle id="reset-template-title" sx={{ color: semanticColors.text, fontWeight: 750 }}>Reset Template</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
