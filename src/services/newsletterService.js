@@ -475,8 +475,16 @@ export const createNewsletterCategory = (payload) =>
 export const updateNewsletterCategory = (slug, payload) =>
   unwrap(apiClient.patch(`${adminCategoriesEndpoint}${slug}/`, payload));
 
+// Deactivate (reversible). Kept under its historical name for existing callers.
 export const deleteNewsletterCategory = (slug) =>
   unwrap(apiClient.delete(`${adminCategoriesEndpoint}${slug}/`));
+
+// Permanent delete: read-only preflight, then the one-way delete.
+export const getNewsletterCategoryDeletePreflight = (slug) =>
+  unwrap(apiClient.get(`${adminCategoriesEndpoint}${slug}/delete/`));
+
+export const permanentlyDeleteNewsletterCategory = (slug) =>
+  unwrap(apiClient.post(`${adminCategoriesEndpoint}${slug}/delete/`));
 
 export const listMauticSegments = () =>
   unwrap(apiClient.get("/newsletter/admin/mautic/segments/"));

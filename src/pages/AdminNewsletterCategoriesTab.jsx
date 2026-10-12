@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -28,6 +28,7 @@ import {
   Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import PeopleAltRoundedIcon from "@mui/icons-material/PeopleAltRounded";
@@ -44,6 +45,7 @@ import {
   linkNewsletterCategoryMauticSegment,
   syncNewsletterCategoryMautic,
 } from "../services/newsletterService";
+import DeleteSubscriptionListDialog from "../components/marketing/DeleteSubscriptionListDialog";
 
 const getErrorMessage = (err, fallback = "Something went wrong") => {
   const data = err?.response?.data;
@@ -112,6 +114,7 @@ const categoryMauticId = (category) => {
 
 export default function AdminNewsletterCategoriesTab({ onDataReady }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -122,6 +125,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
   const [actionKey, setActionKey] = useState("");
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
   const [deactivateConfirm, setDeactivateConfirm] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
 
   const [connectCategory, setConnectCategory] = useState(null);
   const [mauticSegments, setMauticSegments] = useState([]);
@@ -146,6 +150,21 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
   React.useEffect(() => {
     loadCategories();
   }, [loadCategories]);
+
+  // A list deleted from its detail page lands back here with a confirmation.
+  React.useEffect(() => {
+    const deletedName = location.state?.subscriptionListDeleted;
+    if (!deletedName) return;
+    setSnack({ open: true, severity: "success", message: `Subscription list “${deletedName}” deleted` });
+    navigate(location.pathname, { replace: true, state: null });
+  }, [location.state, location.pathname, navigate]);
+
+  const handleDeleted = async (result) => {
+    const name = result?.name || deleteTarget?.name || "Subscription list";
+    setDeleteTarget(null);
+    setSnack({ open: true, severity: "success", message: `Subscription list “${name}” deleted` });
+    await loadCategories();
+  };
 
   const handleOpen = (category = null) => {
     if (category) {
@@ -370,6 +389,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                 const syncing = actionKey === `sync:${category.slug}`;
                 const reactivating = actionKey === `reactivate:${category.slug}`;
                 const deactivating = actionKey === `deactivate:${category.slug}`;
+                const deletionPending = category.deletion_state === "deleting";
 
                 return (
                   <TableRow key={category.slug} sx={{ "&:hover": { bgcolor: "#fafafa" } }}>
@@ -397,13 +417,17 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                       <code style={{ fontSize: "12px", color: "#666" }}>{category.slug}</code>
                     </TableCell>
                     <TableCell align="center">
-                      <Chip
-                        label={category.is_active ? "Active" : "Inactive"}
-                        color={category.is_active ? "success" : "default"}
-                        size="small"
-                        variant={category.is_active ? "filled" : "outlined"}
-                        sx={{ fontWeight: 700 }}
-                      />
+                      {deletionPending ? (
+                        <Chip label="Deletion pending" color="warning" size="small" variant="outlined" sx={{ fontWeight: 700 }} />
+                      ) : (
+                        <Chip
+                          label={category.is_active ? "Active" : "Inactive"}
+                          color={category.is_active ? "success" : "default"}
+                          size="small"
+                          variant={category.is_active ? "filled" : "outlined"}
+                          sx={{ fontWeight: 700 }}
+                        />
+                      )}
                     </TableCell>
                     <TableCell sx={{ minWidth: 180 }}>
                       {segmentId ? (
@@ -431,74 +455,92 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
                         </span>
                       </Tooltip>
 
-                      <Tooltip title="Edit list">
+                      {!deletionPending && (
+                        <>
+                          <Tooltip title="Edit list">
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleOpen(category)}
+                                disabled={saving || Boolean(actionKey)}
+                                sx={{ color: "#10b8a6" }}
+                              >
+                                <EditRoundedIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+
+                          <Tooltip title={segmentId ? "Sync / repair Mautic connection" : "Create / sync Mautic segment"}>
+                            <span>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleSync(category)}
+                                disabled={saving || Boolean(actionKey)}
+                                sx={{ color: "#2563eb" }}
+                              >
+                                {syncing ? <CircularProgress size={18} /> : <SyncRoundedIcon fontSize="small" />}
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+
+                          {!segmentId && (
+                            <Tooltip title="Connect existing Mautic segment">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleOpenConnect(category)}
+                                  disabled={saving || Boolean(actionKey)}
+                                  sx={{ color: "#7c3aed" }}
+                                >
+                                  <LinkRoundedIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+
+                          {category.is_active ? (
+                            <Tooltip title="Deactivate list">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => setDeactivateConfirm(category)}
+                                  disabled={saving || Boolean(actionKey)}
+                                  sx={{ color: "#dc2626" }}
+                                >
+                                  {deactivating ? <CircularProgress size={18} /> : <PowerSettingsNewRoundedIcon fontSize="small" />}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          ) : (
+                            <Tooltip title="Reactivate list">
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleReactivate(category.slug)}
+                                  disabled={saving || Boolean(actionKey)}
+                                  sx={{ color: "#16a34a" }}
+                                >
+                                  {reactivating ? <CircularProgress size={18} /> : <RestoreRoundedIcon fontSize="small" />}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                          )}
+                        </>
+                      )}
+
+                      <Tooltip title={deletionPending ? "Retry delete list" : "Delete list"}>
                         <span>
                           <IconButton
                             size="small"
-                            onClick={() => handleOpen(category)}
+                            aria-label={`Delete list ${category.name}`}
+                            onClick={() => setDeleteTarget(category)}
                             disabled={saving || Boolean(actionKey)}
-                            sx={{ color: "#10b8a6" }}
+                            sx={{ color: "#b91c1c" }}
                           >
-                            <EditRoundedIcon fontSize="small" />
+                            <DeleteOutlineRoundedIcon fontSize="small" />
                           </IconButton>
                         </span>
                       </Tooltip>
-
-                      <Tooltip title={segmentId ? "Sync / repair Mautic connection" : "Create / sync Mautic segment"}>
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={() => handleSync(category)}
-                            disabled={saving || Boolean(actionKey)}
-                            sx={{ color: "#2563eb" }}
-                          >
-                            {syncing ? <CircularProgress size={18} /> : <SyncRoundedIcon fontSize="small" />}
-                          </IconButton>
-                        </span>
-                      </Tooltip>
-
-                      {!segmentId && (
-                        <Tooltip title="Connect existing Mautic segment">
-                          <span>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleOpenConnect(category)}
-                              disabled={saving || Boolean(actionKey)}
-                              sx={{ color: "#7c3aed" }}
-                            >
-                              <LinkRoundedIcon fontSize="small" />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      )}
-
-                      {category.is_active ? (
-                        <Tooltip title="Deactivate list">
-                          <span>
-                            <IconButton
-                              size="small"
-                              onClick={() => setDeactivateConfirm(category)}
-                              disabled={saving || Boolean(actionKey)}
-                              sx={{ color: "#dc2626" }}
-                            >
-                              {deactivating ? <CircularProgress size={18} /> : <PowerSettingsNewRoundedIcon fontSize="small" />}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      ) : (
-                        <Tooltip title="Reactivate list">
-                          <span>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleReactivate(category.slug)}
-                              disabled={saving || Boolean(actionKey)}
-                              sx={{ color: "#16a34a" }}
-                            >
-                              {reactivating ? <CircularProgress size={18} /> : <RestoreRoundedIcon fontSize="small" />}
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -591,6 +633,13 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <DeleteSubscriptionListDialog
+        open={Boolean(deleteTarget)}
+        category={deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onDeleted={handleDeleted}
+      />
 
       <Dialog open={Boolean(connectCategory)} onClose={handleCloseConnect} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontWeight: 700, color: "#1B2A4A" }}>
