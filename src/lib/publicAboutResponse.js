@@ -194,3 +194,6 @@ export async function readAboutPageResponse(response, path) {
     },
   };
 }
+
+// Shared with other public pages that reuse the About sections (src/lib/publicTeamResponse.js).
+export { sections as parseSections, image as parseImage, link as parseLink, safeUrl as parseSafeUrl, text as parseText };

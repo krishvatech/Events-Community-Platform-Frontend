@@ -8,7 +8,7 @@
 // MUI's Drawer provides the focus trap, Escape to close and the backdrop.
 import { useEffect, useId, useState } from "react";
 import { usePathname } from "next/navigation";
-import { Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText } from "@mui/material";
+import { Box, Divider, Drawer, IconButton, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader } from "@mui/material";
 import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import LoginRoundedIcon from "@mui/icons-material/LoginRounded";
@@ -18,10 +18,13 @@ import { colors, semanticColors } from "../../styles/designTokens";
 import { useMemberSession } from "./publicSession";
 
 const isActivePath = (pathname, to) => {
+  if (!to.startsWith("/")) return false;
   const target = to.replace(/\/$/, "") || "/";
   const current = pathname.replace(/\/$/, "") || "/";
   return target === "/" ? current === "/" : current === target || current.startsWith(`${target}/`);
 };
+
+const normalisePath = (path) => (path || "/").replace(/\/+$/, "") || "/";
 
 export default function PublicMobileMenu({ items }) {
   const pathname = usePathname() || "/";
@@ -70,7 +73,42 @@ export default function PublicMobileMenu({ items }) {
           </Box>
           <Divider />
           <List component="nav" aria-label="Primary navigation">
-            {items.map(({ label, to }) => (
+            {items.map(({ label, to, children }) => children ? (
+              // A labelled group (e.g. About Us: About IMAA, Our Team, References), always expanded.
+              <li key={label}>
+                <List
+                  disablePadding
+                  aria-labelledby={`${menuId}-${label}`}
+                  subheader={(
+                    <ListSubheader id={`${menuId}-${label}`} disableSticky
+                                   sx={{ bgcolor: "transparent", color: semanticColors.textBody, fontWeight: 700, lineHeight: "40px" }}>
+                      {label}
+                    </ListSubheader>
+                  )}
+                >
+                  {children.map((child) => {
+                    const external = !child.to.startsWith("/");
+                    const current = !external && normalisePath(pathname) === normalisePath(child.to);
+                    return (
+                      <ListItemButton
+                        key={child.label}
+                        component={external ? "a" : Link}
+                        {...(external ? { href: child.to } : { to: child.to, resetScroll: true })}
+                        onClick={close}
+                        selected={current}
+                        aria-current={current ? "page" : undefined}
+                        sx={{ ...itemSx(child.to), pl: 4, ...(current ? { borderLeftColor: colors.teal } : { borderLeftColor: "transparent" }) }}
+                      >
+                        <ListItemText
+                          primary={external ? <>{child.label} <span aria-hidden="true">↗</span><span className="sr-only"> (imaa-institute.org)</span></> : child.label}
+                          primaryTypographyProps={{ fontWeight: 500 }}
+                        />
+                      </ListItemButton>
+                    );
+                  })}
+                </List>
+              </li>
+            ) : (
               <ListItemButton
                 key={to}
                 component={Link}

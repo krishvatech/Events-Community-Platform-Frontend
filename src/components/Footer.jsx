@@ -2,6 +2,7 @@
 import React from "react";
 import { Container, Box, Link as MLink, IconButton } from "@mui/material";
 import { Link, PUBLIC_CMS_ROUTES_AVAILABLE } from "#navigation";
+import { ourTeamHref } from "../lib/ourTeamRoute.js";
 import { colors, focus, layout, semanticColors } from "../styles/designTokens";
 import imaaLogo from "../assets/IMAA-logo130.svg";
 
@@ -77,6 +78,7 @@ const PUBLIC_FOOTER_COLUMNS = [
     title: "About IMAA",
     links: [
       ["About us", "/about"],
+      ["Our Team", ourTeamHref()], // imaa-institute.org until the Connect route is enabled (src/lib/ourTeamRoute.js)
       ["FAQ", publicPageHref("frequently-asked-questions")],
       ["References", publicPageHref("references")],
       ["IMAA Institute", "https://imaa-institute.org/"],

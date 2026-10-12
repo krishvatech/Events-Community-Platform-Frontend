@@ -16,6 +16,8 @@ import imaaLogo from "../../assets/IMAA-logo130.svg";
 import { PublicFooter } from "../Footer.jsx";
 import PublicColorModeGuard from "./PublicColorModeGuard.jsx";
 import PublicMobileMenu from "./PublicMobileMenu.jsx";
+import PublicNavGroup from "./PublicNavGroup.jsx";
+import { ourTeamHref } from "../../lib/ourTeamRoute.js";
 
 const imaaLogoSrc = typeof imaaLogo === "string" ? imaaLogo : imaaLogo.src;
 
@@ -26,11 +28,22 @@ const PublicAuthActions = dynamic(() => import("./PublicAuthActions.jsx"), {
 });
 
 // Same destinations as src/components/Header.jsx. Member-only targets keep their own guard.
+// "About Us" groups the Institute pages of this public shell (desktop: a disclosure; mobile: a
+// labelled group). "Our Team" points at imaa-institute.org until the Connect route is enabled
+// (src/lib/ourTeamRoute.js).
 const NAV_ITEMS = [
   { label: "Events", to: "/events" },
   { label: "Community", to: "/community" },
   { label: "Resources", to: "/account/resources" },
-  { label: "About Us", to: "/about" },
+  {
+    label: "About Us",
+    to: "/about",
+    children: [
+      { label: "About IMAA", to: "/about" },
+      { label: "Our Team", to: ourTeamHref() },
+      { label: "References", to: "/references" },
+    ],
+  },
 ];
 
 // Links in this shell start the destination at the top (`resetScroll`): the header is sticky,
@@ -47,7 +60,9 @@ export default function PublicSiteShell({ children }) {
             <img src={imaaLogoSrc} alt="IMAA" className="imaa-logo-plate block h-auto w-[130px] sm:w-[150px]" />
           </Link>
           <nav aria-label="Primary navigation" className="hidden items-center gap-8 min-[1200px]:flex">
-            {NAV_ITEMS.map(({ label, to }) => (
+            {NAV_ITEMS.map(({ label, to, children }) => children ? (
+              <PublicNavGroup key={label} label={label} items={children} />
+            ) : (
               <Link
                 key={to}
                 to={to}

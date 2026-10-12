@@ -44,7 +44,7 @@ export const FORCE_LIGHT_PATH_PATTERN =
   "^/(m-and-a-trainings|recognition)(/|$)|^/(public|staging|landing)/|^/live(/|$)|/companion(/|$)";
 // Reviewed for dark mode.
 export const DARK_READY_PATH_PATTERN =
-  "^/($|about/?$|signin/?$|signup/?$|forgot-password/?$|reset-password/?$|auth/|cognito/|oauth/|sso/|kyc/|" +
+  "^/($|about/?$|our-team/?$|signin/?$|signup/?$|forgot-password/?$|reset-password/?$|auth/|cognito/|oauth/|sso/|kyc/|" +
   "events(/|$)|account(/|$)|community(/|$)|groups(/|$)|forms(/|$)|series(/|$)|blogs(/|$)|resource(/|$)|" +
   "newsletter(/|$)|cms(/|$)|admin(/|$)|AdminEvents(/|$)|" +
   // Server-rendered public CMS pages (src/app/(site)), built on the dark-aware utilities.

@@ -22,7 +22,7 @@ const define = (key, value) => Object.defineProperty(globalThis, key, { value, c
 define("window", dom.window);
 define("document", dom.window.document);
 define("navigator", dom.window.navigator);
-for (const key of ["HTMLElement", "Element", "Node", "MouseEvent", "Event", "getComputedStyle"]) define(key, dom.window[key]);
+for (const key of ["HTMLElement", "Element", "Node", "MouseEvent", "Event", "getComputedStyle", "requestAnimationFrame", "cancelAnimationFrame", "DocumentFragment"]) define(key, dom.window[key]);
 define("IS_REACT_ACT_ENVIRONMENT", true);
 
 const React = await import("react");
@@ -218,7 +218,97 @@ test("public shell: burger menu below 1200px, desktop navigation and actions fro
   const nav = header.querySelector('nav[aria-label="Primary navigation"]');
   assert.match(nav.className, /\bhidden\b/);
   assert.match(nav.className, /min-\[1200px\]:flex/);
-  assert.deepEqual([...nav.querySelectorAll("a")].map((a) => a.getAttribute("href")), ["/events", "/community", "/account/resources", "/about"]);
+  assert.deepEqual([...nav.children].filter((el) => el.tagName === "A").map((a) => a.getAttribute("href")),
+    ["/events", "/community", "/account/resources"]);
+  // "About Us" is a disclosure (button + list of links), closed in the server HTML.
+  const about = nav.querySelector("[data-nav-group='About Us'] button");
+  assert.equal(about.textContent, "About Us");
+  assert.equal(about.getAttribute("aria-expanded"), "false");
+  const panel = doc.getElementById(about.getAttribute("aria-controls"));
+  assert.ok(panel.hasAttribute("hidden"));
+  assert.deepEqual([...panel.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]),
+    [["About IMAA", "/about"], ["Our Team", "/our-team"], ["References", "/references"]]);
   assert.equal(doc.querySelector("main").textContent, "Body");
   assert.ok(doc.querySelector("footer"), "public footer");
+});
+
+
+// ------------------------------------------------------------------ About Us group --
+
+test("About Us disclosure: click, keyboard, Escape and outside clicks; the current page is marked", async () => {
+  const { default: PublicNavGroup } = await bundle("src/components/public/PublicNavGroup.jsx", { nextAdapter: true });
+  globalThis.__pathname = "/our-team";
+  const items = [{ label: "About IMAA", to: "/about" }, { label: "Our Team", to: "/our-team" }, { label: "References", to: "/references" }];
+  const container = document.createElement("div");
+  const outside = document.createElement("button");
+  document.body.replaceChildren(container, outside);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(createElement(PublicNavGroup, { label: "About Us", items })));
+    const button = container.querySelector("button");
+    const panel = () => container.querySelector("ul");
+    assert.match(button.className, /text-imaa-teal-dark/, "highlighted: one of its pages is current");
+    assert.equal(container.querySelector('a[aria-current="page"]').textContent, "Our Team");
+    assert.ok(panel().hidden);
+
+    await act(async () => button.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    assert.equal(button.getAttribute("aria-expanded"), "true");
+    assert.equal(panel().hidden, false);
+    await act(async () => container.querySelector("a").dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+    assert.ok(panel().hidden, "Escape closes");
+    assert.equal(document.activeElement, button, "focus returns to the button");
+
+    await act(async () => button.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true })));
+    // The bare global (the one the component uses); an earlier helper replaces window.requestAnimationFrame.
+    await act(async () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    assert.equal(panel().hidden, false, "ArrowDown opens");
+    assert.equal(document.activeElement.textContent, "About IMAA", "and moves into the list");
+    await act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true })));
+    assert.equal(document.activeElement.textContent, "References", "arrows wrap around");
+
+    await act(async () => outside.dispatchEvent(new window.MouseEvent("pointerdown", { bubbles: true })));
+    assert.ok(panel().hidden, "a click outside closes");
+  } finally {
+    await act(async () => root.unmount());
+    delete globalThis.__pathname;
+  }
+});
+
+test("mobile menu: About Us is a labelled group with its pages; the current one is marked", async () => {
+  const { default: PublicMobileMenu } = await bundle("src/components/public/PublicMobileMenu.jsx", { nextAdapter: true });
+  globalThis.__pathname = "/our-team";
+  const items = [{ label: "Events", to: "/events" }, { label: "About Us", to: "/about", children: [
+    { label: "About IMAA", to: "/about" }, { label: "Our Team", to: "/our-team" }, { label: "References", to: "/references" }] }];
+  const container = document.createElement("div");
+  document.body.replaceChildren(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => root.render(createElement(PublicMobileMenu, { items })));
+    await act(async () => container.querySelector('button[aria-label="Open navigation menu"]').dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    const nav = document.querySelector('nav[aria-label="Primary navigation"]');
+    const group = [...nav.querySelectorAll("ul[aria-labelledby]")].find((ul) => document.getElementById(ul.getAttribute("aria-labelledby"))?.textContent === "About Us");
+    assert.ok(group, "a list labelled About Us");
+    assert.deepEqual([...group.querySelectorAll("a")].map((a) => a.getAttribute("href")), ["/about", "/our-team", "/references"]);
+    assert.equal(group.querySelector('a[aria-current="page"]').textContent, "Our Team");
+  } finally {
+    await act(async () => root.unmount());
+    delete globalThis.__pathname;
+  }
+});
+
+test("Our Team links use the Connect route only where it is enabled, imaa-institute.org otherwise", async () => {
+  const { ourTeamRouteEnabled, ourTeamHref, OUR_TEAM_WORDPRESS_URL } = await bundle("src/lib/ourTeamRoute.js", { nextAdapter: true });
+  assert.equal(ourTeamRouteEnabled(undefined, "development"), true);
+  assert.equal(ourTeamRouteEnabled(undefined, "production"), false, "production builds wait for the content");
+  assert.equal(ourTeamRouteEnabled("enabled", "production"), true);
+  assert.equal(ourTeamRouteEnabled("disabled", "development"), false);
+  assert.equal(ourTeamHref(true), "/our-team");
+  assert.equal(ourTeamHref(false), OUR_TEAM_WORDPRESS_URL);
+  for (const [nextAdapter, href] of [[true, "/our-team"], [false, OUR_TEAM_WORDPRESS_URL]]) {
+    const { PublicFooter } = await bundle("src/components/Footer.jsx", { nextAdapter });
+    const element = nextAdapter ? createElement(PublicFooter) : createElement(RouterDom.MemoryRouter, null, createElement(PublicFooter));
+    const doc = parse(renderToStaticMarkup(element));
+    const link = [...doc.querySelectorAll('nav[aria-label="About IMAA"] a')].find((a) => a.textContent === "Our Team");
+    assert.equal(link?.getAttribute("href"), href, nextAdapter ? "Next.js build (development)" : "Vite build");
+  }
 });
