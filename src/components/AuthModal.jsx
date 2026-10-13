@@ -27,6 +27,12 @@ import { wordpressAuthService } from "../services/wordpressAuth";
 import { assertAccountCanLogin } from "../services/accountStatus";
 import { removeAccessToken, removeIdToken, removeRefreshToken } from "../utils/tokenStore";
 import { establishMemberAuthSession } from "../utils/memberAuthSession";
+import {
+  DISPOSABLE_EMAIL_MESSAGE,
+  checkSignupEmail,
+  isDisposableEmailSignupError,
+  normalizeSignupEmail,
+} from "../utils/signupEmailCheck";
 
 const GOOGLE_ICON = (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -135,6 +141,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
   const [pendingUsername, setPendingUsername] = useState("");
   const [verifyCode, setVerifyCode] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
+  const signupInFlightRef = React.useRef(false);
+  const latestSignupEmailRef = React.useRef("");
 
   // Timer Effect
   React.useEffect(() => {
@@ -326,14 +334,48 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
     return Object.keys(errs).length === 0;
   };
 
+  const handleSignupEmailChange = (value) => {
+    const email = filterInput(value, "email");
+    latestSignupEmailRef.current = normalizeSignupEmail(email);
+    setSignupData(p => ({ ...p, email }));
+    // The email changed, so a disposable-domain error no longer applies to it.
+    setSignupErrors(p => (p.email === DISPOSABLE_EMAIL_MESSAGE ? { ...p, email: undefined } : p));
+  };
+
+  // Early feedback when the user leaves the email field. Submit checks again,
+  // so a failed request here is ignored rather than shown.
+  const handleSignupEmailBlur = async () => {
+    const email = normalizeSignupEmail(signupData.email);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    const result = await checkSignupEmail(API_BASE, email);
+    if (result.status === "blocked" && latestSignupEmailRef.current === email) {
+      setSignupErrors(p => ({ ...p, email: result.message }));
+    }
+  };
+
   const handleSignup = async (e) => {
     e.preventDefault();
+    if (signupInFlightRef.current) return;
     setError("");
     if (!validateSignup()) return;
+    signupInFlightRef.current = true;
     setLoading(true);
     try {
-      // ✅ CHECK: Email already registered?
       const email = (signupData.email || "").toLowerCase().trim();
+
+      // Disposable email domains are not accepted for new accounts. Never
+      // continue to Cognito when this check fails or cannot be completed.
+      const emailCheck = await checkSignupEmail(API_BASE, email);
+      if (emailCheck.status === "blocked" || emailCheck.status === "invalid") {
+        setSignupErrors(p => ({ ...p, email: emailCheck.message }));
+        return;
+      }
+      if (emailCheck.status !== "allowed") {
+        setError(emailCheck.message);
+        return;
+      }
+
+      // ✅ CHECK: Email already registered?
       try {
         const checkResponse = await fetch(`${API_BASE}/auth/check-email/?email=${encodeURIComponent(email)}`, {
           method: "GET",
@@ -375,6 +417,10 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
       setPendingUsername(username);
       setMode("confirm");
     } catch (err) {
+      if (isDisposableEmailSignupError(err)) {
+        setSignupErrors(p => ({ ...p, email: DISPOSABLE_EMAIL_MESSAGE }));
+        return;
+      }
       const msg =
         err?.code === "UsernameExistsException" ? "Username already taken" :
           err?.code === "InvalidPasswordException" ? "Password does not match Cognito policy" :
@@ -382,6 +428,7 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
               (err?.message || "Signup failed");
       setError(`❌ ${msg}`);
     } finally {
+      signupInFlightRef.current = false;
       setLoading(false);
     }
   };
@@ -647,7 +694,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
               </Box>
               <TextField
                 label="Email address" type="email" fullWidth value={signupData.email}
-                onChange={e => setSignupData(p => ({ ...p, email: filterInput(e.target.value, "email") }))}
+                onChange={e => handleSignupEmailChange(e.target.value)}
+                onBlur={handleSignupEmailBlur}
                 sx={{ ...inputSx, mb: 2 }}
                 error={!!signupErrors.email} helperText={signupErrors.email}
                 autoComplete="email"
