@@ -1532,7 +1532,15 @@ export default function AdminStaffPage() {
                     <Tabs
                         value={userTypeFilter}
                         onChange={(_, newValue) => setUserTypeFilter(newValue)}
-                        sx={{ mb: 2, borderBottom: `1px solid #e5e7eb` }}
+                        variant="scrollable"
+                        scrollButtons="auto"
+                        allowScrollButtonsMobile
+                        aria-label="User type filters"
+                        sx={{
+                            mb: 2,
+                            maxWidth: "100%",
+                            borderBottom: `1px solid #e5e7eb`,
+                        }}
                     >
                         <Tab label="All Users" value="all" />
                         <Tab label="Superuser" value="superuser" />
