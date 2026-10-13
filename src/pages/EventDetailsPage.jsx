@@ -45,7 +45,7 @@ import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { normalizeTimezoneName, getBrowserTimezone } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
-import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast, isReplayReadyForSignup } from "../utils/eventUtils";
+import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast, isInPersonEvent, isReplayReadyForSignup } from "../utils/eventUtils";
 import { toast } from "react-toastify";
 import { Helmet } from "react-helmet-async";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
@@ -2232,7 +2232,7 @@ export default function EventDetailsPage() {
                           </Button>
                         ) : paymentPending ? (
                           <PaymentPendingDetails registration={registration} event={event} />
-                        ) : canShowActiveJoin && canJoinEventNow ? (
+                        ) : canShowActiveJoin && canJoinEventNow && !(isEventOwner && isInPersonEvent(event)) ? (
                           <Button
                             onClick={() => {
                               // If external streaming enabled, redirect to external platform instead of RTK

@@ -99,7 +99,7 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
-import { isReplayReadyForSignup } from "../utils/eventUtils";
+import { isInPersonEvent, isReplayReadyForSignup } from "../utils/eventUtils";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
@@ -2800,6 +2800,7 @@ export default function EventManagePage() {
               <Box sx={{ mb: 2 }}>
                 {isOwner ? (
                   <Stack spacing={1.5}>
+                    {!isInPersonEvent(event) && (
                     <Tooltip
                       title={
                         isArchivedLifecycle
@@ -2850,6 +2851,7 @@ export default function EventManagePage() {
                         )}
                       </Button>
                     </Tooltip>
+                    )}
 
                     {/* Mark as Live Button - For External Streaming Events */}
                     {event?.use_external_streaming && !isArchivedLifecycle && status !== "live" && status !== "past" && status !== "cancelled" && (
@@ -9081,8 +9083,8 @@ export default function EventManagePage() {
             )}
 
             {isOwner ? (
-              // Host Button for Owner
-              (status === "cancelled" ? (<Button
+              // Host Button for Owner (in-person events have no live room to host)
+              (isInPersonEvent(event) ? null : status === "cancelled" ? (<Button
                 disabled
                 variant="outlined"
                 sx={{

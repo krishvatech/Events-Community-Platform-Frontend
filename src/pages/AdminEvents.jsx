@@ -78,6 +78,7 @@ import { normalizeTimezoneName } from "../utils/timezoneUtils";
 import EditEventForm from "../components/EditEventForm";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import { isInPersonEvent } from "../utils/eventUtils";
 
 
 dayjs.extend(utc);
@@ -3638,7 +3639,7 @@ function AdminEventCard({
                         Cancelled
                       </Box>
                     </Button>
-                  ) : (
+                  ) : isInPersonEvent(ev) ? null : (
                     <Tooltip title={ev.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
                       <Button
                         onClick={() => onHost(ev)}
