@@ -261,6 +261,82 @@ export const listNewsletterStages = (params = {}) =>
 export const bulkUpdateNewsletterAdminContactStage = (payload) =>
   unwrap(apiClient.post(`${adminContactsEndpoint}bulk-stage/`, payload));
 
+// CSV contact import. The file is sent again at every step: ECP never stores it.
+const adminContactImportsEndpoint = `${adminContactsEndpoint}imports/`;
+
+const contactImportForm = (file, fields = {}) => {
+  const form = new FormData();
+  form.append("file", file);
+  Object.entries(fields).forEach(([key, value]) => {
+    form.append(key, typeof value === "string" ? value : JSON.stringify(value));
+  });
+  return form;
+};
+
+const multipart = { headers: { "Content-Type": "multipart/form-data" } };
+
+export const getContactImportFields = () =>
+  unwrap(apiClient.get(`${adminContactImportsEndpoint}fields/`));
+
+export const previewContactImport = (file) =>
+  unwrap(apiClient.post(`${adminContactImportsEndpoint}preview/`, contactImportForm(file), multipart));
+
+export const validateContactImport = (file, { mapping, options }) =>
+  unwrap(
+    apiClient.post(
+      `${adminContactImportsEndpoint}validate/`,
+      contactImportForm(file, { mapping, options }),
+      multipart
+    )
+  );
+
+export const startContactImport = (file, { mapping, options, validationToken }) =>
+  unwrap(
+    apiClient.post(
+      `${adminContactImportsEndpoint}start/`,
+      contactImportForm(file, {
+        mapping,
+        options,
+        validation_token: validationToken,
+        confirm: "true",
+      }),
+      multipart
+    )
+  );
+
+export const listContactImports = (params = {}) =>
+  unwrap(apiClient.get(adminContactImportsEndpoint, { params }));
+
+export const getContactImport = (importId) =>
+  unwrap(apiClient.get(`${adminContactImportsEndpoint}${importId}/`));
+
+export const listContactImportErrors = (importId, params = {}) =>
+  unwrap(apiClient.get(`${adminContactImportsEndpoint}${importId}/errors/`, { params }));
+
+// Bulk delete: prepare a server-side plan (never deletes), then confirm it
+// batch by batch with the exact contact count.
+const adminContactDeleteEndpoint = `${adminContactsEndpoint}delete/`;
+
+export const prepareContactDeleteSelected = (contactIds) =>
+  unwrap(apiClient.post(`${adminContactDeleteEndpoint}prepare/`, { mode: "selected", contact_ids: contactIds }));
+
+export const prepareContactDeleteCsv = (file, emailColumn = "") => {
+  const form = new FormData();
+  form.append("mode", "csv");
+  form.append("file", file);
+  if (emailColumn) form.append("email_column", emailColumn);
+  return unwrap(
+    apiClient.post(`${adminContactDeleteEndpoint}prepare/`, form, { headers: { "Content-Type": "multipart/form-data" } })
+  );
+};
+
+export const getContactDeletePlan = (planId) => unwrap(apiClient.get(`${adminContactDeleteEndpoint}${planId}/`));
+
+export const executeContactDeleteBatch = (planId, confirmCount) =>
+  unwrap(apiClient.post(`${adminContactDeleteEndpoint}${planId}/execute/`, { confirm_count: confirmCount }));
+
+export const cancelContactDelete = (planId) => unwrap(apiClient.post(`${adminContactDeleteEndpoint}${planId}/cancel/`));
+
 export const getNewsletterStage = (stageId) =>
   unwrap(apiClient.get(`${adminStagesEndpoint}${stageId}/`));
 
@@ -399,8 +475,16 @@ export const createNewsletterCategory = (payload) =>
 export const updateNewsletterCategory = (slug, payload) =>
   unwrap(apiClient.patch(`${adminCategoriesEndpoint}${slug}/`, payload));
 
+// Deactivate (reversible). Kept under its historical name for existing callers.
 export const deleteNewsletterCategory = (slug) =>
   unwrap(apiClient.delete(`${adminCategoriesEndpoint}${slug}/`));
+
+// Permanent delete: read-only preflight, then the one-way delete.
+export const getNewsletterCategoryDeletePreflight = (slug) =>
+  unwrap(apiClient.get(`${adminCategoriesEndpoint}${slug}/delete/`));
+
+export const permanentlyDeleteNewsletterCategory = (slug) =>
+  unwrap(apiClient.post(`${adminCategoriesEndpoint}${slug}/delete/`));
 
 export const listMauticSegments = () =>
   unwrap(apiClient.get("/newsletter/admin/mautic/segments/"));

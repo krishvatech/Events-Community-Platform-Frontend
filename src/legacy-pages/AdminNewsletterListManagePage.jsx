@@ -35,6 +35,7 @@ import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
@@ -58,6 +59,7 @@ import {
   syncNewsletterCategoryMautic,
   updateNewsletterCategory,
 } from "../services/newsletterService";
+import DeleteSubscriptionListDialog from "../components/marketing/DeleteSubscriptionListDialog";
 
 const UI_BORDER = "var(--imaa-border)";
 const UI_TEXT = "var(--imaa-ink)";
@@ -409,6 +411,7 @@ export default function AdminNewsletterListManagePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", description: "" });
   const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
   const [segments, setSegments] = useState([]);
   const [segmentsLoading, setSegmentsLoading] = useState(false);
@@ -493,6 +496,7 @@ export default function AdminNewsletterListManagePage() {
   const count = Number(contactsData?.count || 0);
   const numPages = Math.max(1, Number(contactsData?.num_pages || 1));
   const segmentId = category?.mautic_segment_id ? String(category.mautic_segment_id) : "";
+  const deletionPending = category?.deletion_state === "deleting";
 
   const selectableSegments = useMemo(
     () =>
@@ -604,6 +608,14 @@ export default function AdminNewsletterListManagePage() {
     }
   };
 
+  const handleDeleted = (result) => {
+    setDeleteOpen(false);
+    navigate("/admin/newsletter/lists", {
+      replace: true,
+      state: { subscriptionListDeleted: result?.name || category?.name || slug },
+    });
+  };
+
   const openConnect = async () => {
     setConnectOpen(true);
     setSelectedSegmentId("");
@@ -653,13 +665,17 @@ export default function AdminNewsletterListManagePage() {
                 {loading ? "Subscription List" : category?.name || slug}
               </Typography>
               {category && (
-                <Chip
-                  size="small"
-                  label={category.is_active ? "Active" : "Inactive"}
-                  color={category.is_active ? "success" : "default"}
-                  variant={category.is_active ? "filled" : "outlined"}
-                  sx={{ fontWeight: 700, borderRadius: "var(--imaa-radius-tag)" }}
-                />
+                deletionPending ? (
+                  <Chip size="small" label="Deletion pending" color="warning" variant="outlined" sx={{ fontWeight: 700, borderRadius: "var(--imaa-radius-tag)" }} />
+                ) : (
+                  <Chip
+                    size="small"
+                    label={category.is_active ? "Active" : "Inactive"}
+                    color={category.is_active ? "success" : "default"}
+                    variant={category.is_active ? "filled" : "outlined"}
+                    sx={{ fontWeight: 700, borderRadius: "var(--imaa-radius-tag)" }}
+                  />
+                )
               )}
             </Stack>
             <Typography color="text.secondary">
@@ -672,26 +688,33 @@ export default function AdminNewsletterListManagePage() {
           <Button startIcon={<RefreshRoundedIcon />} onClick={refreshAll} disabled={loading || contactsLoading || Boolean(action)}>
             Refresh
           </Button>
-          <Button startIcon={<EditRoundedIcon />} onClick={openEdit} disabled={!category || Boolean(action)}>
-            Edit
-          </Button>
-          <Button startIcon={<SyncRoundedIcon />} onClick={syncMautic} disabled={!category || Boolean(action)}>
-            {action === "sync" ? "Syncing..." : segmentId ? "Sync / Repair" : "Create / Sync Mautic"}
-          </Button>
-          {!segmentId && (
-            <Button startIcon={<LinkRoundedIcon />} onClick={openConnect} disabled={!category || Boolean(action)}>
-              Connect Existing
-            </Button>
+          {!deletionPending && (
+            <>
+              <Button startIcon={<EditRoundedIcon />} onClick={openEdit} disabled={!category || Boolean(action)}>
+                Edit
+              </Button>
+              <Button startIcon={<SyncRoundedIcon />} onClick={syncMautic} disabled={!category || Boolean(action)}>
+                {action === "sync" ? "Syncing..." : segmentId ? "Sync / Repair" : "Create / Sync Mautic"}
+              </Button>
+              {!segmentId && (
+                <Button startIcon={<LinkRoundedIcon />} onClick={openConnect} disabled={!category || Boolean(action)}>
+                  Connect Existing
+                </Button>
+              )}
+              {category?.is_active ? (
+                <Button color="error" startIcon={<PowerSettingsNewRoundedIcon />} onClick={() => setDeactivateOpen(true)} disabled={Boolean(action)}>
+                  Deactivate
+                </Button>
+              ) : (
+                <Button color="success" startIcon={<RestoreRoundedIcon />} onClick={reactivate} disabled={Boolean(action)}>
+                  {action === "reactivate" ? "Reactivating..." : "Reactivate"}
+                </Button>
+              )}
+            </>
           )}
-          {category?.is_active ? (
-            <Button color="error" startIcon={<PowerSettingsNewRoundedIcon />} onClick={() => setDeactivateOpen(true)} disabled={Boolean(action)}>
-              Deactivate
-            </Button>
-          ) : (
-            <Button color="success" startIcon={<RestoreRoundedIcon />} onClick={reactivate} disabled={Boolean(action)}>
-              {action === "reactivate" ? "Reactivating..." : "Reactivate"}
-            </Button>
-          )}
+          <Button color="error" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDeleteOpen(true)} disabled={!category || Boolean(action)}>
+            {deletionPending ? "Retry Delete" : "Delete List"}
+          </Button>
         </Stack>
       </Stack>
 
@@ -1085,6 +1108,13 @@ export default function AdminNewsletterListManagePage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <DeleteSubscriptionListDialog
+        open={deleteOpen}
+        category={category}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={handleDeleted}
+      />
 
       <Snackbar
         open={snack.open}

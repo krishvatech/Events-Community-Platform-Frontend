@@ -38,9 +38,12 @@ import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "#navigation";
 
+import ContactDeleteDialog from "../components/marketing/ContactDeleteDialog.jsx";
+import ContactImportDialog from "../components/marketing/ContactImportDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 
 import {
@@ -112,6 +115,9 @@ export default function AdminNewsletterContactsPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkMessage, setBulkMessage] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  // null, "selected" (ticked contacts on this page) or "csv".
+  const [deleteMode, setDeleteMode] = useState(null);
   const [customFieldDefs, setCustomFieldDefs] = useState([]);
   const [customFieldValues, setCustomFieldValues] = useState({});
   const [createForm, setCreateForm] = useState({
@@ -338,6 +344,22 @@ export default function AdminNewsletterContactsPage() {
             Create Contact
           </Button>
           <Button
+            variant="outlined"
+            startIcon={<UploadFileRoundedIcon />}
+            onClick={() => setImportOpen(true)}
+            sx={{ textTransform: "none" }}
+          >
+            Import CSV
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={() => setDeleteMode("csv")}
+            sx={{ textTransform: "none" }}
+          >
+            Bulk Delete by CSV
+          </Button>
+          <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() =>
               loadContacts({
@@ -496,6 +518,15 @@ export default function AdminNewsletterContactsPage() {
               sx={actionSx}
             >
               Clear Stage
+            </Button>
+            <Button
+              variant="outlined"
+              color="error"
+              onClick={() => setDeleteMode("selected")}
+              disabled={bulkLoading || !selectedIds.length}
+              sx={{ textTransform: "none" }}
+            >
+              Delete selected ({selectedIds.length})
             </Button>
           </Stack>
         )}
@@ -717,6 +748,35 @@ export default function AdminNewsletterContactsPage() {
           </Stack>
         </Stack>
       </Paper>
+
+      <ContactImportDialog
+        open={importOpen}
+        onClose={(result) => {
+          setImportOpen(false);
+          if (result?.viewContacts) {
+            setSearchInput("");
+            setSearch("");
+            setStageFilter("");
+            setPage(1);
+            loadContacts({ nextPage: 1, nextSearch: "", nextStageFilter: "", refresh: true });
+          }
+        }}
+        onFinished={() =>
+          loadContacts({ nextPage: page, nextSearch: search, nextStageFilter: stageFilter, refresh: true })
+        }
+      />
+
+      <ContactDeleteDialog
+        open={Boolean(deleteMode)}
+        mode={deleteMode || "selected"}
+        contactIds={selectedIds}
+        onClose={(result) => {
+          setDeleteMode(null);
+          if (result?.changed) {
+            loadContacts({ nextPage: page, nextSearch: search, nextStageFilter: stageFilter, refresh: true });
+          }
+        }}
+      />
 
       <Dialog open={createOpen} onClose={() => setCreateOpen(false)} fullWidth maxWidth="md" aria-labelledby="create-mautic-contact-title" PaperProps={dialogPaperProps}>
         <DialogTitle id="create-mautic-contact-title">Create Mautic Contact</DialogTitle>
