@@ -187,7 +187,11 @@ test("the page renders hero, faculty, staff and sections in order, all faculty i
   const { TeamPageView } = await loadModules();
   const doc = parse(renderToStaticMarkup(createElement(TeamPageView, { page: await readPage() })));
   assert.equal(doc.querySelector("h1").textContent, "Our Team");
-  assert.equal(doc.querySelector("header a").getAttribute("href"), "https://imaa-institute.org/contact-us/");
+  // The CMS keeps the WordPress address; Contact Us is migrated, so the button stays on this website
+  // (src/lib/migratedLinks.js). Pages that are not migrated keep their imaa-institute.org link.
+  assert.equal(doc.querySelector("header a").getAttribute("href"), "/contact-us");
+  assert.deepEqual([...doc.querySelectorAll("[data-team-section=faculty] > div > div > div a")].slice(0, 2).map((a) => a.getAttribute("href")),
+    ["/contact-us", "https://imaa-institute.org/in-house-training/"]);
   assert.deepEqual([...doc.querySelectorAll("[data-team-section]")].map((s) => s.dataset.teamSection), ["faculty", "staff", "offices"]);
   assert.deepEqual([...doc.querySelectorAll("[data-team-section] h2")].map((h) => h.textContent), ["Experts & Faculty", "Staff of IMAA", "Contact Us"]);
   const faculty = doc.querySelector("[data-faculty-directory]");

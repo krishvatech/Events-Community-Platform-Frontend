@@ -18,6 +18,7 @@ import PublicColorModeGuard from "./PublicColorModeGuard.jsx";
 import PublicMobileMenu from "./PublicMobileMenu.jsx";
 import PublicNavGroup from "./PublicNavGroup.jsx";
 import { ourTeamHref } from "../../lib/ourTeamRoute.js";
+import { publicSectionHref } from "../../lib/publicSectionRoutes.js";
 
 const imaaLogoSrc = typeof imaaLogo === "string" ? imaaLogo : imaaLogo.src;
 
@@ -30,7 +31,8 @@ const PublicAuthActions = dynamic(() => import("./PublicAuthActions.jsx"), {
 // Same destinations as src/components/Header.jsx. Member-only targets keep their own guard.
 // "About Us" groups the Institute pages of this public shell (desktop: a disclosure; mobile: a
 // labelled group). "Our Team" points at imaa-institute.org until the Connect route is enabled
-// (src/lib/ourTeamRoute.js).
+// (src/lib/ourTeamRoute.js); so do Testimonials, Contact Us, In The News and M&A Publications
+// (src/lib/publicSectionRoutes.js).
 const NAV_ITEMS = [
   { label: "Events", to: "/events" },
   { label: "Community", to: "/community" },
@@ -41,7 +43,17 @@ const NAV_ITEMS = [
     children: [
       { label: "About IMAA", to: "/about" },
       { label: "Our Team", to: ourTeamHref() },
+      { label: "Testimonials", to: publicSectionHref("testimonials") },
       { label: "References", to: "/references" },
+      { label: "Contact Us", to: publicSectionHref("contact") },
+    ],
+  },
+  {
+    label: "News & Publications",
+    to: publicSectionHref("news"),
+    children: [
+      { label: "In The News", to: publicSectionHref("news") },
+      { label: "M&A Publications", to: publicSectionHref("publications") },
     ],
   },
 ];

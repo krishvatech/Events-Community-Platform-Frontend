@@ -3,6 +3,7 @@ import React from "react";
 import { Container, Box, Link as MLink, IconButton } from "@mui/material";
 import { Link, PUBLIC_CMS_ROUTES_AVAILABLE } from "#navigation";
 import { ourTeamHref } from "../lib/ourTeamRoute.js";
+import { publicSectionHref } from "../lib/publicSectionRoutes.js";
 import { colors, focus, layout, semanticColors } from "../styles/designTokens";
 import imaaLogo from "../assets/IMAA-logo130.svg";
 
@@ -79,10 +80,20 @@ const PUBLIC_FOOTER_COLUMNS = [
     links: [
       ["About us", "/about"],
       ["Our Team", ourTeamHref()], // imaa-institute.org until the Connect route is enabled (src/lib/ourTeamRoute.js)
+      // The next ones too, each until its route is enabled (src/lib/publicSectionRoutes.js).
+      ["Testimonials", publicSectionHref("testimonials")],
       ["FAQ", publicPageHref("frequently-asked-questions")],
       ["References", publicPageHref("references")],
+      // Deliberately the IMAA Institute website (WordPress home page), opened in the same tab.
       ["IMAA Institute", "https://imaa-institute.org/"],
-      ["Contact us", "https://imaa-institute.org/contact-us/"],
+      ["Contact us", publicSectionHref("contact")],
+    ],
+  },
+  {
+    title: "News & Publications",
+    links: [
+      ["In The News", publicSectionHref("news")],
+      ["M&A Publications", publicSectionHref("publications")],
     ],
   },
 ];
@@ -101,7 +112,7 @@ const linkProps = (href) => (href.startsWith("/") ? { component: Link, to: href,
 export const PublicFooter = () => (
   <Box component="footer" sx={{ bgcolor: semanticColors.surface, borderTop: `1px solid ${semanticColors.border}`, color: PUBLIC_INK }}>
     <Container maxWidth="lg" sx={{ py: { xs: 5, md: 7 } }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1.5fr 1fr 1fr" }, gap: { xs: 4, md: 7 } }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "1.5fr 1fr 1fr 1fr" }, gap: { xs: 4, md: 7 } }}>
         <Box>
           <Box component={Link} to="/" resetScroll aria-label="IMAA Connect home" sx={{ display: "inline-flex", ...publicLinkSx }}>
             {/* Navy logo on a white plate in dark mode (brand.css .imaa-logo-plate); no effect in light mode. */}

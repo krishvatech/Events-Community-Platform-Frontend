@@ -13,6 +13,7 @@ import {
   TEXT_LINK,
   isExternal,
 } from "./aboutStyles.js";
+import { rewriteMigratedLinks, siteHref } from "../../../lib/migratedLinks.js";
 
 const escapeHtml = (value) =>
   String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -51,12 +52,14 @@ function ExternalMark({ url }) {
   );
 }
 
+// CMS links to migrated imaa-institute.org pages point at this website (src/lib/migratedLinks.js).
 function Button({ link, variant = "primary", className = "" }) {
   if (!link) return null;
+  const url = siteHref(link.url);
   return (
-    <a href={link.url} className={`${variant === "primary" ? PRIMARY_BUTTON : SECONDARY_BUTTON} gap-1.5 ${className}`}>
+    <a href={url} className={`${variant === "primary" ? PRIMARY_BUTTON : SECONDARY_BUTTON} gap-1.5 ${className}`}>
       {link.label}
-      <ExternalMark url={link.url} />
+      <ExternalMark url={url} />
     </a>
   );
 }
@@ -78,7 +81,7 @@ function AccordionSection({ section }) {
     let id = `accreditation-${slugify(item.title) || "item"}`;
     for (let n = 2; used.has(id); n += 1) id = `accreditation-${slugify(item.title)}-${n}`;
     used.add(id);
-    return { id, questionHtml: escapeHtml(item.title), answerHtml: item.body_html };
+    return { id, questionHtml: escapeHtml(item.title), answerHtml: rewriteMigratedLinks(item.body_html) };
   });
   const half = Math.ceil(items.length / 2);
   return (
@@ -110,7 +113,7 @@ function CtaBandSection({ section }) {
         </ul>
       ) : null}
       <div>
-        <div className={`${SMALL_PROSE_CLASS} md:text-base`} dangerouslySetInnerHTML={{ __html: section.text_html }} />
+        <div className={`${SMALL_PROSE_CLASS} md:text-base`} dangerouslySetInnerHTML={{ __html: rewriteMigratedLinks(section.text_html) }} />
         {section.button ? <Button link={section.button} className="mt-6" /> : null}
       </div>
     </div>
@@ -125,21 +128,25 @@ function FormatIcon({ name }) {
   return <span className="mb-4 inline-flex h-12 w-12 text-imaa-coral [&_svg]:h-12 [&_svg]:w-12" dangerouslySetInnerHTML={{ __html: svg }} />;
 }
 
-function Card({ card, compact = false }) {
+// `wide`: a group with a single card (Contact Us) shows it as one horizontal block from md, image
+// beside the text, instead of one narrow column of a four-column grid.
+function Card({ card, compact = false, wide = false }) {
   return (
-    <article className="flex h-full w-full flex-col overflow-hidden rounded-xl border border-imaa-border bg-white">
+    <article className={`flex h-full w-full flex-col overflow-hidden rounded-xl border border-imaa-border bg-white ${wide ? "md:flex-row" : ""}`}>
       {card.image ? (
-        <Img image={card.image} className="aspect-[530/363] h-auto w-full object-cover" sizes="(min-width: 1024px) 360px, 85vw" />
+        <Img image={card.image}
+             className={`aspect-[530/363] h-auto w-full object-cover ${wide ? "md:aspect-auto md:h-auto md:w-[45%] md:shrink-0" : ""}`}
+             sizes={wide ? "(min-width: 768px) 520px, 85vw" : "(min-width: 1024px) 360px, 85vw"} />
       ) : null}
-      <div className={`flex flex-1 flex-col ${compact ? "p-5" : "p-6"}`}>
+      <div className={`flex flex-1 flex-col ${compact ? "p-5" : "p-6"} ${wide ? "md:justify-center md:p-10" : ""}`}>
         <FormatIcon name={card.icon} />
         <h3 className="m-0 font-sans text-lg font-semibold leading-snug text-imaa-ink">{card.title}</h3>
         {card.text ? <p className="mb-0 mt-2 whitespace-pre-line text-[15px] leading-relaxed text-imaa-body">{card.text}</p> : null}
         {card.link ? (
-          <a href={card.link.url} className={`${TEXT_LINK} mt-auto self-start pt-4`}>
+          <a href={siteHref(card.link.url)} className={`${TEXT_LINK} mt-auto self-start pt-4 ${wide ? "md:mt-2" : ""}`}>
             {card.link.label}
             <span className="sr-only">: {card.title}</span>
-            <ExternalMark url={card.link.url} />
+            <ExternalMark url={siteHref(card.link.url)} />
           </a>
         ) : null}
       </div>
@@ -160,10 +167,10 @@ function CardGroupSection({ section }) {
             ))}
           </AboutCarousel>
         ) : (
-          <ul className="m-0 grid list-none gap-5 p-0 sm:grid-cols-2 lg:grid-cols-4">
+          <ul className={`m-0 grid list-none gap-5 p-0 ${section.cards.length === 1 ? "" : "sm:grid-cols-2 lg:grid-cols-4"}`}>
             {section.cards.map((card, index) => (
               <li key={`${card.title}-${index}`} className="flex">
-                <Card card={card} />
+                <Card card={card} wide={section.cards.length === 1} />
               </li>
             ))}
           </ul>
@@ -206,9 +213,9 @@ function TestimonialCard({ item }) {
         </div>
       </figcaption>
       {item.url ? (
-        <a href={item.url} className={`${TEXT_LINK} self-start pt-3`}>
+        <a href={siteHref(item.url)} className={`${TEXT_LINK} self-start pt-3`}>
           Read more<span className="sr-only">: testimonial by {item.name}</span>
-          <ExternalMark url={item.url} />
+          <ExternalMark url={siteHref(item.url)} />
         </a>
       ) : null}
     </figure>
@@ -265,7 +272,7 @@ function ContactCalloutSection({ section }) {
       <div className="max-w-2xl">
         {section.heading ? <h2 className="m-0 font-serif text-2xl font-bold text-imaa-ink">{section.heading}</h2> : null}
         {section.text_html ? (
-          <div className={`${SMALL_PROSE_CLASS} md:text-base ${section.heading ? "mt-3" : ""}`} dangerouslySetInnerHTML={{ __html: section.text_html }} />
+          <div className={`${SMALL_PROSE_CLASS} md:text-base ${section.heading ? "mt-3" : ""}`} dangerouslySetInnerHTML={{ __html: rewriteMigratedLinks(section.text_html) }} />
         ) : null}
       </div>
       {section.email ? (

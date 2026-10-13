@@ -4,6 +4,7 @@ import { FAQ_CONTACT_URL, FAQ_SLUG, splitFaqSections } from "@/lib/faqSections";
 import { LegalSectionNavMobile, LegalSectionNavSidebar } from "./LegalSectionNav.jsx";
 import { LEGAL_TOC_SLUGS, addLegalSectionAnchors } from "@/lib/legalSections";
 import { IMPRINT_SLUG, splitImprintSections } from "@/lib/imprintSections";
+import { rewriteMigratedLinks, siteHref } from "@/lib/migratedLinks";
 
 // src/components/public/StandardPageArticle.jsx
 // Server Component: the one renderer for public StandardPage content (title + rich-text body),
@@ -78,7 +79,8 @@ const IMPRINT_CARD_BODY_CLASS = [
 const withLazyImages = (html) => html.replace(/<img(?![^>]*\bloading=)/g, '<img loading="lazy" decoding="async"');
 
 export default function StandardPageArticle({ page, source = "cms" }) {
-  const rawBody = typeof page?.body_html === "string" ? page.body_html.trim() : "";
+  // Links to migrated imaa-institute.org pages point at this website (src/lib/migratedLinks.js).
+  const rawBody = typeof page?.body_html === "string" ? rewriteMigratedLinks(page.body_html.trim()) : "";
   const isReferences = page?.slug === "references";
   const body = withLazyImages(rawBody);
   // FAQ: the same CMS body, shown as one toggle per <h2> question (src/lib/faqSections.js).
@@ -122,7 +124,7 @@ export default function StandardPageArticle({ page, source = "cms" }) {
                 </p>
               </div>
               <a
-                href={FAQ_CONTACT_URL}
+                href={siteHref(FAQ_CONTACT_URL)}
                 className="inline-flex min-h-[44px] shrink-0 items-center justify-center rounded-full bg-imaa-teal-dark px-6 py-2.5 font-sans text-base font-semibold text-white no-underline transition-colors hover:bg-imaa-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-imaa-teal"
               >
                 Contact us

@@ -227,7 +227,29 @@ test("public shell: burger menu below 1200px, desktop navigation and actions fro
   const panel = doc.getElementById(about.getAttribute("aria-controls"));
   assert.ok(panel.hasAttribute("hidden"));
   assert.deepEqual([...panel.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]),
-    [["About IMAA", "/about"], ["Our Team", "/our-team"], ["References", "/references"]]);
+    [["About IMAA", "/about"], ["Our Team", "/our-team"], ["Testimonials", "/testimonials"], ["References", "/references"], ["Contact Us", "/contact-us"]]);
+  // Batch 3 article sections (development: the routes are on; see src/lib/publicSectionRoutes.js).
+  // (Matched by value: jsdom's selector engine does not match "&" inside an attribute selector.)
+  const news = [...nav.querySelectorAll("[data-nav-group]")].find((el) => el.dataset.navGroup === "News & Publications").querySelector("button");
+  assert.equal(news.textContent, "News & Publications");
+  assert.deepEqual([...doc.getElementById(news.getAttribute("aria-controls")).querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]),
+    [["In The News", "/in-the-news"], ["M&A Publications", "/publications"]]);
+  const footerLinks = [...doc.querySelectorAll("footer a")].map((a) => [a.textContent, a.getAttribute("href")]);
+  for (const link of [["Testimonials", "/testimonials"], ["Contact us", "/contact-us"], ["In The News", "/in-the-news"], ["M&A Publications", "/publications"]]) {
+    assert.ok(footerLinks.some(([text, href]) => text === link[0] && href === link[1]), `footer: ${link[0]}`);
+  }
+  // Only "IMAA Institute" points at the WordPress home page; About us stays on this site.
+  assert.deepEqual(footerLinks.filter(([, href]) => /^https?:\/\/(www\.)?imaa-institute\.org\/?$/.test(href)),
+    [["IMAA Institute", "https://imaa-institute.org/"]]);
+  assert.ok(footerLinks.some(([text, href]) => text === "About us" && href === "/about"));
+  // "IMAA Institute" stays in the column, between References and Contact us.
+  const aboutColumn = [...doc.querySelectorAll("footer nav")].find((nav) => nav.getAttribute("aria-label") === "About IMAA");
+  assert.deepEqual([...aboutColumn.querySelectorAll("a")].map((a) => [a.textContent, a.getAttribute("href")]), [
+    ["About us", "/about"], ["Our Team", "/our-team"], ["Testimonials", "/testimonials"], ["FAQ", "/frequently-asked-questions"],
+    ["References", "/references"], ["IMAA Institute", "https://imaa-institute.org/"], ["Contact us", "/contact-us"],
+  ]);
+  const institute = [...aboutColumn.querySelectorAll("a")].find((a) => a.textContent === "IMAA Institute");
+  assert.equal(institute.getAttribute("target"), null, "same tab, as before");
   assert.equal(doc.querySelector("main").textContent, "Body");
   assert.ok(doc.querySelector("footer"), "public footer");
 });

@@ -13,6 +13,7 @@
 // here. Rich text is the backend's sanitised public HTML; card text is plain text.
 import { SECTION_COMPONENTS } from "./about/AboutSections.jsx";
 import { GROUNDS, HEADING_CLASS, PROSE_CLASS, SECTION_INNER } from "./about/aboutStyles.js";
+import { rewriteMigratedLinks } from "../../lib/migratedLinks.js";
 
 const hasText = (html) => typeof html === "string" && html.replace(/<[^>]*>|&nbsp;|\s/g, "") !== "";
 
@@ -53,7 +54,7 @@ function Intro({ page }) {
   return (
     <div className={`grid items-start gap-10 ${aside ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:gap-14" : ""}`}>
       {hasText(textHtml) ? (
-        <div className={`${PROSE_CLASS} max-w-[700px]`} dangerouslySetInnerHTML={{ __html: textHtml }} />
+        <div className={`${PROSE_CLASS} max-w-[700px]`} dangerouslySetInnerHTML={{ __html: rewriteMigratedLinks(textHtml) }} />
       ) : (
         <div />
       )}
@@ -80,7 +81,7 @@ function Intro({ page }) {
                   <svg aria-hidden="true" viewBox="0 0 20 20" width="20" height="20" className="mt-px shrink-0 text-imaa-teal" fill="currentColor">
                     <path d="M10 1.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17Zm4.2 6.2-5 5.3a.9.9 0 0 1-1.3 0L5.8 10.8a.9.9 0 1 1 1.3-1.3l1.5 1.5 4.3-4.6a.9.9 0 1 1 1.3 1.3Z" />
                   </svg>
-                  <span dangerouslySetInnerHTML={{ __html: item }} />
+                  <span dangerouslySetInnerHTML={{ __html: rewriteMigratedLinks(item) }} />
                 </li>
               ))}
             </ul>
@@ -98,7 +99,7 @@ function Mission({ page }) {
     <>
       {heading ? <h2 className={HEADING_CLASS}>{heading}</h2> : null}
       {hasText(page.mission_html) ? (
-        <div className={`${PROSE_CLASS} max-w-[700px] ${heading ? "mt-6" : ""}`} dangerouslySetInnerHTML={{ __html: page.mission_html }} />
+        <div className={`${PROSE_CLASS} max-w-[700px] ${heading ? "mt-6" : ""}`} dangerouslySetInnerHTML={{ __html: rewriteMigratedLinks(page.mission_html) }} />
       ) : null}
       {page.features.length ? (
         <>

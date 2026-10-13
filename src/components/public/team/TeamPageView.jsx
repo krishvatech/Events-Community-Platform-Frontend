@@ -8,16 +8,19 @@
 import { SECTION_COMPONENTS } from "../about/AboutSections.jsx";
 import { GROUNDS, HEADING_CLASS, PRIMARY_BUTTON, PROSE_CLASS, SECONDARY_BUTTON, SECTION_INNER, isExternal } from "../about/aboutStyles.js";
 import FacultyDirectory from "./FacultyDirectory.jsx";
+import { rewriteMigratedLinks, siteHref } from "../../../lib/migratedLinks.js";
 import { CARD_GRID, StaffCard } from "./TeamCards.jsx";
 
 const hasText = (html) => typeof html === "string" && html.replace(/<[^>]*>|&nbsp;|\s/g, "") !== "";
 
 function Button({ link, variant = "primary", className = "" }) {
   if (!link) return null;
+  // CMS links to migrated imaa-institute.org pages (e.g. Contact Us) point at this website.
+  const url = siteHref(link.url);
   return (
-    <a href={link.url} className={`${variant === "primary" ? PRIMARY_BUTTON : SECONDARY_BUTTON} gap-1.5 ${className}`}>
+    <a href={url} className={`${variant === "primary" ? PRIMARY_BUTTON : SECONDARY_BUTTON} gap-1.5 ${className}`}>
       {link.label}
-      {isExternal(link.url) ? (
+      {isExternal(url) ? (
         <>
           <span aria-hidden="true">↗</span>
           <span className="sr-only"> (imaa-institute.org)</span>
@@ -32,7 +35,7 @@ function SectionIntro({ heading, subheading, html, buttons }) {
     <div className="max-w-[760px]">
       {heading ? <h2 className={HEADING_CLASS}>{heading}</h2> : null}
       {subheading ? <p className="mb-0 mt-3 font-sans text-lg font-semibold text-imaa-teal-dark">{subheading}</p> : null}
-      {hasText(html) ? <div className={`${PROSE_CLASS} mt-5`} dangerouslySetInnerHTML={{ __html: html }} /> : null}
+      {hasText(html) ? <div className={`${PROSE_CLASS} mt-5`} dangerouslySetInnerHTML={{ __html: rewriteMigratedLinks(html) }} /> : null}
       {buttons.length ? (
         <div className="mt-6 flex flex-wrap gap-3">
           {buttons.map((link, index) => (
@@ -92,11 +95,11 @@ export default function TeamPageView({ page }) {
           ) : null}
           {page.hero_button ? (
             <a
-              href={page.hero_button.url}
+              href={siteHref(page.hero_button.url)}
               className="mt-7 inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-white/70 px-6 py-2.5 font-sans text-sm font-bold text-white no-underline transition-colors hover:bg-white hover:text-imaa-navy focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
             >
               {page.hero_button.label}
-              {isExternal(page.hero_button.url) ? (
+              {isExternal(siteHref(page.hero_button.url)) ? (
                 <>
                   <span aria-hidden="true">↗</span>
                   <span className="sr-only"> (imaa-institute.org)</span>

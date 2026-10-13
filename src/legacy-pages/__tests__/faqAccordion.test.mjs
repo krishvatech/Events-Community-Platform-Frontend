@@ -171,11 +171,13 @@ test("the FAQ renders every question as a collapsed, labelled toggle with its an
   assert.equal(doc.querySelector("h1").textContent, page.title);
 });
 
-test("the FAQ ends with a Contact Us link to the working IMAA contact form, not a local form", async () => {
+test("the FAQ ends with a Contact Us link to the site's Contact Us page, not a local form", async () => {
   const doc = await renderArticle(defaultFaqPage());
   const contact = doc.querySelector("aside[aria-labelledby='faq-contact-heading']");
   assert.equal(contact.querySelector("h2").textContent, "Contact Us");
-  assert.equal(contact.querySelector("a").getAttribute("href"), FAQ_CONTACT_URL);
+  // FAQ_CONTACT_URL is the WordPress page; /contact-us is migrated and switched on (src/lib/migratedLinks.js).
+  assert.equal(FAQ_CONTACT_URL, "https://imaa-institute.org/contact-us/");
+  assert.equal(contact.querySelector("a").getAttribute("href"), "/contact-us");
   assert.equal(doc.querySelectorAll("form, input, textarea").length, 0);
 });
 
