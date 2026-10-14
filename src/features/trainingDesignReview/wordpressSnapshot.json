@@ -1,0 +1,1324 @@
+{
+  "source": "local-wordpress-html",
+  "updatedAt": "2026-10-14T09:25:23+00:00",
+  "overview": [
+    {
+      "kind": "p",
+      "text": "The International Mergers & Acquisitions Expert (IM&A) program dives deep into the entire M&A process – from strategy and valuation to execution and post merger integration (PMI)."
+    },
+    {
+      "kind": "p",
+      "text": "Whether managing or advising a merger or acquisition for your company or assisting your clients, we will equip you with the tools and knowledge you need to skip the common pitfalls and succeed."
+    },
+    {
+      "kind": "p",
+      "text": "In the highly interactive on-site course or the self-paced online course, you’ll take your skills to the next level by practicing:"
+    },
+    {
+      "kind": "heading",
+      "text": "Expanding your M&A perspective"
+    },
+    {
+      "kind": "p",
+      "text": "Hone new target identification strategies and advanced synergy analyses to close the best deals and navigate common post-merger integration pitfalls."
+    },
+    {
+      "kind": "heading",
+      "text": "Mapping out the negotiation landscape"
+    },
+    {
+      "kind": "p",
+      "text": "Identifying the true stakeholders and likely competitors for the target ahead of time, so you’re ready with the right strategies and tactics for closing the transaction without trouble."
+    },
+    {
+      "kind": "heading",
+      "text": "Improving your Foresight"
+    },
+    {
+      "kind": "p",
+      "text": "By “looking ahead and reasoning back,” you’ll practice implementing exceptional value analysis and comprehensive due diligence so you can lead your team into unlocking the most lucrative merger and acquisition opportunities."
+    }
+  ],
+  "designation": [
+    {
+      "kind": "p",
+      "text": "After successfully completing the course, you will receive the IM&A Charter. The IM&A is the most internationally recognized designation offered in the field of M&A. This charter signals to peers, clients, employers, and other professionals that you have completed the most comprehensive M&A education program available and are proficient in all areas of the mergers and acquisitions process."
+    }
+  ],
+  "curriculum": {
+    "Essentials of M&A": [
+      {
+        "kind": "p",
+        "text": "This module covers the fundamentals of Mergers & Acquisitions:"
+      },
+      {
+        "kind": "li",
+        "text": "Deal types : What are the different types of transactions that you can use in M&A? There is a whole range of deal types and deal continuum that we look at, e.g. the full spectrum from minority stakes to full acquisitions, various ways to arrange a merger, leveraged buy outs (LBOs), initial public offerings (IPOs), divestitures, spin-offs, equity carve-outs-"
+      },
+      {
+        "kind": "li",
+        "text": "M&A Process : The program covers both perspectives from a buyer’s perspective (buy side) and from a seller’s perspective (sell-side). We explore how to seek buyers or potential targets (long list & short list) and how to run a sale in various ways (negotiations and auctions)."
+      },
+      {
+        "kind": "li",
+        "text": "Strategies for M&A : We dive into the strategies for Mergers & Acquisitions. How can you create competitive advantage through M&A, divestitures and equity alliance?"
+      },
+      {
+        "kind": "li",
+        "text": "M&A Negotiation : How can you prepare for the negotiation phase? What are ways to arrange a value creating deal?"
+      },
+      {
+        "kind": "li",
+        "text": "Introduction to Due Diligence : How do you prepare for and execute a smart Due Diligence to assure value creation? What are the different areas that can be covered in the Due Diligence process?"
+      },
+      {
+        "kind": "li",
+        "text": "Success Factors in Transactions: We explore the success factors and key challenges and mistakes to avoid. Which M&A tactics work in which industries?"
+      },
+      {
+        "kind": "li",
+        "text": "Takeover Strategies and Defence Tactics : How can you prepare your company against a hostile takeover attempt and reduce potential threats? Which are the defence mechanisms that you can put into place and how affective are they? Which ways exist to acquire a business successfully in a hostile way?"
+      },
+      {
+        "kind": "p",
+        "text": "Learning Outcomes"
+      },
+      {
+        "kind": "li",
+        "text": "Understand the different methods companies can acquire or merge another firm"
+      },
+      {
+        "kind": "li",
+        "text": "Distinguish between Management Buy Outs and Management Buy Ins"
+      },
+      {
+        "kind": "li",
+        "text": "Differentiate between spin-off, split-off & carve-outs"
+      },
+      {
+        "kind": "li",
+        "text": "Classify horizontal & vertical mergers"
+      },
+      {
+        "kind": "li",
+        "text": "Identify different strategies companies use to exit investments"
+      },
+      {
+        "kind": "li",
+        "text": "Classify types of tender offers and what constitutes them"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze and compare different ownership shapes & structures"
+      },
+      {
+        "kind": "li",
+        "text": "Identify growth factors in M&A transactions"
+      },
+      {
+        "kind": "li",
+        "text": "Structure & manage M&A portfolios"
+      },
+      {
+        "kind": "li",
+        "text": "Identify value adding factors in M&A"
+      },
+      {
+        "kind": "li",
+        "text": "Identify value destroying factors"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze various success measurement test & methods"
+      },
+      {
+        "kind": "li",
+        "text": "Classify drivers of profitability in M&A"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze historical M&A waves and their driving factors"
+      },
+      {
+        "kind": "li",
+        "text": "Identify factors in Cross Border M&A activity"
+      },
+      {
+        "kind": "li",
+        "text": "European, Emerging markets, based on regions"
+      },
+      {
+        "kind": "li",
+        "text": "Evaluate historically largest deals"
+      },
+      {
+        "kind": "li",
+        "text": "Define characteristics of M&A waves"
+      },
+      {
+        "kind": "li",
+        "text": "Understand the buy and sell side process, covering both the traditional and holistic view"
+      },
+      {
+        "kind": "li",
+        "text": "Distinguish between the role of advisors and working with them in an M&A setting"
+      },
+      {
+        "kind": "li",
+        "text": "Establish framework for potential target buyer and seller searches"
+      },
+      {
+        "kind": "li",
+        "text": "Identifying relevant industries, companies, locations, financial advisors"
+      },
+      {
+        "kind": "li",
+        "text": "Preparing long and short lists"
+      },
+      {
+        "kind": "li",
+        "text": "How do M&A deals originate and the deal flow"
+      },
+      {
+        "kind": "li",
+        "text": "Discuss necessary agreements and documents in M&A deals"
+      },
+      {
+        "kind": "li",
+        "text": "Construct due diligence plans and activities"
+      },
+      {
+        "kind": "li",
+        "text": "Conducting and updating findings over the transaction lifecycle"
+      },
+      {
+        "kind": "li",
+        "text": "Organizing due diligence teams and data room management"
+      },
+      {
+        "kind": "li",
+        "text": "Identify various areas that require due diligence runs"
+      },
+      {
+        "kind": "li",
+        "text": "Conduct due diligence in a cross-border setting"
+      },
+      {
+        "kind": "li",
+        "text": "Create a minimalistic due diligence"
+      },
+      {
+        "kind": "li",
+        "text": "Identify warning signs in due diligence results"
+      },
+      {
+        "kind": "li",
+        "text": "Judge past and present takeovers battles"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze takeover attacks and strategies for defense"
+      }
+    ],
+    "Due Diligence": [
+      {
+        "kind": "p",
+        "text": "In the Due Diligence module, we discuss the key questions and topics to address in a due diligence. It covers the following areas of DD in depth:"
+      },
+      {
+        "kind": "li",
+        "text": "Financial Due Diligence"
+      },
+      {
+        "kind": "li",
+        "text": "Tax Due Diligence"
+      },
+      {
+        "kind": "li",
+        "text": "Legal Due Diligence"
+      },
+      {
+        "kind": "li",
+        "text": "Human Resources (HR) Due Diligence"
+      },
+      {
+        "kind": "li",
+        "text": "Commercial Due Diligence and"
+      },
+      {
+        "kind": "li",
+        "text": "other Due Diligence areas"
+      },
+      {
+        "kind": "p",
+        "text": "Learning Outcomes"
+      },
+      {
+        "kind": "li",
+        "text": "Determine potential deal breakers, negotiations and quality of earnings"
+      },
+      {
+        "kind": "li",
+        "text": "Differentiate between a DD and an audit"
+      },
+      {
+        "kind": "li",
+        "text": "Recognize tax exposures and liabilities"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze different types of taxes"
+      },
+      {
+        "kind": "li",
+        "text": "Structure transactions"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing current and future liabilities"
+      },
+      {
+        "kind": "li",
+        "text": "Selecting the right legal counsel"
+      },
+      {
+        "kind": "li",
+        "text": "Legal and contractual obstacles"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing employment contracts, compensation & labor agreements"
+      },
+      {
+        "kind": "li",
+        "text": "Conducting a cultural due diligence"
+      },
+      {
+        "kind": "li",
+        "text": "Running a management audit"
+      },
+      {
+        "kind": "li",
+        "text": "Conceptual & general tools for industry analysis"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze current and potential customers"
+      },
+      {
+        "kind": "li",
+        "text": "Conduct a product and technology portfolio analysis"
+      }
+    ],
+    "Valuation": [
+      {
+        "kind": "p",
+        "text": "In the valuation module, you will explore the"
+      },
+      {
+        "kind": "li",
+        "text": "Different Valuation Techniques for Mergers & Acquisitions : Various techniques such as Discounted Cash Flow (DFC) modelling, Transaction and Trading Multiples, and more will be explained step by step including a demonstration of building models in excel."
+      },
+      {
+        "kind": "li",
+        "text": "Private Equity & Start Up Valuation"
+      },
+      {
+        "kind": "li",
+        "text": "Deal Financing & Payment Structure"
+      },
+      {
+        "kind": "li",
+        "text": "Deal Design & Structure"
+      },
+      {
+        "kind": "p",
+        "text": "Learning Outcomes"
+      },
+      {
+        "kind": "li",
+        "text": "Define data points for adjusting multiples"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze financial statements"
+      },
+      {
+        "kind": "li",
+        "text": "Interpret P&L, balance sheet, cashflow"
+      },
+      {
+        "kind": "li",
+        "text": "Differentiate between types of financial statement"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze application of cashflow, P&L and balance sheet within valuation models"
+      },
+      {
+        "kind": "li",
+        "text": "Identify different approaches to valuation"
+      },
+      {
+        "kind": "li",
+        "text": "Interpret the fundamental assumptions in valuation"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze various valuation techniques"
+      },
+      {
+        "kind": "li",
+        "text": "Understand the application of various valuation methods and various pros and cons"
+      },
+      {
+        "kind": "li",
+        "text": "Differentiate between FCFF & FCFE during valuation process"
+      },
+      {
+        "kind": "li",
+        "text": "Define use of FCFF & FCFE"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze present and future value of a firm and equity"
+      },
+      {
+        "kind": "li",
+        "text": "Understand FCFF/FCFE application during valuation"
+      },
+      {
+        "kind": "li",
+        "text": "Classify and define equity and firm valuation"
+      },
+      {
+        "kind": "li",
+        "text": "Understand risk and volatility of a portfolio compared to market"
+      },
+      {
+        "kind": "li",
+        "text": "Apply DCF valuation model"
+      },
+      {
+        "kind": "li",
+        "text": "Estimate shareholder equity"
+      },
+      {
+        "kind": "li",
+        "text": "Understand DCF valuation using FCFF"
+      },
+      {
+        "kind": "li",
+        "text": "Define CAPM model and its application"
+      },
+      {
+        "kind": "li",
+        "text": "Define components of cost of debt"
+      },
+      {
+        "kind": "li",
+        "text": "Estimate cost of debt"
+      },
+      {
+        "kind": "li",
+        "text": "Determine ratings using financial statements"
+      },
+      {
+        "kind": "li",
+        "text": "Assign weights for cost of capital calculation"
+      },
+      {
+        "kind": "li",
+        "text": "Understand application of sensitivity analysis in financial modeling"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze impact on end results"
+      },
+      {
+        "kind": "li",
+        "text": "Identify value of shares through growth rates and cost of capital"
+      },
+      {
+        "kind": "li",
+        "text": "Define valuation by market approach method"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze Guideline Public Company and market variables"
+      },
+      {
+        "kind": "li",
+        "text": "Conceptualize various multiples used in valuation process"
+      },
+      {
+        "kind": "li",
+        "text": "Interpret adjustments"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze and apply multiples"
+      },
+      {
+        "kind": "li",
+        "text": "Define Enterprise Value (EV)"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze various EV multiples"
+      },
+      {
+        "kind": "li",
+        "text": "Understand application of EV multiples in valuation"
+      },
+      {
+        "kind": "li",
+        "text": "Calculate and interpret PE ratios"
+      },
+      {
+        "kind": "li",
+        "text": "Apply PE ratios for market wide comparison"
+      },
+      {
+        "kind": "li",
+        "text": "Identify drawbacks for PE ratios"
+      },
+      {
+        "kind": "li",
+        "text": "Define investment structure"
+      },
+      {
+        "kind": "li",
+        "text": "Understand & analyze investor return calculations"
+      },
+      {
+        "kind": "li",
+        "text": "Defining pre and post money valuation"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding & implementing shareholding analysis before and after investment"
+      },
+      {
+        "kind": "li",
+        "text": "Define returns"
+      },
+      {
+        "kind": "li",
+        "text": "Understand straight equity vs. mezzanine investment structure"
+      },
+      {
+        "kind": "li",
+        "text": "Differentiate impact of both investment structures"
+      },
+      {
+        "kind": "li",
+        "text": "Establish valuation method within the framework of a given case study"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding historical financials as a means of projecting value"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing assumptions to build a financial model"
+      },
+      {
+        "kind": "li",
+        "text": "Identify different cashflow measures"
+      },
+      {
+        "kind": "li",
+        "text": "Account for operating lease expenses"
+      },
+      {
+        "kind": "li",
+        "text": "Classify & capitalize R&D expenses"
+      },
+      {
+        "kind": "li",
+        "text": "Analyze effects of taxes on cash flow estimations and change in working capital"
+      },
+      {
+        "kind": "li",
+        "text": "Defining financial assumptions"
+      },
+      {
+        "kind": "li",
+        "text": "Constructing an Assumptions Sheet"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing data points related to personnel & salaries"
+      },
+      {
+        "kind": "li",
+        "text": "Calculating growth rates/fluctuations in headcounts and salary, etc"
+      },
+      {
+        "kind": "li",
+        "text": "Defining cost projections/assumptions"
+      },
+      {
+        "kind": "li",
+        "text": "Defining revenues based on assumption sheet"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing sales prices and volumes"
+      },
+      {
+        "kind": "li",
+        "text": "Modeling total revenue projection as part of valuation process"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding components of cost"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing cost projections based on component analysis"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding operating costs"
+      },
+      {
+        "kind": "li",
+        "text": "Calculating total operating cost projection as part of valuation"
+      },
+      {
+        "kind": "li",
+        "text": "Defining depreciation values"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding straight line method in depreciation calculation"
+      },
+      {
+        "kind": "li",
+        "text": "Defining interest expense"
+      },
+      {
+        "kind": "li",
+        "text": "Calculating net interest expense"
+      },
+      {
+        "kind": "li",
+        "text": "Defining working capital"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding how the operating cycle relates to need for liquidity"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding inventory, receivable and payable days"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing key ratios and defining assumptions"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing cashflows from previous financial statements"
+      },
+      {
+        "kind": "li",
+        "text": "Projecting cashflows"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding interest coverage"
+      },
+      {
+        "kind": "li",
+        "text": "Defining leverage, liquidity and activity ratios"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding return on average equity, average capital employed and average assets (ROAE, ROACE, ROAA)"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding ROAE for shareholder returns"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding ROACE for debt & equity holders"
+      },
+      {
+        "kind": "li",
+        "text": "Understanding ROAA for debt and equity holders"
+      }
+    ],
+    "Post Merger Integration (PMI)": [
+      {
+        "kind": "p",
+        "text": "The Post Merger Integration module gives you a thorough introduction into the following aspects:"
+      },
+      {
+        "kind": "li",
+        "text": "Integration Governance : Project Management and Work Stream coordination"
+      },
+      {
+        "kind": "li",
+        "text": "Synergies : Identification of Growth and Cost Synergies and their realization"
+      },
+      {
+        "kind": "li",
+        "text": "Function Integration : How to integrate the different business functions, e.g. Sales & Marketing, Finance, HR, etc."
+      },
+      {
+        "kind": "li",
+        "text": "Change Management and Cultural Issues : How to deal with differences and success with Communication and Change Management."
+      },
+      {
+        "kind": "p",
+        "text": "Learning Outcomes"
+      },
+      {
+        "kind": "li",
+        "text": "Identify the major challenges in PMI"
+      },
+      {
+        "kind": "li",
+        "text": "Determine the success factors in PMI"
+      },
+      {
+        "kind": "li",
+        "text": "Integrate due diligence findings with PMI planning"
+      },
+      {
+        "kind": "li",
+        "text": "Evaluate reasons for failure in PMI"
+      },
+      {
+        "kind": "li",
+        "text": "Devise a timeline for integration planning"
+      },
+      {
+        "kind": "li",
+        "text": "Adapt to speed, based on deal size and goals"
+      },
+      {
+        "kind": "li",
+        "text": "Strategy creation for achieving quick-wins"
+      },
+      {
+        "kind": "li",
+        "text": "Create integration teams and coordinate with Integration Management Office"
+      },
+      {
+        "kind": "li",
+        "text": "Create temporary task forces and coordinate with the IMO"
+      },
+      {
+        "kind": "li",
+        "text": "Examples of PMI organizational structures"
+      },
+      {
+        "kind": "li",
+        "text": "Identify correct communications timings and channels"
+      },
+      {
+        "kind": "li",
+        "text": "Establish a plan for day 1"
+      },
+      {
+        "kind": "li",
+        "text": "Understand the guidelines for internal communication"
+      },
+      {
+        "kind": "li",
+        "text": "Plan and prepare for change management"
+      },
+      {
+        "kind": "li",
+        "text": "Recommend processes to facilitate change and communication"
+      },
+      {
+        "kind": "li",
+        "text": "Prepare tools for change management"
+      },
+      {
+        "kind": "li",
+        "text": "Classify channels for communication"
+      },
+      {
+        "kind": "li",
+        "text": "Methods to maximize value after acquisition"
+      },
+      {
+        "kind": "li",
+        "text": "Analyzing acquisition climate and target resistance"
+      },
+      {
+        "kind": "li",
+        "text": "Recognize the directions of integration"
+      },
+      {
+        "kind": "li",
+        "text": "Recognize the dependence of acquisition strategy and degree of integration"
+      },
+      {
+        "kind": "li",
+        "text": "Identify various integration phases"
+      },
+      {
+        "kind": "li",
+        "text": "Determine steps to deal with integration phases"
+      },
+      {
+        "kind": "li",
+        "text": "Coordinate with the IMO and steering committee"
+      },
+      {
+        "kind": "li",
+        "text": "Determine the extent of integration"
+      },
+      {
+        "kind": "li",
+        "text": "Maintain day-to-day business operation in parallel with integration activities"
+      },
+      {
+        "kind": "li",
+        "text": "Identify immediate synergies & quick wins"
+      },
+      {
+        "kind": "li",
+        "text": "Recognize key customer journeys"
+      },
+      {
+        "kind": "li",
+        "text": "Identify long term synergies and goals"
+      },
+      {
+        "kind": "li",
+        "text": "Achieve synergies"
+      },
+      {
+        "kind": "li",
+        "text": "Devise tools and templates for functional workplans"
+      },
+      {
+        "kind": "li",
+        "text": "Construct a workstream charter"
+      },
+      {
+        "kind": "li",
+        "text": "Managing communication channels in M&A"
+      },
+      {
+        "kind": "li",
+        "text": "Interpret various behavioral patterns"
+      },
+      {
+        "kind": "li",
+        "text": "Classify dealing with people in an M&A setting"
+      }
+    ]
+  },
+  "faculty": [
+    {
+      "name": "Prof. Dr. Christopher Kummer",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2021/09/Prof.-Dr.-Christopher-Kummer-300x300.png"
+    },
+    {
+      "name": "Prof. David J. Brophy, PhD",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2021/09/David-Brophy.png"
+    },
+    {
+      "name": "Prof. Andrew Campbell",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2021/09/prof-andrew-campbell.png"
+    },
+    {
+      "name": "Andre Gan",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2021/09/Andre-Gan.png"
+    },
+    {
+      "name": "Darryl Kinneally",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2021/09/Darryl-Kinneally-300x300.png"
+    },
+    {
+      "name": "Dhruv Mehra",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2021/09/Dhruv-Mehra-300x300.png"
+    }
+  ],
+  "testimonials": [
+    {
+      "name": "Dr. Saeed Ahmed Al-Gailani",
+      "quote": "This program designed to equip professionals with the practical skills needed to manage the entire M&A deal lifecycle. IMAA was the perfect choice for me!",
+      "role": "",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2026/05/Dr.-Saeed-Ahmed-Al-Gailani-Participant-Testimonital-KV-1.webp"
+    },
+    {
+      "name": "Mohamed Shouman",
+      "quote": "I was able to immediately apply this knowledge [in] one of the largest M&A transactions in the region.",
+      "role": "General Manager, Group Corporate Banking · Kuwait Finance House",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2025/10/Mo-shouman-1-300x300.webp"
+    },
+    {
+      "name": "Michael Reed",
+      "quote": "The program was extraordinary",
+      "role": "Senior Consultant · Smith Reed Partners",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2023/10/Michael-Reed-Black-and-White-300x300.jpg"
+    },
+    {
+      "name": "Aline Soghomonian",
+      "quote": "Great content, lots of interactive work",
+      "role": "Legal professional · TAQA Group",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2024/01/Aline-Soghomonian-300x300.png"
+    },
+    {
+      "name": "Christian Muntean",
+      "quote": "High-caliber, whip-smart, and friendly people",
+      "role": "President, Advisor to owners, executives & boards · Vantage Consulting",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2023/10/Christian-Muntean-black-and-white-300x300.png"
+    },
+    {
+      "name": "Shaune Lim",
+      "quote": "Relevant real-world examples and case studies",
+      "role": "CEO · Assured Asset Management",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2023/10/Shaune-Lim-black-and-white-300x300.jpg"
+    },
+    {
+      "name": "Ezinne Q. Joshua",
+      "quote": "Provided me with new perspectives",
+      "role": "Associate Portfolio Manager · Aquamore Finance",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2023/11/Ezinne-Joshua1-1-300x300.jpg"
+    },
+    {
+      "name": "Chuck Adams",
+      "quote": "Better value to our clients",
+      "role": "Managing Partner · Coeptis Consulting Group",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2023/10/Chuck-Adams-black-and-white-300x300.jpg"
+    },
+    {
+      "name": "Kenneth Penn, CPA",
+      "quote": "Networking with my fellow professionals",
+      "role": "Managing Partner & CEO · The Pantera Group, LLC",
+      "image": "https://www.imaa-institute.org/wp-content/uploads/2023/10/Kenneth-Penn-black-and-white-300x300.jpg"
+    }
+  ],
+  "prerequisites": [
+    {
+      "kind": "li",
+      "text": "Hold one or more professional designations (such as CPA, CFA, CAIA or equivalent); OR an academic degree (e.g. Bachelor Degree, Masters Degree, DBA, JD or PhD)."
+    },
+    {
+      "kind": "li",
+      "text": "NASBA Information: Participants are required to have a basic understanding of financial and strategic concepts. Ideally participants have previous knowledge in courses in covering financial and business related topics on a university level. For more information, please reach out to us. There is no advance preparation required. However, participants are encouraged to review basic financial and business concepts before attending the training."
+    }
+  ],
+  "audience": [
+    {
+      "kind": "p",
+      "text": "While you will meet an international mix of participants from various industries, the Mergers and Acquisitions program is designed for mid-management to senior executives in the C-Suite, directors of public and private companies, board leaders, and heads of strategy and corporate development. It is also geared toward advisers, investment bankers, transactional lawyers, and private equity investors. Individuals and teams are welcome to attend."
+    }
+  ],
+  "other": [
+    {
+      "kind": "p",
+      "text": "This cross-disciplinary curriculum provides a holistic view of the M&A process – from strategy and valuation to execution and post-merger integration management."
+    },
+    {
+      "kind": "p",
+      "text": "You will delve into the challenges and opportunities presented by new technology and learn all the terminology and best practices for cross-border deals, corporate inversions, earn-outs, spin-offs, restructurings, corporate governance and more opportunities. Different strategic approaches for private and public companies will also be examined."
+    }
+  ],
+  "schedule": [
+    {
+      "kind": "heading",
+      "text": "IM&A Certificate ONLINE"
+    },
+    {
+      "kind": "p",
+      "text": "Online"
+    },
+    {
+      "kind": "p",
+      "text": "Bundle & Save:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $4,360.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $3,290.00."
+    },
+    {
+      "kind": "heading",
+      "text": "October 19-23, 2026"
+    },
+    {
+      "kind": "p",
+      "text": "Onsite"
+    },
+    {
+      "kind": "p",
+      "text": "19"
+    },
+    {
+      "kind": "p",
+      "text": "Oct"
+    },
+    {
+      "kind": "p",
+      "text": "on 00:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "New York | Oct 2026"
+    },
+    {
+      "kind": "heading",
+      "text": "IM&A February – April 2027"
+    },
+    {
+      "kind": "p",
+      "text": "Interactive Online Live"
+    },
+    {
+      "kind": "p",
+      "text": "Early Bird Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $4,390.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $3,790.00."
+    },
+    {
+      "kind": "p",
+      "text": "18"
+    },
+    {
+      "kind": "p",
+      "text": "Feb"
+    },
+    {
+      "kind": "p",
+      "text": "on 13:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "Feb - Apr 2027"
+    },
+    {
+      "kind": "heading",
+      "text": "May 4-6, 2027"
+    },
+    {
+      "kind": "p",
+      "text": "Onsite"
+    },
+    {
+      "kind": "p",
+      "text": "Early Bird Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $5,490.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $4,890.00."
+    },
+    {
+      "kind": "p",
+      "text": "04"
+    },
+    {
+      "kind": "p",
+      "text": "May"
+    },
+    {
+      "kind": "p",
+      "text": "on 00:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "New York | May 2027"
+    },
+    {
+      "kind": "heading",
+      "text": "IM&A May – July 2027"
+    },
+    {
+      "kind": "p",
+      "text": "Interactive Online Live"
+    },
+    {
+      "kind": "p",
+      "text": "Early Bird Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $4,390.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $3,790.00."
+    },
+    {
+      "kind": "p",
+      "text": "20"
+    },
+    {
+      "kind": "p",
+      "text": "May"
+    },
+    {
+      "kind": "p",
+      "text": "on 13:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "May - Jul 2027"
+    },
+    {
+      "kind": "heading",
+      "text": "May 24-28, 2027"
+    },
+    {
+      "kind": "p",
+      "text": "Onsite"
+    },
+    {
+      "kind": "p",
+      "text": "Early Bird Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $5,490.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $4,890.00."
+    },
+    {
+      "kind": "p",
+      "text": "24"
+    },
+    {
+      "kind": "p",
+      "text": "May"
+    },
+    {
+      "kind": "p",
+      "text": "on 00:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "London | May 2027"
+    },
+    {
+      "kind": "heading",
+      "text": "IM&A September – October 2027"
+    },
+    {
+      "kind": "p",
+      "text": "Interactive Online Live"
+    },
+    {
+      "kind": "p",
+      "text": "Early Bird Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $4,390.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $3,790.00."
+    },
+    {
+      "kind": "p",
+      "text": "02"
+    },
+    {
+      "kind": "p",
+      "text": "Sep"
+    },
+    {
+      "kind": "p",
+      "text": "on 13:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "Sep - Oct 2027"
+    },
+    {
+      "kind": "heading",
+      "text": "September 13-16, 2027"
+    },
+    {
+      "kind": "p",
+      "text": "Onsite"
+    },
+    {
+      "kind": "p",
+      "text": "Early Bird Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $5,490.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $4,890.00."
+    },
+    {
+      "kind": "p",
+      "text": "13"
+    },
+    {
+      "kind": "p",
+      "text": "Sep"
+    },
+    {
+      "kind": "p",
+      "text": "on 00:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "Singapore | Sep 2027"
+    },
+    {
+      "kind": "heading",
+      "text": "October 4-8, 2027"
+    },
+    {
+      "kind": "p",
+      "text": "Onsite"
+    },
+    {
+      "kind": "p",
+      "text": "Early Bird Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $5,490.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $4,890.00."
+    },
+    {
+      "kind": "p",
+      "text": "04"
+    },
+    {
+      "kind": "p",
+      "text": "Oct"
+    },
+    {
+      "kind": "p",
+      "text": "on 00:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "Amsterdam | Oct 2027"
+    },
+    {
+      "kind": "heading",
+      "text": "IM&A October – December 2027"
+    },
+    {
+      "kind": "p",
+      "text": "Interactive Online Live"
+    },
+    {
+      "kind": "p",
+      "text": "Early Bird Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "Original price was: $4,390.00."
+    },
+    {
+      "kind": "p",
+      "text": "Current price is: $3,790.00."
+    },
+    {
+      "kind": "p",
+      "text": "07"
+    },
+    {
+      "kind": "p",
+      "text": "Oct"
+    },
+    {
+      "kind": "p",
+      "text": "on 13:00 UTC"
+    },
+    {
+      "kind": "p",
+      "text": "Oct - Dec 2027"
+    },
+    {
+      "kind": "heading",
+      "text": "Essentials of M&A (Module 1)"
+    },
+    {
+      "kind": "p",
+      "text": "Online"
+    },
+    {
+      "kind": "p",
+      "text": "Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "The Essentials of M&A module provides you with a solid foundation in M&A so you can deep dive in integration issues laster. This module covers: Various deal types M&A Process (buy- and sell-side) Strategies for M&A Introduction to Due Diligence Success Factors in Transactions: Takeover Strategies and Defence Tactics in Hostile M&A"
+    },
+    {
+      "kind": "heading",
+      "text": "Due Diligence (Module 2)"
+    },
+    {
+      "kind": "p",
+      "text": "Online"
+    },
+    {
+      "kind": "p",
+      "text": "Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "The Due Diligence module covers in detail: Financial Due Diligence Tax Due Diligence Legal Due Diligence Human Resource / HR Due Diligence other Due Diligence areas (e.g. Commercial Due Diligence, Antitrust Due Diligence, Environmental Due Diligence, IT Due Diligence, etc.)"
+    },
+    {
+      "kind": "heading",
+      "text": "Valuation (Module 3)"
+    },
+    {
+      "kind": "p",
+      "text": "Online"
+    },
+    {
+      "kind": "p",
+      "text": "Fees:"
+    },
+    {
+      "kind": "heading",
+      "text": "Post Merger Integration (Module 4)"
+    },
+    {
+      "kind": "p",
+      "text": "Online"
+    },
+    {
+      "kind": "p",
+      "text": "Fees:"
+    },
+    {
+      "kind": "p",
+      "text": "In the Post Merger Integration (PMI) module, you will gain insights about Planning and execution of PMI Project management and governance in the context of integration integration the various functions such as marketing & sales, finance, IT, HR, etc. change management in M&A"
+    }
+  ]
+}
