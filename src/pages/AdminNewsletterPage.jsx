@@ -98,6 +98,7 @@ import AdminNewsletterMauticCampaignBuilderPage from "./AdminNewsletterMauticCam
 import AdminNewsletterNativeSegmentsPanel from "./AdminNewsletterNativeSegmentsPanel.jsx";
 import AdminNewsletterTagsPanel from "./AdminNewsletterTagsPanel.jsx";
 import AdminNewsletterCustomFieldsPanel from "./AdminNewsletterCustomFieldsPanel.jsx";
+import AdminNewsletterSendOutcomePanel from "./AdminNewsletterSendOutcomePanel.jsx";
 import { getMarketingSectionFromPath } from "../config/marketingNavigation";
 
 const STATUS_LABELS = {
@@ -215,12 +216,16 @@ const getErrorMessage = (err, fallback = "Something went wrong. Please try again
   return fallback;
 };
 
-function StatusChip({ status }) {
+// A Sending broadcast with an error recorded is one Mautic never confirmed
+// (the provider boundary clears errors when sending starts).
+const isOutcomeUncertain = (campaign) => campaign?.status === "sending" && Boolean(campaign?.last_error);
+
+function StatusChip({ status, uncertain = false }) {
   const normalized = String(status || "draft").toLowerCase();
   return (
     <Chip
       size="small"
-      label={STATUS_LABELS[normalized] || normalized}
+      label={uncertain ? "Sending — Outcome Uncertain" : STATUS_LABELS[normalized] || normalized}
       color={STATUS_COLORS[normalized] || "default"}
       variant={normalized === "draft" || normalized === "cancelled" ? "outlined" : "filled"}
       sx={{ fontWeight: 800 }}
@@ -452,7 +457,7 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
                       <Typography variant="body2" color="text.secondary">{row.subject || "-"}</Typography>
                     </TableCell>
                     <TableCell>{getCampaignAudienceLabels(row).join(", ") || "-"}</TableCell>
-                    <TableCell><StatusChip status={row.status} /></TableCell>
+                    <TableCell><StatusChip status={row.status} uncertain={isOutcomeUncertain(row)} /></TableCell>
                     <TableCell>{formatDateTime(row.created_at)}</TableCell>
                     <TableCell>{formatDateTime(row.scheduled_at)}</TableCell>
                     <TableCell>{formatDateTime(row.sent_at || row.send_started_at)}</TableCell>
@@ -1264,7 +1269,7 @@ export default function AdminNewsletterPage() {
           <Box>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
               <Typography variant="h4" sx={{ fontWeight: 850, color: "#1B2A4A" }}>{isNew ? "Create Broadcast" : campaign?.name || "Email Broadcast"}</Typography>
-              {!isNew && <StatusChip status={campaign?.status} />}
+              {!isNew && <StatusChip status={campaign?.status} uncertain={isOutcomeUncertain(campaign)} />}
             </Stack>
             <Typography color="text.secondary">Build the email broadcast in four steps, then test, schedule, or send.</Typography>
           </Box>
@@ -1283,7 +1288,13 @@ export default function AdminNewsletterPage() {
 
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
       {isDirty && <Alert severity="info">Save your changes before previewing, testing, scheduling, or sending.</Alert>}
-      {!isNew && detailLoaded && campaign?.last_error && <Alert severity="error">{campaign.last_error}</Alert>}
+      {!isNew && detailLoaded && campaign?.last_error && (
+        // An unconfirmed send is not a failure: show it as a warning.
+        <Alert severity={isOutcomeUncertain(campaign) ? "warning" : "error"}>{campaign.last_error}</Alert>
+      )}
+      {!isNew && detailLoaded && campaign?.status === "sending" && (
+        <AdminNewsletterSendOutcomePanel campaign={campaign} onResolved={loadDetail} />
+      )}
 
       {loading ? (
         <Stack spacing={2}>{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} variant="rectangular" height={140} />)}</Stack>
