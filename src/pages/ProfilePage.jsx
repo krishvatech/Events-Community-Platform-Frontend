@@ -49,6 +49,7 @@ import GroupOutlinedIcon from "@mui/icons-material/GroupOutlined";
 import PersonAddAlt1RoundedIcon from "@mui/icons-material/PersonAddAlt1Rounded";
 import RichProfile from "./community/RichProfile";
 import SecurityCard from "../components/profile/SecurityCard";
+import CompanionVisibilityDialog from "../components/profile/CompanionVisibilityDialog";
 import LinkedInProfileImportDialog from "../components/LinkedInProfileImportDialog";
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
@@ -1814,6 +1815,7 @@ export default function ProfilePage() {
 
   // Privacy Dialog State
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [companionVisibilityOpen, setCompanionVisibilityOpen] = useState(false);
   const [privacySettings, setPrivacySettings] = useState({
     directory_hidden: false,
     connections_hidden: false,
@@ -4473,7 +4475,26 @@ export default function ProfilePage() {
                               Anonymous by default: new Q&A questions will be anonymous unless you change this for individual questions.
                             </Typography>
                           </Box>
+                          <Box>
+                            <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                              <Typography variant="body1">Event Companion visibility</Typography>
+                              <Button size="small" onClick={() => setCompanionVisibilityOpen(true)}>
+                                Manage
+                              </Button>
+                            </Box>
+                            <Typography variant="body2" color="text.secondary">
+                              Event Companion: choose, per in-person event you are registered for, whether other participants can see you in that event&apos;s Companion directory.
+                            </Typography>
+                          </Box>
                         </Stack>
+
+                        <CompanionVisibilityDialog
+                          open={companionVisibilityOpen}
+                          onClose={() => setCompanionVisibilityOpen(false)}
+                          apiBase={API_BASE}
+                          tokenHeader={tokenHeader}
+                          onNotify={showNotification}
+                        />
 
                         <Dialog
                           open={privacyOpen}

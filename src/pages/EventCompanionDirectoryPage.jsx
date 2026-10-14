@@ -237,6 +237,11 @@ function DesktopView({
                               (me)
                             </Typography>
                           )}
+                          {Boolean(p.user_id) && p.user_id === currentUserId && p.hidden_from_companion && (
+                            <Tooltip title="You opted out of this event's Companion. Other participants can't see you. Change it in Profile → Privacy Settings.">
+                              <Chip component="span" label="Hidden from others" size="small" variant="outlined" sx={{ ml: 0.75, height: 18, fontSize: '0.65rem', borderColor: '#f59e0b', color: '#b45309' }} />
+                            </Tooltip>
+                          )}
                         </Typography>
                         {p.badge_labels && p.badge_labels.length > 0 ? (
                           p.badge_labels.map((badge) => (
@@ -1071,6 +1076,11 @@ function MobileView({
                             <Typography component="span" sx={{ fontSize: 12, color: '#999', fontWeight: 400, ml: 0.625 }}>
                               (me)
                             </Typography>
+                          )}
+                          {Boolean(p.user_id) && p.user_id === currentUserId && p.hidden_from_companion && (
+                            <Tooltip title="You opted out of this event's Companion. Other participants can't see you. Change it in Profile → Privacy Settings.">
+                              <Chip component="span" label="Hidden from others" size="small" variant="outlined" sx={{ ml: 0.75, height: 18, fontSize: '0.65rem', borderColor: '#f59e0b', color: '#b45309' }} />
+                            </Tooltip>
                           )}
                         </Typography>
                         {p.badge_labels && p.badge_labels.length > 0 ? (
