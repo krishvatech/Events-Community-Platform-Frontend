@@ -2348,7 +2348,8 @@ export default function EventManagePage() {
   const isWithinEarlyJoinWindow = canJoinEarly(event, 15);
   const isPreEventLounge = isPreEventLoungeOpen(event);
   const isHost = isOwner || Boolean(myReg?.is_host);
-  const canShowActiveJoin = (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge) && status !== "cancelled" && event?.status !== "ended";
+  // In-person events have no live room, so staff/members never get a Join button.
+  const canShowActiveJoin = !isInPersonEvent(event) && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge) && status !== "cancelled" && event?.status !== "ended";
 
   const joinLabel = getResolvedJoinLabel(event, isLive, false, myReg, isOwner);
   const statusMeta = statusChip(status);

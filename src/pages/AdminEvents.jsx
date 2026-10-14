@@ -3507,7 +3507,7 @@ function AdminEventCard({
           {isOwner ? (
             <>
               {/* OWNER: Buttons row */}
-              {isPostEventLounge ? (
+              {isPostEventLounge && !isInPersonEvent(ev) ? (
                 <>
                   <Button
                     onClick={() => onJoinLive?.(ev)}
@@ -3822,7 +3822,7 @@ function AdminEventCard({
                     Cancelled
                   </Box>
                 </Button>
-              ) : canShowActiveJoin ? (
+              ) : canShowActiveJoin && !isInPersonEvent(ev) ? (
                 // Live OR within 15 min before start → Join
                 (<Button
                   onClick={() => onJoinLive?.(ev)}
@@ -3917,7 +3917,7 @@ function AdminEventCard({
                     Ended
                   </Box>
                 </Button>)
-              ) : (
+              ) : isInPersonEvent(ev) ? null : (
                 // Upcoming but more than 15 min away → disabled Join
                 (<Button
                   disabled

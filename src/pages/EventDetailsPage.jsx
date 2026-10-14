@@ -2232,7 +2232,7 @@ export default function EventDetailsPage() {
                           </Button>
                         ) : paymentPending ? (
                           <PaymentPendingDetails registration={registration} event={event} />
-                        ) : canShowActiveJoin && canJoinEventNow && !(isEventOwner && isInPersonEvent(event)) ? (
+                        ) : canShowActiveJoin && canJoinEventNow && !isInPersonEvent(event) ? (
                           <Button
                             onClick={() => {
                               // If external streaming enabled, redirect to external platform instead of RTK
@@ -2268,7 +2268,7 @@ export default function EventDetailsPage() {
                           >
                             {primaryActionLabel}
                           </Button>
-                        ) : canShowWaitingForSession ? (
+                        ) : canShowWaitingForSession && !isInPersonEvent(event) ? (
                           <Button
                             disabled
                             variant="contained"
@@ -2332,7 +2332,17 @@ export default function EventDetailsPage() {
                                 ? (() => {
                                   // After approval, check if user can join with guest token or is registered
                                   const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
-                                  if (guestToken) {
+                                  if (guestToken && isInPersonEvent(event)) {
+                                    // In-person events have no live room to join
+                                    return (
+                                      <Chip
+                                        label="Application Accepted"
+                                        color="success"
+                                        variant="outlined"
+                                        sx={{ py: 2.5 }}
+                                      />
+                                    );
+                                  } else if (guestToken) {
                                     // Guest has JWT token - can join only if event is live AND not using external streaming
                                     if (isLive && !event?.use_external_streaming) {
                                       return (
@@ -2530,7 +2540,7 @@ export default function EventDetailsPage() {
                                 </Typography>
                               </Alert>
                             )}
-                            {(!token || isGuest) && isWithinGuestJoinWindow(event.start_time) && (
+                            {(!token || isGuest) && !isInPersonEvent(event) && isWithinGuestJoinWindow(event.start_time) && (
                               <Button
                                 onClick={() => setGuestModalOpen(true)}
                                 variant="outlined"
@@ -2610,7 +2620,7 @@ export default function EventDetailsPage() {
                           >
                             Event Ended
                           </Button>
-                        ) : (
+                        ) : isInPersonEvent(event) ? null : (
                           <Button
                             disabled
                             variant="contained"
