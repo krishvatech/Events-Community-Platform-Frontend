@@ -562,12 +562,14 @@ function SettingsPage() {
   const StatusChip = ({ value }) => {
     const normalized = String(value || "Not available");
     const healthy = ["Healthy", "Available", "Configured", "Enabled", "Ready", "Received"].includes(normalized);
-    const warning = ["Degraded", "Not Verifiable", "Never Received", "Disabled"].includes(normalized);
+    const warning = ["Degraded", "Not Verifiable", "Never Received", "Disabled", "Warning"].includes(normalized);
+    // Unknown means no evidence either way, which is not a failure.
+    const unknown = normalized === "Unknown";
     return (
       <Chip
         size="small"
         label={normalized}
-        color={healthy ? "success" : warning ? "warning" : "error"}
+        color={healthy ? "success" : warning ? "warning" : unknown ? "default" : "error"}
         variant={healthy ? "filled" : "outlined"}
         sx={{ fontWeight: 800 }}
       />
@@ -594,6 +596,15 @@ function SettingsPage() {
       </Typography>
     </Stack>
   );
+
+  const schedulerComponents = [
+    ["celery_beat", "Celery Beat"],
+    ["scheduled_tasks", "Scheduled task execution"],
+    ["celery_worker", "Celery Worker"],
+    ["redis_broker", "Redis Broker"],
+    ["mautic_cron", "Mautic Cron"],
+    ["mautic_worker", "Mautic Worker"],
+  ];
 
   const formatDiagnosticDate = (value) => {
     if (!value) return "Never";
@@ -724,6 +735,32 @@ function SettingsPage() {
                     <Field label="Native Broadcast reconciliation scheduled" value={diagnostics.background_processing?.native_broadcast_reconciliation_scheduled ? "Yes" : "No"} />
                   </InfoCard>
                 </Grid>
+                {diagnostics.scheduler_monitoring?.components ? (
+                  <Grid item xs={12}>
+                    <InfoCard title="Scheduler Health" status={diagnostics.scheduler_monitoring.status}>
+                      <Typography variant="body2" color="text.secondary">
+                        Each scheduler is judged on its own evidence. Unknown means there is no evidence yet, not a failure.
+                      </Typography>
+                      {schedulerComponents.map(([key, label]) => {
+                        const component = diagnostics.scheduler_monitoring.components[key];
+                        if (!component) return null;
+                        const lastActivity = component.last_success_at || component.last_attempt_at;
+                        return (
+                          <Box key={key} sx={{ borderTop: "1px solid #E7ECEF", pt: 1.25 }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: "#1B2A4A" }}>{label}</Typography>
+                              <StatusChip value={component.status} />
+                            </Stack>
+                            <Field label="Last activity" value={formatDiagnosticDate(lastActivity)} />
+                            {component.status !== "Healthy" && component.detail ? (
+                              <Typography variant="body2" color="text.secondary">{component.detail}</Typography>
+                            ) : null}
+                          </Box>
+                        );
+                      })}
+                    </InfoCard>
+                  </Grid>
+                ) : null}
               </Grid>
 
               {diagnostics.diagnostics?.warnings?.length ? (
