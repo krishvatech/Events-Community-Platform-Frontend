@@ -64,8 +64,8 @@ export const sendNewsletterCampaign = (uuid) =>
   unwrap(apiClient.post(`${adminCampaignsEndpoint}${uuid}/send/`));
 
 // Read-only: state, send event, Mautic evidence and the send-outcome classification.
-export const getNewsletterCampaignDeliveryInspection = (uuid) =>
-  unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/delivery-inspection/`));
+export const getNewsletterCampaignDeliveryInspection = (uuid, config = {}) =>
+  unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/delivery-inspection/`, config));
 
 // Closes an unresolved Send Now on Mautic's own evidence. Never sends email.
 export const resolveNewsletterCampaignSendOutcome = (uuid, payload) =>

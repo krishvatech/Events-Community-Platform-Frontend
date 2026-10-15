@@ -90,6 +90,8 @@ import {
   broadcastRateText,
   broadcastScheduleActions,
   isBroadcastDetailLoaded,
+  isLostProviderResponse,
+  isNativeScheduled,
 } from "./newsletterBroadcastState.js";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
@@ -216,9 +218,9 @@ const getErrorMessage = (err, fallback = "Something went wrong. Please try again
   return fallback;
 };
 
-// A Sending broadcast with an error recorded is one Mautic never confirmed
-// (the provider boundary clears errors when sending starts).
-const isOutcomeUncertain = (campaign) => campaign?.status === "sending" && Boolean(campaign?.last_error);
+// A Sending broadcast whose Send Now response Mautic never gave (the
+// backend's own uncertain-send message, not just any error).
+const isOutcomeUncertain = isLostProviderResponse;
 
 function StatusChip({ status, uncertain = false }) {
   const normalized = String(status || "draft").toLowerCase();
@@ -525,7 +527,12 @@ function BroadcastAnalyticsPanel({ status, analyticsState, onRefresh }) {
         </Stack>
         {analyticsState.error && <Alert severity="warning">{analyticsState.error} The broadcast itself is unaffected.</Alert>}
         {providerUnavailable && <Alert severity="warning">Mautic statistics are temporarily unavailable, so opens and sends cannot be shown right now.</Alert>}
-        {noSends && <Alert severity="info" variant="outlined">No sends yet. Analytics appear after this broadcast is sent.</Alert>}
+        {noSends && (
+          // While a send is unresolved, zero counts are not proof of non-delivery.
+          String(status || "").toLowerCase() === "sending"
+            ? <Alert severity="warning" variant="outlined">Delivery is not confirmed yet, so these counts may be incomplete. This does not mean nothing was sent.</Alert>
+            : <Alert severity="info" variant="outlined">No sends yet. Analytics appear after this broadcast is sent.</Alert>
+        )}
         <Grid container spacing={2}>
           {/* Sent counts provider send attempts, not mailbox deliveries. */}
           <Grid item xs={6} sm={4} md={3}><MetricCard label="Sent" value={sentUnknown ? "Unavailable" : count(sendSummary.sent_count)} loading={loading} /></Grid>
@@ -1290,10 +1297,11 @@ export default function AdminNewsletterPage() {
       {isDirty && <Alert severity="info">Save your changes before previewing, testing, scheduling, or sending.</Alert>}
       {!isNew && detailLoaded && campaign?.last_error && (
         // An unconfirmed send is not a failure: show it as a warning.
-        <Alert severity={isOutcomeUncertain(campaign) ? "warning" : "error"}>{campaign.last_error}</Alert>
+        // Any error on a Sending broadcast is about an unresolved send, never a failure.
+        <Alert severity={campaign?.status === "sending" ? "warning" : "error"}>{campaign.last_error}</Alert>
       )}
-      {!isNew && detailLoaded && campaign?.status === "sending" && (
-        <AdminNewsletterSendOutcomePanel campaign={campaign} onResolved={loadDetail} />
+      {!isNew && detailLoaded && (campaign?.status === "sending" || isNativeScheduled(campaign)) && (
+        <AdminNewsletterSendOutcomePanel key={campaign.uuid} campaign={campaign} onResolved={loadDetail} />
       )}
 
       {loading ? (
