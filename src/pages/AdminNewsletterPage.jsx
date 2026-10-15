@@ -93,6 +93,14 @@ import {
   isLostProviderResponse,
   isNativeScheduled,
 } from "./newsletterBroadcastState.js";
+import {
+  hasWebhookVerification,
+  webhookDeliveryHostLabel,
+  webhookDeliveryText,
+  webhookMissingEventsText,
+  webhookSecretLabel,
+  webhookSubscribedLabel,
+} from "./newsletterWebhookDiagnostics.js";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
@@ -725,6 +733,41 @@ function SettingsPage() {
                     <Field label="Endpoint" value={diagnostics.webhook?.endpoint_path} />
                     <Field label="Last Received" value={formatDiagnosticDate(diagnostics.webhook?.last_received_at)} />
                     <Field label="Registration" value={diagnostics.webhook?.registration} />
+                    {hasWebhookVerification(diagnostics.webhook) ? (
+                      <>
+                        {diagnostics.webhook.registration_detail ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {diagnostics.webhook.registration_detail}
+                          </Typography>
+                        ) : null}
+                        <Field label="Shared secret" value={webhookSecretLabel(diagnostics.webhook.secret_matches)} />
+                        <Field label="Delivery host" value={webhookDeliveryHostLabel(diagnostics.webhook)} />
+                        <Field label="Subscribed events" value={webhookSubscribedLabel(diagnostics.webhook)} />
+                        {webhookMissingEventsText(diagnostics.webhook) ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {webhookMissingEventsText(diagnostics.webhook)}
+                          </Typography>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {diagnostics.webhook?.deliveries?.observed ? (
+                      [
+                        ["accepted", "Last accepted"],
+                        ["rejected", "Last rejected"],
+                        ["failed", "Last failed"],
+                      ].map(([kind, label]) => {
+                        const observation = diagnostics.webhook.deliveries[`last_${kind}`];
+                        return (
+                          <Field
+                            key={kind}
+                            label={label}
+                            value={observation
+                              ? `${formatDiagnosticDate(observation.at)} · ${webhookDeliveryText(kind, observation)}`
+                              : "None recorded"}
+                          />
+                        );
+                      })
+                    ) : null}
                     <Typography variant="body2" color="text.secondary">
                       {(diagnostics.webhook?.supported_event_types || []).join(", ")}
                     </Typography>
