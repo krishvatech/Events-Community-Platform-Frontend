@@ -39,6 +39,7 @@ import { API_BASE, getToken } from "../utils/api.js";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js";
 import AdminStatusChip from "../components/admin/AdminStatusChip.jsx";
 import AdminEmptyState from "../components/admin/AdminEmptyState.jsx";
+import "../styles/commerce-records.css";
 
 // --- shared helpers (copied from MyCartPage) ---
 const authHeaders = () => {
@@ -627,6 +628,7 @@ export default function AdminCarts() {
         <Box sx={{ mt: 1 }}>
           <Paper
             elevation={0}
+            className="commerce-records__orders"
             sx={{
               borderRadius: "var(--imaa-radius-card)",
               border: "1px solid var(--imaa-border)",
@@ -764,6 +766,7 @@ export default function AdminCarts() {
         fullWidth
         maxWidth="sm"
         aria-labelledby="admin-order-details-title"
+        PaperProps={{ className: "commerce-records__dialog" }}
       >
         <DialogTitle id="admin-order-details-title">
           {selectedOrder ? `Order #${selectedOrder.number}` : "Order details"}

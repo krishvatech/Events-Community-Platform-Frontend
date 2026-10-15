@@ -1,0 +1,103 @@
+/* Commerce-records visual layer. Scoped to the two existing order views so it
+   cannot change checkout or unrelated tables. */
+.commerce-records__orders {
+  background: var(--imaa-bg-surface);
+  border-color: var(--imaa-border) !important;
+  border-radius: var(--imaa-radius-card) !important;
+  box-shadow: var(--imaa-shadow-sm);
+}
+
+.commerce-records__orders .MuiTableHead-root .MuiTableCell-root,
+.commerce-records__dialog .MuiTableHead-root .MuiTableCell-root {
+  background: var(--imaa-bg-cool);
+  border-bottom: 1px solid var(--imaa-border);
+  color: var(--imaa-ink-body);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding-bottom: 0.8125rem;
+  padding-top: 0.8125rem;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.commerce-records__orders .MuiTableBody-root .MuiTableRow-root,
+.commerce-records__dialog .MuiTableBody-root .MuiTableRow-root {
+  transition: background-color 160ms ease;
+}
+
+.commerce-records__orders .MuiTableBody-root .MuiTableRow-root:nth-of-type(even) {
+  background: color-mix(in srgb, var(--imaa-bg-cool) 48%, transparent);
+}
+
+.commerce-records__orders .MuiTableBody-root .MuiTableRow-root:hover,
+.commerce-records__dialog .MuiTableBody-root .MuiTableRow-root:hover {
+  background: var(--imaa-bg-hover) !important;
+}
+
+.commerce-records__orders .MuiTableCell-root,
+.commerce-records__dialog .MuiTableCell-root {
+  border-color: var(--imaa-border);
+  color: var(--imaa-ink);
+  padding-bottom: 1rem;
+  padding-top: 1rem;
+  vertical-align: middle;
+}
+
+.commerce-records__orders .MuiChip-root,
+.commerce-records__dialog .MuiChip-root {
+  border-radius: var(--imaa-radius-pill);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  min-height: 24px;
+}
+
+.commerce-records__orders .MuiButton-outlined {
+  border-color: var(--imaa-border-hover);
+  border-radius: var(--imaa-radius-field);
+  font-weight: 700;
+  min-height: 34px;
+}
+
+.commerce-records__orders .MuiPagination-root {
+  padding-top: 0.5rem;
+}
+
+.commerce-records__dialog {
+  border: 1px solid var(--imaa-border);
+  border-radius: var(--imaa-radius-popup) !important;
+  box-shadow: var(--imaa-shadow-lg) !important;
+  overflow: hidden;
+}
+
+.commerce-records__dialog .MuiDialogTitle-root {
+  background: var(--imaa-bg-surface);
+  color: var(--imaa-ink);
+  font-family: var(--imaa-font-serif);
+  font-weight: 700;
+}
+
+.commerce-records__dialog .MuiDialogContent-root {
+  background: var(--imaa-bg-surface);
+}
+
+.commerce-records__dialog .MuiDialogActions-root {
+  border-top: 1px solid var(--imaa-border);
+  padding: 1rem 1.5rem;
+}
+
+@media (max-width: 599px) {
+  .commerce-records__orders {
+    padding: 1rem !important;
+  }
+
+  .commerce-records__orders .MuiTableCell-root {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+
+  .commerce-records__dialog .MuiDialogContent-root {
+    padding: 1.25rem;
+  }
+}

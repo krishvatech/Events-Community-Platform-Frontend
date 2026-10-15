@@ -55,6 +55,7 @@ import SettingsOutlinedIcon from "@mui/icons-material/SettingsOutlined";
 import { API_BASE, getToken } from "../utils/api.js";
 import { LeadGenModal } from "../components/LeadGenModal.jsx";
 import { PageHeader, EmptyState } from "../components/page";
+import "../styles/commerce-records.css";
 
 const navItems = [
   { key: "activity", label: "Activity", icon: <TimelineOutlinedIcon /> },
@@ -1002,7 +1003,7 @@ export default function MyCartPage() {
 
             {/* TAB 1: PREVIOUS ORDERS */}
             {tab === 1 && (
-              <Box className="mt-4 p-4 sm:p-6 rounded-lg border border-imaa-border bg-white text-imaa-ink">
+              <Box className="commerce-records__orders mt-4 p-4 sm:p-6 rounded-lg border border-imaa-border text-imaa-ink">
                 {/* Header with filters on the right */}
                 <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 3, gap: 2, flexWrap: "wrap" }}>
                   <Box component="h2" sx={{ m: 0, fontFamily: "var(--imaa-font-serif)", fontWeight: 700, fontSize: 20, color: "var(--imaa-ink)" }}>
@@ -1404,6 +1405,7 @@ export default function MyCartPage() {
         fullWidth
         maxWidth="sm"
         PaperProps={{
+          className: "commerce-records__dialog",
           sx: {
             borderRadius: "var(--imaa-radius-popup)",
             boxShadow: "var(--imaa-shadow-lg)",
