@@ -79,6 +79,7 @@ import { normalizeTimezoneName } from "../utils/timezoneUtils";
 import EditEventForm from "../components/EditEventForm";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import { isInPersonEvent } from "../utils/eventUtils";
 
 
 dayjs.extend(utc);
@@ -3545,7 +3546,7 @@ function AdminEventCard({
           {isOwner ? (
             <>
               {/* OWNER: Buttons row */}
-              {isPostEventLounge ? (
+              {isPostEventLounge && !isInPersonEvent(ev) ? (
                 <>
                   <Button
                     onClick={() => onJoinLive?.(ev)}
@@ -3679,7 +3680,7 @@ function AdminEventCard({
                         Cancelled
                       </Box>
                     </Button>
-                  ) : (
+                  ) : isInPersonEvent(ev) ? null : (
                     <Tooltip title={ev.is_hidden && !isOwner ? "Please unhide the event to host it" : ""} disableInteractive={false}>
                       <Button
                         onClick={() => onHost(ev)}
@@ -3862,7 +3863,7 @@ function AdminEventCard({
                     Cancelled
                   </Box>
                 </Button>
-              ) : canShowActiveJoin ? (
+              ) : canShowActiveJoin && !isInPersonEvent(ev) ? (
                 // Live OR within 15 min before start → Join
                 (<Button
                   onClick={() => onJoinLive?.(ev)}
@@ -3959,7 +3960,7 @@ function AdminEventCard({
                     Ended
                   </Box>
                 </Button>)
-              ) : (
+              ) : isInPersonEvent(ev) ? null : (
                 // Upcoming but more than 15 min away → disabled Join
                 (<Button
                   disabled

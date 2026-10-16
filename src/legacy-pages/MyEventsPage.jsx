@@ -56,6 +56,7 @@ import dayjs from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import { isInPersonEvent } from "../utils/eventUtils";
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -465,6 +466,9 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             const isPostEventLounge = isPostEventLoungeOpen(ev);
             const isPast = (status === "past" || ev.status === "ended") && !isPostEventLounge;
             const isLive = status === "live" && ev.status !== "ended";
+            // In-person events have no live room: no Join button (only the
+            // past-event states below still apply).
+            const hideJoin = isInPersonEvent(ev);
 
             // ✅ allow users to join up to 15 minutes before the start time
             const isWithinEarlyJoinWindow = canJoinEarly(ev, 15);
@@ -474,7 +478,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
               (ev.status !== "ended" && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge));
 
             // For multi-day events with sessions, use session-based logic
-            if (ev.is_multi_day) {
+            if (ev.is_multi_day && !hideJoin) {
               if (joinState) {
                 return (
                   <Button
@@ -497,7 +501,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             }
 
             // 1) LIVE or within 15 min before start → active Join button (SINGLE-DAY EVENTS)
-            if (canShowActiveJoin) {
+            if (canShowActiveJoin && !hideJoin) {
               const buttonText = getResolvedJoinLabel(ev, isLive, isJoining, reg, isOwner);
               const isNotLiveYet = buttonText === "Join (Not Live Yet)";
 
@@ -578,6 +582,7 @@ function EventCard({ ev, reg, onJoinLive, onUnregistered, onCancelRequested, isJ
             }
 
             // 3) Upcoming but more than 15 min away → disabled Join
+            if (hideJoin) return null;
             return (
               <Button
                 size="small"

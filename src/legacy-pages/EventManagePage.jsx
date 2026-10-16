@@ -99,7 +99,7 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import { getJoinButtonText, isPostEventLoungeOpen, isPreEventLoungeOpen, getResolvedJoinLabel } from "../utils/gracePeriodUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
-import { isReplayReadyForSignup } from "../utils/eventUtils";
+import { isInPersonEvent, isReplayReadyForSignup } from "../utils/eventUtils";
 
 import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
@@ -2350,7 +2350,8 @@ export default function EventManagePage() {
   const isWithinEarlyJoinWindow = canJoinEarly(event, 15);
   const isPreEventLounge = isPreEventLoungeOpen(event);
   const isHost = isOwner || Boolean(myReg?.is_host);
-  const canShowActiveJoin = (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge) && status !== "cancelled" && event?.status !== "ended";
+  // In-person events have no live room, so staff/members never get a Join button.
+  const canShowActiveJoin = !isInPersonEvent(event) && (isHost || isLive || isWithinEarlyJoinWindow || isPreEventLounge || isPostEventLounge) && status !== "cancelled" && event?.status !== "ended";
 
   const joinLabel = getResolvedJoinLabel(event, isLive, false, myReg, isOwner);
   const statusMeta = statusChip(status);
@@ -2802,6 +2803,7 @@ export default function EventManagePage() {
               <Box sx={{ mb: 2 }}>
                 {isOwner ? (
                   <Stack spacing={1.5}>
+                    {!isInPersonEvent(event) && (
                     <Tooltip
                       title={
                         isArchivedLifecycle
@@ -2852,6 +2854,7 @@ export default function EventManagePage() {
                         )}
                       </Button>
                     </Tooltip>
+                    )}
 
                     {/* Mark as Live Button - For External Streaming Events */}
                     {event?.use_external_streaming && !isArchivedLifecycle && status !== "live" && status !== "past" && status !== "cancelled" && (
@@ -9083,8 +9086,8 @@ export default function EventManagePage() {
             )}
 
             {isOwner ? (
-              // Host Button for Owner
-              (status === "cancelled" ? (<Button
+              // Host Button for Owner (in-person events have no live room to host)
+              (isInPersonEvent(event) ? null : status === "cancelled" ? (<Button
                 disabled
                 variant="outlined"
                 sx={{

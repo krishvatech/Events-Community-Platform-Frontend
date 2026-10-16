@@ -11,6 +11,7 @@ import {
 import { establishMemberAuthSession } from "../utils/memberAuthSession";
 import { isSecureAuthSessionEnabled } from "../utils/secureAuthSession";
 import { logoutBrowserSession } from "../utils/logoutSession";
+import { DISPOSABLE_EMAIL_MESSAGE, isDisposableEmailSignupError } from "../utils/signupEmailCheck";
 
 const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api").replace(/\/+$/, "");
 const COGNITO_DOMAIN = (import.meta.env.VITE_COGNITO_DOMAIN || "").replace(/\/+$/, "");
@@ -84,7 +85,12 @@ const CognitoOAuthCallback = () => {
 
     if (error) {
       console.error("❌ Cognito error:", error, errorDescription);
-      toast.error(`❌ Cognito error: ${error}`);
+      // The Pre Sign-up trigger rejected a first-time social signup.
+      if (isDisposableEmailSignupError(errorDescription)) {
+        toast.error(DISPOSABLE_EMAIL_MESSAGE);
+      } else {
+        toast.error(`❌ Cognito error: ${error}`);
+      }
       navigate("/signin", { replace: true });
       return;
     }

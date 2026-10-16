@@ -85,6 +85,8 @@ import EventLandingPage_Marketing from "./legacy-pages/EventLandingPage_Marketin
 import SingleEventMarketingPage from "./legacy-pages/SingleEventMarketingPage.jsx";
 import AttendeeFormPage from "./legacy-pages/AttendeeFormPage.jsx";
 import TrainingProgramsPage from "./legacy-pages/TrainingProgramsPage.jsx";
+import DesignGallery from "./features/trainingDesignReview/DesignGallery.jsx";
+import DesignPreview from "./features/trainingDesignReview/DesignPreview.jsx";
 import RecognitionDirectoryPage from "./legacy-pages/RecognitionDirectoryPage.jsx";
 
 
@@ -214,6 +216,9 @@ export const LegacyRoutes = () => (
       <Route path="/community/groups/:groupId" element={<RequireAuth><RedirectGroupDetailsToAdmin /></RequireAuth>} />
 
       {/* IMAA Standalone Public Pages */}
+      {/* Public, isolated design-review area: no auth, checkout or backend calls. */}
+      <Route path="/training-design-review" element={<DesignGallery />} />
+      <Route path="/training-design-review/:designId" element={<DesignPreview />} />
       <Route path="/m-and-a-trainings" element={<TrainingProgramsPage />} />
       <Route path="/m-and-a-trainings/*" element={<TrainingProgramsPage />} />
       <Route path="/recognition" element={<RecognitionDirectoryPage />} />

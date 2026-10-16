@@ -1544,7 +1544,7 @@ export default function AdminStaffPage() {
                         scrollButtons="auto"
                         allowScrollButtonsMobile
                         aria-label="User type filters"
-                        sx={{ mb: 2, borderBottom: "1px solid var(--imaa-border)", minWidth: 0 }}
+                        sx={{ mb: 2, maxWidth: "100%", minWidth: 0, borderBottom: "1px solid var(--imaa-border)" }}
                     >
                         <Tab label="All Users" value="all" />
                         <Tab label="Superuser" value="superuser" />

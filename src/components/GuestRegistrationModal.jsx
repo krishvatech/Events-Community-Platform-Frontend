@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -23,6 +23,11 @@ import {
 } from "../utils/cognitoAuth";
 import { getAccessToken } from "../utils/tokenStore";
 import { establishMemberAuthSession } from "../utils/memberAuthSession";
+import {
+  DISPOSABLE_EMAIL_MESSAGE,
+  checkSignupEmail,
+  isDisposableEmailSignupError,
+} from "../utils/signupEmailCheck";
 
 /**
  * GuestRegistrationModal
@@ -61,6 +66,7 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
     () => (localStorage.getItem("guest_email") || "").trim().toLowerCase()
   );
   const [allowDifferentEmail, setAllowDifferentEmail] = useState(false);
+  const registerInFlightRef = useRef(false);
 
   const normalizedSignupEmail = useMemo(
     () => form.email.trim().toLowerCase(),
@@ -174,7 +180,18 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
     return true;
   };
 
+  // Ignore repeat clicks while a signup or verification request is running.
   const handleRegister = async () => {
+    if (registerInFlightRef.current) return;
+    registerInFlightRef.current = true;
+    try {
+      await runRegister();
+    } finally {
+      registerInFlightRef.current = false;
+    }
+  };
+
+  const runRegister = async () => {
     setError("");
     if (stage === "confirm") {
       if (!verifyCode.trim()) {
@@ -286,6 +303,15 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
     setLoading(true);
     try {
       const email = form.email.trim().toLowerCase();
+
+      // Disposable email domains are not accepted for new accounts. Never
+      // continue to Cognito when this check fails or cannot be completed.
+      const emailCheck = await checkSignupEmail(API_BASE, email);
+      if (emailCheck.status !== "allowed") {
+        setError(emailCheck.message);
+        return;
+      }
+
       let emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
       if (!emailPrefix) emailPrefix = "user";
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -303,7 +329,9 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
       setStage("confirm");
     } catch (err) {
       const msg =
-        err?.code === "UsernameExistsException"
+        isDisposableEmailSignupError(err)
+          ? DISPOSABLE_EMAIL_MESSAGE
+          : err?.code === "UsernameExistsException"
           ? "Email is already registered."
           : err?.code === "InvalidPasswordException"
             ? "Password does not meet requirements."

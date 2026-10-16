@@ -53,6 +53,12 @@ const AppChrome = ({ children }) => {
     }
 
     const initialPath = window.location.pathname.replace(/\/$/, "") || "/";
+    // Client preview is public and must never depend on an auth bootstrap.
+    if (initialPath === "/training-design-review" || initialPath.startsWith("/training-design-review/")) {
+      setAuthReady(true);
+      return () => { cancelled = true; };
+    }
+
     const callbackCreatesSession =
       initialPath === "/cognito/callback" ||
       initialPath === "/oauth/callback" ||
@@ -103,6 +109,9 @@ const AppChrome = ({ children }) => {
   // Also hide chrome on event marketing pages (single slug route or /landing/:slug)
   // And hide on IMAA standalone public pages
   const normalizedPath = location.pathname.replace(/\/$/, "");
+  const isTrainingDesignReview =
+    normalizedPath === "/training-design-review" ||
+    normalizedPath.startsWith("/training-design-review/");
   const isImaaStandalonePublicPage =
     normalizedPath === "/m-and-a-trainings" ||
     normalizedPath.startsWith("/m-and-a-trainings/") ||
@@ -127,6 +136,7 @@ const AppChrome = ({ children }) => {
   const hideChrome =
     isSsoRedirectPage ||
     isImaaStandalonePublicPage ||
+    isTrainingDesignReview ||
     location.pathname === "/signin" ||
     location.pathname === "/signup" ||
     location.pathname === "/forgot-password" ||
@@ -200,7 +210,7 @@ const AppChrome = ({ children }) => {
       )}
 
       {/* On desktop the KYC notice sits in the content column, beside the fixed sidebar instead of under it */}
-      {!isCompanionPage && !isImaaStandalonePublicPage && !isSsoRedirectPage && (
+      {!isCompanionPage && !isImaaStandalonePublicPage && !isTrainingDesignReview && !isSsoRedirectPage && (
         <Box
           sx={{
             width: showSidebar && !isMobile ? "calc(100% - 280px)" : "100%",

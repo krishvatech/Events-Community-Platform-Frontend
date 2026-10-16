@@ -5,6 +5,7 @@
 // Network-facing modules are swapped at bundle time:
 //   services/blogApi       -> fakeBlogApi.mjs (delegates to globalThis.__blogTestApi)
 //   utils/api              -> fakeUtilsApi.mjs (no network)
+//   utils/cognitoAuth      -> fakeCognitoAuth.mjs (no AWS)
 //   BlogRichTextEditor.jsx -> FakeRichTextEditor.jsx (plain textarea)
 // No request ever leaves the process.
 
@@ -100,6 +101,7 @@ window.console = console;
 const STUBS = [
   { match: /\/services\/blogApi(\.js)?$/, file: path.join(HERE, "fakeBlogApi.mjs") },
   { match: /\/utils\/api(\.js)?$/, file: path.join(HERE, "fakeUtilsApi.mjs") },
+  { match: /\/utils\/cognitoAuth(\.js)?$/, file: path.join(HERE, "fakeCognitoAuth.mjs") },
   { match: /\/BlogRichTextEditor(\.jsx)?$/, file: path.join(HERE, "FakeRichTextEditor.jsx") },
 ];
 
@@ -155,7 +157,8 @@ export async function loadSource(relativePath) {
     platform: "node",
     target: "node20",
     jsx: "automatic",
-    loader: { ".js": "jsx" },
+    // Image imports (e.g. the IMAA logo in AuthModal) become data URLs, as the app gets a URL string.
+    loader: { ".js": "jsx", ".svg": "dataurl", ".png": "dataurl" },
     banner: { js: 'import { createRequire as __cr } from "node:module"; const require = __cr(import.meta.url);' },
     define: { "import.meta.env": "{}" },
     plugins: [stubPlugin],

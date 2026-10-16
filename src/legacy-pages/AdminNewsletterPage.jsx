@@ -90,7 +90,17 @@ import {
   broadcastRateText,
   broadcastScheduleActions,
   isBroadcastDetailLoaded,
+  isLostProviderResponse,
+  isNativeScheduled,
 } from "./newsletterBroadcastState.js";
+import {
+  hasWebhookVerification,
+  webhookDeliveryHostLabel,
+  webhookDeliveryText,
+  webhookMissingEventsText,
+  webhookSecretLabel,
+  webhookSubscribedLabel,
+} from "./newsletterWebhookDiagnostics.js";
 import AdminNewsletterCategoriesTab from "./AdminNewsletterCategoriesTab.jsx";
 import AdminNewsletterTemplatesPanel from "./AdminNewsletterTemplatesPanel.jsx";
 import AdminNewsletterMauticCampaignsPanel from "./AdminNewsletterMauticCampaignsPanel.jsx";
@@ -98,6 +108,7 @@ import AdminNewsletterMauticCampaignBuilderPage from "./AdminNewsletterMauticCam
 import AdminNewsletterNativeSegmentsPanel from "./AdminNewsletterNativeSegmentsPanel.jsx";
 import AdminNewsletterTagsPanel from "./AdminNewsletterTagsPanel.jsx";
 import AdminNewsletterCustomFieldsPanel from "./AdminNewsletterCustomFieldsPanel.jsx";
+import AdminNewsletterSendOutcomePanel from "./AdminNewsletterSendOutcomePanel.jsx";
 import { getMarketingSectionFromPath } from "../config/marketingNavigation";
 
 const STATUS_LABELS = {
@@ -240,12 +251,16 @@ const getErrorMessage = (err, fallback = "Something went wrong. Please try again
   return fallback;
 };
 
-function StatusChip({ status }) {
+// A Sending broadcast whose Send Now response Mautic never gave (the
+// backend's own uncertain-send message, not just any error).
+const isOutcomeUncertain = isLostProviderResponse;
+
+function StatusChip({ status, uncertain = false }) {
   const normalized = String(status || "draft").toLowerCase();
   return (
     <Chip
       size="small"
-      label={STATUS_LABELS[normalized] || normalized}
+      label={uncertain ? "Sending — Outcome Uncertain" : STATUS_LABELS[normalized] || normalized}
       color={STATUS_COLORS[normalized] || "default"}
       variant={normalized === "draft" || normalized === "cancelled" ? "outlined" : "filled"}
       sx={{ fontWeight: 800, borderRadius: "var(--imaa-radius-tag)" }}
@@ -500,7 +515,7 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
                       )}
                     </TableCell>
                     <TableCell sx={{ minWidth: 160, maxWidth: 240, overflowWrap: "anywhere" }}>{getCampaignAudienceLabels(row).join(", ") || "-"}</TableCell>
-                    <TableCell><StatusChip status={row.status} /></TableCell>
+                    <TableCell><StatusChip status={row.status} uncertain={isOutcomeUncertain(row)} /></TableCell>
                     <TableCell>{formatDateTime(row.created_at)}</TableCell>
                     <TableCell>{formatDateTime(row.scheduled_at)}</TableCell>
                     <TableCell>{formatDateTime(row.sent_at || row.send_started_at)}</TableCell>
@@ -569,7 +584,12 @@ function BroadcastAnalyticsPanel({ status, analyticsState, onRefresh }) {
         </Stack>
         {analyticsState.error && <Alert severity="warning">{analyticsState.error} The broadcast itself is unaffected.</Alert>}
         {providerUnavailable && <Alert severity="warning">Mautic statistics are temporarily unavailable, so opens and sends cannot be shown right now.</Alert>}
-        {noSends && <Alert severity="info" variant="outlined">No sends yet. Analytics appear after this broadcast is sent.</Alert>}
+        {noSends && (
+          // While a send is unresolved, zero counts are not proof of non-delivery.
+          String(status || "").toLowerCase() === "sending"
+            ? <Alert severity="warning" variant="outlined">Delivery is not confirmed yet, so these counts may be incomplete. This does not mean nothing was sent.</Alert>
+            : <Alert severity="info" variant="outlined">No sends yet. Analytics appear after this broadcast is sent.</Alert>
+        )}
         <Grid container spacing={2}>
           {/* Sent counts provider send attempts, not mailbox deliveries. */}
           <Grid item xs={6} sm={4} md={3}><MetricCard label="Sent" value={sentUnknown ? "Unavailable" : count(sendSummary.sent_count)} loading={loading} /></Grid>
@@ -611,12 +631,14 @@ function SettingsPage() {
   const StatusChip = ({ value }) => {
     const normalized = String(value || "Not available");
     const healthy = ["Healthy", "Available", "Configured", "Enabled", "Ready", "Received"].includes(normalized);
-    const warning = ["Degraded", "Not Verifiable", "Never Received", "Disabled"].includes(normalized);
+    const warning = ["Degraded", "Not Verifiable", "Never Received", "Disabled", "Warning"].includes(normalized);
+    // Unknown means no evidence either way, which is not a failure.
+    const unknown = normalized === "Unknown";
     return (
       <Chip
         size="small"
         label={normalized}
-        color={healthy ? "success" : warning ? "warning" : "error"}
+        color={healthy ? "success" : warning ? "warning" : unknown ? "default" : "error"}
         variant={healthy ? "filled" : "outlined"}
         sx={{ fontWeight: 800 }}
       />
@@ -643,6 +665,15 @@ function SettingsPage() {
       </Typography>
     </Stack>
   );
+
+  const schedulerComponents = [
+    ["celery_beat", "Celery Beat"],
+    ["scheduled_tasks", "Scheduled task execution"],
+    ["celery_worker", "Celery Worker"],
+    ["redis_broker", "Redis Broker"],
+    ["mautic_cron", "Mautic Cron"],
+    ["mautic_worker", "Mautic Worker"],
+  ];
 
   const formatDiagnosticDate = (value) => {
     if (!value) return "Never";
@@ -751,6 +782,41 @@ function SettingsPage() {
                     <Field label="Endpoint" value={diagnostics.webhook?.endpoint_path} />
                     <Field label="Last Received" value={formatDiagnosticDate(diagnostics.webhook?.last_received_at)} />
                     <Field label="Registration" value={diagnostics.webhook?.registration} />
+                    {hasWebhookVerification(diagnostics.webhook) ? (
+                      <>
+                        {diagnostics.webhook.registration_detail ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {diagnostics.webhook.registration_detail}
+                          </Typography>
+                        ) : null}
+                        <Field label="Shared secret" value={webhookSecretLabel(diagnostics.webhook.secret_matches)} />
+                        <Field label="Delivery host" value={webhookDeliveryHostLabel(diagnostics.webhook)} />
+                        <Field label="Subscribed events" value={webhookSubscribedLabel(diagnostics.webhook)} />
+                        {webhookMissingEventsText(diagnostics.webhook) ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {webhookMissingEventsText(diagnostics.webhook)}
+                          </Typography>
+                        ) : null}
+                      </>
+                    ) : null}
+                    {diagnostics.webhook?.deliveries?.observed ? (
+                      [
+                        ["accepted", "Last accepted"],
+                        ["rejected", "Last rejected"],
+                        ["failed", "Last failed"],
+                      ].map(([kind, label]) => {
+                        const observation = diagnostics.webhook.deliveries[`last_${kind}`];
+                        return (
+                          <Field
+                            key={kind}
+                            label={label}
+                            value={observation
+                              ? `${formatDiagnosticDate(observation.at)} · ${webhookDeliveryText(kind, observation)}`
+                              : "None recorded"}
+                          />
+                        );
+                      })
+                    ) : null}
                     <Typography variant="body2" color="text.secondary">
                       {(diagnostics.webhook?.supported_event_types || []).join(", ")}
                     </Typography>
@@ -773,6 +839,32 @@ function SettingsPage() {
                     <Field label="Native Broadcast reconciliation scheduled" value={diagnostics.background_processing?.native_broadcast_reconciliation_scheduled ? "Yes" : "No"} />
                   </InfoCard>
                 </Grid>
+                {diagnostics.scheduler_monitoring?.components ? (
+                  <Grid item xs={12}>
+                    <InfoCard title="Scheduler Health" status={diagnostics.scheduler_monitoring.status}>
+                      <Typography variant="body2" color="text.secondary">
+                        Each scheduler is judged on its own evidence. Unknown means there is no evidence yet, not a failure.
+                      </Typography>
+                      {schedulerComponents.map(([key, label]) => {
+                        const component = diagnostics.scheduler_monitoring.components[key];
+                        if (!component) return null;
+                        const lastActivity = component.last_success_at || component.last_attempt_at;
+                        return (
+                          <Box key={key} sx={{ borderTop: "1px solid #E7ECEF", pt: 1.25 }}>
+                            <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: "#1B2A4A" }}>{label}</Typography>
+                              <StatusChip value={component.status} />
+                            </Stack>
+                            <Field label="Last activity" value={formatDiagnosticDate(lastActivity)} />
+                            {component.status !== "Healthy" && component.detail ? (
+                              <Typography variant="body2" color="text.secondary">{component.detail}</Typography>
+                            ) : null}
+                          </Box>
+                        );
+                      })}
+                    </InfoCard>
+                  </Grid>
+                ) : null}
               </Grid>
 
               {diagnostics.diagnostics?.warnings?.length ? (
@@ -1276,7 +1368,7 @@ export default function AdminNewsletterPage() {
           <Box sx={{ minWidth: 0 }}>
             <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
               <Typography component="h1" variant="h4" sx={{ fontFamily: "var(--imaa-font-serif)", fontWeight: 850, color: UI_TEXT, overflowWrap: "anywhere" }}>{isNew ? "Create Broadcast" : campaign?.name || "Email Broadcast"}</Typography>
-              {!isNew && <StatusChip status={campaign?.status} />}
+              {!isNew && <StatusChip status={campaign?.status} uncertain={isOutcomeUncertain(campaign)} />}
             </Stack>
             <Typography color="text.secondary">Build the email broadcast in four steps, then test, schedule, or send.</Typography>
           </Box>
@@ -1295,7 +1387,14 @@ export default function AdminNewsletterPage() {
 
       {error && <Alert severity="error" onClose={() => setError("")}>{error}</Alert>}
       {isDirty && <Alert severity="info">Save your changes before previewing, testing, scheduling, or sending.</Alert>}
-      {!isNew && detailLoaded && campaign?.last_error && <Alert severity="error">{campaign.last_error}</Alert>}
+      {!isNew && detailLoaded && campaign?.last_error && (
+        // An unconfirmed send is not a failure: show it as a warning.
+        // Any error on a Sending broadcast is about an unresolved send, never a failure.
+        <Alert severity={campaign?.status === "sending" ? "warning" : "error"}>{campaign.last_error}</Alert>
+      )}
+      {!isNew && detailLoaded && (campaign?.status === "sending" || isNativeScheduled(campaign)) && (
+        <AdminNewsletterSendOutcomePanel key={campaign.uuid} campaign={campaign} onResolved={loadDetail} />
+      )}
 
       {!isNew && detailLoaded && (
         <Paper component="section" aria-label="Broadcast delivery and synchronization details" variant="outlined" sx={{ ...surfaceSx, p: { xs: 2, md: 2.5 } }}>

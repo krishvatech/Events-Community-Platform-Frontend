@@ -67,7 +67,7 @@ import { getUniqueSeries } from "../utils/seriesEventUtils";
 import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
-import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast } from "../utils/eventUtils";
+import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast, isInPersonEvent } from "../utils/eventUtils";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const API_BASE =
@@ -627,6 +627,8 @@ function canJoinEarly(ev, minutes = 15) {
 }
 
 function shouldShowJoinAction(ev) {
+  // In-person events have no live room, so they never get a Join button.
+  if (isInPersonEvent(ev)) return false;
   const format = ev?.event_format || ev?.format;
   return format === "virtual" || format === "hybrid" || ev?.registration_type === "apply";
 }
@@ -1425,7 +1427,12 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                     ? (() => {
                       // After approval, check if user can join with guest token or is registered
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
-                      if (guestToken) {
+                      if (guestToken && isInPersonEvent(ev)) {
+                        // In-person events have no live room to join
+                        return (
+                          <Chip label="Application Accepted" color="success" variant="outlined" size="small" />
+                        );
+                      } else if (guestToken) {
                         // Guest has JWT token - can join only if event is live
                         if (isLive) {
                           return (
@@ -2044,7 +2051,12 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                       </div>
                     ) : applicationStatus === 'accepted' ? (() => {
                       const guestToken = typeof localStorage !== 'undefined' ? localStorage.getItem("guest_token") : null;
-                      if (guestToken) {
+                      if (guestToken && isInPersonEvent(ev)) {
+                        // In-person events have no live room to join
+                        return (
+                          <Chip label="Application Accepted" color="success" variant="outlined" size="small" />
+                        );
+                      } else if (guestToken) {
                         if (isLive) {
                           return (
                             <Button

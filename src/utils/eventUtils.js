@@ -175,6 +175,13 @@ export const isEventEffectivelyPast = (event, nowMs = Date.now()) => {
 };
 
 /**
+ * In-person events have no live room to host, so hosting actions are hidden.
+ * Hybrid events keep them because they still stream a virtual session.
+ */
+export const isInPersonEvent = (event) =>
+  (event?.event_format || event?.format) === "in_person";
+
+/**
  * Replay signup is valid only after the event and only when participants can
  * actually open a published recording. Prefer the backend-derived flag when
  * available and keep a fallback for preloaded/older API payloads.

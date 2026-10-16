@@ -28,6 +28,30 @@ export function broadcastHasSendData(status) {
 }
 
 /**
+ * Start of the message the backend records (UNCERTAIN_SEND_MESSAGE in
+ * campaign_send_processor.py) when Mautic was asked to send and never
+ * answered. Only that message means a lost provider response; any other
+ * error on a broadcast is shown as what it is.
+ */
+export const LOST_PROVIDER_RESPONSE_PREFIX = "Mautic did not confirm this broadcast send.";
+
+/** A Sending broadcast whose Send Now response from Mautic was lost. */
+export function isLostProviderResponse(campaign) {
+  return (
+    String(campaign?.status || "").toLowerCase() === "sending" &&
+    String(campaign?.last_error || "").startsWith(LOST_PROVIDER_RESPONSE_PREFIX)
+  );
+}
+
+/** A broadcast Mautic itself will send at its scheduled time. */
+export function isNativeScheduled(campaign) {
+  return (
+    String(campaign?.status || "").toLowerCase() === "scheduled" &&
+    String(campaign?.schedule_owner || "").toLowerCase() === "mautic"
+  );
+}
+
+/**
  * How to show one rate (`open_rate` or `click_rate`) from a backend analytics
  * payload — the per-broadcast response or one entry of the list summary,
  * which share the same shape and semantics.
