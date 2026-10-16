@@ -1,8 +1,7 @@
-// Reuse the profile's existing Certifications & Licenses experience for direct
-// Next.js visits (including refreshes), rather than resolving through the 404
-// catch-all or introducing a second certificate workflow.
+// Certificates are not currently available as a standalone member workflow.
+// Keep direct visits and the sidebar shortcut in the application dashboard.
 import { redirect } from "next/navigation";
 
 export default function CertificatesPage() {
-  redirect("/account/profile#certifications");
+  redirect("/community?view=home");
 }

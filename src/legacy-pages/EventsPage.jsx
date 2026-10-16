@@ -3454,11 +3454,11 @@ export default function EventsPage() {
   return (
     <>
       {/* Directory header: restrained and content-led, matching the event-row reference. */}
-      <section className="relative border-b border-imaa-border bg-[#F0F4F5]">
+      <section className="relative border-b border-imaa-border" style={{ backgroundColor: "var(--imaa-bg-cool)" }}>
         <div
           className="relative text-left"
           style={{
-            background: "linear-gradient(180deg, rgba(255,255,255,.78), rgba(255,255,255,0))",
+            background: "linear-gradient(180deg, var(--imaa-dm-glass, rgba(255,255,255,.78)), transparent)",
           }}
         >
           <Container maxWidth={false} disableGutters>
@@ -3528,9 +3528,9 @@ export default function EventsPage() {
                             textTransform: "none",
                             fontWeight: 700,
                             color: "var(--imaa-navy)",
-                            borderColor: "rgba(27,42,74,.22)",
-                            bgcolor: "rgba(255,255,255,.94)",
-                            "&:hover": { borderColor: "var(--imaa-navy)", bgcolor: "#fff" },
+                            borderColor: "var(--imaa-border)",
+                            bgcolor: "var(--imaa-dm-glass, rgba(255,255,255,.94))",
+                            "&:hover": { borderColor: "var(--imaa-navy)", bgcolor: "var(--imaa-dm-surface-hover, #fff)" },
                           }}
                         >
                           {label}
@@ -3555,9 +3555,9 @@ export default function EventsPage() {
                           textTransform: "none",
                           fontWeight: 700,
                           color: "var(--imaa-navy)",
-                          borderColor: "rgba(27,42,74,.22)",
-                          bgcolor: "rgba(255,255,255,.94)",
-                          "&:hover": { borderColor: "var(--imaa-navy)", bgcolor: "#fff" },
+                          borderColor: "var(--imaa-border)",
+                          bgcolor: "var(--imaa-dm-glass, rgba(255,255,255,.94))",
+                          "&:hover": { borderColor: "var(--imaa-navy)", bgcolor: "var(--imaa-dm-surface-hover, #fff)" },
                         }}
                       >
                         {label}
@@ -4431,9 +4431,9 @@ export default function EventsPage() {
                 sx={{
                   mt: 2.5,
                   py: { xs: 3.5, sm: 4 },
-                  bgcolor: "#fff",
+                  bgcolor: "var(--imaa-dm-surface, #fff)",
                   boxShadow: "0 4px 16px rgba(27,42,74,.04)",
-                  "& h3": { fontFamily: "var(--imaa-font-sans)", color: "var(--imaa-navy)" },
+                  "& h3": { fontFamily: "var(--imaa-font-sans)", color: "var(--imaa-ink)" },
                 }}
               />
             )}
@@ -4544,9 +4544,9 @@ export default function EventsPage() {
                 sx={{
                   mt: 2.5,
                   py: { xs: 3.5, sm: 4 },
-                  bgcolor: "#fff",
+                  bgcolor: "var(--imaa-dm-surface, #fff)",
                   boxShadow: "0 4px 16px rgba(27,42,74,.04)",
-                  "& h3": { fontFamily: "var(--imaa-font-sans)", color: "var(--imaa-navy)" },
+                  "& h3": { fontFamily: "var(--imaa-font-sans)", color: "var(--imaa-ink)" },
                 }}
               />
             )}

@@ -214,17 +214,17 @@ const SeriesList = () => {
       </Typography>
 
       {/* Toolbar */}
-      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+      <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap', bgcolor: 'var(--imaa-dm-surface, #fff)', border: '1px solid var(--imaa-border)' }}>
         <TextField
           placeholder="Search series..."
           value={search}
           onChange={(e) => { setSearch(e.target.value); setPage(1); }}
           size="small"
-          sx={{ minWidth: 200 }}
+          sx={{ minWidth: 200, '& .MuiOutlinedInput-root': { bgcolor: 'var(--imaa-dm-surface, #fff)' } }}
           InputProps={{ startAdornment: <SearchIcon sx={{ mr: 1, color: 'var(--imaa-dm-text-hint, #9e9e9e)' }} /> }}
         />
 
-        <FormControl sx={{ minWidth: 150 }} size="small">
+        <FormControl sx={{ minWidth: 150, '& .MuiOutlinedInput-root': { bgcolor: 'var(--imaa-dm-surface, #fff)' } }} size="small">
           <InputLabel>Status</InputLabel>
           <Select
             value={statusFilter}

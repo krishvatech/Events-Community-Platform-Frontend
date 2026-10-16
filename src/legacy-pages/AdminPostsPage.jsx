@@ -2715,7 +2715,7 @@ export default function AdminPostsPage() {
           <Stack direction="row" spacing={2} alignItems="center" sx={{ width: "100%" }}>
             <Avatar sx={{ bgcolor: "#0A9396" }}>A</Avatar>
             <Box sx={{ minWidth: 0 }}>
-              <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>Community Posts</Typography>
+              <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "var(--imaa-ink)" }}>Community Posts</Typography>
               <Typography color="text.secondary">
                 Publish community-wide updates from the dashboard.
               </Typography>
@@ -2741,7 +2741,7 @@ export default function AdminPostsPage() {
           </Box>
         </Stack>
 
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2, p: 2, border: "1px solid #e2e8f0", borderRadius: "8px", bgcolor: "#fff" }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 2, p: 2, border: "1px solid var(--imaa-border)", borderRadius: "8px", bgcolor: "var(--imaa-dm-surface, #fff)" }}>
           <TextField
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -2775,6 +2775,7 @@ export default function AdminPostsPage() {
               sx={{
                 borderRadius: "8px",
                 borderColor: "var(--imaa-dm-border, #e5e7eb)",
+                bgcolor: "var(--imaa-dm-surface, #fff)",
                 p: 4,
                 textAlign: "center",
                 color: loadingErr ? "error.main" : "text.secondary",

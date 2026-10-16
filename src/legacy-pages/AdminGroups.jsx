@@ -2442,7 +2442,7 @@ export default function AdminGroups() {
       </Box >
 
       {owner && (
-        <Paper elevation={0} className="border border-slate-200 mb-5 overflow-hidden" sx={{ borderRadius: "8px" }}>
+        <Paper elevation={0} className="border border-slate-200 mb-5 overflow-hidden" sx={{ borderRadius: "8px", bgcolor: "var(--imaa-dm-surface, #fff)" }}>
           <Tabs
             value={activeTab}
             onChange={changeTab}
@@ -2451,7 +2451,7 @@ export default function AdminGroups() {
             sx={{
               px: 2,
               minHeight: 48,
-              "& .MuiTab-root": { textTransform: "none", fontWeight: 700, minHeight: 48 },
+              "& .MuiTab-root": { textTransform: "none", fontWeight: 700, minHeight: 48, color: "var(--imaa-ink-body)" },
               "& .Mui-selected": { color: "var(--imaa-dm-teal-text, #0ea5a4) !important" },
               "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
             }}
@@ -2478,7 +2478,7 @@ export default function AdminGroups() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           InputProps={{ startAdornment: <SearchRoundedIcon className="mr-2 text-slate-400" /> }}
-          sx={{ width: { xs: "100%", sm: 360 } }}
+          sx={{ width: { xs: "100%", sm: 360 }, "& .MuiOutlinedInput-root": { bgcolor: "var(--imaa-dm-surface, #fff)" } }}
         />
         <Box sx={{ flex: 1 }} />
       </Stack >

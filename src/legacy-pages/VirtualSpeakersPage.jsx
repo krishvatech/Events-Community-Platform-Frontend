@@ -335,13 +335,22 @@ const VirtualSpeakersPage = () => {
           sx={{
             mb: 3,
             maxWidth: 560,
-            '& .MuiOutlinedInput-root': { borderRadius: `${radii.field}px` },
+            '& .MuiOutlinedInput-root': { borderRadius: `${radii.field}px`, bgcolor: semanticColors.surface },
           }}
           size="small"
         />
 
         {loadError ? (
-          <Alert severity="error" sx={{ borderRadius: `${radii.card}px` }}>
+          <Alert
+            severity="error"
+            sx={{
+              borderRadius: `${radii.card}px`,
+              bgcolor: 'var(--imaa-dm-tint-red, #FDECEC)',
+              color: 'var(--imaa-dm-red-text, #B42318)',
+              border: '1px solid var(--imaa-dm-tint-red-border, #F5B5B0)',
+              '& .MuiAlert-icon': { color: 'inherit' },
+            }}
+          >
             {loadError}
           </Alert>
         ) : (

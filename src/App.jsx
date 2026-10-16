@@ -194,7 +194,7 @@ export const LegacyRoutes = () => (
 
       <Route path="/account/courses" element={<RequireAuth><CoursesPage /></RequireAuth>} />
       <Route path="/account/courses/:courseId" element={<RequireAuth><CoursePlayerPage /></RequireAuth>} />
-      <Route path="/account/certificates" element={<RequireAuth><Navigate to="/account/profile#certifications" replace /></RequireAuth>} />
+      <Route path="/account/certificates" element={<RequireAuth><Navigate to="/community?view=home" replace /></RequireAuth>} />
       <Route path="/account/resources" element={<RequireAuth><MyResourcesPage /></RequireAuth>} />
       <Route path="/account/profile" element={<RequireAuth><ProfilePage /></RequireAuth>} />
       {/* Signed-in federated (e.g. Google) users setting a password for the

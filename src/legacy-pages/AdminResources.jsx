@@ -915,7 +915,7 @@ export default function MyResourcesAdmin() {
         </Avatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "var(--imaa-ink)" }}>
             Resources
           </Typography>
           <Typography className="text-slate-500">
@@ -950,7 +950,7 @@ export default function MyResourcesAdmin() {
       <Stack
         direction={{ xs: "column", md: "row" }}
         spacing={2}
-        sx={{ mb: 3, p: 2, border: "1px solid #e2e8f0", borderRadius: "8px", bgcolor: "#fff" }}
+        sx={{ mb: 3, p: 2, border: "1px solid var(--imaa-border)", borderRadius: "8px", bgcolor: "var(--imaa-dm-surface, #fff)" }}
         alignItems={{ xs: "stretch", md: "center" }}
       >
         <TextField
@@ -1070,7 +1070,7 @@ export default function MyResourcesAdmin() {
         </Box>
       ) : (
         <>
-          <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: "100%", overflowX: "auto", borderRadius: "8px", boxShadow: "0 1px 2px rgba(15,23,42,0.04)", "& .MuiTable-root": { minWidth: 640 }, "& .MuiTableCell-root": { borderColor: "#e2e8f0" }, "& .MuiTableHead-root .MuiTableCell-root": { bgcolor: "#f8fafc", color: "#1B2A4A", fontWeight: 700 } }}>
+          <TableContainer component={Paper} variant="outlined" sx={{ maxWidth: "100%", overflowX: "auto", borderRadius: "8px", boxShadow: "0 1px 2px rgba(15,23,42,0.04)", "& .MuiTable-root": { minWidth: 640 }, "& .MuiTableCell-root": { borderColor: "var(--imaa-border)" }, "& .MuiTableHead-root .MuiTableCell-root": { bgcolor: "var(--imaa-dm-surface-alt, #f8fafc)", color: "var(--imaa-ink)", fontWeight: 700 } }}>
             <Table aria-label="Resources">
               <TableHead>
                 <TableRow>

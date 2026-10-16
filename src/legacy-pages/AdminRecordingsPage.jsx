@@ -328,7 +328,7 @@ export default function AdminRecordingsPage() {
         </Avatar>
 
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>
+          <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "var(--imaa-ink)" }}>
             Recordings
           </Typography>
           <Typography className="text-slate-500">
@@ -341,7 +341,7 @@ export default function AdminRecordingsPage() {
       <Paper
         elevation={0}
         className="border border-slate-200 p-3 sm:p-4 mb-3 sm:mb-4"
-        sx={{ borderRadius: "8px", boxShadow: "0 1px 2px rgba(15,23,42,0.04)" }}
+        sx={{ borderRadius: "8px", boxShadow: "0 1px 2px rgba(15,23,42,0.04)", bgcolor: "var(--imaa-dm-surface, #fff)", borderColor: "var(--imaa-border)" }}
       >
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <FormControl size="small">

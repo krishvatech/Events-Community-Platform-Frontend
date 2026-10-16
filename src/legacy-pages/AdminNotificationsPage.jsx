@@ -1023,7 +1023,7 @@ export default function AdminNotificationsPage() {
           <Avatar sx={{ bgcolor: "#0A9396", width: 48, height: 48, fontSize: '1.25rem', fontWeight: 700 }}>{userInitial}</Avatar>
           <Box sx={{ minWidth: 0 }}>
             <Stack direction="row" spacing={1} alignItems="center">
-              <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "#1B2A4A" }}>Admin Notifications</Typography>
+              <Typography component="h1" variant="h4" sx={{ fontFamily: '"Source Serif 4", Georgia, serif', fontWeight: 700, color: "var(--imaa-ink)" }}>Admin Notifications</Typography>
               {unreadCount > 0 && <Chip size="small" label={`${unreadCount} pending`} sx={{ borderRadius: 1, bgcolor: 'var(--imaa-dm-surface-alt, #f1f5f9)', fontWeight: 600, height: 24, fontSize: '0.75rem' }} />}
             </Stack>
             <Typography variant="body2" sx={{ color: "var(--imaa-dm-text-meta, #64748b)" }}>Manage system and group notifications.</Typography>
@@ -1035,24 +1035,39 @@ export default function AdminNotificationsPage() {
             startIcon={<DoneAllRoundedIcon />}
             onClick={handleMarkAllRead}
             disabled={initialLoading || unreadCount === 0}
-            sx={{ borderRadius: "6px", textTransform: "none", fontSize: 12, px: 2.5, borderColor: "#0A9396", color: "#0A9396", '&:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #f0fdfa)', borderColor: "#0A9396" } }}
+            sx={{ borderRadius: "6px", textTransform: "none", fontSize: 12, px: 2.5, borderColor: "var(--imaa-dm-teal-text, #0A9396)", color: "var(--imaa-dm-teal-text, #0A9396)", '&:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #f0fdfa)', borderColor: "var(--imaa-dm-teal-text, #0A9396)" } }}
           >
             Mark all read
           </Button>
         )}
       </Stack>
       {/* Filters */}
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 3, p: 2, border: "1px solid #e2e8f0", borderRadius: "8px", bgcolor: "#fff" }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ xs: "stretch", sm: "center" }} sx={{ mb: 3, p: 2, border: "1px solid var(--imaa-border)", borderRadius: "8px", bgcolor: "var(--imaa-dm-surface, #fff)" }}>
         <Stack direction="row" alignItems="center" sx={{ width: { xs: "100%", sm: "auto" } }}>
           <FormControlLabel
             sx={{ ml: 0 }}
-            control={<Switch checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: TEAL }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: TEAL } }} />}
-            label={<Typography variant="body2" fontWeight={500} color="var(--imaa-dm-text-body, #475569)">Pending / Unread</Typography>}
+            control={<Switch checked={onlyUnread} onChange={(e) => setOnlyUnread(e.target.checked)} sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: 'var(--imaa-teal)' }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { backgroundColor: 'var(--imaa-teal)' } }} />}
+            label={<Typography variant="body2" fontWeight={500} color="var(--imaa-ink-body)">Pending / Unread</Typography>}
           />
         </Stack>
         <Box sx={{ flexGrow: 1 }} />
         <FormControl size="small" sx={{ minWidth: 180 }}>
-          <Select value={tab} onChange={(e) => setTab(e.target.value)} sx={{ borderRadius: 2, bgcolor: 'var(--imaa-dm-surface, white)', '& .MuiSelect-select': { py: 1, fontSize: '0.9rem', fontWeight: 500 } }}>
+          <Select
+            value={tab}
+            onChange={(e) => setTab(e.target.value)}
+            MenuProps={{
+              PaperProps: {
+                sx: {
+                  bgcolor: 'var(--imaa-dm-surface, #fff)',
+                  color: 'var(--imaa-ink)',
+                  border: '1px solid var(--imaa-border)',
+                  '& .MuiMenuItem-root:hover, & .MuiMenuItem-root.Mui-selected:hover': { bgcolor: 'var(--imaa-dm-surface-hover, #f5f5f5)' },
+                  '& .MuiMenuItem-root.Mui-selected': { bgcolor: 'var(--imaa-dm-surface-alt, #f5f5f5)' },
+                },
+              },
+            }}
+            sx={{ borderRadius: 2, bgcolor: 'var(--imaa-dm-surface, #fff)', color: 'var(--imaa-ink)', '& .MuiSelect-icon': { color: 'var(--imaa-ink-body)' }, '& .MuiSelect-select': { py: 1, fontSize: '0.9rem', fontWeight: 500 } }}
+          >
             <MenuItem value="all">All notifications</MenuItem>
             <MenuItem value="name_change">Identity Requests</MenuItem>
             <MenuItem value="verification_request">Verification Requests</MenuItem>

@@ -4421,7 +4421,7 @@ function EventsPage() {
       </Box>
 
       {/* Tabs */}
-      <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4">
+      <Paper elevation={0} className="rounded-2xl border border-slate-200 mb-4" sx={{ bgcolor: "var(--imaa-dm-surface, #fff)" }}>
         <Tabs
           value={tab}
           onChange={(_, v) => setTab(v)}
@@ -4429,7 +4429,7 @@ function EventsPage() {
           scrollButtons="auto"
           sx={{
             px: 1,
-            "& .MuiTab-root": { textTransform: "none", minHeight: 46 },
+            "& .MuiTab-root": { textTransform: "none", minHeight: 46, color: "var(--imaa-ink-body)" },
             "& .Mui-selected": { color: "#0ea5a4 !important", fontWeight: 700 },
             "& .MuiTabs-indicator": { backgroundColor: "#0ea5a4" },
           }}
@@ -4451,7 +4451,7 @@ function EventsPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           InputProps={{ startAdornment: <SearchRoundedIcon className="mr-2 text-slate-400" /> }}
-          sx={{ width: { xs: "100%", sm: 360 } }}
+          sx={{ width: { xs: "100%", sm: 360 }, "& .MuiOutlinedInput-root": { bgcolor: "var(--imaa-dm-surface, #fff)" } }}
         />
         <Box sx={{ flex: 1 }} />
         <Tooltip title="Refresh events">
