@@ -80,8 +80,10 @@ const ChevronPattern = () => (
   </Box>
 );
 
-const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
+const FeatureCard = ({ icon: Icon, iconColor, title, desc, href }) => (
   <Box
+    component={href ? Link : "div"}
+    {...(href ? { to: href, resetScroll: true } : {})}
     sx={{
       width: "100%",
       minHeight: { xs: 204, md: 224 },
@@ -95,6 +97,7 @@ const FeatureCard = ({ icon: Icon, iconColor, title, desc }) => (
       flexDirection: "column",
       justifyContent: "flex-start",
       transition: "transform .2s ease, box-shadow .2s ease, border-color .2s ease",
+      ...(href ? { textDecoration: "none", cursor: "pointer" } : {}),
       "&:hover": {
         transform: "translateY(-2px)",
         borderColor: "var(--imaa-dm-border-strong, rgba(27,42,74,.18))",
@@ -431,6 +434,13 @@ export default function HomePage() {
                 iconColor: NAVY_TEXT, // navy icon in light; readable light icon on the dark card
                 title: "Private Groups",
                 desc: "Join invite-only groups, alumni networks, and deal communities.",
+              },
+              {
+                icon: TrendingIcon,
+                iconColor: TEAL_TEXT,
+                title: "M&A Statistics",
+                desc: "Explore global and regional M&A statistics, transaction data, and industry research.",
+                href: "/mergers-and-acquisitions-statistics",
               },
             ].map((f) => (
               <FeatureCard key={f.title} {...f} />

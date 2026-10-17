@@ -92,6 +92,7 @@ const PUBLIC_FOOTER_COLUMNS = [
   {
     title: "News & Publications",
     links: [
+      ["M&A Statistics", "/mergers-and-acquisitions-statistics"],
       ["In The News", publicSectionHref("news")],
       ["M&A Publications", publicSectionHref("publications")],
     ],

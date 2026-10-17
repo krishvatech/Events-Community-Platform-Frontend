@@ -378,6 +378,7 @@ const Header = ({ instituteTheme = false }) => {
             <NavLink to="/events">Events</NavLink>
             <NavLink to="/community" requireAuth>Community</NavLink>
             <NavLink to={resourcesHref} requireAuth>Resources</NavLink>
+            <NavLink to="/mergers-and-acquisitions-statistics">M&amp;A Statistics</NavLink>
             <NavLink to="/about">About Us</NavLink>
           </Box>
 
@@ -469,6 +470,9 @@ const Header = ({ instituteTheme = false }) => {
               if (!authed) { e.preventDefault(); navigate(`/signin?next=${encodeURIComponent(resourcesHref)}`); }
             }}>
               <ListItemText primary="Resources" primaryTypographyProps={{ fontWeight: 500 }} />
+            </ListItemButton>
+            <ListItemButton component={Link} to="/mergers-and-acquisitions-statistics" selected={isNavItemActive("/mergers-and-acquisitions-statistics")} aria-current={isNavItemActive("/mergers-and-acquisitions-statistics") ? "page" : undefined} sx={mobileNavItemSx("/mergers-and-acquisitions-statistics")}>
+              <ListItemText primary="M&A Statistics" primaryTypographyProps={{ fontWeight: 500 }} />
             </ListItemButton>
             <ListItemButton component={Link} to="/about" selected={isNavItemActive("/about")} aria-current={isNavItemActive("/about") ? "page" : undefined} sx={mobileNavItemSx("/about")}>
               <ListItemText primary="About Us" primaryTypographyProps={{ fontWeight: 500 }} />

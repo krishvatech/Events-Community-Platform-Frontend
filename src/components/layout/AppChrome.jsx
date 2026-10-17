@@ -121,6 +121,9 @@ const AppChrome = ({ children }) => {
   const isCompanionPage = location.pathname.includes("/companion");
   const isMarketingHub = isMarketingHubPath(location.pathname);
   const isSsoRedirectPage = normalizedPath === "/sso/imaa";
+  // This is a normal public resource page, not an event-slug landing page.  Keep
+  // the shared header/footer (and authenticated sidebar) around it.
+  const isMergerStatisticsPage = normalizedPath === "/mergers-and-acquisitions-statistics";
   const isSingleEventPage = (location.pathname.startsWith("/landing/") && location.pathname !== "/landing") ||
                             (!location.pathname.startsWith("/events") &&
                             !location.pathname.startsWith("/account") &&
@@ -132,6 +135,7 @@ const AppChrome = ({ children }) => {
                             location.pathname !== "/" &&
                             location.pathname !== "/about" &&
                             location.pathname !== "/cms" &&
+                            !isMergerStatisticsPage &&
                             location.pathname.match(/^\/[a-zA-Z0-9\-]+\/?$/));
   const hideChrome =
     isSsoRedirectPage ||

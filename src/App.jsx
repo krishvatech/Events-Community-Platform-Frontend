@@ -85,6 +85,7 @@ import EventLandingPage_Marketing from "./legacy-pages/EventLandingPage_Marketin
 import SingleEventMarketingPage from "./legacy-pages/SingleEventMarketingPage.jsx";
 import AttendeeFormPage from "./legacy-pages/AttendeeFormPage.jsx";
 import TrainingProgramsPage from "./legacy-pages/TrainingProgramsPage.jsx";
+import MergerStatisticsPage from "./legacy-pages/MergerStatisticsPage.jsx";
 import DesignGallery from "./features/trainingDesignReview/DesignGallery.jsx";
 import DesignPreview from "./features/trainingDesignReview/DesignPreview.jsx";
 import RecognitionDirectoryPage from "./legacy-pages/RecognitionDirectoryPage.jsx";
@@ -221,6 +222,7 @@ export const LegacyRoutes = () => (
       <Route path="/training-design-review/:designId" element={<DesignPreview />} />
       <Route path="/m-and-a-trainings" element={<TrainingProgramsPage />} />
       <Route path="/m-and-a-trainings/*" element={<TrainingProgramsPage />} />
+      <Route path="/mergers-and-acquisitions-statistics" element={<MergerStatisticsPage />} />
       <Route path="/recognition" element={<RecognitionDirectoryPage />} />
       <Route path="/recognition/*" element={<RecognitionDirectoryPage />} />
 
