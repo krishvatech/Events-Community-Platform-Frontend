@@ -26,11 +26,12 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../utils/api';
 import { API_BASE, apiClient } from '../utils/api';
 import {
+  DISPOSABLE_EMAIL_MESSAGE,
   checkParticipantEmail,
   getEmailRuleErrorMessage,
+  isDisposableEmailSignupError,
   isEmailFormatValid,
   normalizeSignupEmail,
 } from '../utils/signupEmailCheck';
@@ -534,6 +535,8 @@ const MultiTrackApplicationForm = ({
     setSubmitError(null);
     setExistingAccountNotice('');
     try {
+      // A disposable or invalid email never reaches the password step.
+      if (!(await verifyApplicantEmail())) return;
       const email = (applicantData.email || '').trim().toLowerCase();
       const resp = await apiClient.get('/auth/check-email/', { params: { email } });
       if (resp?.data?.indeterminate === true) {
@@ -804,6 +807,10 @@ const MultiTrackApplicationForm = ({
     try {
       const email = (applicantData.email || '').trim().toLowerCase();
 
+      // Same rule as signup: never create a Cognito account for a disposable
+      // or invalid email, and never continue when the check cannot run.
+      if (!(await verifyApplicantEmail())) return;
+
       // Preflight duplicate check — UX only; identity is proven by OTP, never
       // by this lookup. On an existing account we stop and point to sign-in.
       try {
@@ -836,7 +843,12 @@ const MultiTrackApplicationForm = ({
       setRegistrationPhase('otp');
     } catch (err) {
       const code = err?.code || err?.name;
-      if (code === 'UsernameExistsException' || code === 'AliasExistsException') {
+      if (isDisposableEmailSignupError(err)) {
+        // Rejected by the Cognito Pre Sign-up trigger.
+        setEmailError(DISPOSABLE_EMAIL_MESSAGE);
+        setSubmitError(DISPOSABLE_EMAIL_MESSAGE);
+        setActiveStep(0);
+      } else if (code === 'UsernameExistsException' || code === 'AliasExistsException') {
         setExistingAccountNotice(
           'An IMAA Connect account already exists for this email. Please sign in to continue your application.'
         );
@@ -2049,13 +2061,14 @@ const MultiTrackApplicationForm = ({
               disabled={
                 isSubmitting ||
                 checkingAccount ||
+                isCheckingEmail ||
                 (activeStep === 0 && !isApplicantDataValid()) ||
                 // On the existing-account path the applicant must sign in; they
                 // cannot advance the guest registration from here.
                 (activeStep === 0 && needsAccountRegistration && accountFlow === 'existing')
               }
             >
-              {checkingAccount ? 'Checking…' : 'Next'}
+              {checkingAccount || isCheckingEmail ? 'Checking…' : 'Next'}
             </Button>
           ) : (
             <Button
