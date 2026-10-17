@@ -88,6 +88,28 @@ export function isDisposableEmailSignupError(error) {
   );
 }
 
+export const isEmailFormatValid = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeSignupEmail(email));
+
+/**
+ * The same check for forms that admit someone without a signup (guest join,
+ * event applications). `accountEmail` is the signed-in user's own address:
+ * an existing account is never refused, matching the backend rule.
+ */
+export function checkParticipantEmail(apiBase, email, { accountEmail = "", fetchImpl } = {}) {
+  const normalized = normalizeSignupEmail(email);
+  if (accountEmail && normalized === normalizeSignupEmail(accountEmail)) {
+    return Promise.resolve({ status: "allowed" });
+  }
+  return checkSignupEmail(apiBase, normalized, fetchImpl ? { fetchImpl } : undefined);
+}
+
+/** The field message when the backend refused an email for being disposable or malformed. */
+export function getEmailRuleErrorMessage(data) {
+  if (data?.code === "disposable_email_domain") return DISPOSABLE_EMAIL_MESSAGE;
+  if (data?.code === "invalid_email") return INVALID_EMAIL_MESSAGE;
+  return "";
+}
+
 export function clearSignupEmailCheckCache() {
   definitiveResults.clear();
   pendingChecks.clear();

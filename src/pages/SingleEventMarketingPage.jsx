@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { checkParticipantEmail, isEmailFormatValid } from "../utils/signupEmailCheck";
 import speakerImage from "../assets/prof-dr-aswath-damodaran-12b35a4e.png";
 import citiesImage from "../assets/cities.png";
 import virtualImage from "../assets/virtual.png";
@@ -53,9 +54,20 @@ function Hero({ eventData = {}, eventId }) {
   const handleSendOtp = async () => {
     setError("");
     if (!valid) return;
+    if (!isEmailFormatValid(form.email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
 
     setLoading(true);
     try {
+      // Same email rules as signup: valid and not disposable.
+      const emailCheck = await checkParticipantEmail(API_BASE, form.email);
+      if (emailCheck.status !== "allowed") {
+        setError(emailCheck.message);
+        return;
+      }
+
       const res = await fetch(urlJoin(API_BASE, `/events/${eventId}/guest-join/`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -304,7 +316,7 @@ function Hero({ eventData = {}, eventId }) {
                   </div>
                   <input
                     value={form.email}
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                    onChange={e => setForm(f => ({ ...f, email: e.target.value.replace(/\s/g, "") }))}
                     placeholder="Email"
                     type="email"
                     disabled={loading}

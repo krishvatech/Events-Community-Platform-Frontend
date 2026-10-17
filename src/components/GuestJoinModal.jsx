@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -13,6 +13,12 @@ import {
   Box,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import {
+  checkParticipantEmail,
+  getEmailRuleErrorMessage,
+  isEmailFormatValid,
+  normalizeSignupEmail,
+} from "../utils/signupEmailCheck";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || "").trim();
 const API_BASE = RAW_BASE.replace(/\/+$/, "");
@@ -38,6 +44,8 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
   const [otpCode, setOtpCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const latestEmailRef = useRef("");
   const [isReturningGuest, setIsReturningGuest] = useState(false);
   const [otpSentEmail, setOtpSentEmail] = useState("");
 
@@ -100,6 +108,25 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
+  const handleEmailChange = (e) => {
+    // Spaces are never valid in an email, same as signup.
+    const email = e.target.value.replace(/\s/g, "");
+    latestEmailRef.current = normalizeSignupEmail(email);
+    setForm((prev) => ({ ...prev, email }));
+    setEmailError("");
+  };
+
+  // Early feedback when the user leaves the email field. Submit checks again,
+  // so a failed request here is ignored rather than shown.
+  const handleEmailBlur = async () => {
+    const email = normalizeSignupEmail(form.email);
+    if (!isEmailFormatValid(email)) return;
+    const result = await checkParticipantEmail(API_BASE, email);
+    if (result.status === "blocked" && latestEmailRef.current === email) {
+      setEmailError(result.message);
+    }
+  };
+
   const validateForm = () => {
     if (!form.first_name.trim()) {
       setError("First name is required");
@@ -110,13 +137,11 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
       return false;
     }
     if (!form.email.trim()) {
-      setError("Email is required");
+      setEmailError("Email is required");
       return false;
     }
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(form.email.trim())) {
-      setError("Please enter a valid email address");
+    if (!isEmailFormatValid(form.email)) {
+      setEmailError("Please enter a valid email address");
       return false;
     }
     return true;
@@ -128,6 +153,18 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
 
     setLoading(true);
     try {
+      // Same email rules as signup: valid and not disposable. Never send the
+      // code when this check fails or cannot be completed.
+      const emailCheck = await checkParticipantEmail(API_BASE, form.email);
+      if (emailCheck.status === "blocked" || emailCheck.status === "invalid") {
+        setEmailError(emailCheck.message);
+        return;
+      }
+      if (emailCheck.status !== "allowed") {
+        setError(emailCheck.message);
+        return;
+      }
+
       // Step 1: Send OTP to email
       const res = await fetch(urlJoin(API_BASE, `/events/${event.id}/guest-join/`), {
         method: "POST",
@@ -152,6 +189,11 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
       if (!res.ok) {
         if (data.error === "account_exists") {
           setError("You already have an account for this event. Please sign in.");
+          return;
+        }
+        const emailRuleError = getEmailRuleErrorMessage(data);
+        if (emailRuleError) {
+          setEmailError(emailRuleError);
           return;
         }
         throw new Error(data.error || data.message || text || `Failed to send verification code (${res.status})`);
@@ -302,11 +344,13 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
     setForm({ first_name: "", last_name: "", email: "", job_title: "", company_name: "" });
     setIsReturningGuest(false);
     setError("");
+    setEmailError("");
   };
 
   const handleModalClose = () => {
     setIsReturningGuest(false);
     setError("");
+    setEmailError("");
     setStep("form");
     setOtpCode("");
     setOtpSentEmail("");
@@ -378,7 +422,10 @@ export default function GuestJoinModal({ open, onClose, event, livePath }) {
                 fullWidth
                 size="small"
                 value={form.email}
-                onChange={handleInputChange("email")}
+                onChange={handleEmailChange}
+                onBlur={handleEmailBlur}
+                error={Boolean(emailError)}
+                helperText={emailError}
                 disabled={loading}
               />
 
