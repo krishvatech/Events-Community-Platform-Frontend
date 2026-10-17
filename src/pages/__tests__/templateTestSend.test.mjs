@@ -1,241 +1,139 @@
 import assert from "node:assert/strict";
-import { afterEach, beforeEach, test } from "node:test";
+import { afterEach, test } from "node:test";
 
-import {
-  React,
-  act,
-  all,
-  cleanup,
-  click,
-  getByRole,
-  loadSource,
-  queryByRole,
-  queryByText,
-  renderRoutes,
-  router,
-  typeInto,
-  waitFor,
-} from "./helpers/blogDomHarness.mjs";
+import { act, cleanup, click, getByRole, loadSource, queryByText, typeInto, waitFor } from "./helpers/blogDomHarness.mjs";
+import { installTemplatesApi, makeTemplate, renderTemplatePages } from "./helpers/templatePagesHarness.mjs";
 
-const { default: AdminNewsletterTemplatesPanel, templateTestSendBlocker } = await loadSource(
-  "src/pages/AdminNewsletterTemplatesPanel.jsx"
-);
-const { Route } = router;
-const h = React.createElement;
+const { templateTestSendBlocker } = await loadSource("src/pages/AdminNewsletterTemplatesPanel.jsx");
 
-const TEMPLATE = {
-  id: "18",
-  name: "Reusable Newsletter",
-  subject: "Monthly update",
-  preheaderText: "",
-  fromName: "IMAA Connect",
-  fromAddress: "eventncommunity@gmail.com",
-  plainText: "Plain content",
-  customHtml: "<h1>HTML content</h1>",
-  emailType: "template",
-  category: null,
-  template: "",
-  isPublished: false,
-  sentCount: 0,
-  readCount: 0,
-};
-
-let posts;
-
-/** Answers the panel's own reads; POSTs go to `onPost`. Nothing leaves the process. */
-function installApi({ templates = [TEMPLATE], onPost = async () => ({ data: {} }) } = {}) {
-  posts = [];
-  globalThis.__testApiClient = {
-    get: async (url) => {
-      if (url === "/newsletter/admin/templates/") {
-        return { data: { count: templates.length, page: 1, page_size: 25, num_pages: 1, results: templates } };
-      }
-      return { data: { count: 0, results: [] } };
-    },
-    post: async (url, payload) => {
-      posts.push({ url, payload });
-      return onPost(url, payload);
-    },
-  };
-}
+// Test Send lives inline on the Template Details page. Assertions compare
+// booleans/strings only: a failing assert on a jsdom node exhausts memory.
 
 const deferred = () => {
   let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => {
+  const promise = new Promise((res) => {
     resolve = res;
-    reject = rej;
   });
-  return { promise, resolve, reject };
+  return { promise, resolve };
 };
 
-const testSendButtons = () => all("button[aria-label='Send test email']");
+const panel = () => {
+  const section = document.querySelector("section[aria-label='Send Test Email']");
+  if (!section) throw new Error("Send Test Email panel not rendered yet");
+  return section;
+};
+const input = () => panel().querySelector("input[type='email']");
+const sendButton = () => getByRole("button", "Send Test", { scope: panel() });
 
-async function renderPanel() {
-  await renderRoutes([h(Route, { key: "t", path: "*", element: h(AdminNewsletterTemplatesPanel) })]);
-  await waitFor(() => assert.equal(testSendButtons().length >= 1, true));
+let api;
+async function openDetails({ template = makeTemplate(), onTestSend } = {}) {
+  api = installTemplatesApi({
+    templates: [template],
+    handlers: onTestSend ? { [`post /newsletter/admin/templates/${template.id}/test-send/`]: onTestSend } : {},
+  });
+  await renderTemplatePages(`/admin/newsletter/templates/${template.id}`);
+  await waitFor(() => panel());
 }
+const testSends = () => api.writes("post").filter((c) => c.url.endsWith("/test-send/"));
 
-async function openDialog(index = 0) {
-  await click(testSendButtons()[index]);
-  const dialog = await waitFor(() => getByRole("dialog"));
-  const input = dialog.querySelector("input[type='email']");
-  assert.ok(input, "the dialog asks for a recipient email");
-  return { dialog, input };
-}
-
-// Assertions only ever compare booleans: a failing assert on a live jsdom node
-// makes Node pretty-print the whole circular DOM graph and exhaust memory.
-const dialogOpen = () => queryByRole("dialog") !== null;
-
-const sendButton = (dialog) => getByRole("button", "Send Test", { scope: dialog });
-
-beforeEach(() => installApi());
 afterEach(async () => {
   await cleanup();
   delete globalThis.__testApiClient;
 });
 
-test("Test Send is enabled for a template with a subject and content", async () => {
-  await renderPanel();
-  const [button] = testSendButtons();
-  assert.equal(button.disabled, false);
-  assert.equal(queryByText(/requires a verified Mautic test-send bridge/) === null, true);
+test("the panel names the Template and nothing is sent on page load", async () => {
+  await openDetails();
+  assert.match(panel().textContent, /Reusable Newsletter/);
+  assert.match(panel().textContent, /temporary copy/);
+  assert.equal(sendButton().disabled, true, "nothing to send until an address is typed");
+  assert.equal(testSends().length, 0);
 });
 
-test("Test Send is disabled, with a reason, for a template that cannot be sent", async () => {
-  installApi({
-    templates: [TEMPLATE, { ...TEMPLATE, id: "19", name: "No subject", subject: "" }],
-  });
-  await renderPanel();
-  const [complete, incomplete] = testSendButtons();
-  assert.equal(complete.disabled, false);
-  assert.equal(incomplete.disabled, true);
+test("a Template that cannot be sent explains why and disables sending", async () => {
+  await openDetails({ template: makeTemplate({ subject: " " }) });
+  assert.match(panel().textContent, /Add a subject before sending a test email/);
+  assert.equal(input().disabled, true);
+  assert.equal(sendButton().disabled, true);
 
-  assert.equal(templateTestSendBlocker(TEMPLATE), "");
-  assert.match(templateTestSendBlocker({ ...TEMPLATE, subject: " " }), /subject/);
-  assert.match(
-    templateTestSendBlocker({ ...TEMPLATE, customHtml: " ", plainText: "" }),
-    /content/
-  );
-});
-
-test("the dialog opens with the template name and a recipient field", async () => {
-  await renderPanel();
-  const { dialog } = await openDialog();
-  assert.match(dialog.textContent, /Reusable Newsletter/);
-  assert.match(dialog.textContent, /temporary copy/);
-  assert.equal(sendButton(dialog).disabled, true, "nothing to send until an address is typed");
+  assert.equal(templateTestSendBlocker(makeTemplate()), "");
+  assert.match(templateTestSendBlocker(makeTemplate({ customHtml: " ", plainText: "" })), /content/);
 });
 
 test("an invalid email is rejected without a request", async () => {
-  await renderPanel();
-  const { dialog, input } = await openDialog();
-
-  await typeInto(input, "not-an-email");
-
-  assert.match(dialog.textContent, /Enter a valid email address/);
-  assert.equal(sendButton(dialog).disabled, true);
-  await click(sendButton(dialog));
-  assert.equal(posts.length, 0);
+  await openDetails();
+  await typeInto(input(), "not-an-email");
+  assert.match(panel().textContent, /Enter a valid email address/);
+  assert.equal(sendButton().disabled, true);
+  await click(sendButton());
+  assert.equal(testSends().length, 0);
 });
 
-test("a valid email posts the trimmed address to the template's test-send endpoint", async () => {
-  installApi({
-    onPost: async () => ({ data: { success: true, recipient_email: "qa@example.test" } }),
-  });
-  await renderPanel();
-  const { dialog, input } = await openDialog();
-
-  await typeInto(input, "  qa@example.test  ");
-  await click(sendButton(dialog));
-
-  await waitFor(() => assert.equal(posts.length, 1));
-  assert.deepEqual(posts[0], {
-    url: "/newsletter/admin/templates/18/test-send/",
-    payload: { email: "qa@example.test" },
-  });
+test("a valid email posts the trimmed address to the Template's test-send endpoint", async () => {
+  await openDetails({ onTestSend: async () => ({ data: { success: true, recipient_email: "qa@example.test" } }) });
+  await typeInto(input(), "  qa@example.test  ");
+  await click(sendButton());
+  await waitFor(() => assert.equal(testSends().length, 1));
+  assert.deepEqual(
+    { url: testSends()[0].url, payload: testSends()[0].payload },
+    { url: "/newsletter/admin/templates/18/test-send/", payload: { email: "qa@example.test" } }
+  );
 });
 
-test("while sending, the dialog shows progress and blocks a second submission", async () => {
+test("while sending, the panel shows progress and blocks a second submission", async () => {
   const pending = deferred();
-  installApi({ onPost: () => pending.promise });
-  await renderPanel();
-  const { dialog, input } = await openDialog();
-  await typeInto(input, "qa@example.test");
+  await openDetails({ onTestSend: () => pending.promise });
+  await typeInto(input(), "qa@example.test");
 
-  const button = sendButton(dialog);
+  const button = sendButton();
   // Two clicks in the same tick, before React can re-render the disabled state.
   await act(async () => {
     button.click();
     button.click();
   });
-
-  await waitFor(() => assert.equal(dialog.querySelector("[role='progressbar']") !== null, true));
+  await waitFor(() => assert.equal(panel().querySelector("[role='progressbar']") !== null, true));
   assert.equal(button.disabled, true);
-  assert.equal(getByRole("button", "Cancel", { scope: dialog }).disabled, true);
-  assert.equal(input.disabled, true);
+  assert.equal(input().disabled, true);
   await click(button);
-  assert.equal(posts.length, 1, "exactly one request is sent");
+  assert.equal(testSends().length, 1, "exactly one request is sent");
 
   await act(async () => {
     pending.resolve({ data: { success: true, recipient_email: "qa@example.test" } });
   });
-  await waitFor(() => assert.equal(dialogOpen(), false, "dialog closed"));
-});
-
-test("success closes the dialog and confirms the recipient", async () => {
-  installApi({
-    onPost: async () => ({ data: { success: true, recipient_email: "qa@example.test" } }),
-  });
-  await renderPanel();
-  const { dialog, input } = await openDialog();
-  await typeInto(input, "qa@example.test");
-  await click(sendButton(dialog));
-
-  await waitFor(() => assert.equal(dialogOpen(), false, "dialog closed"));
   await waitFor(() => assert.equal(queryByText("Test email sent to qa@example.test.") !== null, true));
 });
 
-test("a backend error is shown in the dialog and the address is kept for a retry", async () => {
-  installApi({
-    onPost: async () => {
-      const error = new Error("Request failed with status code 502");
-      error.response = { status: 502, data: { detail: "Mautic rejected the test email." } };
-      throw error;
+test("a backend error is shown and the address is kept for a retry", async () => {
+  await openDetails({
+    onTestSend: async () => {
+      throw Object.assign(new Error("Request failed with status code 502"), {
+        response: { status: 502, data: { detail: "Mautic rejected the test email." } },
+      });
     },
   });
-  await renderPanel();
-  const { dialog, input } = await openDialog();
-  await typeInto(input, "qa@example.test");
-  await click(sendButton(dialog));
-
-  await waitFor(() => assert.match(dialog.textContent, /Mautic rejected the test email\./));
-  assert.equal(dialogOpen(), true, "the dialog stays open");
-  assert.equal(input.value, "qa@example.test");
-  assert.equal(sendButton(dialog).disabled, false, "the user can retry");
+  await typeInto(input(), "qa@example.test");
+  await click(sendButton());
+  await waitFor(() => assert.match(panel().textContent, /Mautic rejected the test email\./));
+  assert.equal(input().value, "qa@example.test");
+  assert.equal(sendButton().disabled, false, "the user can retry");
 });
 
 test("a network error gets its own message", async () => {
-  installApi({
-    onPost: async () => {
+  await openDetails({
+    onTestSend: async () => {
       throw new Error("Network Error");
     },
   });
-  await renderPanel();
-  const { dialog, input } = await openDialog();
-  await typeInto(input, "qa@example.test");
-  await click(sendButton(dialog));
-
-  await waitFor(() => assert.match(dialog.textContent, /could not reach the server/));
+  await typeInto(input(), "qa@example.test");
+  await click(sendButton());
+  await waitFor(() => assert.match(panel().textContent, /could not reach the server/));
 });
 
-test("Cancel closes the dialog without sending", async () => {
-  await renderPanel();
-  const { dialog, input } = await openDialog();
-  await typeInto(input, "qa@example.test");
-  await click(getByRole("button", "Cancel", { scope: dialog }));
-
-  await waitFor(() => assert.equal(dialogOpen(), false, "dialog closed"));
-  assert.equal(posts.length, 0);
+test("the list's Test Send action lands on this panel", async () => {
+  await openDetails();
+  await cleanup();
+  installTemplatesApi();
+  const view = await renderTemplatePages("/admin/newsletter/templates/18?testSend=1");
+  await waitFor(() => panel());
+  assert.equal(view.path(), "/admin/newsletter/templates/18?testSend=1");
+  await waitFor(() => assert.equal(document.activeElement === input(), true));
 });

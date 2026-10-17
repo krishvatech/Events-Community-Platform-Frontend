@@ -110,6 +110,16 @@ import AdminNewsletterTagsPanel from "./AdminNewsletterTagsPanel.jsx";
 import AdminNewsletterCustomFieldsPanel from "./AdminNewsletterCustomFieldsPanel.jsx";
 import AdminNewsletterSendOutcomePanel from "./AdminNewsletterSendOutcomePanel.jsx";
 import { getMarketingSectionFromPath } from "../config/marketingNavigation";
+import EmailPreviewFrame from "../components/marketing/EmailPreviewFrame.jsx";
+import MauticTokenPicker from "../components/marketing/MauticTokenPicker.jsx";
+import NewsletterTemplatePickerDialog from "../components/marketing/NewsletterTemplatePickerDialog.jsx";
+import MarketingEmailContentEditor, {
+  MODE_HTML,
+  MODE_VISUAL,
+  initialEmailEditorMode,
+  savedDesignContent,
+} from "../components/marketing/MarketingEmailContentEditor.jsx";
+import { findUnknownFieldTokens, insertTokenAt, useMauticTokens } from "../components/marketing/marketingEmailTokens";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -314,14 +324,12 @@ function PreviewDialog({ open, loading, preview, error, onClose }) {
               <Typography sx={{ fontWeight: 700 }}>{preview?.subject || "-"}</Typography>
               {preview?.preview_text && <Typography color="text.secondary">{preview.preview_text}</Typography>}
             </Box>
-            <Paper variant="outlined" sx={{ height: 360, overflow: "hidden", borderRadius: 2 }}>
-              <iframe
-                title="Newsletter HTML preview"
-                sandbox=""
-                srcDoc={preview?.html_content || preview?.html || "<p>No HTML preview available.</p>"}
-                style={{ width: "100%", height: "100%", border: 0, background: "white" }}
-              />
-            </Paper>
+            <EmailPreviewFrame
+              title="Newsletter HTML preview"
+              height={360}
+              html={preview?.html_content || preview?.html}
+              emptyHtml="<p>No HTML preview available.</p>"
+            />
           </Stack>
         )}
       </DialogContent>
@@ -838,7 +846,131 @@ function SettingsPage() {
   );
 }
 
-function CampaignForm({ value, categories, readOnly, errors, onChange, activeStep, onStepChange }) {
+/**
+ * Copies Template content into the draft form. HTML and plain text are
+ * replaced; subject and preview text are filled only when the draft has none.
+ * Exported for tests.
+ */
+export function applyTemplateContentToDraft(form, content) {
+  return {
+    ...form,
+    html_content: content.html_content,
+    plain_text: content.plain_text,
+    subject: String(form.subject || "").trim() ? form.subject : content.subject,
+    preview_text: String(form.preview_text || "").trim() ? form.preview_text : content.preview_text,
+  };
+}
+
+function BroadcastContentStep({ value, readOnly, errors, onChange, design }) {
+  const htmlRef = useRef(null);
+  const textRef = useRef(null);
+  const lastField = useRef("html_content");
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [templateOpen, setTemplateOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+  const tokenState = useMauticTokens(!readOnly);
+  const htmlMode = readOnly || design.mode !== MODE_VISUAL;
+
+  const unknownTokens = tokenState.loaded
+    ? findUnknownFieldTokens(
+        `${htmlMode ? value.html_content || "" : ""}\n${value.plain_text || ""}`,
+        tokenState.tokens
+      )
+    : [];
+
+  const setField = (field, nextValue) => onChange({ ...value, [field]: nextValue });
+
+  const insertToken = (token) => {
+    setPickerOpen(false);
+    const field = lastField.current;
+    const element = (field === "plain_text" ? textRef : htmlRef).current;
+    const { value: nextValue, caret } = insertTokenAt(value[field], token.token, element?.selectionStart, element?.selectionEnd);
+    setField(field, nextValue);
+    window.requestAnimationFrame(() => {
+      element?.focus();
+      element?.setSelectionRange?.(caret, caret);
+    });
+  };
+
+  const applyTemplate = (content) => {
+    setTemplateOpen(false);
+    onChange(applyTemplateContentToDraft(value, content));
+    // A Template whose visual design is current is copied as an independent
+    // design; otherwise only its HTML is copied and the draft is edited as HTML.
+    const templateDesign =
+      content.visualDesign?.status === "in_sync" ? savedDesignContent(content.visualDesign) : null;
+    if (templateDesign) {
+      design.contentRef.current?.loadDesign(templateDesign);
+      design.onDesignChange(templateDesign, { initial: false });
+    } else {
+      design.onModeChange(MODE_HTML);
+    }
+    setNotice(
+      `Copied from Template "${content.templateName || "Untitled"}"` +
+        (templateDesign ? " with its visual design" : " as HTML") +
+        ". Save the draft to keep it."
+    );
+  };
+
+  return (
+    <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: errors.html_content ? "error.main" : "#E7ECEF" }}>
+      <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>Email Content</Typography>
+      {!readOnly && (
+        <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 2 }}>
+          <Button variant="outlined" startIcon={<ViewModuleRoundedIcon />} onClick={() => setTemplateOpen(true)} sx={{ textTransform: "none" }}>
+            Start from Template
+          </Button>
+          {htmlMode && (
+            <Button variant="outlined" startIcon={<AddRoundedIcon />} onClick={() => setPickerOpen(true)} sx={{ textTransform: "none" }}>
+              Insert Token
+            </Button>
+          )}
+        </Stack>
+      )}
+      {notice && <Alert severity="success" onClose={() => setNotice("")} sx={{ mb: 2 }}>{notice}</Alert>}
+      {unknownTokens.length > 0 && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          Mautic does not know these fields and will send them as empty text: {unknownTokens.join(", ")}
+        </Alert>
+      )}
+      <Stack spacing={2}>
+        <MarketingEmailContentEditor
+          ref={design.contentRef}
+          itemKey={design.itemKey}
+          isNew={design.isNew}
+          visualDesign={design.visualDesign}
+          mode={design.mode}
+          onModeChange={design.onModeChange}
+          readOnly={readOnly}
+          tokens={tokenState.tokens}
+          tokensReady={tokenState.loaded || Boolean(tokenState.error)}
+          onDesignChange={design.onDesignChange}
+          onHtmlFromDesign={(html) => setField("html_content", html)}
+          htmlEditor={
+            <TextField label="HTML Content" value={value.html_content} onChange={(event) => setField("html_content", event.target.value)} onFocus={() => { lastField.current = "html_content"; }} inputRef={htmlRef} multiline minRows={12} fullWidth required error={Boolean(errors.html_content)} helperText={errors.html_content || "Use HTML content for the email body."} InputProps={{ readOnly }} />
+          }
+        />
+        <TextField label="Plain Text Fallback" value={value.plain_text} onChange={(event) => setField("plain_text", event.target.value)} onFocus={() => { lastField.current = "plain_text"; }} inputRef={textRef} multiline minRows={6} fullWidth InputProps={{ readOnly }} />
+      </Stack>
+      {!readOnly && (
+        <>
+          <MauticTokenPicker
+            open={pickerOpen}
+            tokens={tokenState.tokens}
+            loading={tokenState.loading}
+            error={tokenState.error}
+            onRetry={tokenState.retry}
+            onSelect={insertToken}
+            onClose={() => setPickerOpen(false)}
+          />
+          <NewsletterTemplatePickerDialog open={templateOpen} onClose={() => setTemplateOpen(false)} onApply={applyTemplate} />
+        </>
+      )}
+    </Paper>
+  );
+}
+
+function CampaignForm({ value, categories, readOnly, errors, onChange, activeStep, onStepChange, design }) {
   const setField = (field, nextValue) => onChange({ ...value, [field]: nextValue });
   const toggleAudience = (slug) => {
     const set = new Set(value.audience_slugs || []);
@@ -911,15 +1043,12 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
         </Paper>
       )}
 
-      {activeStep === 2 && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: errors.html_content ? "error.main" : "#E7ECEF" }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>Email Content</Typography>
-          <Alert severity="info" variant="outlined" sx={{ mb: 2 }}>Advanced Email Builder Coming Soon</Alert>
-          <Stack spacing={2}>
-            <TextField label="HTML Content" value={value.html_content} onChange={(event) => setField("html_content", event.target.value)} multiline minRows={12} fullWidth required error={Boolean(errors.html_content)} helperText={errors.html_content || "Use HTML content for the email body."} InputProps={{ readOnly }} />
-            <TextField label="Plain Text Fallback" value={value.plain_text} onChange={(event) => setField("plain_text", event.target.value)} multiline minRows={6} fullWidth InputProps={{ readOnly }} />
-          </Stack>
-        </Paper>
+      {/* Mounted from the first visit on and only hidden afterwards, so moving
+          between steps never discards unsaved visual-design work. */}
+      {design.contentVisited && (
+        <Box sx={{ display: activeStep === 2 ? "block" : "none" }}>
+          <BroadcastContentStep value={value} readOnly={readOnly} errors={errors} onChange={onChange} design={design} />
+        </Box>
       )}
 
       {activeStep === 3 && (
@@ -973,6 +1102,21 @@ export default function AdminNewsletterPage() {
   const refreshListAnalytics = useRef(false);
   const [duplicatingUuid, setDuplicatingUuid] = useState("");
   const duplicateInFlight = useRef(false);
+  // Visual Builder state for the open broadcast.
+  const contentRef = useRef(null);
+  const [editorMode, setEditorMode] = useState(MODE_VISUAL);
+  const [designDirty, setDesignDirty] = useState(false);
+  const [contentVisited, setContentVisited] = useState(false);
+
+  const resetDesignState = (visualDesign, { isNewItem }) => {
+    setEditorMode(initialEmailEditorMode({ isNew: isNewItem, visualDesign }));
+    setDesignDirty(false);
+    setContentVisited(false);
+  };
+
+  useEffect(() => {
+    if (activeStep === 2) setContentVisited(true);
+  }, [activeStep]);
 
   const loadCampaigns = async () => {
     setLoading(true);
@@ -1005,6 +1149,7 @@ export default function AdminNewsletterPage() {
         setForm(blankForm);
         setSavedForm(blankForm);
         setActiveStep(0);
+        resetDesignState(null, { isNewItem: true });
       } else {
         const data = await getNewsletterCampaign(campaignId);
         const nextForm = campaignToForm(data);
@@ -1012,6 +1157,7 @@ export default function AdminNewsletterPage() {
         setForm(nextForm);
         setSavedForm(nextForm);
         setActiveStep(0);
+        resetDesignState(data.visual_design, { isNewItem: false });
         loadAnalytics(campaignId);
       }
     } catch (err) {
@@ -1111,7 +1257,7 @@ export default function AdminNewsletterPage() {
   };
 
   const saveDraft = async () => {
-    if (!validate()) return null;
+    if (saving || !validate()) return null;
     setSaving(true);
     setError("");
     const payload = {
@@ -1124,6 +1270,22 @@ export default function AdminNewsletterPage() {
       plain_text: form.plain_text,
       audience_slugs: form.audience_slugs,
     };
+    // In Visual Builder the server compiles html_content from this design. An
+    // editor never opened in this visit has no changes, so the saved design
+    // (and the HTML it produced) is left as it is.
+    if (editorMode === MODE_VISUAL && contentVisited) {
+      try {
+        const visual = await contentRef.current?.collect();
+        if (visual) {
+          payload.design = visual.design;
+          payload.mjml = visual.mjml;
+        }
+      } catch (err) {
+        setSaving(false);
+        setError(err?.message || "The visual design could not be read.");
+        return null;
+      }
+    }
     try {
       return await saveBroadcastDraft({
         isNew,
@@ -1137,6 +1299,8 @@ export default function AdminNewsletterPage() {
           setCampaign(record);
           setForm(nextForm);
           setSavedForm(nextForm);
+          // The server stored the design with the HTML it compiled.
+          if (payload.design) setDesignDirty(false);
         },
         onError: ({ stage, error }) => {
           setError(
@@ -1257,7 +1421,7 @@ export default function AdminNewsletterPage() {
   const detailLoaded = isBroadcastDetailLoaded({ isNew, loading, campaign });
   const status = campaign ? String(campaign.status || "").toLowerCase() : "";
   const editable = detailLoaded && (isNew || status === "draft");
-  const isDirty = editable && !isNew && JSON.stringify(form) !== JSON.stringify(savedForm);
+  const isDirty = editable && !isNew && (designDirty || JSON.stringify(form) !== JSON.stringify(savedForm));
   const canDelete = detailLoaded && !isNew && status === "draft";
   const { canSchedule, canCancel } = broadcastScheduleActions({
     detailLoaded,
@@ -1358,6 +1522,18 @@ export default function AdminNewsletterPage() {
           onChange={setForm}
           activeStep={activeStep}
           onStepChange={setActiveStep}
+          design={{
+            contentRef,
+            contentVisited,
+            itemKey: `broadcast:${isNew ? "new" : campaignId}`,
+            isNew,
+            visualDesign: campaign?.visual_design,
+            mode: editorMode,
+            onModeChange: setEditorMode,
+            onDesignChange: (_, meta) => {
+              if (!meta?.initial) setDesignDirty(true);
+            },
+          }}
         />
       ) : (
         <EmptyState title="Broadcast could not be loaded." action={<Button variant="contained" onClick={loadDetail}>Retry</Button>} />

@@ -202,6 +202,10 @@ export const listNewsletterTemplateThemes = () =>
 export const getNewsletterTemplateUsage = (templateId) =>
   unwrap(apiClient.get(`${adminTemplatesEndpoint}${templateId}/usage/`));
 
+// Visual editor MJML -> email HTML. Compiles only: nothing is stored or sent.
+export const compileNewsletterEmailMjml = (mjml) =>
+  unwrap(apiClient.post("/newsletter/admin/email-designs/compile/", { mjml }));
+
 export const listNewsletterCategories = () =>
   unwrap(apiClient.get("/newsletter/admin/categories/"));
 

@@ -103,6 +103,9 @@ const STUBS = [
   { match: /\/utils\/api(\.js)?$/, file: path.join(HERE, "fakeUtilsApi.mjs") },
   { match: /\/utils\/cognitoAuth(\.js)?$/, file: path.join(HERE, "fakeCognitoAuth.mjs") },
   { match: /\/BlogRichTextEditor(\.jsx)?$/, file: path.join(HERE, "FakeRichTextEditor.jsx") },
+  // Imported (lazily) by pages: never load Templatical into jsdom. The editor's
+  // own tests load the real module directly as their entry point.
+  { match: /\/MarketingEmailVisualEditor(\.jsx)?$/, file: path.join(HERE, "FakeMarketingEmailVisualEditor.jsx") },
 ];
 
 // CommonJS packages whose named exports Node's ESM loader cannot detect are

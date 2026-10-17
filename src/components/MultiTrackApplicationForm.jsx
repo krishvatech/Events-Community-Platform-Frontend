@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -27,6 +27,13 @@ import {
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../utils/api';
+import { API_BASE, apiClient } from '../utils/api';
+import {
+  checkParticipantEmail,
+  getEmailRuleErrorMessage,
+  isEmailFormatValid,
+  normalizeSignupEmail,
+} from '../utils/signupEmailCheck';
 import {
   cognitoSignUp,
   cognitoConfirmSignUp,
@@ -73,6 +80,10 @@ const MultiTrackApplicationForm = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const [emailError, setEmailError] = useState('');
+  // The signed-in user's own address; an existing account is never refused.
+  const [accountEmail, setAccountEmail] = useState('');
+  const latestEmailRef = useRef('');
+  const [isCheckingEmail, setIsCheckingEmail] = useState(false);
   const [linkedinError, setLinkedinError] = useState('');
   const [submittedApplication, setSubmittedApplication] = useState(null);
 
@@ -157,6 +168,7 @@ const MultiTrackApplicationForm = ({
       const primaryPhone = data.links?.contact?.phones?.find(
         (phone) => phone?.number && String(phone.number).trim()
       )?.number;
+      setAccountEmail(data.email || '');
       setApplicantData((prev) => ({
         ...prev,
         first_name: data.first_name || prev.first_name,
@@ -173,6 +185,7 @@ const MultiTrackApplicationForm = ({
       if (!userStr) return;
       try {
         const user = JSON.parse(userStr);
+        setAccountEmail(user.email || '');
         setApplicantData((prev) => ({
           ...prev,
           email: user.email || prev.email,
@@ -399,7 +412,12 @@ const MultiTrackApplicationForm = ({
     return 'Submit Application';
   };
 
-  const handleApplicantChange = (field, value) => {
+  const handleApplicantChange = (field, rawValue) => {
+    // Spaces are never valid in an email, same as signup.
+    const value = field === 'email' ? rawValue.replace(/\s/g, '') : rawValue;
+    if (field === 'email') {
+      latestEmailRef.current = normalizeSignupEmail(value);
+    }
     setApplicantData((prev) => ({
       ...prev,
       [field]: value,
@@ -462,6 +480,30 @@ const MultiTrackApplicationForm = ({
     setLinkedinError('');
     setSubmitError(null);
     return true;
+  };
+
+  // Early feedback when the user leaves the email field. The step and submit
+  // checks run again, so a failed request here is ignored rather than shown.
+  const handleApplicantEmailBlur = async () => {
+    const email = normalizeSignupEmail(applicantData.email);
+    if (!isEmailFormatValid(email)) return;
+    const result = await checkParticipantEmail(API_BASE, email, { accountEmail });
+    if (result.status === 'blocked' && latestEmailRef.current === email) {
+      setEmailError(result.message);
+    }
+  };
+
+  // Same email rules as signup: the address must be valid and not disposable.
+  // Never continue when the check fails or cannot be completed.
+  const verifyApplicantEmail = async () => {
+    const result = await checkParticipantEmail(API_BASE, applicantData.email, { accountEmail });
+    if (result.status === 'allowed') return true;
+    if (result.status === 'blocked' || result.status === 'invalid') {
+      setEmailError(result.message);
+    }
+    setSubmitError(result.message);
+    setActiveStep(0);
+    return false;
   };
 
   const isApplicantDataValid = () => {
@@ -702,6 +744,16 @@ const MultiTrackApplicationForm = ({
         setSubmitError(`Please enter the ${missingField[1]} for ${trackLabel}.`);
         return false;
       }
+
+      const badEmailField = [
+        ['nominator_email', 'nominator email'],
+        ['nominee_email', 'recommended expert email'],
+      ].find(([field]) => !isEmailFormatValid(getTrackModeData(trackId, field)));
+
+      if (badEmailField) {
+        setSubmitError(`Please enter a valid ${badEmailField[1]} for ${trackLabel}.`);
+        return false;
+      }
     }
 
     return true;
@@ -922,6 +974,8 @@ const MultiTrackApplicationForm = ({
       setIsSubmitting(true);
       setSubmitError(null);
 
+      if (!(await verifyApplicantEmail())) return;
+
       // Build track_applications array with per-track pre-approval code
       const track_applications = selectedTracks.map((trackId) => {
         const perTrackData = trackData[trackId] || {};
@@ -1047,8 +1101,14 @@ const MultiTrackApplicationForm = ({
       const responseData = error.response?.data;
 
       let errorMessage = 'Failed to submit application. Please try again.';
+      const emailRuleError = getEmailRuleErrorMessage(responseData);
 
-      if (codeError && trackId) {
+      if (emailRuleError) {
+        // Backend refused the applicant email (disposable or malformed).
+        errorMessage = emailRuleError;
+        setEmailError(emailRuleError);
+        setActiveStep(0);
+      } else if (codeError && trackId) {
         // Pre-approval code error for a specific track - show near the field
         const userFriendlyError = {
           'invalid': 'The pre-approval code you entered is invalid.',
@@ -1113,9 +1173,17 @@ const MultiTrackApplicationForm = ({
     }
   };
 
-  const moveToNextStep = () => {
-    if (activeStep === 0 && !validateApplicantData()) {
-      return;
+  const moveToNextStep = async () => {
+    if (activeStep === 0) {
+      if (!validateApplicantData()) {
+        return;
+      }
+      setIsCheckingEmail(true);
+      try {
+        if (!(await verifyApplicantEmail())) return;
+      } finally {
+        setIsCheckingEmail(false);
+      }
     }
     if (currentTrackId && !validateTrackStep(currentTrackId)) {
       return;
@@ -1570,6 +1638,7 @@ const MultiTrackApplicationForm = ({
                     type="email"
                     value={applicantData.email}
                     onChange={(e) => handleApplicantChange('email', e.target.value)}
+                    onBlur={handleApplicantEmailBlur}
                     error={Boolean(emailError)}
                     helperText={emailError}
                     required
@@ -1976,6 +2045,7 @@ const MultiTrackApplicationForm = ({
           {activeStep < reviewStep ? (
             <Button
               variant="contained"
+<<<<<<< HEAD
               onClick={activeStep === 0 ? handleStepZeroPrimary : moveToNextStep}
               disabled={
                 isSubmitting ||
@@ -1985,6 +2055,11 @@ const MultiTrackApplicationForm = ({
                 // cannot advance the guest registration from here.
                 (activeStep === 0 && needsAccountRegistration && accountFlow === 'existing')
               }
+=======
+              onClick={moveToNextStep}
+              disabled={(activeStep === 0 && !isApplicantDataValid()) || isSubmitting || isCheckingEmail}
+              startIcon={isCheckingEmail ? <CircularProgress size={20} /> : null}
+>>>>>>> avinash-code
             >
               {checkingAccount ? 'Checking…' : 'Next'}
             </Button>

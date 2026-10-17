@@ -5,9 +5,12 @@ import {
   DISPOSABLE_EMAIL_MESSAGE,
   SIGNUP_EMAIL_CHECK_FAILED_MESSAGE,
   SIGNUP_EMAIL_CHECK_THROTTLED_MESSAGE,
+  checkParticipantEmail,
   checkSignupEmail,
   clearSignupEmailCheckCache,
+  getEmailRuleErrorMessage,
   isDisposableEmailSignupError,
+  isEmailFormatValid,
 } from "./signupEmailCheck.js";
 
 const API = "http://api.test/api";
@@ -111,4 +114,53 @@ test("recognizes the Cognito Pre Sign-up rejection only", () => {
   assert.equal(isDisposableEmailSignupError({ code: "UserLambdaValidationException", message: "PreSignUp failed with error other." }), false);
   assert.equal(isDisposableEmailSignupError({ code: "UsernameExistsException", message: "exists" }), false);
   assert.equal(isDisposableEmailSignupError(null), false);
+});
+
+test("participant check uses the signup preflight and blocks disposable domains", async () => {
+  const { calls, fetchImpl } = fakeFetch(() =>
+    jsonResponse(200, { allowed: false, code: "disposable_email_domain", message: DISPOSABLE_EMAIL_MESSAGE })
+  );
+  const result = await checkParticipantEmail(API, " Guest@Mailinator.com", { fetchImpl });
+  assert.deepEqual(result, { status: "blocked", message: DISPOSABLE_EMAIL_MESSAGE });
+  assert.deepEqual(calls[0].body, { email: "guest@mailinator.com" });
+});
+
+test("participant check never refuses the signed-in user's own account email", async () => {
+  const { calls, fetchImpl } = fakeFetch(() => jsonResponse(200, { allowed: false, code: "disposable_email_domain" }));
+  const result = await checkParticipantEmail(API, "legacy@mailinator.com", {
+    accountEmail: "Legacy@Mailinator.com",
+    fetchImpl,
+  });
+  assert.deepEqual(result, { status: "allowed" });
+  assert.equal(calls.length, 0);
+});
+
+test("participant check still checks a different email typed by a signed-in user", async () => {
+  const { calls, fetchImpl } = fakeFetch(() => jsonResponse(200, { allowed: false, code: "disposable_email_domain" }));
+  const result = await checkParticipantEmail(API, "other@mailinator.com", { accountEmail: "me@example.com", fetchImpl });
+  assert.equal(result.status, "blocked");
+  assert.equal(calls.length, 1);
+});
+
+test("participant check reports a failed request as an error, never allowed", async () => {
+  const fetchImpl = async () => {
+    throw new Error("offline");
+  };
+  const result = await checkParticipantEmail(API, "guest@example.com", { fetchImpl });
+  assert.deepEqual(result, { status: "error", message: SIGNUP_EMAIL_CHECK_FAILED_MESSAGE });
+});
+
+test("email format check matches the signup rule", () => {
+  assert.equal(isEmailFormatValid(" guest@example.com "), true);
+  assert.equal(isEmailFormatValid("guest@example"), false);
+  assert.equal(isEmailFormatValid("sifoka"), false);
+  assert.equal(isEmailFormatValid(""), false);
+  assert.equal(isEmailFormatValid(undefined), false);
+});
+
+test("maps backend email rule refusals to field messages", () => {
+  assert.equal(getEmailRuleErrorMessage({ code: "disposable_email_domain" }), DISPOSABLE_EMAIL_MESSAGE);
+  assert.equal(getEmailRuleErrorMessage({ code: "invalid_email" }), "Enter a valid email address");
+  assert.equal(getEmailRuleErrorMessage({ code: "account_exists" }), "");
+  assert.equal(getEmailRuleErrorMessage(null), "");
 });

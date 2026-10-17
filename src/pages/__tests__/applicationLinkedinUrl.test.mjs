@@ -49,11 +49,35 @@ const TRACKS = {
 const axiosError = (status, data) =>
   Object.assign(new Error("Request failed"), status ? { response: { status, data } } : {});
 
+const realFetch = globalThis.fetch;
 let posts;
+let emailChecks;
+const DISPOSABLE_MESSAGE =
+  "Temporary or disposable email addresses are not supported. Please use your regular email address.";
+
+/** Answers the signup email preflight: listed domains are disposable, the rest allowed. */
+function installEmailCheck(disposableDomains = ["mailinator.com"]) {
+  emailChecks = [];
+  globalThis.fetch = async (url, init = {}) => {
+    if (!String(url).endsWith("/auth/validate-signup-email/")) throw new Error(`unexpected fetch ${url}`);
+    const { email } = JSON.parse(init.body);
+    emailChecks.push(email);
+    const disposable = disposableDomains.includes(email.split("@")[1]);
+    return new Response(
+      JSON.stringify(
+        disposable
+          ? { allowed: false, code: "disposable_email_domain", message: DISPOSABLE_MESSAGE }
+          : { allowed: true, code: "allowed", message: "" }
+      ),
+      { status: 200 }
+    );
+  };
+}
 
 /** Mocks every apiClient call the form makes. Nothing leaves the process. */
 function installApi({ onApply = async () => ({ data: { id: 1, status: "pending" } }), profile } = {}) {
   posts = [];
+  installEmailCheck();
   globalThis.__testApiClient = {
     get: async (url) => {
       if (url === "/auth/me/profile/") {
@@ -97,10 +121,10 @@ async function renderForm({ selectedTracks = [32], isGuestApplication = true, on
   return successes;
 }
 
-async function fillApplicant({ linkedin = PROFILE } = {}) {
+async function fillApplicant({ linkedin = PROFILE, email = "rahul@example.com" } = {}) {
   await typeInto(getByRole("textbox", /^First Name/), "Rahul");
   await typeInto(getByRole("textbox", /^Last Name/), "Sharma");
-  await typeInto(document.querySelector("input[type='email']"), "rahul@example.com");
+  await typeInto(document.querySelector("input[type='email']"), email);
   await typeInto(getByRole("textbox", /^Job Title/), "Director");
   await typeInto(getByRole("textbox", /^Company/), "Acme");
   await typeInto(getByRole("textbox", /^Country\/Region/), "India");
@@ -120,9 +144,12 @@ async function advanceAndSubmit(selectedTracks = [32]) {
   await click(getByRole("button", "Submit Application"));
 }
 
+const emailInput = () => document.querySelector("input[type='email']");
+
 afterEach(async () => {
   await cleanup();
   delete globalThis.__testApiClient;
+  globalThis.fetch = realFetch;
 });
 
 // ------------------------------------------------- MultiTrackApplicationForm --
@@ -270,10 +297,70 @@ test("authenticated multi-track submission keeps both track selections and profi
   assert.deepEqual(payload.track_applications.map((t) => t.form_answers), [{ q32: "Answer 32" }, { q33: "Answer 33" }]);
 });
 
+test("disposable applicant email is refused on the applicant step; nothing is posted", async () => {
+  installApi();
+  await renderForm();
+  await fillApplicant({ email: "rahul@mailinator.com" });
+
+  await click(getByRole("button", "Next"));
+
+  await waitFor(() => assert.equal(emailInput().getAttribute("aria-invalid"), "true"));
+  assert.match(document.body.textContent, /Temporary or disposable email addresses are not supported/);
+  assert.equal(onApplicantStep(), true);
+  assert.deepEqual(emailChecks, ["rahul@mailinator.com"]);
+  assert.equal(applyPosts().length, 0);
+});
+
+test("spaces typed into the applicant email are removed", async () => {
+  installApi();
+  await renderForm();
+  await typeInto(emailInput(), " rahul @example.com ");
+  assert.equal(emailInput().value, "rahul@example.com");
+});
+
+test("email check failure blocks the step instead of allowing it", async () => {
+  installApi();
+  globalThis.fetch = async () => { throw new Error("offline"); };
+  await renderForm();
+  await fillApplicant({ email: "offline-check@example.com" });
+
+  await click(getByRole("button", "Next"));
+
+  await waitFor(() => assert.match(alertText(), /couldn't verify your email address/));
+  assert.equal(onApplicantStep(), true);
+  assert.equal(applyPosts().length, 0);
+});
+
+test("backend disposable-email 400 returns to the applicant step with the field message", async () => {
+  installApi({
+    onApply: async () => {
+      throw axiosError(400, { detail: DISPOSABLE_MESSAGE, code: "disposable_email_domain", email: [DISPOSABLE_MESSAGE] });
+    },
+  });
+  await renderForm();
+  await fillApplicant({ email: "rahul@new-throwaway.example" });
+  await advanceAndSubmit();
+
+  await waitFor(() => assert.equal(onApplicantStep(), true));
+  assert.equal(emailInput().getAttribute("aria-invalid"), "true");
+  assert.equal(emailInput().value, "rahul@new-throwaway.example", "keeps the typed email");
+});
+
+test("signed-in applicant's own account email is never sent to the disposable check", async () => {
+  installApi({
+    profile: { first_name: "Rahul", last_name: "Sharma", email: "legacy@mailinator.com", job_title: "Director", company: "Acme", location: "India", links: {} },
+  });
+  const successes = await renderForm({ isGuestApplication: false });
+  await waitFor(() => assert.equal(emailInput().value, "legacy@mailinator.com"));
+  await advanceAndSubmit();
+
+  await waitFor(() => assert.equal(successes.length, 1));
+  assert.deepEqual(emailChecks, []);
+});
+
 // ----------------------------------------------------------- GuestApplyModal --
 
 let fetchCalls;
-const realFetch = globalThis.fetch;
 
 function installFetch(onApplyPost) {
   fetchCalls = [];
