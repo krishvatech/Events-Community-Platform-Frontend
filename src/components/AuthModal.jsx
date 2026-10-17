@@ -19,6 +19,7 @@ import { Visibility, VisibilityOff, Close as CloseIcon } from "@mui/icons-materi
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { cognitoSignIn, cognitoSignUp, cognitoConfirmSignUp, cognitoResendSignUp } from "../utils/cognitoAuth";
+import { PASSWORD_POLICY_REGEX, PASSWORD_POLICY_MESSAGE } from "../utils/passwordPolicy";
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
 import { API_BASE } from "../utils/api";
@@ -323,9 +324,8 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
     if (!emailRegex.test(signupData.email || "")) {
       errs.email = "Enter a valid email address";
     }
-    const strongPwd = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9])[^\s]{8,}$/;
-    if (!strongPwd.test(signupData.password || "")) {
-      errs.password = "Min 8 chars, 1 uppercase, 1 number, 1 special";
+    if (!PASSWORD_POLICY_REGEX.test(signupData.password || "")) {
+      errs.password = PASSWORD_POLICY_MESSAGE;
     }
     if (signupData.password !== signupData.confirmPassword) {
       errs.confirmPassword = "Passwords do not match";

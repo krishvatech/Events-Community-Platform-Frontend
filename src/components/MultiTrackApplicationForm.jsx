@@ -21,8 +21,21 @@ import {
   MenuItem,
   Select,
   Chip,
+  IconButton,
+  InputAdornment,
 } from '@mui/material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../utils/api';
+import {
+  cognitoSignUp,
+  cognitoConfirmSignUp,
+  cognitoResendSignUp,
+  cognitoSignIn,
+} from '../utils/cognitoAuth';
+import { establishMemberAuthSession } from '../utils/memberAuthSession';
+import { saveLoginPayload } from '../utils/authStorage';
+import { PASSWORD_POLICY_REGEX, PASSWORD_POLICY_MESSAGE } from '../utils/passwordPolicy';
 import {
   LINKEDIN_URL_ERROR_MESSAGE,
   formatFieldErrors,
@@ -89,6 +102,47 @@ const MultiTrackApplicationForm = ({
   const [trackPreapprovalState, setTrackPreapprovalState] = useState({});
   const [isCheckingPreapproval, setIsCheckingPreapproval] = useState(false);
   const [trackCodeErrors, setTrackCodeErrors] = useState({});
+
+  // IPDT-772: guest account registration during the event application.
+  // `isGuestRegistration` is captured ONCE at mount. The sign-in that happens
+  // mid-flow flips the live token (and the `isGuestApplication` prop), so a
+  // reactive flag would wrongly hide the registration UI or reset the flow
+  // before the application is submitted. `accountReady` marks the point after
+  // which the applicant is authenticated and the application submits normally.
+  const [isGuestRegistration] = useState(isGuestApplication);
+  const [accountReady, setAccountReady] = useState(false);
+  const [registrationPhase, setRegistrationPhase] = useState('form'); // 'form' | 'otp'
+  // Which account path applies to this guest. Resolved when they click Next on
+  // the applicant-info step, so password fields are shown only to genuinely
+  // new applicants — an unauthenticated visitor may already have an account.
+  const [accountFlow, setAccountFlow] = useState('unresolved'); // 'unresolved' | 'new' | 'existing'
+  const [checkingAccount, setCheckingAccount] = useState(false);
+  const navigate = useNavigate();
+  // Resumable registration stages. Each is set true only when that step has
+  // actually succeeded, so a retry resumes from the first incomplete step and
+  // never repeats Cognito signup/OTP, sign-in, or account creation.
+  const [emailConfirmed, setEmailConfirmed] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [profileBootstrapped, setProfileBootstrapped] = useState(false);
+  // Passwords live only in component memory — never cached, serialized, or logged.
+  const [registrationCreds, setRegistrationCreds] = useState({ password: '', confirmPassword: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordErrors, setPasswordErrors] = useState({});
+  const [pendingSignup, setPendingSignup] = useState({ username: '', email: '' });
+  const [otpCode, setOtpCode] = useState('');
+  const [resendTimer, setResendTimer] = useState(0);
+  const [existingAccountNotice, setExistingAccountNotice] = useState('');
+
+  // Whether password/registration UI should be shown for this applicant.
+  const needsAccountRegistration = isGuestRegistration && !accountReady;
+
+  // OTP resend cooldown countdown.
+  useEffect(() => {
+    if (resendTimer <= 0) return undefined;
+    const id = setInterval(() => setResendTimer((s) => (s > 0 ? s - 1 : 0)), 1000);
+    return () => clearInterval(id);
+  }, [resendTimer]);
 
   // Load user data if authenticated
   useEffect(() => {
@@ -350,8 +404,11 @@ const MultiTrackApplicationForm = ({
       ...prev,
       [field]: value,
     }));
-    if (field === 'email' && emailError) {
-      setEmailError('');
+    if (field === 'email') {
+      if (emailError) setEmailError('');
+      // A changed email invalidates a prior account-path decision; re-check on Next.
+      if (accountFlow !== 'unresolved') setAccountFlow('unresolved');
+      if (existingAccountNotice) setExistingAccountNotice('');
     }
     if (field === 'linkedin_url' && linkedinError) {
       setLinkedinError('');
@@ -409,7 +466,7 @@ const MultiTrackApplicationForm = ({
 
   const isApplicantDataValid = () => {
     const { first_name, last_name, email, job_title, company_name, location } = applicantData;
-    return Boolean(
+    const baseValid = Boolean(
       first_name?.trim() &&
       last_name?.trim() &&
       email?.trim() &&
@@ -417,6 +474,91 @@ const MultiTrackApplicationForm = ({
       company_name?.trim() &&
       location?.trim()
     );
+    // Passwords are required only once the new-account path is active (they are
+    // not shown before the account check, nor on the existing-account path).
+    if (needsAccountRegistration && accountFlow === 'new') {
+      return baseValid
+        && PASSWORD_POLICY_REGEX.test(registrationCreds.password || '')
+        && registrationCreds.password === registrationCreds.confirmPassword;
+    }
+    return baseValid;
+  };
+
+  // IPDT-772: resolve new-vs-existing account when the guest leaves step 0.
+  // The check is a UX aid only; Cognito still enforces uniqueness at signup.
+  const resolveAccountFlow = async () => {
+    if (!validateApplicantData()) { return; }
+    setCheckingAccount(true);
+    setSubmitError(null);
+    setExistingAccountNotice('');
+    try {
+      const email = (applicantData.email || '').trim().toLowerCase();
+      const resp = await apiClient.get('/auth/check-email/', { params: { email } });
+      if (resp?.data?.indeterminate === true) {
+        // Backend could not consult Cognito. Never classify as new on an
+        // unconfirmed result — keep unresolved and let the user retry/sign in.
+        setAccountFlow('unresolved');
+        setSubmitError('We could not check your account status just now. Please try again — or sign in if you already have an account.');
+        return;
+      }
+      setAccountFlow(resp?.data?.exists === true ? 'existing' : 'new');
+    } catch {
+      // Inconclusive: do not assume the account is free. Stay unresolved so the
+      // button retries the check; the persistent Sign In link covers known
+      // existing users. Cognito is still the final uniqueness authority.
+      setAccountFlow('unresolved');
+      setSubmitError('We could not check your account status just now. Please try again — or sign in if you already have an account.');
+    } finally {
+      setCheckingAccount(false);
+    }
+  };
+
+  // Existing-account path: reuse the platform's existing sign-in route. The
+  // in-progress application cannot be carried across this navigation, so the
+  // applicant returns authenticated and continues via Apply Now (Scenario C).
+  const handleGoToSignIn = () => {
+    const next = typeof window !== 'undefined' ? window.location.pathname : '/';
+    navigate(`/signin?next=${encodeURIComponent(next)}`);
+  };
+
+  // Existing-account path: let the applicant try a different email instead of
+  // signing in. Clears the email + account decision so the next check re-runs.
+  const handleUseAnotherEmail = () => {
+    setAccountFlow('unresolved');
+    setExistingAccountNotice('');
+    setSubmitError(null);
+    handleApplicantChange('email', '');
+  };
+
+  // Primary action for the applicant-info step. For a guest it first resolves
+  // the account path, then (once 'new') advances like a normal Next.
+  const handleStepZeroPrimary = async () => {
+    if (!needsAccountRegistration) { moveToNextStep(); return; }
+    if (accountFlow === 'new') { moveToNextStep(); return; }
+    // 'unresolved' (first click or after a failed check): run the check.
+    await resolveAccountFlow();
+  };
+
+  // IPDT-772: validate the registration passwords and surface inline errors.
+  const validateRegistrationPassword = () => {
+    const errs = {};
+    if (!PASSWORD_POLICY_REGEX.test(registrationCreds.password || '')) {
+      errs.password = PASSWORD_POLICY_MESSAGE;
+    }
+    if (registrationCreds.password !== registrationCreds.confirmPassword) {
+      errs.confirmPassword = 'Passwords do not match';
+    }
+    setPasswordErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleRegistrationCredChange = (field, value) => {
+    // Strip whitespace to match the signup policy (no whitespace allowed).
+    const next = (value || '').replace(/\s/g, '');
+    setRegistrationCreds((prev) => ({ ...prev, [field]: next }));
+    if (passwordErrors[field]) {
+      setPasswordErrors((prev) => ({ ...prev, [field]: undefined }));
+    }
   };
 
   const saveRegistrationProfile = async () => {
@@ -584,7 +726,186 @@ const MultiTrackApplicationForm = ({
     return true;
   };
 
+  // Entry point for the final action button. For a guest who still needs an
+  // account, this starts the Cognito self-signup + OTP flow; the application
+  // itself is submitted (by submitApplication) only after the applicant has
+  // verified their email and is authenticated. Everyone else submits directly.
   const handleSubmit = async () => {
+    if (needsAccountRegistration) {
+      await beginGuestRegistration();
+      return;
+    }
+    await submitApplication();
+  };
+
+  const beginGuestRegistration = async () => {
+    if (!validateApplicantData()) { setActiveStep(0); return; }
+    if (!validateRegistrationPassword()) { setActiveStep(0); return; }
+    // The track steps must also be valid before we create an account, so a
+    // verified account is never left without a submittable application.
+    const invalidTrack = selectedTracks.find((trackId) => !validateTrackStep(trackId));
+    if (invalidTrack) { setActiveStep(selectedTracks.indexOf(invalidTrack) + 1); return; }
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    setExistingAccountNotice('');
+    try {
+      const email = (applicantData.email || '').trim().toLowerCase();
+
+      // Preflight duplicate check — UX only; identity is proven by OTP, never
+      // by this lookup. On an existing account we stop and point to sign-in.
+      try {
+        const resp = await apiClient.get('/auth/check-email/', { params: { email } });
+        if (resp?.data?.exists === true) {
+          setExistingAccountNotice(
+            'An IMAA Connect account already exists for this email. Please sign in to continue your application.'
+          );
+          return;
+        }
+      } catch {
+        // Non-blocking: Cognite will still reject a duplicate below.
+      }
+
+      // Cognito requires a non-email username when the pool uses email alias.
+      const emailPrefix = (email.split('@')[0] || 'user').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'user';
+      const username = `${emailPrefix}${Math.floor(1000 + Math.random() * 9000)}`;
+
+      await cognitoSignUp({
+        username,
+        email,
+        firstName: (applicantData.first_name || '').trim(),
+        lastName: (applicantData.last_name || '').trim(),
+        password: registrationCreds.password,
+      });
+
+      setPendingSignup({ username, email });
+      setOtpCode('');
+      setResendTimer(60);
+      setRegistrationPhase('otp');
+    } catch (err) {
+      const code = err?.code || err?.name;
+      if (code === 'UsernameExistsException' || code === 'AliasExistsException') {
+        setExistingAccountNotice(
+          'An IMAA Connect account already exists for this email. Please sign in to continue your application.'
+        );
+      } else if (code === 'InvalidPasswordException') {
+        setPasswordErrors((p) => ({ ...p, password: 'Password does not meet the required policy.' }));
+        setActiveStep(0);
+      } else {
+        setSubmitError(err?.message || 'Could not start account registration. Please try again.');
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Resumable registration driver. Runs only the stages that have not yet
+  // succeeded, so a retry after a mid-sequence failure never repeats Cognito
+  // signup/OTP confirmation or creates a second account. Stage order:
+  //   1. confirm OTP (proves email ownership)
+  //   2. sign in + establish member session (needs the password)
+  //   3. bootstrap the Django profile (company/job title/Country-Region)
+  //   4. submit the event application on the authenticated session.
+  const advanceRegistration = async () => {
+    if (isSubmitting) return; // guard against concurrent clicks
+    if (!emailConfirmed && !otpCode.trim()) {
+      setSubmitError('Please enter the verification code.');
+      return;
+    }
+
+    // Local progress mirrors state so the catch block can report the correct
+    // stage even though React state updates are not visible synchronously.
+    let confirmedNow = emailConfirmed;
+    let sessionNow = sessionReady;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      // Stage 1 — confirm OTP (skip if already confirmed in a prior attempt).
+      if (!emailConfirmed) {
+        await cognitoConfirmSignUp({ username: pendingSignup.username, code: otpCode.trim() });
+        setEmailConfirmed(true);
+        confirmedNow = true;
+      }
+
+      // Stage 2 — sign in and establish the member session (needs password).
+      if (!sessionReady) {
+        if (!registrationCreds.password) {
+          // Credentials are no longer in memory (e.g. after a remount). Do not
+          // re-run OTP; direct the applicant to the existing sign-in UX.
+          setSubmitError('Your email is verified. Please sign in with your new password to finish submitting your application.');
+          return;
+        }
+        const session = await cognitoSignIn({
+          usernameOrEmail: pendingSignup.username,
+          password: registrationCreds.password,
+        });
+        const bearer = await establishMemberAuthSession({
+          accessToken: session.idToken,
+          idToken: session.idToken,
+          refreshToken: session.refreshToken,
+          cognitoAccessToken: session.accessToken,
+        });
+        saveLoginPayload({ id_token: bearer, access_token: bearer, refresh: '' });
+        setSessionReady(true);
+        sessionNow = true;
+        // Passwords are only needed through sign-in. Clear them now; a later
+        // bootstrap/submit retry never needs them again.
+        setRegistrationCreds({ password: '', confirmPassword: '' });
+      }
+
+      // Stage 3 — seed profile so event lead-gen validation passes. apiClient
+      // now carries the Bearer. Retried independently if it fails.
+      if (!profileBootstrapped) {
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        await apiClient.post('/auth/cognito/bootstrap/', {
+          username: pendingSignup.username,
+          email: pendingSignup.email,
+          firstName: (applicantData.first_name || '').trim(),
+          lastName: (applicantData.last_name || '').trim(),
+          company: (applicantData.company_name || '').trim(),
+          job_title: (applicantData.job_title || '').trim(),
+          location: (applicantData.location || '').trim(),
+          timezone: tz,
+        });
+        setProfileBootstrapped(true);
+      }
+
+      // All prerequisites satisfied. Only now is the account "ready" and the
+      // original application submitted (exactly once) on the verified session.
+      setAccountReady(true);
+      setRegistrationPhase('form');
+      await submitApplication();
+    } catch (err) {
+      const code = err?.code || err?.name;
+      let msg;
+      if (!confirmedNow) {
+        msg = code === 'CodeMismatchException' ? 'Invalid verification code.'
+          : code === 'ExpiredCodeException' ? 'Verification code expired. Please resend a new code.'
+            : (err?.message || 'Verification failed. Please try again.');
+      } else if (!sessionNow) {
+        msg = 'Your email is verified, but sign-in failed. Please try again.';
+      } else {
+        msg = 'Your account is ready, but we could not finish setting up your profile. Please try again.';
+      }
+      setSubmitError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    if (resendTimer > 0) return;
+    try {
+      await cognitoResendSignUp({ username: pendingSignup.username });
+      setResendTimer(60);
+      setSubmitError(null);
+    } catch (err) {
+      setSubmitError(err?.message || 'Failed to resend the verification code.');
+    }
+  };
+
+  const submitApplication = async () => {
     if (!validateApplicantData()) {
       // Applicant fields live on step 0; take the user back there to fix them.
       setActiveStep(0);
@@ -703,6 +1024,14 @@ const MultiTrackApplicationForm = ({
       );
 
       console.log('✅ Application submitted successfully:', response.data);
+
+      // IPDT-772: for a guest who just registered, the member session was
+      // established silently during OTP confirmation. Notify the rest of the
+      // app now — after the application is safely submitted — so the modal and
+      // in-progress state were never torn down mid-flow by an auth refresh.
+      if (accountReady && typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:changed'));
+      }
 
       if (onSuccess) {
         onSuccess(response.data);
@@ -1125,6 +1454,66 @@ const MultiTrackApplicationForm = ({
     );
   }
 
+  // IPDT-772: email verification step. Shown after Cognito self-signup and
+  // before the application is submitted, so email ownership is always proven.
+  if (registrationPhase === 'otp' && !submittedApplication) {
+    // Once the email is confirmed, a retry resumes at sign-in or profile setup
+    // rather than re-entering a code — the code input is only for stage 1.
+    const ctaLabel = !emailConfirmed
+      ? (isSubmitting ? 'Verifying...' : 'Verify & Submit')
+      : !sessionReady
+        ? (isSubmitting ? 'Signing in...' : 'Retry sign-in')
+        : (isSubmitting ? 'Finishing...' : 'Finish & submit');
+    return (
+      <Container maxWidth="sm" sx={{ py: 4 }}>
+        {submitError && <Alert severity="error" sx={{ mb: 3 }}>{submitError}</Alert>}
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              {emailConfirmed ? 'Finish creating your account' : 'Verify your email'}
+            </Typography>
+            <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
+              {emailConfirmed
+                ? 'Your email is verified. Continue to finish setting up your account and submit your application.'
+                : <>We sent a verification code to <strong>{pendingSignup.email}</strong>. Enter it below to finish creating your account and submit your application.</>}
+            </Typography>
+            {!emailConfirmed && (
+              <TextField
+                fullWidth
+                label="Verification Code"
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value.replace(/\s/g, ''))}
+                autoComplete="one-time-code"
+                inputProps={{ inputMode: 'numeric' }}
+                sx={{ mb: 2 }}
+              />
+            )}
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
+              {!emailConfirmed ? (
+                <Button
+                  onClick={handleResendOtp}
+                  disabled={resendTimer > 0 || isSubmitting}
+                  size="small"
+                >
+                  {resendTimer > 0 ? `Resend code (${resendTimer}s)` : 'Resend code'}
+                </Button>
+              ) : <span />}
+              <Button
+                variant="contained"
+                color="success"
+                onClick={advanceRegistration}
+                disabled={isSubmitting || (!emailConfirmed && !otpCode.trim())}
+                startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
+              >
+                {ctaLabel}
+              </Button>
+            </Box>
+          </CardContent>
+        </Card>
+      </Container>
+    );
+  }
+
   return (
     <Container maxWidth="md" sx={{ py: 4 }}>
       {submitError && <Alert severity="error" sx={{ mb: 3 }}>{submitError}</Alert>}
@@ -1213,6 +1602,140 @@ const MultiTrackApplicationForm = ({
                     required
                   />
                 </Grid>
+                {/* IPDT-772: account-registration fields, shown only for a guest
+                    who still needs an IMAA Connect account. Authenticated users
+                    (Apply Now) never see these. Passwords are kept in a separate
+                    state and are never serialized into the application payload,
+                    the review screen, the application cache, or logs. */}
+                {/* IPDT-772 new-account path: password fields appear only once
+                    the account check has determined this is a new applicant. */}
+                {needsAccountRegistration && accountFlow === 'new' && (
+                  <>
+                    <Grid item xs={12}>
+                      <Divider sx={{ mt: 1, mb: 2 }} />
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+                        Create your IMAA Connect account
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        You'll verify your email with a code before your application is submitted.
+                      </Typography>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Password *"
+                        type={showPassword ? 'text' : 'password'}
+                        value={registrationCreds.password}
+                        onChange={(e) => handleRegistrationCredChange('password', e.target.value)}
+                        error={Boolean(passwordErrors.password)}
+                        helperText={passwordErrors.password || PASSWORD_POLICY_MESSAGE}
+                        required
+                        autoComplete="new-password"
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                onClick={() => setShowPassword((v) => !v)}
+                                edge="end"
+                              >
+                                {showPassword ? <VisibilityOff /> : <Visibility />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <TextField
+                        fullWidth
+                        label="Confirm Password *"
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        value={registrationCreds.confirmPassword}
+                        onChange={(e) => handleRegistrationCredChange('confirmPassword', e.target.value)}
+                        onBlur={validateRegistrationPassword}
+                        error={Boolean(passwordErrors.confirmPassword)}
+                        helperText={passwordErrors.confirmPassword || ''}
+                        required
+                        autoComplete="new-password"
+                        InputProps={{
+                          endAdornment: (
+                            <InputAdornment position="end">
+                              <IconButton
+                                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                                onClick={() => setShowConfirmPassword((v) => !v)}
+                                edge="end"
+                              >
+                                {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                              </IconButton>
+                            </InputAdornment>
+                          ),
+                        }}
+                      />
+                    </Grid>
+                  </>
+                )}
+
+                {/* IPDT-772 existing-account path: no new password; offer sign-in. */}
+                {needsAccountRegistration && accountFlow === 'existing' && (
+                  <Grid item xs={12}>
+                    <Box
+                      sx={{
+                        mt: 1,
+                        p: 2,
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        backgroundColor: 'action.hover',
+                      }}
+                    >
+                      <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                        Already have an IMAA Connect account?
+                      </Typography>
+                      <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                        An account may already be registered with this email. Please sign in to
+                        continue your event application. After signing in, return to this event and
+                        choose Apply Now. (Your entries here are not carried across sign-in.)
+                      </Typography>
+                      <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                        <Button variant="contained" onClick={handleGoToSignIn}>
+                          Sign in to continue
+                        </Button>
+                        <Button variant="outlined" onClick={handleUseAnotherEmail}>
+                          Use another email
+                        </Button>
+                      </Box>
+                    </Box>
+                  </Grid>
+                )}
+
+                {/* Backstop notice from a submit-time duplicate detection. */}
+                {needsAccountRegistration && existingAccountNotice && (
+                  <Grid item xs={12}>
+                    <Alert
+                      severity="info"
+                      action={
+                        <Button color="inherit" size="small" onClick={handleGoToSignIn}>
+                          Sign In
+                        </Button>
+                      }
+                    >
+                      {existingAccountNotice}
+                    </Alert>
+                  </Grid>
+                )}
+
+                {/* Always available for a guest who knows they already have an account. */}
+                {needsAccountRegistration && accountFlow !== 'existing' && (
+                  <Grid item xs={12}>
+                    <Typography variant="caption" color="textSecondary">
+                      Already have an IMAA Connect account?{' '}
+                      <Button variant="text" size="small" sx={{ p: 0, minWidth: 0, verticalAlign: 'baseline' }} onClick={handleGoToSignIn}>
+                        Sign in
+                      </Button>
+                    </Typography>
+                  </Grid>
+                )}
                 <Grid item xs={12} sm={6}>
                   <TextField
                     fullWidth
@@ -1453,10 +1976,17 @@ const MultiTrackApplicationForm = ({
           {activeStep < reviewStep ? (
             <Button
               variant="contained"
-              onClick={moveToNextStep}
-              disabled={(activeStep === 0 && !isApplicantDataValid()) || isSubmitting}
+              onClick={activeStep === 0 ? handleStepZeroPrimary : moveToNextStep}
+              disabled={
+                isSubmitting ||
+                checkingAccount ||
+                (activeStep === 0 && !isApplicantDataValid()) ||
+                // On the existing-account path the applicant must sign in; they
+                // cannot advance the guest registration from here.
+                (activeStep === 0 && needsAccountRegistration && accountFlow === 'existing')
+              }
             >
-              Next
+              {checkingAccount ? 'Checking…' : 'Next'}
             </Button>
           ) : (
             <Button
