@@ -2045,7 +2045,6 @@ const MultiTrackApplicationForm = ({
           {activeStep < reviewStep ? (
             <Button
               variant="contained"
-<<<<<<< HEAD
               onClick={activeStep === 0 ? handleStepZeroPrimary : moveToNextStep}
               disabled={
                 isSubmitting ||
@@ -2055,11 +2054,6 @@ const MultiTrackApplicationForm = ({
                 // cannot advance the guest registration from here.
                 (activeStep === 0 && needsAccountRegistration && accountFlow === 'existing')
               }
-=======
-              onClick={moveToNextStep}
-              disabled={(activeStep === 0 && !isApplicantDataValid()) || isSubmitting || isCheckingEmail}
-              startIcon={isCheckingEmail ? <CircularProgress size={20} /> : null}
->>>>>>> avinash-code
             >
               {checkingAccount ? 'Checking…' : 'Next'}
             </Button>
