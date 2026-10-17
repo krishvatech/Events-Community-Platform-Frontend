@@ -1074,8 +1074,8 @@ export default function EventDetailsPage() {
       if (!profile.first_name) missingFields.push("First Name");
       if (!profile.last_name) missingFields.push("Last Name");
       if (!profile.email) missingFields.push("Email");
-      if (!profile.job_title) missingFields.push("Job Title");
-      if (!profile.company) missingFields.push("Company");
+      if (!profile.job_title) missingFields.push("Experience: Position");
+      if (!profile.company) missingFields.push("Experience: Company Name");
 
       if (missingFields.length > 0) {
         toast.error(`Please complete your profile: ${missingFields.join(", ")}`);

@@ -10,6 +10,13 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 
+// Missing-field keys mapped to the section and field names the user sees on the Profile page.
+const PROFILE_FIELD_LABELS = {
+  job_title: ['Experience: Position'],
+  company: ['Experience: Company Name'],
+  location: ['Location: City', 'Location: Country'],
+};
+
 /**
  * LeadGenModal: Info-only modal showing missing lead-generation fields for event registration.
  * Does NOT allow editing directly in the modal. User must go to their Profile to update.
@@ -34,7 +41,9 @@ export function LeadGenModal({
   };
 
   const getMissingFieldsList = () => {
-    return Object.entries(missingFields).map(([key, displayName]) => displayName);
+    return Object.entries(missingFields).flatMap(
+      ([key, displayName]) => PROFILE_FIELD_LABELS[key] || [displayName]
+    );
   };
 
   return (

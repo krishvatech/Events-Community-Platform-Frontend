@@ -3872,7 +3872,7 @@ export default function ProfilePage() {
                             </Avatar>
 
                             <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                              Add an experience to your profile
+                              Add your Position and Company Name here. These details are required to register for events.
                             </Typography>
 
                             <Box>
