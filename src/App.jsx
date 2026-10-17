@@ -36,6 +36,8 @@ import SettingsPage from "./pages/SettingsPage.jsx";
 import NewsletterPage from "./pages/NewsletterPage.jsx";
 import AdminNewsletterDashboardPage from "./pages/AdminNewsletterDashboardPage.jsx";
 import AdminNewsletterPage from "./pages/AdminNewsletterPage.jsx";
+import AdminNewsletterTemplateDetailsPage from "./pages/AdminNewsletterTemplateDetailsPage.jsx";
+import AdminNewsletterTemplateEditorPage from "./pages/AdminNewsletterTemplateEditorPage.jsx";
 import AdminNewsletterAnalyticsPage from "./pages/AdminNewsletterAnalyticsPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
 import AdminNewsletterContactDetailPage from "./pages/AdminNewsletterContactDetailPage.jsx";
@@ -381,6 +383,10 @@ const AppShell = () => {
               <Route path="campaigns" element={<AdminNewsletterPage />} />
               <Route path="broadcasts" element={<AdminNewsletterPage />} />
               <Route path="templates" element={<AdminNewsletterPage />} />
+              {/* Static "templates/..." segments rank above the broadcast ":campaignId" route. */}
+              <Route path="templates/new" element={<AdminNewsletterTemplateEditorPage />} />
+              <Route path="templates/:templateId" element={<AdminNewsletterTemplateDetailsPage />} />
+              <Route path="templates/:templateId/edit" element={<AdminNewsletterTemplateEditorPage />} />
               <Route path="lists" element={<AdminNewsletterPage />} />
               <Route path="segments" element={<AdminNewsletterPage />} />
               <Route path="analytics" element={<AdminNewsletterAnalyticsPage />} />

@@ -12,6 +12,11 @@ window.addEventListener('unhandledrejection', (event) => {
 
 import './sentry';
 
+// Must run before <BrowserRouter> mounts: unsaved-changes guards have to see
+// browser Back/Forward before the router's own popstate listener does.
+import { installHistoryGuard } from './components/marketing/historyGuard';
+installHistoryGuard();
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';

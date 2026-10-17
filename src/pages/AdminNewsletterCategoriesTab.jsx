@@ -310,8 +310,10 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
 
   return (
     <Stack spacing={3}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 2 }}>
-        <Box>
+      {/* Wraps on narrow screens: the actions move below the title instead of
+          running off the edge. Wide screens have room, so nothing wraps. */}
+      <Box sx={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
           <Typography variant="h6" sx={{ fontWeight: 700, color: "#2C3E5A" }}>
             Subscription Lists
           </Typography>
@@ -319,7 +321,7 @@ export default function AdminNewsletterCategoriesTab({ onDataReady }) {
             Manage ECP subscription lists and their Mautic segment connections.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
           <Tooltip title="Refresh">
             <Button
               variant="outlined"
