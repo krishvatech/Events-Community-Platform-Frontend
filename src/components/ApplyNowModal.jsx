@@ -5,13 +5,14 @@ import {
   Button,
   Card,
   CardContent,
-  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  Radio,
+  RadioGroup,
   Stack,
   Typography,
 } from "@mui/material";
@@ -96,10 +97,13 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
     onClose();
   };
 
-  const handleTrackToggle = (trackId, checked) => {
-    setSelectedTrackIds((prev) =>
-      checked ? [...prev, trackId] : prev.filter((id) => id !== trackId)
-    );
+  const handleTrackSelect = (trackId) => {
+    // IPDT-771: single selection only. Selecting a track replaces any
+    // previous selection. The state stays an array (length <= 1) so the
+    // `selectedTracks` contract consumed by MultiTrackApplicationForm is
+    // unchanged; the step `key` includes the selected id, so switching
+    // tracks remounts the form and no stale per-track answers survive.
+    setSelectedTrackIds([trackId]);
   };
 
   const handleApplicationSuccess = (data) => {
@@ -140,21 +144,21 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
           Select Application Track
         </Typography>
         <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
-          Choose one or more tracks you'd like to apply for:
+          Choose one track you'd like to apply for:
         </Typography>
 
-        <Stack spacing={1}>
-          {tracks.map((track) => {
-            const checked = selectedTrackIds.includes(track.id);
-            return (
+        <RadioGroup
+          aria-label="Application track"
+          name="application-track"
+          value={selectedTrackIds.length ? String(selectedTrackIds[0]) : ""}
+          onChange={(e) => handleTrackSelect(Number(e.target.value))}
+        >
+          <Stack spacing={1}>
+            {tracks.map((track) => (
               <FormControlLabel
                 key={track.id}
-                control={
-                  <Checkbox
-                    checked={checked}
-                    onChange={(e) => handleTrackToggle(track.id, e.target.checked)}
-                  />
-                }
+                value={String(track.id)}
+                control={<Radio />}
                 label={
                   <Box>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
@@ -178,9 +182,9 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
                 }
                 sx={{ alignItems: "flex-start", m: 0 }}
               />
-            );
-          })}
-        </Stack>
+            ))}
+          </Stack>
+        </RadioGroup>
 
         <Button
           variant="contained"
@@ -251,7 +255,7 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
             {tracks.length > 1 && (
               <Box sx={{ mb: 2 }}>
                 <Button variant="text" size="small" onClick={() => setShowTrackSelector(true)}>
-                  Change selected tracks
+                  Change selected track
                 </Button>
               </Box>
             )}
