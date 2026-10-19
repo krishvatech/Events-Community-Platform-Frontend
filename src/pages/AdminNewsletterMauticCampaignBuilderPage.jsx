@@ -97,7 +97,19 @@ import {
   requiresProviderDeletion,
 } from "./mauticCampaignEventRemoval";
 import MauticRemoteChoiceField from "./MauticRemoteChoiceField";
-import { duplicateFailureMessage, duplicateSuccessMessage } from "./mauticCampaignDuplicate";
+import {
+  EMAIL_TYPE_PATH,
+  TRANSACTIONAL_CONFIRMATION_FIELD,
+  emailTypeState,
+  unresolvedEmailSendEvents,
+  withNewEventEmailTypeDefault,
+  withPersistedEmailType,
+} from "./mauticCampaignEmailType";
+import {
+  duplicateFailureMessage,
+  duplicateSuccessMessage,
+  duplicateSuccessSeverity,
+} from "./mauticCampaignDuplicate";
 import {
   createNativeMauticCampaign,
   deleteNativeMauticCampaignEvent,
@@ -249,7 +261,77 @@ function PersistedPropertiesSummary({ properties }) {
   );
 }
 
-function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading = false }) {
+// What the Send email type means for delivery, and the explicit confirmation a
+// transactional send needs (checked again by the backend).
+export function EmailTypeNotice({ event, onChangeEventField }) {
+  const state = emailTypeState(event);
+  if (!state.applies) return null;
+
+  if (state.legacyMissing) {
+    return (
+      <Alert severity="warning" variant="outlined" data-testid="email-type-legacy">
+        This saved Send email step has no email type, so Mautic sends it as
+        Transactional: contacts who unsubscribed or are marked Do Not Contact still
+        receive it, and a contact can receive it again. Choose Marketing to respect
+        unsubscribes, or Transactional to keep the current behaviour. Saving other
+        changes leaves this step as it is.
+      </Alert>
+    );
+  }
+
+  if (state.transactional) {
+    return (
+      <Alert severity="error" variant="outlined" data-testid="email-type-transactional">
+        <Stack spacing={1}>
+          <Typography variant="body2">
+            Transactional emails ignore unsubscribes and Do Not Contact, and can be sent
+            to the same contact more than once. Use them only for messages a contact
+            must receive, never for marketing.
+          </Typography>
+          {state.needsConfirmation ? (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={state.confirmed}
+                  onChange={(changeEvent) =>
+                    onChangeEventField?.(
+                      event.id,
+                      TRANSACTIONAL_CONFIRMATION_FIELD,
+                      changeEvent.target.checked
+                    )
+                  }
+                />
+              }
+              label="I confirm this step sends a transactional email"
+            />
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              Saved in Mautic as Transactional.
+            </Typography>
+          )}
+        </Stack>
+      </Alert>
+    );
+  }
+
+  if (state.marketing) {
+    return (
+      <Typography variant="caption" color="text.secondary" data-testid="email-type-marketing">
+        Marketing: contacts who unsubscribed or are marked Do Not Contact are skipped,
+        and each contact receives this email once.
+      </Typography>
+    );
+  }
+
+  return null;
+}
+
+function EventConfigurationPanel({
+  event,
+  onChangeProperty,
+  onChangeEventField,
+  capabilitiesLoading = false,
+}) {
   const fields = useMemo(
     () => getEventPropertyFields(event),
     [event]
@@ -423,6 +505,7 @@ function EventConfigurationPanel({ event, onChangeProperty, capabilitiesLoading 
                 />
               );
             })}
+            <EmailTypeNotice event={event} onChangeEventField={onChangeEventField} />
           </Stack>
         ) : status?.unavailable ? (
           <Stack spacing={1}>
@@ -454,6 +537,7 @@ function CanvasNodeConfigPanel({
   onLinkEvent,
   onChangeDelay,
   onChangeProperty,
+  onChangeEventField,
   onDeleteNode,
   onClose,
   disabled,
@@ -620,6 +704,7 @@ function CanvasNodeConfigPanel({
         <EventConfigurationPanel
           event={linkedEvent}
           onChangeProperty={onChangeProperty}
+          onChangeEventField={onChangeEventField}
           capabilitiesLoading={capabilitiesLoading}
         />
       )}
@@ -762,6 +847,12 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     resolveRemoteLegacyValues(form.events);
   }, [form.events, resolveRemoteLegacyValues]);
 
+  // Send email steps that may not be put into service (no or unsupported email
+  // type). They block Publish, and Update while the campaign is published;
+  // drafts still save and Unpublish always works.
+  const unresolvedEmailSteps = useMemo(() => unresolvedEmailSendEvents(form.events), [form.events]);
+  const emailTypeBlocksPublish = unresolvedEmailSteps.length > 0;
+
   const legacyValueBlockers = useMemo(
     () =>
       legacyValueIssues(form.events, { remoteChoices: remoteChoicesRef.current }).map(
@@ -819,7 +910,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         properties: isPlainObject(event.properties) ? event.properties : {},
       })),
       capabilityIndexRef.current
-    );
+    ).map(withPersistedEmailType);
 
     // The workflow shown is the one Mautic runs: rebuilt from each event's
     // parent and YES/NO path. The saved canvas only lends node positions.
@@ -956,15 +1047,17 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     if (!selected) return;
     const id = workflowEventId();
 
-    const added = hydrateWorkflowEvent(
-      {
-        id,
-        key: getEventKey(selected),
-        eventType: selected.eventType || eventPicker.eventType,
-        metadata: selected,
-        properties: {},
-      },
-      capabilityIndex
+    const added = withNewEventEmailTypeDefault(
+      hydrateWorkflowEvent(
+        {
+          id,
+          key: getEventKey(selected),
+          eventType: selected.eventType || eventPicker.eventType,
+          metadata: selected,
+          properties: {},
+        },
+        capabilityIndex
+      )
     );
 
     setForm((current) => ({
@@ -1052,13 +1145,23 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
   const updateWorkflowEventProperty = (eventId, path, value) => {
     setForm((current) => ({
       ...current,
+      events: current.events.map((event) => {
+        if (event.id !== eventId) return event;
+        const next = { ...event, properties: setNestedValue(event.properties, path, value) };
+        // A new email type choice needs a new confirmation.
+        if (path === EMAIL_TYPE_PATH) delete next[TRANSACTIONAL_CONFIRMATION_FIELD];
+        return next;
+      }),
+    }));
+  };
+
+  // An event-level setting that is not a provider property (the transactional
+  // email confirmation).
+  const updateWorkflowEventField = (eventId, field, value) => {
+    setForm((current) => ({
+      ...current,
       events: current.events.map((event) =>
-        event.id === eventId
-          ? {
-              ...event,
-              properties: setNestedValue(event.properties, path, value),
-            }
-          : event
+        event.id === eventId ? { ...event, [field]: value } : event
       ),
     }));
   };
@@ -1225,6 +1328,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
       canvasNodes,
       canvasEdges: form.canvasSettings?.edges || [],
       remoteChoices: remoteChoicesRef.current,
+      publishing: action === CAMPAIGN_PUBLISH || Boolean(form.isPublished),
     });
 
   const reportValidationErrors = (errors) => {
@@ -1366,7 +1470,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
     setIsDuplicating(true);
     try {
       const copy = await duplicateNativeMauticCampaign(campaignId);
-      setSnack({ open: true, severity: "success", message: duplicateSuccessMessage(copy) });
+      setSnack({ open: true, severity: duplicateSuccessSeverity(copy), message: duplicateSuccessMessage(copy) });
       navigate(`/admin/newsletter/builder/${copy.id}`);
     } catch (err) {
       setSnack({ open: true, severity: "error", message: duplicateFailureMessage(err) });
@@ -1427,7 +1531,8 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     disabled={
                       saving ||
                       isDuplicating ||
-                      (!form.isPublished && (graphBlockers.length > 0 || legacyValueBlockers.length > 0))
+                      (!form.isPublished &&
+                        (graphBlockers.length > 0 || legacyValueBlockers.length > 0 || emailTypeBlocksPublish))
                     }
                     variant="outlined"
                     sx={{ textTransform: "none" }}
@@ -1514,6 +1619,20 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               are, Mautic would create a new tag named after the number. Update and Publish
               are disabled until each is replaced. Unpublishing is still possible.{" "}
               {legacyValueBlockers.join(" ")}
+            </Alert>
+          )}
+          {emailTypeBlocksPublish && (
+            <Alert severity={form.isPublished ? "error" : "warning"} data-testid="email-type-publish-blocker">
+              {unresolvedEmailSteps.length === 1
+                ? "1 Send email step has"
+                : `${unresolvedEmailSteps.length} Send email steps have`}{" "}
+              no email type, so Mautic sends{" "}
+              {unresolvedEmailSteps.length === 1 ? "it" : "them"} as Transactional — to contacts who
+              unsubscribed or are marked Do Not Contact too.{" "}
+              {form.isPublished
+                ? "This campaign is published: Update is disabled until each step has an email type. Unpublishing is still possible, and nothing is changed until you save."
+                : "Publishing is disabled until each step has an email type. The draft can still be saved."}{" "}
+              Open each step in Workflow Events and choose Marketing or Transactional.
             </Alert>
           )}
 
@@ -1772,6 +1891,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               <EventConfigurationPanel
                 event={selectedWorkflowEvent}
                 onChangeProperty={updateWorkflowEventProperty}
+                onChangeEventField={updateWorkflowEventField}
                 capabilitiesLoading={loading}
               />
 
@@ -1878,6 +1998,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     onLinkEvent={handleCanvasLinkEvent}
                     onChangeDelay={handleCanvasSetDelay}
                     onChangeProperty={updateWorkflowEventProperty}
+                    onChangeEventField={updateWorkflowEventField}
                     onDeleteNode={handleCanvasDeleteNode}
                     onClose={() => setSelectedCanvasNodeId("")}
                     disabled={saving}
@@ -1916,7 +2037,12 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
               type="submit"
               variant="contained"
               startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />}
-              disabled={saving || graphBlockers.length > 0 || legacyValueBlockers.length > 0}
+              disabled={
+                saving ||
+                graphBlockers.length > 0 ||
+                legacyValueBlockers.length > 0 ||
+                (Boolean(form.isPublished) && emailTypeBlocksPublish)
+              }
             >
               {isEditMode ? "Update Campaign" : "Create Campaign"}
             </Button>

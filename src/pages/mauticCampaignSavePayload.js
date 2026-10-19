@@ -7,6 +7,10 @@
 // kind of ID makes the provider either duplicate or ignore the event.
 
 import { getEventLabel, isPlainObject } from "./mauticCampaignEventHydration.js";
+import {
+  TRANSACTIONAL_CONFIRMATION_FIELD,
+  transactionalConfirmationFields,
+} from "./mauticCampaignEmailType.js";
 
 export const isPersistedEventId = (id) => /^\d+$/.test(String(id ?? "").trim());
 
@@ -64,6 +68,7 @@ export const buildFlatExecutionEvents = (events) =>
     order: index + 1,
     parent: null,
     ...persistedTriggerFields(event),
+    ...transactionalConfirmationFields(event),
   }));
 
 // `children` is rebuilt provider-side and must not be sent.
@@ -87,6 +92,9 @@ export const toEventPayload = (workflowEvent) => {
   }
   if (workflowEvent?.triggerDate) payload.triggerDate = workflowEvent.triggerDate;
   if (workflowEvent?.decisionPath) payload.decisionPath = workflowEvent.decisionPath;
+  if (workflowEvent?.[TRANSACTIONAL_CONFIRMATION_FIELD] === true) {
+    payload[TRANSACTIONAL_CONFIRMATION_FIELD] = true;
+  }
 
   return payload;
 };

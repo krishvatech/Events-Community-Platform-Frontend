@@ -6,6 +6,7 @@
 
 import { asArray, getEventLabel, isPlainObject } from "./mauticCampaignEventHydration.js";
 import { choiceSourceKey, selectedValueList } from "./mauticCampaignChoices.js";
+import { emailTypeIssues, publishEmailTypeIssues } from "./mauticCampaignEmailType.js";
 import {
   findChoiceByValue,
   getEventPropertyFields,
@@ -145,8 +146,11 @@ const isNumericValue = (value) =>
  * @returns {Array<{eventId: string, path: string, message: string, kind?: string}>}
  */
 export const validateWorkflowEvent = (event, { remoteChoices } = {}) => {
+  // The one rule tied to an event type: a Send email action's email type
+  // decides whether Mautic honours Do Not Contact (mauticCampaignEmailType.js).
+  const emailIssues = emailTypeIssues(event, eventName(event));
   const fields = getEventPropertyFields(event);
-  if (!fields.length) return [];
+  if (!fields.length) return emailIssues;
 
   const issues = [];
   const problem = (field, message, kind) =>
@@ -223,7 +227,7 @@ export const validateWorkflowEvent = (event, { remoteChoices } = {}) => {
     }
   });
 
-  return issues;
+  return [...issues, ...emailIssues];
 };
 
 export const EVENT_STATUS_NO_CONFIGURATION = "no-configuration";
@@ -324,6 +328,7 @@ export const validateCampaignForSave = ({
   canvasNodes,
   canvasEdges,
   remoteChoices,
+  publishing = false,
 } = {}) => {
   const errors = [];
 
@@ -340,6 +345,9 @@ export const validateCampaignForSave = ({
   const issues = [
     ...validateWorkflowEvents(events, { remoteChoices }),
     ...validateCampaignCanvas({ events, canvasNodes, canvasEdges }),
+    // Putting the workflow into service (publish, or saving it while
+    // published) needs every Send email step to have an email type.
+    ...(publishing ? publishEmailTypeIssues(events, eventName) : []),
   ];
 
   // The same problem on several events is worth saying once per event, but an

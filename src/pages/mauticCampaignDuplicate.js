@@ -20,5 +20,18 @@ export const duplicateFailureMessage = (err) => {
   return `${detail} ${shown}${more}`;
 };
 
-export const duplicateSuccessMessage = (copy) =>
-  `Duplicated as "${copy?.name || "a new campaign"}". The copy is unpublished — review it before publishing.`;
+// Send email steps copied from the source without an email type; the backend
+// lists them so the copy can be fixed before it is published.
+export const duplicateUnresolvedEmailSteps = (copy) =>
+  Array.isArray(copy?.emailTypeUnresolved) ? copy.emailTypeUnresolved : [];
+
+export const duplicateSuccessMessage = (copy) => {
+  const base = `Duplicated as "${copy?.name || "a new campaign"}". The copy is unpublished — review it before publishing.`;
+  const unresolved = duplicateUnresolvedEmailSteps(copy);
+  if (!unresolved.length) return base;
+  const steps = unresolved.length === 1 ? "1 Send email step has" : `${unresolved.length} Send email steps have`;
+  return `${base} ${steps} no email type (copied from the original) and must be set to Marketing or Transactional before the copy can be published.`;
+};
+
+export const duplicateSuccessSeverity = (copy) =>
+  duplicateUnresolvedEmailSteps(copy).length ? "warning" : "success";
