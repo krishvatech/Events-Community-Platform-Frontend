@@ -18,6 +18,7 @@ import {
   isPersistedEventId,
   persistedEventName,
 } from "./mauticCampaignSavePayload.js";
+import { transactionalConfirmationFields } from "./mauticCampaignEmailType.js";
 
 export const BRANCH_PATHS = ["yes", "no"];
 export const EVENT_NODE_TYPES = new Set(["action", "condition", "decision"]);
@@ -245,6 +246,7 @@ export const mapCanvasToExecution = (canvasNodes, canvasEdges, form) => {
           parent: parentEventId,
         };
         if (parentEventId && path) executionEvent.decisionPath = path;
+        Object.assign(executionEvent, transactionalConfirmationFields(event));
 
         const preserved = preservedTiming(event);
         if (delay) {

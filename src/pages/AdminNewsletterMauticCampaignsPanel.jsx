@@ -41,7 +41,11 @@ import {
   listNewsletterMauticCampaigns,
   updateNewsletterMauticCampaign,
 } from "../services/newsletterService";
-import { duplicateFailureMessage, duplicateSuccessMessage } from "./mauticCampaignDuplicate";
+import {
+  duplicateFailureMessage,
+  duplicateSuccessMessage,
+  duplicateSuccessSeverity,
+} from "./mauticCampaignDuplicate";
 
 const PAGE_SIZE = 25;
 
@@ -319,7 +323,7 @@ export default function AdminNewsletterMauticCampaignsPanel() {
     setDuplicatingId(String(campaign.id));
     try {
       const copy = await duplicateNativeMauticCampaign(campaign.id);
-      setSnack({ open: true, severity: "success", message: duplicateSuccessMessage(copy) });
+      setSnack({ open: true, severity: duplicateSuccessSeverity(copy), message: duplicateSuccessMessage(copy) });
       navigate(`/admin/newsletter/builder/${copy.id}`);
     } catch (err) {
       // The list stays as it is; only the message reports the failure.
