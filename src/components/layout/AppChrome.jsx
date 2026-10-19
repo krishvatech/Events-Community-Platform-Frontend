@@ -123,7 +123,7 @@ const AppChrome = ({ children }) => {
   const isSsoRedirectPage = normalizedPath === "/sso/imaa";
   // This is a normal public resource page, not an event-slug landing page.  Keep
   // the shared header/footer (and authenticated sidebar) around it.
-  const isMergerStatisticsPage = normalizedPath === "/mergers-and-acquisitions-statistics";
+  const isMergerStatisticsPage = normalizedPath === "/mergers-and-acquisitions-statistics" || normalizedPath.startsWith("/mergers-and-acquisitions-statistics/");
   const isSingleEventPage = (location.pathname.startsWith("/landing/") && location.pathname !== "/landing") ||
                             (!location.pathname.startsWith("/events") &&
                             !location.pathname.startsWith("/account") &&
