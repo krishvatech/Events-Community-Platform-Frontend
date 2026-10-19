@@ -42,6 +42,9 @@ import {
 import { establishMemberAuthSession } from '../utils/memberAuthSession';
 import { saveLoginPayload } from '../utils/authStorage';
 import { PASSWORD_POLICY_REGEX, PASSWORD_POLICY_MESSAGE } from '../utils/passwordPolicy';
+import TurnstileWidget from './TurnstileWidget';
+import { isCaptchaPrototypeEnabled } from '../utils/turnstile';
+import { requestSignupProof } from '../utils/captchaProof';
 import {
   LINKEDIN_URL_ERROR_MESSAGE,
   formatFieldErrors,
@@ -140,6 +143,10 @@ const MultiTrackApplicationForm = ({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [passwordErrors, setPasswordErrors] = useState({});
   const [pendingSignup, setPendingSignup] = useState({ username: '', email: '' });
+  // IPDT-773 — CAPTCHA prototype (flag OFF by default; no effect unless enabled).
+  const captchaEnabled = isCaptchaPrototypeEnabled();
+  const [captchaToken, setCaptchaToken] = useState('');
+  const [captchaKey, setCaptchaKey] = useState(0);
   const [otpCode, setOtpCode] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const [existingAccountNotice, setExistingAccountNotice] = useState('');
@@ -817,6 +824,31 @@ const MultiTrackApplicationForm = ({
         // Non-blocking: Cognite will still reject a duplicate below.
       }
 
+      // IPDT-773 (flag off by default): only genuinely new applicants reach
+      // here (existing accounts are routed to Sign In earlier). Exchange the
+      // Turnstile token for a backend-signed proof just before account creation
+      // — not held across the multi-step wizard — and attach it as Cognito
+      // client metadata. Skipped entirely while the flag is off.
+      let clientMetadata;
+      if (captchaEnabled) {
+        if (!captchaToken) {
+          setSubmitError('Please complete the security check before submitting.');
+          return;
+        }
+        const proofResult = await requestSignupProof({ token: captchaToken, email, operation: 'signup' });
+        if (!proofResult.ok) {
+          setSubmitError(
+            proofResult.error === 'rate_limited'
+              ? 'Too many attempts. Please wait a moment and try again.'
+              : 'Security check failed. Please try again.'
+          );
+          setCaptchaToken('');
+          setCaptchaKey((k) => k + 1); // reset widget; applicant data is preserved
+          return;
+        }
+        clientMetadata = { signup_proof: proofResult.proof };
+      }
+
       // Cognito requires a non-email username when the pool uses email alias.
       const emailPrefix = (email.split('@')[0] || 'user').replace(/[^a-zA-Z0-9]/g, '').toLowerCase() || 'user';
       const username = `${emailPrefix}${Math.floor(1000 + Math.random() * 9000)}`;
@@ -827,6 +859,7 @@ const MultiTrackApplicationForm = ({
         firstName: (applicantData.first_name || '').trim(),
         lastName: (applicantData.last_name || '').trim(),
         password: registrationCreds.password,
+        clientMetadata,
       });
 
       setPendingSignup({ username, email });
@@ -1678,70 +1711,84 @@ const MultiTrackApplicationForm = ({
                 {/* IPDT-772 new-account path: password fields appear only once
                     the account check has determined this is a new applicant. */}
                 {needsAccountRegistration && accountFlow === 'new' && (
-                  <>
-                    <Grid item xs={12}>
-                      <Divider sx={{ mt: 1, mb: 2 }} />
+                  <Grid item xs={12}>
+                    <Box
+                      sx={{
+                        mt: 1,
+                        p: { xs: 2, sm: 3 },
+                        borderRadius: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        backgroundColor: 'action.hover',
+                      }}
+                    >
                       <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                         Create your IMAA Connect account
                       </Typography>
-                      <Typography variant="caption" color="textSecondary">
+                      <Typography
+                        variant="caption"
+                        color="textSecondary"
+                        sx={{ display: 'block', mb: 2 }}
+                      >
                         You'll verify your email with a code before your application is submitted.
                       </Typography>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Password *"
-                        type={showPassword ? 'text' : 'password'}
-                        value={registrationCreds.password}
-                        onChange={(e) => handleRegistrationCredChange('password', e.target.value)}
-                        error={Boolean(passwordErrors.password)}
-                        helperText={passwordErrors.password || PASSWORD_POLICY_MESSAGE}
-                        required
-                        autoComplete="new-password"
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                aria-label={showPassword ? 'Hide password' : 'Show password'}
-                                onClick={() => setShowPassword((v) => !v)}
-                                edge="end"
-                              >
-                                {showPassword ? <VisibilityOff /> : <Visibility />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <TextField
-                        fullWidth
-                        label="Confirm Password *"
-                        type={showConfirmPassword ? 'text' : 'password'}
-                        value={registrationCreds.confirmPassword}
-                        onChange={(e) => handleRegistrationCredChange('confirmPassword', e.target.value)}
-                        onBlur={validateRegistrationPassword}
-                        error={Boolean(passwordErrors.confirmPassword)}
-                        helperText={passwordErrors.confirmPassword || ''}
-                        required
-                        autoComplete="new-password"
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton
-                                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                                onClick={() => setShowConfirmPassword((v) => !v)}
-                                edge="end"
-                              >
-                                {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
-                        }}
-                      />
-                    </Grid>
-                  </>
+                      <Grid container spacing={2}>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Password *"
+                            type={showPassword ? 'text' : 'password'}
+                            value={registrationCreds.password}
+                            onChange={(e) => handleRegistrationCredChange('password', e.target.value)}
+                            error={Boolean(passwordErrors.password)}
+                            helperText={passwordErrors.password || PASSWORD_POLICY_MESSAGE}
+                            required
+                            autoComplete="new-password"
+                            InputProps={{
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <IconButton
+                                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                    onClick={() => setShowPassword((v) => !v)}
+                                    edge="end"
+                                  >
+                                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                                  </IconButton>
+                                </InputAdornment>
+                              ),
+                            }}
+                          />
+                        </Grid>
+                        <Grid item xs={12} sm={6}>
+                          <TextField
+                            fullWidth
+                            label="Confirm Password *"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={registrationCreds.confirmPassword}
+                            onChange={(e) => handleRegistrationCredChange('confirmPassword', e.target.value)}
+                            onBlur={validateRegistrationPassword}
+                            error={Boolean(passwordErrors.confirmPassword)}
+                            helperText={passwordErrors.confirmPassword || ''}
+                            required
+                            autoComplete="new-password"
+                            InputProps={{
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <IconButton
+                                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                                    onClick={() => setShowConfirmPassword((v) => !v)}
+                                    edge="end"
+                                  >
+                                    {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                                  </IconButton>
+                                </InputAdornment>
+                              ),
+                            }}
+                          />
+                        </Grid>
+                      </Grid>
+                    </Box>
+                  </Grid>
                 )}
 
                 {/* IPDT-772 existing-account path: no new password; offer sign-in. */}
@@ -2032,6 +2079,21 @@ const MultiTrackApplicationForm = ({
         </CardContent>
       </Card>
 
+      {/* IPDT-773 (flag off by default): security check for a NEW guest account,
+          shown on the review step just before account creation — not held across
+          the earlier wizard steps where a token could expire. */}
+      {captchaEnabled && activeStep === reviewStep && needsAccountRegistration && accountFlow === 'new' && (
+        <Box sx={{ mb: 2 }}>
+          <TurnstileWidget
+            key={captchaKey}
+            action="guest_signup"
+            onVerify={(t) => setCaptchaToken(t)}
+            onExpire={() => setCaptchaToken('')}
+            onError={() => setCaptchaToken('')}
+          />
+        </Box>
+      )}
+
       {/* Navigation buttons */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
         <Button
@@ -2061,7 +2123,11 @@ const MultiTrackApplicationForm = ({
               variant="contained"
               color="success"
               onClick={handleSubmit}
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                // New-account guests must pass the security check first (flag on only).
+                (captchaEnabled && needsAccountRegistration && accountFlow === 'new' && !captchaToken)
+              }
               startIcon={isSubmitting ? <CircularProgress size={20} /> : null}
             >
               {isSubmitting ? `${getCtaText()}...` : getCtaText()}
