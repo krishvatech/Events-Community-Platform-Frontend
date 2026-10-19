@@ -74,12 +74,28 @@ function installEmailCheck(disposableDomains = ["mailinator.com"]) {
   };
 }
 
+const GUEST_PASSWORD = "Str0ng!Pass";
+const OTP = "123456";
+
+/** Guests create an IMAA Connect account (IPDT-772); every Cognito call is faked. */
+function installCognito() {
+  globalThis.__cognitoTestAuth = {
+    signUp: async () => ({}),
+    confirmSignUp: async () => ({}),
+    resendSignUp: async () => ({}),
+    signIn: async () => ({ idToken: "test.id.token", refreshToken: "test-refresh", accessToken: "test.access.token" }),
+  };
+}
+const cognitoCalls = (name) => (globalThis.__cognitoTestAuth?.calls || []).filter((c) => c.name === name);
+
 /** Mocks every apiClient call the form makes. Nothing leaves the process. */
-function installApi({ onApply = async () => ({ data: { id: 1, status: "pending" } }), profile } = {}) {
+function installApi({ onApply = async () => ({ data: { id: 1, status: "pending" } }), profile, accountExists = false } = {}) {
   posts = [];
   installEmailCheck();
+  installCognito();
   globalThis.__testApiClient = {
     get: async (url) => {
+      if (url === "/auth/check-email/") return { data: { exists: accountExists } };
       if (url === "/auth/me/profile/") {
         if (profile) return { data: profile };
         throw axiosError(401, {});
@@ -131,9 +147,29 @@ async function fillApplicant({ linkedin = PROFILE, email = "rahul@example.com" }
   await typeInto(linkedinInput(), linkedin);
 }
 
-/** From step 0 through every track step to Review & Submit, then submits once. */
-async function advanceAndSubmit(selectedTracks = [32]) {
+const passwordInputs = () => document.querySelectorAll("input[autocomplete='new-password']");
+
+/** A guest's first Next checks the account; a new applicant then sets a password. */
+async function passAccountStep() {
+  await waitFor(() => assert.ok(passwordInputs().length || queryByRole("textbox", /^Why attend/)));
+  const [password, confirm] = passwordInputs();
+  if (!password) return;
+  await typeInto(password, GUEST_PASSWORD);
+  await typeInto(confirm, GUEST_PASSWORD);
   await click(getByRole("button", "Next"));
+}
+
+/** A guest verifies the emailed code; the application is posted after that. */
+async function verifyGuestCode() {
+  await waitFor(() => assert.ok(queryByRole("textbox", /^Verification Code/)));
+  await typeInto(getByRole("textbox", /^Verification Code/), OTP);
+  await click(getByRole("button", "Verify & Submit"));
+}
+
+/** From step 0 through every track step to Review & Submit, then submits once. */
+async function advanceAndSubmit(selectedTracks = [32], { guest = true } = {}) {
+  await click(getByRole("button", "Next"));
+  if (guest) await passAccountStep();
   for (const id of selectedTracks) {
     await waitFor(() => assert.ok(queryByRole("textbox", new RegExp(`^Why attend ${id}\\?`))));
     const answer = getByRole("textbox", new RegExp(`^Why attend ${id}\\?`));
@@ -142,6 +178,7 @@ async function advanceAndSubmit(selectedTracks = [32]) {
   }
   await waitFor(() => assert.ok(queryByText("Review Your Application")));
   await click(getByRole("button", "Submit Application"));
+  if (guest) await verifyGuestCode();
 }
 
 const emailInput = () => document.querySelector("input[type='email']");
@@ -149,6 +186,7 @@ const emailInput = () => document.querySelector("input[type='email']");
 afterEach(async () => {
   await cleanup();
   delete globalThis.__testApiClient;
+  delete globalThis.__cognitoTestAuth;
   globalThis.fetch = realFetch;
 });
 
@@ -222,6 +260,9 @@ test("valid guest submission trims whitespace/zero-width chars and keeps the pay
   );
   // Guests never hit the signed-in profile sync.
   assert.equal(posts.some((p) => p.url === "/events/save-lead-gen-fields/"), false);
+  // The guest's account is created once, after the email check passed.
+  assert.equal(cognitoCalls("signUp").length, 1);
+  assert.equal(cognitoCalls("signUp")[0].args.email, "rahul@example.com");
 });
 
 test("backend linkedin_url 400 shows the field message, returns to the field, keeps data, allows retry", async () => {
@@ -247,7 +288,8 @@ test("backend linkedin_url 400 shows the field message, returns to the field, ke
 
   await typeInto(linkedinInput(), "https://www.linkedin.com/in/rahul-sharma-2");
   assert.equal(linkedinInput().getAttribute("aria-invalid"), "false");
-  await advanceAndSubmit();
+  // The account was created on the first attempt, so the retry submits directly.
+  await advanceAndSubmit([32], { guest: false });
 
   await waitFor(() => assert.equal(successes.length, 1));
   assert.equal(applyPosts().length, 2);
@@ -287,7 +329,7 @@ test("authenticated multi-track submission keeps both track selections and profi
   const successes = await renderForm({ selectedTracks: [32, 33], isGuestApplication: false });
   await waitFor(() => assert.equal(getByRole("textbox", /^First Name/).value, "Rahul"));
   await typeInto(linkedinInput(), ` ${PROFILE} `);
-  await advanceAndSubmit([32, 33]);
+  await advanceAndSubmit([32, 33], { guest: false });
 
   await waitFor(() => assert.equal(successes.length, 1));
   assert.equal(posts.filter((p) => p.url === "/events/save-lead-gen-fields/").length, 1);
@@ -309,6 +351,10 @@ test("disposable applicant email is refused on the applicant step; nothing is po
   assert.equal(onApplicantStep(), true);
   assert.deepEqual(emailChecks, ["rahul@mailinator.com"]);
   assert.equal(applyPosts().length, 0);
+  // Refused before the account check, so no password step and no Cognito account.
+  assert.equal(posts.length, 0);
+  assert.equal(passwordInputs().length, 0);
+  assert.equal(cognitoCalls("signUp").length, 0);
 });
 
 test("spaces typed into the applicant email are removed", async () => {
@@ -352,7 +398,7 @@ test("signed-in applicant's own account email is never sent to the disposable ch
   });
   const successes = await renderForm({ isGuestApplication: false });
   await waitFor(() => assert.equal(emailInput().value, "legacy@mailinator.com"));
-  await advanceAndSubmit();
+  await advanceAndSubmit([32], { guest: false });
 
   await waitFor(() => assert.equal(successes.length, 1));
   assert.deepEqual(emailChecks, []);
