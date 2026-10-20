@@ -2,6 +2,7 @@ import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
+import DynamicFormRoundedIcon from "@mui/icons-material/DynamicFormRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
@@ -90,6 +91,13 @@ export const marketingNavigationGroups = [
         path: `${MARKETING_HOME_PATH}/segments`,
         icon: SegmentRoundedIcon,
         match: [`${MARKETING_HOME_PATH}/segments`],
+      },
+      {
+        id: "forms",
+        label: "Forms",
+        path: `${MARKETING_HOME_PATH}/forms`,
+        icon: DynamicFormRoundedIcon,
+        match: [`${MARKETING_HOME_PATH}/forms`],
       },
     ],
   },
