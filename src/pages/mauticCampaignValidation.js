@@ -145,6 +145,14 @@ const isNumericValue = (value) =>
  *
  * @returns {Array<{eventId: string, path: string, message: string, kind?: string}>}
  */
+// Mautic 7.1.3 runs a "Clicks email" decision with no "Limit to Urls" entries
+// for a click on ANY tracked link of the parent Send email (EmailBundle
+// CampaignSubscriber), so an empty form is a real choice there, not a no-op.
+const EMPTY_CONFIGURATION_IS_NATIVE = new Set(["decision:email.click"]);
+
+export const emptyConfigurationIsNative = (event) =>
+  EMPTY_CONFIGURATION_IS_NATIVE.has(`${event?.eventType}:${event?.key || event?.metadata?.key || ""}`);
+
 export const validateWorkflowEvent = (event, { remoteChoices } = {}) => {
   // The one rule tied to an event type: a Send email action's email type
   // decides whether Mautic honours Do Not Contact (mauticCampaignEmailType.js).
@@ -172,7 +180,12 @@ export const validateWorkflowEvent = (event, { remoteChoices } = {}) => {
   // No field is individually required, so the event itself carries the rule: a
   // step that does nothing is not a step. Which fields count comes from the
   // schema, so "add or remove tags" reads correctly without naming that event.
-  if (!requiredFields.length && !fields.some((field) => isConfigured(event, field))) {
+  // The exception is an event whose empty form is a native configuration.
+  if (
+    !requiredFields.length &&
+    !emptyConfigurationIsNative(event) &&
+    !fields.some((field) => isConfigured(event, field))
+  ) {
     issues.push({
       eventId: String(event?.id ?? ""),
       path: fields[0].path,
