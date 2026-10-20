@@ -176,6 +176,7 @@ function DesktopView({
             <Box sx={{
               display: 'flex', alignItems: 'center', gap: 1, p: '10px 14px',
               borderRadius: 1.25, background: COLORS.bg, mb: 2,
+              '& input::placeholder': { color: '#AAA', opacity: 1 },
             }}>
               <Search size={15} color="#BBB" strokeWidth={2} />
               <input
@@ -184,7 +185,7 @@ function DesktopView({
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 style={{
-                  flex: 1, fontSize: 13, color: '#CCC', background: 'transparent',
+                  flex: 1, fontSize: 13, color: COLORS.dark, background: 'transparent',
                   border: 'none', outline: 'none', fontFamily: 'inherit',
                 }}
               />
@@ -1018,6 +1019,7 @@ function MobileView({
               display: 'flex', alignItems: 'center', gap: 1,
               p: '10px 14px', borderRadius: 1.25, background: '#fff',
               mb: 1.25, border: '1px solid #ECEAE6',
+              '& input::placeholder': { color: '#AAA', opacity: 1 },
             }}>
               <Search size={15} color="#BBB" strokeWidth={2} />
               <input
@@ -1026,7 +1028,7 @@ function MobileView({
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
                 style={{
-                  flex: 1, fontSize: 13, color: '#CCC', background: 'transparent',
+                  flex: 1, fontSize: 13, color: COLORS.dark, background: 'transparent',
                   border: 'none', outline: 'none', fontFamily: 'inherit',
                 }}
               />
@@ -1695,33 +1697,46 @@ function EventCompanionDirectoryPage() {
   const unreadPollInterval = useRef(null);
   const [unreadCounts, setUnreadCounts] = useState({});
 
-  // Handle tab and meeting query parameters
+  // Handle the ?meeting=<id> deep link. This needs the loaded meetings list,
+  // so it depends on myMeetings (which refreshes on a background poll).
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const tab = params.get('tab');
     const meetingId = params.get('meeting');
+    if (!meetingId || !myMeetings) return;
 
-    if (meetingId && myMeetings) {
-      const meeting = myMeetings.find(m => m.id === parseInt(meetingId));
-      if (meeting && meeting.status === 'accepted') {
-        setActiveMeeting(meeting);
-        const otherParty = meeting.requester_detail?.user_id === currentUserId
-          ? meeting.recipient_detail
-          : meeting.requester_detail;
-        setSelectedAttendee(otherParty);
-        setFlowStep(4);
-        setActiveTab(0);
-      } else if (meeting && ['declined', 'cancelled', 'expired'].includes(meeting.status)) {
-        setActiveTab(0);
-        setFlowStep(1);
-      }
-    } else if (tab === 'meetings') {
+    const meeting = myMeetings.find(m => m.id === parseInt(meetingId));
+    if (meeting && meeting.status === 'accepted') {
+      setActiveMeeting(meeting);
+      const otherParty = meeting.requester_detail?.user_id === currentUserId
+        ? meeting.recipient_detail
+        : meeting.requester_detail;
+      setSelectedAttendee(otherParty);
+      setFlowStep(4);
+      setActiveTab(0);
+    } else if (meeting && ['declined', 'cancelled', 'expired'].includes(meeting.status)) {
+      setActiveTab(0);
+      setFlowStep(1);
+    }
+  }, [location.search, myMeetings, currentUserId]);
+
+  // Handle the ?tab= query parameter. IPDT-769 Bug 1: this is keyed ONLY on
+  // location.search (not myMeetings) so the periodic My Meetings refresh can no
+  // longer re-run it and reset an in-progress Pick Time flow back to Browse.
+  // The reset still fires on genuine navigation — tab clicks, browser
+  // Back/Forward, and direct links — because those change location.search.
+  // Meeting deep links are handled by the effect above, so skip them here.
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get('meeting')) return;
+
+    const tab = params.get('tab');
+    if (tab === 'meetings') {
       setActiveTab(1);
     } else if (tab === 'directory') {
       setActiveTab(0);
       setFlowStep(1);
     }
-  }, [location.search, myMeetings, currentUserId]);
+  }, [location.search]);
 
   // Fetch user's meetings (all statuses for proper URL handling)
   useEffect(() => {
