@@ -10,7 +10,13 @@
 // persisted to localStorage/sessionStorage; it is passed straight to the
 // signup call. Any failure is reported as a failure — a proof is never faked.
 
-import { API_BASE } from "./api";
+// Node-safe API base resolution (mirrors utils/api.js) so this fetchImpl-
+// injectable helper can be imported under `node --test` without Vite's
+// import.meta.env. In the Vite build this resolves identically to api.js.
+const API_BASE = (
+  (typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_BASE_URL) ||
+  "http://127.0.0.1:8000/api"
+).trim().replace(/\/+$/, "");
 
 /**
  * Request a signed signup proof for a Turnstile token.
@@ -26,7 +32,23 @@ import { API_BASE } from "./api";
  *   a short machine-readable reason ("captcha_failed", "email_required",
  *   "proof_unavailable", "disabled", "network_error", "bad_response").
  */
-export async function requestSignupProof({ token, email, operation = "signup", fetchImpl = globalThis.fetch } = {}) {
+// IPDT-773 Phase 2.1: coalesce only truly-identical concurrent requests. The
+// key includes operation + normalized email + the exact Turnstile token, so
+// two overlapping calls with different tokens never share one result. Entries
+// are cleared on settle (success or failure), so a later call always issues a
+// fresh request — no stale or previously consumed proof is ever returned.
+const _inflight = new Map();
+
+export function requestSignupProof(args = {}) {
+  const { token, email, operation = "signup" } = args;
+  const key = `${operation}\u0000${String(email || "").trim().toLowerCase()}\u0000${token || ""}`;
+  if (_inflight.has(key)) return _inflight.get(key);
+  const p = _requestSignupProof(args).finally(() => _inflight.delete(key));
+  _inflight.set(key, p);
+  return p;
+}
+
+async function _requestSignupProof({ token, email, operation = "signup", fetchImpl = globalThis.fetch } = {}) {
   let response;
   try {
     response = await fetchImpl(`${API_BASE}/auth/signup-proof/`, {

@@ -17,7 +17,14 @@ if (cognitoSdkStorage) poolData.Storage = cognitoSdkStorage;
 
 const pool = new CognitoUserPool(poolData);
 
-export function cognitoSignUp({ username, email, firstName, lastName, password }) {
+export function cognitoSignUp({ username, email, firstName, lastName, password, clientMetadata }) {
+  // IPDT-773: optional `clientMetadata` is backward compatible. Existing
+  // callers (and all callers while the CAPTCHA flag is off) omit it and nothing
+  // changes. When supplied (e.g. { signup_proof }) it is delivered to the
+  // Cognito Pre Sign-up Lambda as request.clientMetadata — it is untrusted
+  // transport, is NOT persisted, and enforces nothing until the Lambda
+  // validates it. It never affects password handling or user attributes.
+  const hasMetadata = clientMetadata && Object.keys(clientMetadata).length > 0;
   return new Promise((resolve, reject) => {
     pool.signUp(
       username,
@@ -31,7 +38,8 @@ export function cognitoSignUp({ username, email, firstName, lastName, password }
       (err, result) => {
         if (err) return reject(err);
         resolve(result);
-      }
+      },
+      hasMetadata ? clientMetadata : undefined
     );
   });
 }

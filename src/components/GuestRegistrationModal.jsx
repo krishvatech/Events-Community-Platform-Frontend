@@ -28,6 +28,9 @@ import {
   checkSignupEmail,
   isDisposableEmailSignupError,
 } from "../utils/signupEmailCheck";
+import TurnstileWidget from "./TurnstileWidget";
+import { isCaptchaPrototypeEnabled } from "../utils/turnstile";
+import { requestSignupProof } from "../utils/captchaProof";
 
 /**
  * GuestRegistrationModal
@@ -58,6 +61,10 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [stage, setStage] = useState("signup"); // signup | confirm | done
+  // IPDT-773 — CAPTCHA prototype (flag OFF by default; no effect unless enabled).
+  const captchaEnabled = isCaptchaPrototypeEnabled();
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaKey, setCaptchaKey] = useState(0);
   const [verifyCode, setVerifyCode] = useState("");
   const [pendingUsername, setPendingUsername] = useState("");
   const [loading, setLoading] = useState(false);
@@ -312,6 +319,28 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
         return;
       }
 
+      // IPDT-773 (flag off by default): attach a backend-signed proof derived
+      // from the Turnstile token as Cognito client metadata. Skipped when off.
+      let clientMetadata;
+      if (captchaEnabled) {
+        if (!captchaToken) {
+          setError("Please complete the security check.");
+          return;
+        }
+        const proofResult = await requestSignupProof({ token: captchaToken, email, operation: "signup" });
+        if (!proofResult.ok) {
+          setError(
+            proofResult.error === "rate_limited"
+              ? "Too many attempts. Please wait a moment and try again."
+              : "Security check failed. Please try again."
+          );
+          setCaptchaToken("");
+          setCaptchaKey((k) => k + 1);
+          return;
+        }
+        clientMetadata = { signup_proof: proofResult.proof };
+      }
+
       let emailPrefix = email.split("@")[0].replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
       if (!emailPrefix) emailPrefix = "user";
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
@@ -323,6 +352,7 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
         firstName: form.first_name.trim(),
         lastName: form.last_name.trim(),
         password: form.password,
+        clientMetadata,
       });
 
       setPendingUsername(username);
@@ -575,6 +605,15 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
             </>
           )}
 
+          {captchaEnabled && stage === "signup" && (
+            <TurnstileWidget
+              key={captchaKey}
+              action="guest_signup"
+              onVerify={(t) => setCaptchaToken(t)}
+              onExpire={() => setCaptchaToken("")}
+              onError={() => setCaptchaToken("")}
+            />
+          )}
           <Button
             variant="contained"
             fullWidth
@@ -584,8 +623,9 @@ export default function GuestRegistrationModal({ open, onClose: onCloseProp }) {
               !form.first_name.trim() ||
               !form.last_name.trim() ||
               !form.email.trim() ||
-              !form.password || 
-              !form.confirm_password
+              !form.password ||
+              !form.confirm_password ||
+              (captchaEnabled && stage === "signup" && !captchaToken)
             }
             sx={{ py: 1, color: "#ffffff", fontWeight: 600 }}
           >

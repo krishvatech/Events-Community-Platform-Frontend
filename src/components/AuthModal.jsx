@@ -19,6 +19,9 @@ import { Visibility, VisibilityOff, Close as CloseIcon } from "@mui/icons-materi
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { cognitoSignIn, cognitoSignUp, cognitoConfirmSignUp, cognitoResendSignUp } from "../utils/cognitoAuth";
+import TurnstileWidget from "./TurnstileWidget";
+import { isCaptchaPrototypeEnabled } from "../utils/turnstile";
+import { requestSignupProof } from "../utils/captchaProof";
 import { PASSWORD_POLICY_REGEX, PASSWORD_POLICY_MESSAGE } from "../utils/passwordPolicy";
 import { saveLoginPayload } from "../utils/authStorage";
 import { getCognitoGroupsFromTokens, getRoleAndRedirectPath } from "../utils/roleRedirect";
@@ -143,6 +146,10 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
   const [verifyCode, setVerifyCode] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
   const signupInFlightRef = React.useRef(false);
+  // IPDT-773 — CAPTCHA prototype (flag OFF by default; no effect unless enabled).
+  const captchaEnabled = isCaptchaPrototypeEnabled();
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaKey, setCaptchaKey] = useState(0); // bump to force widget reset
   const latestSignupEmailRef = React.useRef("");
 
   // Timer Effect
@@ -405,12 +412,36 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
       const randomSuffix = Math.floor(1000 + Math.random() * 9000);
       const username = `${emailPrefix}${randomSuffix}`;
 
+      // IPDT-773 (flag off by default): exchange the Turnstile token for a
+      // backend-signed proof and attach it as Cognito client metadata. When the
+      // flag is off this block is skipped and signup is unchanged.
+      let clientMetadata;
+      if (captchaEnabled) {
+        if (!captchaToken) {
+          setError("❌ Please complete the security check.");
+          return;
+        }
+        const proofResult = await requestSignupProof({ token: captchaToken, email, operation: "signup" });
+        if (!proofResult.ok) {
+          setError(
+            proofResult.error === "rate_limited"
+              ? "❌ Too many attempts. Please wait a moment and try again."
+              : "❌ Security check failed. Please try again."
+          );
+          setCaptchaToken("");
+          setCaptchaKey((k) => k + 1); // reset widget for retry
+          return;
+        }
+        clientMetadata = { signup_proof: proofResult.proof };
+      }
+
       await cognitoSignUp({
         username,
         email: email,
         firstName: (signupData.firstName || "").trim(),
         lastName: (signupData.lastName || "").trim(),
         password: signupData.password,
+        clientMetadata,
       });
 
       toast.info("📩 Verification code sent to your email.");
@@ -732,11 +763,20 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
                   ),
                 }}
               />
+              {captchaEnabled && (
+                <TurnstileWidget
+                  key={captchaKey}
+                  action="signup"
+                  onVerify={(t) => setCaptchaToken(t)}
+                  onExpire={() => setCaptchaToken("")}
+                  onError={() => setCaptchaToken("")}
+                />
+              )}
               <Button
                 type="submit"
                 fullWidth
                 variant="contained"
-                disabled={loading}
+                disabled={loading || (captchaEnabled && !captchaToken)}
                 sx={{ borderRadius: 2, py: 1.25, bgcolor: "#0F2040", color: "#FFFFFF", fontWeight: 600, fontSize: 15, textTransform: "none", "&:hover": { bgcolor: "#1a3460" }, boxShadow: "none" }}
               >
                 {loading ? <CircularProgress size={20} color="inherit" /> : "Create account"}
