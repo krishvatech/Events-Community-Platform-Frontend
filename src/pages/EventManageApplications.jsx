@@ -8,10 +8,7 @@ import {
   Snackbar,
   Card,
   CardContent,
-  TextField,
-  InputAdornment,
 } from '@mui/material';
-import SearchIcon from '@mui/icons-material/Search';
 import DownloadIcon from '@mui/icons-material/Download';
 import EventManageLayout from '../layouts/EventManageLayout';
 import ReviewQueueTable from '../components/ReviewQueueTable';
@@ -38,7 +35,6 @@ const EventManageApplications = ({ eventId }) => {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(25);
   const [totalCount, setTotalCount] = useState(0);
-  const [searchText, setSearchText] = useState('');
 
   // Selection and dialogs
   const [selectedIds, setSelectedIds] = useState([]);
@@ -105,10 +101,8 @@ const EventManageApplications = ({ eventId }) => {
       setLoading(true);
       setError(null);
 
+      // Search comes from the single ReviewQueueFilters search bar (filters.search).
       const currentFilters = { ...filters };
-      if (searchText) {
-        currentFilters.search = searchText;
-      }
 
       const result = await fetchReviewQueue(eventId, currentFilters, page + 1, pageSize);
       if (result.success) {
@@ -122,17 +116,12 @@ const EventManageApplications = ({ eventId }) => {
     };
 
     loadApplications();
-  }, [eventId, filters, page, pageSize, searchText, refetchTrigger]);
+  }, [eventId, filters, page, pageSize, refetchTrigger]);
 
   const handleFilterChange = (newFilters) => {
     setFilters(newFilters);
     setPage(0); // Reset to first page
     setSelectedIds([]); // Clear selection
-  };
-
-  const handleSearch = (e) => {
-    setSearchText(e.target.value);
-    setPage(0);
   };
 
   const handleExport = async () => {
@@ -234,25 +223,10 @@ const EventManageApplications = ({ eventId }) => {
           />
         )}
 
-        {/* Search and Actions */}
+        {/* Applications Toolbar (search lives in the filters bar above) */}
         <Card sx={{ mb: 3 }}>
           <CardContent>
-            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-              <TextField
-                placeholder="Search by name or email..."
-                size="small"
-                value={searchText}
-                onChange={handleSearch}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{ flex: 1, minWidth: 200 }}
-              />
-
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', justifyContent: 'flex-end' }}>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
                   variant="outlined"

@@ -34,6 +34,9 @@ const ReviewQueueFilters = ({ onFilterChange, tracks = [], reviewers = [], tiers
   const handleSearchChange = (value) => {
     const newFilters = { ...filters, search: value };
     setFilters(newFilters);
+    // Apply as the user types so this single search bar preserves the live
+    // search-as-you-type behaviour of the (now removed) duplicate toolbar search.
+    onFilterChange(newFilters);
   };
 
   const handleSearchSubmit = () => {
