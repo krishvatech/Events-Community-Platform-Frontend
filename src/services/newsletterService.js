@@ -17,6 +17,7 @@ const adminPointsEndpoint = "/newsletter/admin/points/";
 const adminPointTriggersEndpoint = `${adminPointsEndpoint}triggers/`;
 const adminPointGroupsEndpoint = `${adminPointsEndpoint}groups/`;
 const adminTemplatesEndpoint = "/newsletter/admin/templates/";
+const adminFormsEndpoint = "/newsletter/admin/forms/";
 const adminMauticCampaignsEndpoint = "/newsletter/admin/mautic-campaigns/";
 const adminAnalyticsEndpoint = "/newsletter/admin/analytics/";
 const adminDashboardEndpoint = "/newsletter/admin/dashboard/";
@@ -189,6 +190,39 @@ export const deleteNewsletterTemplate = (templateId) =>
 
 export const testSendNewsletterTemplate = (templateId, email) =>
   unwrap(apiClient.post(`${adminTemplatesEndpoint}${templateId}/test-send/`, { email }));
+
+// Native Mautic Forms: basic settings and publication only. There is
+// deliberately no delete.
+export const listNewsletterForms = (params = {}) =>
+  unwrap(apiClient.get(adminFormsEndpoint, { params }));
+
+export const getNewsletterForm = (formId) =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/`));
+
+export const createNewsletterForm = (payload) =>
+  unwrap(apiClient.post(adminFormsEndpoint, payload));
+
+export const updateNewsletterForm = (formId, payload) =>
+  unwrap(apiClient.patch(`${adminFormsEndpoint}${formId}/`, payload));
+
+export const publishNewsletterForm = (formId) =>
+  unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/publish/`));
+
+export const unpublishNewsletterForm = (formId) =>
+  unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/unpublish/`));
+
+// Form Field Builder: add, change and re-order supported fields (no delete).
+export const getNewsletterFormBuilderMetadata = () =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}builder/`));
+
+export const createNewsletterFormField = (formId, payload) =>
+  unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/fields/`, payload));
+
+export const updateNewsletterFormField = (formId, fieldId, payload) =>
+  unwrap(apiClient.patch(`${adminFormsEndpoint}${formId}/fields/${fieldId}/`, payload));
+
+export const reorderNewsletterFormFields = (formId, order) =>
+  unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/fields/reorder/`, { order }));
 
 export const listNewsletterTemplateTokens = () =>
   unwrap(apiClient.get(`${adminTemplatesEndpoint}tokens/`));
