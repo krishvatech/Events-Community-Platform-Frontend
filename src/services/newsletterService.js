@@ -224,6 +224,29 @@ export const updateNewsletterFormField = (formId, fieldId, payload) =>
 export const reorderNewsletterFormFields = (formId, order) =>
   unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/fields/reorder/`, { order }));
 
+// Form submit actions: tags and points only (no delete); see newsletterFormActions.js.
+export const getNewsletterFormActionMetadata = () =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}actions/metadata/`));
+
+export const createNewsletterFormAction = (formId, payload) =>
+  unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/actions/`, payload));
+
+export const updateNewsletterFormAction = (formId, actionId, payload) =>
+  unwrap(apiClient.patch(`${adminFormsEndpoint}${formId}/actions/${actionId}/`, payload));
+
+export const reorderNewsletterFormActions = (formId, order) =>
+  unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/actions/reorder/`, { order }));
+
+// Read-only. Submissions hold personal data: the backend never caches them.
+export const listNewsletterFormSubmissions = (formId, params = {}) =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/submissions/`, { params }));
+
+export const getNewsletterFormSubmission = (formId, submissionId) =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/submissions/${submissionId}/`));
+
+export const getNewsletterFormUsage = (formId) =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/usage/`));
+
 export const listNewsletterTemplateTokens = () =>
   unwrap(apiClient.get(`${adminTemplatesEndpoint}tokens/`));
 

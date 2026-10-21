@@ -25,7 +25,9 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
 import { Link as RouterLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
-import { getNewsletterForm } from "../services/newsletterService";
+import InboxRoundedIcon from "@mui/icons-material/InboxRounded";
+import { getNewsletterForm, getNewsletterFormUsage } from "../services/newsletterService";
+import { describeAction } from "./newsletterFormActions.js";
 import {
   CARD_BORDER,
   FORMS_PATH,
@@ -34,6 +36,7 @@ import {
   NAVY,
   describeFormLoadError,
   formEditPath,
+  formSubmissionsPath,
   formatDateTime,
   isValidFormId,
   postActionLabel,
@@ -71,6 +74,7 @@ export default function AdminNewsletterFormDetailsPage() {
   const [form, setForm] = useState(null);
   const [load, setLoad] = useState({ loading: true, error: null });
   const [publicationOpen, setPublicationOpen] = useState(false);
+  const [usage, setUsage] = useState({ loading: true, data: null, error: "" });
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
 
   useEffect(() => {
@@ -87,6 +91,13 @@ export default function AdminNewsletterFormDetailsPage() {
         setLoad({ loading: false, error: null });
       })
       .catch((err) => active && setLoad({ loading: false, error: describeFormLoadError(err) }));
+    // Usage is supplementary: the page works without it.
+    if (isValidFormId(formId)) {
+      setUsage({ loading: true, data: null, error: "" });
+      getNewsletterFormUsage(formId)
+        .then((data) => active && setUsage({ loading: false, data, error: "" }))
+        .catch(() => active && setUsage({ loading: false, data: null, error: "Usage could not be loaded from Mautic." }));
+    }
     return () => {
       active = false;
     };
@@ -155,6 +166,9 @@ export default function AdminNewsletterFormDetailsPage() {
             <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate(FORMS_PATH)} sx={{ textTransform: "none" }}>Back</Button>
             <Button startIcon={<EditRoundedIcon />} variant="outlined" onClick={() => navigate(formEditPath(form.id))} sx={{ textTransform: "none" }}>
               Edit Form
+            </Button>
+            <Button startIcon={<InboxRoundedIcon />} variant="outlined" onClick={() => navigate(formSubmissionsPath(form.id))} sx={{ textTransform: "none" }}>
+              Submissions{usage.data?.submissions ? ` (${usage.data.submissions.total})` : ""}
             </Button>
             <Button
               variant="contained"
@@ -235,7 +249,7 @@ export default function AdminNewsletterFormDetailsPage() {
         )}
       </Section>
 
-      <Section title={`Submit Actions (${actions.length})`} subtitle="Read-only. Existing actions are kept exactly as they are in Mautic.">
+      <Section title={`Submit Actions (${actions.length})`} subtitle="Tag and points actions can be changed from Edit Form; every other action is kept exactly as it is in Mautic.">
         {actions.length === 0 ? (
           <Typography color="text.secondary">This Form has no submit actions.</Typography>
         ) : (
@@ -246,13 +260,40 @@ export default function AdminNewsletterFormDetailsPage() {
                 <Stack key={action.id || action.name} direction={{ xs: "column", sm: "row" }} spacing={1} justifyContent="space-between" alignItems={{ sm: "center" }}>
                   <Box sx={{ minWidth: 0 }}>
                     <Typography sx={{ fontWeight: 700, wordBreak: "break-word" }}>{action.name || action.type}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-all" }}>{action.type}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-word" }}>{describeAction(action)} · {action.type}</Typography>
                     {action.policyReason && <Typography variant="body2" color={chip?.color === "error" ? "error" : "warning.dark"}>{action.policyReason}</Typography>}
                   </Box>
                   {chip && <Chip size="small" color={chip.color} label={chip.label} sx={{ fontWeight: 700, alignSelf: { xs: "flex-start", sm: "center" } }} />}
                 </Stack>
               );
             })}
+          </Stack>
+        )}
+      </Section>
+
+      <Section title="Usage" subtitle="Read-only. Where this Form is used in Mautic.">
+        {usage.loading ? (
+          <Typography color="text.secondary">Loading usage…</Typography>
+        ) : usage.error ? (
+          <Alert severity="warning">{usage.error}</Alert>
+        ) : (
+          <Stack spacing={1}>
+            <Typography>
+              <strong>Campaign sources:</strong>{" "}
+              {usage.data.campaignSources.length ? usage.data.campaignSources.map((c) => `${c.name} (#${c.id}${c.published ? "" : ", unpublished"})`).join(", ") : "none"}
+            </Typography>
+            <Typography>
+              <strong>Campaign decisions and conditions:</strong>{" "}
+              {usage.data.campaignEvents.length ? usage.data.campaignEvents.map((e) => `${e.campaignName} (#${e.campaignId}, ${e.type})`).join(", ") : "none"}
+            </Typography>
+            <Typography>
+              <strong>Point actions:</strong>{" "}
+              {usage.data.pointActions.length ? usage.data.pointActions.map((p) => `${p.name} (#${p.id})`).join(", ") : "none"}
+            </Typography>
+            <Typography>
+              <strong>Stored submissions:</strong> {usage.data.submissions.total}
+              {usage.data.submissions.latest ? ` · latest ${formatDateTime(`${String(usage.data.submissions.latest).replace(" ", "T")}Z`)}` : ""}
+            </Typography>
           </Stack>
         )}
       </Section>

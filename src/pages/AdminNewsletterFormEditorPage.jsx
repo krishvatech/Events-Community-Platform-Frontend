@@ -19,6 +19,7 @@ import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 
 import { UnsavedChangesDialog, useUnsavedChangesGuard } from "../components/marketing/UnsavedChangesGuard.jsx";
 import { createNewsletterForm, getNewsletterForm, updateNewsletterForm } from "../services/newsletterService";
+import NewsletterFormActionBuilder from "./NewsletterFormActionBuilder.jsx";
 import NewsletterFormFieldBuilder from "./NewsletterFormFieldBuilder.jsx";
 import {
   CARD_BORDER,
@@ -58,13 +59,16 @@ export default function AdminNewsletterFormEditorPage() {
   const [saveError, setSaveError] = useState(null);
   const [dirty, setDirty] = useState(false);
   const [fieldsDirty, setFieldsDirty] = useState(false);
+  const [actionsDirty, setActionsDirty] = useState(false);
   const [savedNotice, setSavedNotice] = useState("");
   const saveInFlight = useRef(false);
   const onFieldsDirty = useCallback((value) => setFieldsDirty(Boolean(value)), []);
+  const onActionsDirty = useCallback((value) => setActionsDirty(Boolean(value)), []);
+  const otherWorkDirty = fieldsDirty || actionsDirty;
 
   const isNew = !formId;
-  // Unsaved basic settings, an unsaved field or an unsaved field order all hold navigation.
-  const guard = useUnsavedChangesGuard((dirty || fieldsDirty) && !saving);
+  // Unsaved basic settings, fields, field order, actions or action order all hold navigation.
+  const guard = useUnsavedChangesGuard((dirty || fieldsDirty || actionsDirty) && !saving);
 
   useEffect(() => {
     setFieldErrors({});
@@ -135,11 +139,11 @@ export default function AdminNewsletterFormEditorPage() {
     try {
       const saved = isNew ? await createNewsletterForm(payload) : await updateNewsletterForm(original.id, payload);
       setDirty(false);
-      if (!isNew && fieldsDirty) {
+      if (!isNew && otherWorkDirty) {
         // Unsaved field work stays on screen: keep the page, refresh the baseline.
         setOriginal(saved);
         setDraft(formToDraft(saved));
-        setSavedNotice("Form settings saved. You still have unsaved field changes below.");
+        setSavedNotice("Form settings saved. You still have unsaved field or action changes below.");
         return;
       }
       guard.allowNavigation();
@@ -327,6 +331,10 @@ export default function AdminNewsletterFormEditorPage() {
 
       {!isNew && original && (
         <NewsletterFormFieldBuilder form={original} onFormChange={setOriginal} onDirtyChange={onFieldsDirty} />
+      )}
+
+      {!isNew && original && (
+        <NewsletterFormActionBuilder form={original} onFormChange={setOriginal} onDirtyChange={onActionsDirty} />
       )}
 
       <UnsavedChangesDialog guard={guard} />

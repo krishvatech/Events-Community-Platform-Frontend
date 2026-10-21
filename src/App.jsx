@@ -41,6 +41,8 @@ import AdminNewsletterTemplateEditorPage from "./pages/AdminNewsletterTemplateEd
 import AdminNewsletterFormsPage from "./pages/AdminNewsletterFormsPage.jsx";
 import AdminNewsletterFormDetailsPage from "./pages/AdminNewsletterFormDetailsPage.jsx";
 import AdminNewsletterFormEditorPage from "./pages/AdminNewsletterFormEditorPage.jsx";
+import AdminNewsletterFormSubmissionsPage from "./pages/AdminNewsletterFormSubmissionsPage.jsx";
+import AdminNewsletterFormSubmissionDetailPage from "./pages/AdminNewsletterFormSubmissionDetailPage.jsx";
 import AdminNewsletterAnalyticsPage from "./pages/AdminNewsletterAnalyticsPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
 import AdminNewsletterContactDetailPage from "./pages/AdminNewsletterContactDetailPage.jsx";
@@ -395,6 +397,8 @@ const AppShell = () => {
               <Route path="forms/new" element={<AdminNewsletterFormEditorPage />} />
               <Route path="forms/:formId" element={<AdminNewsletterFormDetailsPage />} />
               <Route path="forms/:formId/edit" element={<AdminNewsletterFormEditorPage />} />
+              <Route path="forms/:formId/submissions" element={<AdminNewsletterFormSubmissionsPage />} />
+              <Route path="forms/:formId/submissions/:submissionId" element={<AdminNewsletterFormSubmissionDetailPage />} />
               <Route path="lists" element={<AdminNewsletterPage />} />
               <Route path="segments" element={<AdminNewsletterPage />} />
               <Route path="analytics" element={<AdminNewsletterAnalyticsPage />} />

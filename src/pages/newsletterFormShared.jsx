@@ -26,6 +26,8 @@ export const FORMS_PATH = "/admin/newsletter/forms";
 export const FORM_NEW_PATH = `${FORMS_PATH}/new`;
 export const formDetailsPath = (id) => `${FORMS_PATH}/${encodeURIComponent(id)}`;
 export const formEditPath = (id) => `${formDetailsPath(id)}/edit`;
+export const formSubmissionsPath = (id) => `${formDetailsPath(id)}/submissions`;
+export const formSubmissionPath = (id, submissionId) => `${formSubmissionsPath(id)}/${encodeURIComponent(submissionId)}`;
 
 /** Mautic Form IDs are positive integers; anything else never reaches the API. */
 export const isValidFormId = (value) => /^[1-9]\d{0,17}$/.test(String(value || ""));
