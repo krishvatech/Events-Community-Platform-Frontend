@@ -14,6 +14,7 @@ import {
   Typography,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import PreviewRoundedIcon from "@mui/icons-material/PreviewRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 
@@ -226,6 +227,14 @@ export default function AdminNewsletterFormEditorPage() {
             <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate(backPath)} disabled={saving} sx={{ textTransform: "none" }}>
               Back
             </Button>
+            {!isNew && original && (
+              // Opens the details page's preview of the last saved version; the
+              // unsaved-changes guard still asks first if anything is unsaved.
+              <Button startIcon={<PreviewRoundedIcon />} onClick={() => navigate(`${formDetailsPath(original.id)}?preview=1`)} disabled={saving}
+                sx={{ textTransform: "none" }}>
+                Preview saved version
+              </Button>
+            )}
             <Button
               variant="contained"
               startIcon={saving ? <CircularProgress size={18} color="inherit" /> : <SaveRoundedIcon />}

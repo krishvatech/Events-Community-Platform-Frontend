@@ -247,6 +247,13 @@ export const getNewsletterFormSubmission = (formId, submissionId) =>
 export const getNewsletterFormUsage = (formId) =>
   unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/usage/`));
 
+// Read-only: the saved native render (sandboxed) and Mautic's own embed codes.
+export const getNewsletterFormPreview = (formId) =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/preview/`));
+
+export const getNewsletterFormEmbed = (formId) =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/embed/`));
+
 export const listNewsletterTemplateTokens = () =>
   unwrap(apiClient.get(`${adminTemplatesEndpoint}tokens/`));
 

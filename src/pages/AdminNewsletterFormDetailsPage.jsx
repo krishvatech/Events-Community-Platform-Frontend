@@ -25,7 +25,10 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
 import { Link as RouterLink, useLocation, useNavigate, useParams } from "react-router-dom";
 
+import CodeRoundedIcon from "@mui/icons-material/CodeRounded";
 import InboxRoundedIcon from "@mui/icons-material/InboxRounded";
+import PreviewRoundedIcon from "@mui/icons-material/PreviewRounded";
+import { FormEmbedDialog, FormPreviewDialog } from "./NewsletterFormPreviewEmbed.jsx";
 import { getNewsletterForm, getNewsletterFormUsage } from "../services/newsletterService";
 import { describeAction } from "./newsletterFormActions.js";
 import {
@@ -75,6 +78,9 @@ export default function AdminNewsletterFormDetailsPage() {
   const [load, setLoad] = useState({ loading: true, error: null });
   const [publicationOpen, setPublicationOpen] = useState(false);
   const [usage, setUsage] = useState({ loading: true, data: null, error: "" });
+  // ?preview=1 (from the editor's "Preview saved version") opens the preview.
+  const [previewOpen, setPreviewOpen] = useState(() => new URLSearchParams(location.search).get("preview") === "1");
+  const [embedOpen, setEmbedOpen] = useState(false);
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
 
   useEffect(() => {
@@ -166,6 +172,12 @@ export default function AdminNewsletterFormDetailsPage() {
             <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate(FORMS_PATH)} sx={{ textTransform: "none" }}>Back</Button>
             <Button startIcon={<EditRoundedIcon />} variant="outlined" onClick={() => navigate(formEditPath(form.id))} sx={{ textTransform: "none" }}>
               Edit Form
+            </Button>
+            <Button startIcon={<PreviewRoundedIcon />} variant="outlined" onClick={() => setPreviewOpen(true)} sx={{ textTransform: "none" }}>
+              Preview Form
+            </Button>
+            <Button startIcon={<CodeRoundedIcon />} variant="outlined" onClick={() => setEmbedOpen(true)} sx={{ textTransform: "none" }}>
+              Embed Form
             </Button>
             <Button startIcon={<InboxRoundedIcon />} variant="outlined" onClick={() => navigate(formSubmissionsPath(form.id))} sx={{ textTransform: "none" }}>
               Submissions{usage.data?.submissions ? ` (${usage.data.submissions.total})` : ""}
@@ -280,11 +292,23 @@ export default function AdminNewsletterFormDetailsPage() {
           <Stack spacing={1}>
             <Typography>
               <strong>Campaign sources:</strong>{" "}
-              {usage.data.campaignSources.length ? usage.data.campaignSources.map((c) => `${c.name} (#${c.id}${c.published ? "" : ", unpublished"})`).join(", ") : "none"}
+              {usage.data.campaignSources.length ? usage.data.campaignSources.map((c, index) => (
+                <React.Fragment key={`source-${c.id}`}>
+                  {index > 0 && ", "}
+                  <Link component={RouterLink} to={`/admin/newsletter/builder/${encodeURIComponent(c.id)}`}>{c.name}</Link>
+                  {` (#${c.id}${c.published ? "" : ", unpublished"})`}
+                </React.Fragment>
+              )) : "none"}
             </Typography>
             <Typography>
               <strong>Campaign decisions and conditions:</strong>{" "}
-              {usage.data.campaignEvents.length ? usage.data.campaignEvents.map((e) => `${e.campaignName} (#${e.campaignId}, ${e.type})`).join(", ") : "none"}
+              {usage.data.campaignEvents.length ? usage.data.campaignEvents.map((e, index) => (
+                <React.Fragment key={`event-${e.id}`}>
+                  {index > 0 && ", "}
+                  <Link component={RouterLink} to={`/admin/newsletter/builder/${encodeURIComponent(e.campaignId)}`}>{e.campaignName}</Link>
+                  {` (#${e.campaignId}, ${e.type === "form.submit" ? "Submits form" : e.type === "form.field_value" ? "Form field value" : e.type})`}
+                </React.Fragment>
+              )) : "none"}
             </Typography>
             <Typography>
               <strong>Point actions:</strong>{" "}
@@ -297,6 +321,9 @@ export default function AdminNewsletterFormDetailsPage() {
           </Stack>
         )}
       </Section>
+
+      <FormPreviewDialog formId={form.id} open={previewOpen} onClose={() => setPreviewOpen(false)} />
+      <FormEmbedDialog formId={form.id} open={embedOpen} onClose={() => setEmbedOpen(false)} />
 
       <FormPublicationDialog
         form={form}

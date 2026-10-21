@@ -5,6 +5,7 @@ import {
   Button,
   Checkbox,
   Chip,
+  FormHelperText,
   CircularProgress,
   Dialog,
   DialogActions,
@@ -37,7 +38,7 @@ import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 
 import WorkflowCanvas from "./WorkflowCanvas";
 import {
@@ -152,6 +153,14 @@ const eventTypeColor = (eventType) => {
 
 const sourceLabel = (source, fallback) =>
   source?.name || source?.alias || (source?.id ? `${fallback} #${source.id}` : fallback);
+
+// Forms show whether visitors can submit them: an unpublished Form can be a
+// source, but nobody can enter the Campaign through it until it is published.
+// A Form is only called unavailable once the source list has loaded.
+const formSourceLabel = (source, id, loaded = true) => {
+  if (source) return `${sourceLabel(source, "Form")}${source.isPublished ? "" : " (unpublished)"}`;
+  return loaded ? `Form #${id} (unavailable)` : `Form #${id}`;
+};
 
 const workflowEventId = () =>
   `event-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -1704,17 +1713,21 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     input={<OutlinedInput label="Forms" />}
                     renderValue={(selected) =>
                       selected
-                        .map((id) => sourceLabel(forms.find((source) => String(source.id) === String(id)), "Form"))
+                        .map((id) => formSourceLabel(forms.find((source) => String(source.id) === String(id)), id, Boolean(capabilities)))
                         .join(", ")
                     }
                   >
                     {forms.map((source) => (
                       <MenuItem key={`form-${source.id}`} value={source.id}>
                         <Checkbox checked={form.forms.includes(source.id)} />
-                        <ListItemText primary={sourceLabel(source, "Form")} />
+                        <ListItemText primary={formSourceLabel(source, source.id)} />
                       </MenuItem>
                     ))}
                   </Select>
+                  <FormHelperText>
+                    Visitors who submit a published source Form enter this Campaign. A Form submission is not marketing
+                    consent: marketing emails still reach any contact without a Do Not Contact restriction.
+                  </FormHelperText>
                 </FormControl>
               </Stack>
 
@@ -1782,7 +1795,15 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                           <Chip key={list} label={`Segment: ${list}`} size="small" variant="outlined" />
                         ))}
                         {form.forms.map((formId) => (
-                          <Chip key={formId} label={`Form: ${formId}`} size="small" variant="outlined" />
+                          <Chip
+                            key={formId}
+                            label={`Form: ${formSourceLabel(forms.find((source) => String(source.id) === String(formId)), formId, Boolean(capabilities))}`}
+                            size="small"
+                            variant="outlined"
+                            component={RouterLink}
+                            to={`/admin/newsletter/forms/${encodeURIComponent(formId)}`}
+                            clickable
+                          />
                         ))}
                         {!form.lists.length && !form.forms.length && (
                           <Typography variant="caption" color="error">
