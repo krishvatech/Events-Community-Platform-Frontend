@@ -28,7 +28,7 @@ import { Link as RouterLink, useLocation, useNavigate, useParams } from "react-r
 import CodeRoundedIcon from "@mui/icons-material/CodeRounded";
 import InboxRoundedIcon from "@mui/icons-material/InboxRounded";
 import PreviewRoundedIcon from "@mui/icons-material/PreviewRounded";
-import { FormEmbedDialog, FormPreviewDialog } from "./NewsletterFormPreviewEmbed.jsx";
+import { FormEmbedDialog, FormPreviewDialog, SubmitAddressStatus } from "./NewsletterFormPreviewEmbed.jsx";
 import { getNewsletterForm, getNewsletterFormUsage } from "../services/newsletterService";
 import { describeAction } from "./newsletterFormActions.js";
 import {
@@ -205,6 +205,8 @@ export default function AdminNewsletterFormDetailsPage() {
         </Alert>
       )}
 
+      <SubmitAddressStatus submitAddress={form.submitAddress} published={form.isPublished} />
+
       <Section title="Settings">
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 6 }}><Setting label="Name">{name}</Setting></Grid>
@@ -213,6 +215,11 @@ export default function AdminNewsletterFormDetailsPage() {
           {form.postAction !== "return" && (
             <Grid size={{ xs: 12 }}>
               <Setting label={form.postAction === "redirect" ? "Redirect URL" : "Message"}>{form.postActionProperty}</Setting>
+            </Grid>
+          )}
+          {form.submitAddress && (
+            <Grid size={{ xs: 12 }}>
+              <Setting label="Submit address"><SubmitAddressStatus submitAddress={form.submitAddress} variant="text" /></Setting>
             </Grid>
           )}
           <Grid size={{ xs: 12, sm: 6, md: 3 }}><Setting label="Alias">{form.alias}</Setting></Grid>

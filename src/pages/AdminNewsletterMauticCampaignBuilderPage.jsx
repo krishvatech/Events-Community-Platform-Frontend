@@ -102,6 +102,7 @@ import {
   EMAIL_TYPE_PATH,
   TRANSACTIONAL_CONFIRMATION_FIELD,
   emailTypeState,
+  isEmailSendAction,
   unresolvedEmailSendEvents,
   withNewEventEmailTypeDefault,
   withPersistedEmailType,
@@ -1725,11 +1726,19 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
                     ))}
                   </Select>
                   <FormHelperText>
-                    Visitors who submit a published source Form enter this Campaign. A Form submission is not marketing
-                    consent: marketing emails still reach any contact without a Do Not Contact restriction.
+                    Visitors who submit a published source Form enter this Campaign. Submitting a Form does not
+                    automatically subscribe a Contact to marketing emails.
                   </FormHelperText>
                 </FormControl>
               </Stack>
+              {form.forms.length > 0 && form.events.some(isEmailSendAction) && (
+                <Alert severity="warning" data-testid="form-source-consent-warning">
+                  Submitting a Form does not automatically subscribe a Contact to marketing emails. In a Campaign with
+                  a Form source, each Send email step must be a marketing email placed directly on the YES path of a
+                  &quot;Contact segments&quot; condition that checks a Subscription List, with any delay on the condition.
+                  Otherwise the Campaign cannot be published.
+                </Alert>
+              )}
 
               <FormControlLabel
                 control={

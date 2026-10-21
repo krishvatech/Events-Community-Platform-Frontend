@@ -45,6 +45,47 @@ export function liveFrameSandbox(url, ownOrigin = typeof window !== "undefined" 
   return (frameOrigin && frameOrigin !== ownOrigin ? [...base, "allow-same-origin"] : base).join(" ");
 }
 
+// Where Mautic's stored Form HTML sends visitors' submissions, compared with
+// Mautic's public address (site_url). A mismatch means submissions may be saved
+// while visitors see no success message or redirect, or may not arrive at all.
+const SUBMIT_ADDRESS_LABELS = {
+  match: "Matches Mautic's public address",
+  mismatch: "Does not match Mautic's public address",
+  missing: "Not rendered yet",
+  public_url_unavailable: "Cannot be checked",
+};
+
+export function submitAddressSeverity(submitAddress, published) {
+  if (!submitAddress || submitAddress.status === "match") return null;
+  if (submitAddress.status === "mismatch") return published ? "error" : "warning";
+  return "info";
+}
+
+export function SubmitAddressStatus({ submitAddress, published, variant = "alert" }) {
+  if (!submitAddress) return null;
+  const label = SUBMIT_ADDRESS_LABELS[submitAddress.status] || submitAddress.status;
+  if (variant === "text") {
+    return (
+      <span data-submit-address-status={submitAddress.status}>
+        {label}
+        {submitAddress.stored ? ` (${submitAddress.stored})` : ""}
+      </span>
+    );
+  }
+  const severity = submitAddressSeverity(submitAddress, published);
+  if (!severity) return null;
+  return (
+    <Alert severity={severity} data-submit-address-status={submitAddress.status}>
+      <strong>Submit address: {label}.</strong> {submitAddress.message}
+      {submitAddress.status === "mismatch" && (
+        <Box component="span" sx={{ display: "block", mt: 0.5, wordBreak: "break-all" }}>
+          Stored: {submitAddress.stored} · Public: {submitAddress.expected}
+        </Box>
+      )}
+    </Alert>
+  );
+}
+
 function useLoad(open, loader, formId) {
   const [state, setState] = useState({ loading: false, data: null, error: "" });
   useEffect(() => {
@@ -163,6 +204,11 @@ export function FormEmbedDialog({ formId, open, onClose }) {
               <Chip size="small" label={data.isLive ? "Published" : "Not published"} color={data.isLive ? "success" : "default"} />
             </Stack>
             {data.warnings.map((warning) => <Alert key={warning} severity="warning">{warning}</Alert>)}
+            {data.submitAddress && (
+              <Typography variant="body2" color="text.secondary">
+                Submit address: <SubmitAddressStatus submitAddress={data.submitAddress} variant="text" />
+              </Typography>
+            )}
             <Typography variant="body2" color="text.secondary">
               Paste one of these native Mautic codes into your website. Visitors submit straight to Mautic; this page never publishes the Form.
             </Typography>

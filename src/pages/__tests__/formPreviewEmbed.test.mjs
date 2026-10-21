@@ -151,11 +151,50 @@ test("usage links each Campaign to the builder", async () => {
   assert.equal(hasText(/Submits form/), true);
 });
 
+test("details flag a published Form whose stored submit address is not Mautic's public address", async () => {
+  installApi({ form: makeForm({ isPublished: true, submitAddress: {
+    status: "mismatch", stored: "http://mautic:80", expected: "https://mautic.example.org",
+    message: "Mautic stored a different submit address for this Form than its public address." } }) });
+  await renderDetails();
+  await waitFor(() => assert.equal(all("[data-submit-address-status='mismatch']").length, 2));
+  const alert = all(".MuiAlert-standardError[data-submit-address-status='mismatch']")[0];
+  assert.equal(Boolean(alert), true);
+  assert.equal(alert.textContent.includes("Stored: http://mautic:80 · Public: https://mautic.example.org"), true);
+  assert.equal(all("button").some((b) => /fix|repair/i.test(b.textContent)), false); // no silent rewrite
+});
+
+test("details show a matching submit address without an alert", async () => {
+  installApi({ form: makeForm({ submitAddress: { status: "match", stored: "https://mautic.example.org",
+    expected: "https://mautic.example.org", message: "Visitors submit to Mautic's public address." } }) });
+  await renderDetails();
+  await waitFor(() => assert.equal(hasText(/Matches Mautic's public address/), true));
+  assert.equal(all(".MuiAlert-root[data-submit-address-status]").length, 0);
+});
+
+test("details say when the submit address cannot be checked", async () => {
+  installApi({ form: makeForm({ submitAddress: { status: "public_url_unavailable", stored: null, expected: null,
+    message: "Mautic's public address is not available, so the submit address cannot be checked." } }) });
+  await renderDetails();
+  await waitFor(() => assert.equal(all(".MuiAlert-standardInfo[data-submit-address-status='public_url_unavailable']").length, 1));
+});
+
+test("the embed dialog states the submit address", async () => {
+  installApi({ embed: { formId: "31", name: "Training Inquiry", isPublished: true, isLive: true, publicUrl: "https://mautic.example.org",
+    formUrl: "https://mautic.example.org/form/31", submitBase: "https://mautic.example.org", methods: [], warnings: [],
+    submitAddress: { status: "match", stored: "https://mautic.example.org", expected: "https://mautic.example.org", message: "" } } });
+  await renderDetails();
+  await click(await waitFor(() => getByRole("button", "Embed Form")));
+  await waitFor(() => assert.equal(hasText(/Submit address: Matches Mautic's public address/), true));
+});
+
 // ------------------------------------------------------- Campaign Builder --
 
 const noSchema = { available: false, fields: [] };
 const CAPABILITIES = {
-  actions: [{ key: "lead.changetags", type: "lead.changetags", eventType: "action", label: "Modify tags", formSchema: noSchema }],
+  actions: [
+    { key: "lead.changetags", type: "lead.changetags", eventType: "action", label: "Modify tags", formSchema: noSchema },
+    { key: "email.send", type: "email.send", eventType: "action", label: "Send email", formSchema: noSchema },
+  ],
   conditions: [],
   decisions: [],
   sources: {
@@ -188,7 +227,7 @@ test("Form sources show publication status, flag unavailable Forms and link to F
   assert.equal(hasText(/Form: Training Inquiry \(unpublished\)/), true);
   assert.equal(hasText(/Form: Form #99 \(unavailable\)/), true);
   assert.equal(all("a[href='/admin/newsletter/forms/31']").length >= 1, true);
-  assert.equal(hasText(/A Form submission is not marketing\s+consent/), true);
+  assert.equal(hasText(/Submitting a Form does not\s+automatically subscribe a Contact to marketing emails/), true);
 
   await chooseSelectOption(getByRole("combobox", /^Forms/), "Webinar Signup");
   await waitFor(() => assert.equal(hasText(/Form: Webinar Signup/), true));
@@ -215,4 +254,34 @@ test("Form sources are not called unavailable while the source list is still loa
   assert.equal(hasText(/unavailable/), false);
   release();
   await waitFor(() => assert.equal(hasText(/Form: Form #99 \(unavailable\)/), true));
+});
+
+const builderApi = (campaign) => {
+  globalThis.__testApiClient = {
+    get: async (url) => (url.endsWith("/capabilities/") ? { data: CAPABILITIES } : url.endsWith("/builder/") ? { data: campaign } : { data: {} }),
+    patch: async (url) => { throw new Error(`unexpected PATCH ${url}`); },
+    post: async (url) => { throw new Error(`unexpected POST ${url}`); },
+    delete: async (url) => { throw new Error(`unexpected DELETE ${url}`); },
+  };
+};
+const EMAIL_EVENT = { id: "82", key: "email.send", eventType: "action", properties: { email: "23", email_type: "marketing" },
+  metadata: { id: "82", name: "Welcome", type: "email.send", eventType: "action", parent: null, decisionPath: null, triggerMode: "immediate", triggerInterval: 0 } };
+
+test("a Form-sourced Campaign with a Send email step explains the consent rule", async () => {
+  builderApi({ ...CAMPAIGN, events: [...CAMPAIGN.events, EMAIL_EVENT] });
+  await renderRoutes([h(Route, { key: "b", path: "/admin/newsletter/builder/:campaignId", element: h(BuilderPage) })], { url: "/admin/newsletter/builder/57" });
+  await waitFor(() => assert.equal(all("[data-testid='form-source-consent-warning']").length, 1), { timeout: 8000 });
+  assert.equal(hasText(/Submitting a Form does not automatically subscribe a Contact to marketing emails\. In a Campaign/), true);
+});
+
+test("no consent warning without a Form source or without email", async () => {
+  builderApi({ ...CAMPAIGN, sources: { segments: [{ id: "7" }], forms: [] }, events: [...CAMPAIGN.events, EMAIL_EVENT] });
+  await renderRoutes([h(Route, { key: "b", path: "/admin/newsletter/builder/:campaignId", element: h(BuilderPage) })], { url: "/admin/newsletter/builder/57" });
+  await waitFor(() => assert.equal(all("input").some((input) => input.value === "Form journey"), true), { timeout: 8000 });
+  assert.equal(all("[data-testid='form-source-consent-warning']").length, 0);
+  await cleanup();
+  builderApi(CAMPAIGN);
+  await renderRoutes([h(Route, { key: "b", path: "/admin/newsletter/builder/:campaignId", element: h(BuilderPage) })], { url: "/admin/newsletter/builder/57" });
+  await waitFor(() => assert.equal(all("input").some((input) => input.value === "Form journey"), true), { timeout: 8000 });
+  assert.equal(all("[data-testid='form-source-consent-warning']").length, 0);
 });
