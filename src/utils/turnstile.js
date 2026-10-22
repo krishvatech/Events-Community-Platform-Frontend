@@ -13,12 +13,26 @@ const TURNSTILE_SRC =
 
 let scriptPromise = null;
 
+// Node-safe env read (mirrors utils/captchaProof.js): in the Vite build this
+// resolves from import.meta.env exactly as before; under `node --test` (no
+// import.meta.env) it falls back to process.env so these helpers can be imported
+// and exercised in unit tests.
+function _viteEnv(key, fallback = "") {
+  if (typeof import.meta !== "undefined" && import.meta.env && import.meta.env[key] != null) {
+    return import.meta.env[key];
+  }
+  if (typeof process !== "undefined" && process.env && process.env[key] != null) {
+    return process.env[key];
+  }
+  return fallback;
+}
+
 // Prototype flag — default false. Any live wiring must check this.
 export const isCaptchaPrototypeEnabled = () =>
-  String(import.meta.env.VITE_CAPTCHA_PROTOTYPE || "false").toLowerCase() === "true";
+  String(_viteEnv("VITE_CAPTCHA_PROTOTYPE", "false")).toLowerCase() === "true";
 
 export const getTurnstileSiteKey = () =>
-  (import.meta.env.VITE_TURNSTILE_SITE_KEY || "").trim();
+  String(_viteEnv("VITE_TURNSTILE_SITE_KEY", "")).trim();
 
 // Load the external Turnstile script once; subsequent callers share the promise.
 export function loadTurnstileScript() {
