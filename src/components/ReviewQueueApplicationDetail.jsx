@@ -333,18 +333,21 @@ const ReviewQueueApplicationDetail = ({
         </Paper>
 
         {/* Pre-Approval Info */}
-        {application.is_preapproved && (
+        {application.is_preapproved === true && (
           <Paper sx={{ p: 2, mb: 3, backgroundColor: '#e8f5e9' }}>
             <Typography variant="h6" sx={{ mb: 2 }}>
               Pre-Approval Information
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', mb: application.preapproval_code ? 2 : 0 }}>
               <Chip
-                label={`Pre-Approved via ${application.preapproval_source}`}
+                label={`Pre-Approved via ${application.preapproval_source === 'email' ? 'email allowlist' : application.preapproval_source}`}
                 color="success"
                 variant="outlined"
               />
             </Box>
+            {application.preapproval_code && (
+              <InfoRow label="Pre-Approved Code" value={application.preapproval_code} />
+            )}
           </Paper>
         )}
 
