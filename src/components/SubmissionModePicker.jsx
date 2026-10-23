@@ -94,7 +94,8 @@ const SubmissionModePicker = ({ track, onModeSelected, onCancel }) => {
               onClick={() => setSelectedMode(mode)}
             >
               <FormControlLabel
-                control={<Radio checked={selectedMode === mode} />}
+                value={mode}
+                control={<Radio value={mode} checked={selectedMode === mode} />}
                 label={
                   <Box sx={{ flex: 1 }}>
                     <Typography variant="subtitle2" fontWeight={600}>
