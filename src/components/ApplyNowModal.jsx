@@ -11,12 +11,14 @@ import {
   DialogContent,
   DialogTitle,
   FormControlLabel,
+  IconButton,
   Radio,
   RadioGroup,
   Stack,
   Typography,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
 import MultiTrackApplicationForm from "./MultiTrackApplicationForm.jsx";
 import {
@@ -209,7 +211,12 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
       fullWidth
       onClick={(e) => e.stopPropagation()}
     >
-      <DialogTitle>Apply to {event?.title}</DialogTitle>
+      <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+        <Box sx={{ minWidth: 0 }}>Apply to {event?.title}</Box>
+        <IconButton aria-label="Close application dialog" onClick={handleModalClose} sx={{ flexShrink: 0 }}>
+          <CloseIcon />
+        </IconButton>
+      </DialogTitle>
       <DialogContent>
         {submittedApplication ? (
           <Stack spacing={2} sx={{ py: 3, textAlign: "center" }}>
