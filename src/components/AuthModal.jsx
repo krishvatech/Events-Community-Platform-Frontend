@@ -604,7 +604,9 @@ export default function AuthModal({ open, onClose, initialMode = "login", onLogi
           borderRadius: "16px",
           boxShadow: "0 20px 60px rgba(0,0,0,.15)",
           p: 0,
-          overflow: "hidden",
+          maxHeight: "calc(100dvh - 64px)",
+          overflowX: "hidden",
+          overflowY: "auto",
         },
       }}
       BackdropProps={{ sx: { backdropFilter: "blur(4px)", bgcolor: "rgba(0,0,0,.35)" } }}
