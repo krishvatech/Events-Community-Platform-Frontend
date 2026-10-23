@@ -206,7 +206,8 @@ export default function ApplyNowModal({ open, onClose, event, token, onSuccess }
   return (
     <Dialog
       open={open}
-      onClose={handleModalClose}
+      onClose={isGuestApplication ? undefined : handleModalClose}
+      disableEscapeKeyDown={isGuestApplication}
       maxWidth={contentIsWide ? "md" : "sm"}
       fullWidth
       onClick={(e) => e.stopPropagation()}
