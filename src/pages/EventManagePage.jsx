@@ -57,6 +57,7 @@ import {
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import EditEventForm from "../components/EditEventForm.jsx";
 import EventPreApprovalManager from "../components/admin/EventPreApprovalManager.jsx";
+import EventSponsorsPartnersManager from "../components/admin/EventSponsorsPartnersManager.jsx";
 import EventQnAManager from "../components/admin/EventQnAManager.jsx";
 import EventEmailTemplatesManager from "../components/admin/EventEmailTemplatesManager.jsx";
 import EventConfirmationEmailManager from "../components/admin/EventConfirmationEmailManager.jsx";
@@ -101,7 +102,7 @@ import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { isInPersonEvent, isReplayReadyForSignup } from "../utils/eventUtils";
 
-import { isOwnerUser, isStaffUser } from "../utils/adminRole.js"; // MOD: added isStaffUser
+import { isOwnerUser, isStaffUser, getBackendUserFromStorage } from "../utils/adminRole.js"; // MOD: added isStaffUser
 
 // DnD Kit imports
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from "@dnd-kit/core";
@@ -223,7 +224,7 @@ const canJoinEarly = (ev, minutes = 15) => {
 };
 
 // ---- Tabs / pagination ----
-const EVENT_TAB_LABELS = ["Overview", "Product Management", "Orders", "Edit", "Applications", "Application Tracks", "Registered Members", "Participants", "Participant Information", "Promotional Profiles", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications"];
+const EVENT_TAB_LABELS = ["Overview", "Product Management", "Orders", "Edit", "Sponsors & Partners", "Applications", "Application Tracks", "Registered Members", "Participants", "Participant Information", "Promotional Profiles", "Companion", "Guest Audit", "Session", "Resources", "Q&A", "Speed Networking", "Breakout Rooms Tables", "Social Lounge", "Lounge Settings", "Email Notifications"];
 
 const STAFF_EVENT_TAB_LABELS = ["Overview", "Resources"];
 
@@ -9251,6 +9252,7 @@ export default function EventManagePage() {
               {isOwner ? (
                 <>
                   {tab === tabLabels.indexOf("Overview") && renderOverview()}
+                  {tab === tabLabels.indexOf("Sponsors & Partners") && <EventSponsorsPartnersManager eventId={event?.id} canManageTypes={Boolean(currentUser?.is_superuser || getBackendUserFromStorage()?.is_superuser)} />}
                   {event?.registration_type === 'apply' ? (
                     <>
                       {tab === tabLabels.indexOf("Applications") && <EventManageApplications eventId={event?.id} />}

@@ -22,6 +22,7 @@ import {
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import RegisteredActions from "../components/RegisteredActions.jsx";
+import EventSponsorsPartnersSection from "../components/events/EventSponsorsPartnersSection.jsx";
 import GuestJoinModal from "../components/GuestJoinModal.jsx";
 import ApplyNowModal from "../components/ApplyNowModal.jsx";
 import PreEventQnAModal from "../components/PreEventQnAModal.jsx";
@@ -2187,6 +2188,9 @@ export default function EventDetailsPage() {
                       </Stack>
                     </Box>
                   </Paper>
+
+                  {/* IPDT-778: Event-specific sponsors and partners (hidden when empty). */}
+                  <EventSponsorsPartnersSection eventId={event?.id} />
 
                   {/* ATTEND CARD */}
                   <Paper elevation={0} className="rounded-2xl border border-slate-200">
