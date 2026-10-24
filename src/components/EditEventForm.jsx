@@ -293,6 +293,9 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
     );
     const [isFree, setIsFree] = useState(event?.is_free || false);
     const [priceLabel, setPriceLabel] = useState(event?.price_label || "");
+    const [attendPrimaryText, setAttendPrimaryText] = useState(event?.attend_primary_button_text || "Register Here");
+    const [attendPrimaryUrl, setAttendPrimaryUrl] = useState(event?.attend_primary_button_url || "");
+    const [attendSecondaryText, setAttendSecondaryText] = useState(event?.attend_secondary_button_text || "");
     const [registrationType, setRegistrationType] = useState(event?.registration_type || "open");
     const [allowGuestApplications, setAllowGuestApplications] = useState(event?.allow_guest_applications === true);
     const [attendeeMarkerEnabled, setAttendeeMarkerEnabled] = useState(Boolean(event?.attendee_marker_enabled));
@@ -1425,7 +1428,10 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
         fd.append("format", format);
         // Paid events: price/label/max_participants managed via Product Management tab
         fd.append("price", isFree ? "0" : "");
-        fd.append("price_label", priceLabel.trim());  // always send, never clear
+        fd.append("price_label", priceLabel.trim());  // Retained description/legacy fallback.
+        fd.append("attend_primary_button_text", attendPrimaryText.trim());
+        fd.append("attend_primary_button_url", attendPrimaryUrl.trim());
+        fd.append("attend_secondary_button_text", attendSecondaryText.trim());
         fd.append("is_free", String(isFree));
         fd.append("registration_type", registrationType);
         fd.append("allow_guest_applications", String(allowGuestApplications));
@@ -2172,13 +2178,41 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
 
                             {/* Public price display text — shown for both free and paid */}
                             <TextField
-                                label="Public price display text"
+                                label="Attend description (Public price display text)"
                                 fullWidth
                                 value={priceLabel}
                                 onChange={(e) => setPriceLabel(e.target.value)}
-                                helperText='Optional fallback before Saleor price is configured. Once Saleor price exists, public pages show the real checkout price.'
+                                helperText="Existing field kept for compatibility. Describe registration options here; put the clickable URL in the primary button field. Saleor pricing still takes precedence."
                                 sx={{ mt: 2 }}
                                 inputProps={{ maxLength: 100 }}
+                            />
+                            <TextField
+                                label="Primary button text"
+                                fullWidth
+                                value={attendPrimaryText}
+                                onChange={(e) => setAttendPrimaryText(e.target.value)}
+                                inputProps={{ maxLength: 80 }}
+                                sx={{ mt: 2 }}
+                                helperText="Example: Register Here (guaranteed seats)."
+                            />
+                            <TextField
+                                label="Primary button URL (HTTPS)"
+                                fullWidth
+                                type="url"
+                                value={attendPrimaryUrl}
+                                onChange={(e) => setAttendPrimaryUrl(e.target.value)}
+                                inputProps={{ maxLength: 500 }}
+                                sx={{ mt: 2 }}
+                                helperText="Leave blank to retain the normal registration flow. This external link appears only before Saleor pricing is active."
+                            />
+                            <TextField
+                                label="Secondary button text"
+                                fullWidth
+                                value={attendSecondaryText}
+                                onChange={(e) => setAttendSecondaryText(e.target.value)}
+                                inputProps={{ maxLength: 80 }}
+                                sx={{ mt: 2 }}
+                                helperText="Optional. Blank keeps the current Apply as Guest / Apply Now labels. Signup, OTP and approvals are unchanged."
                             />
                         </Box>
 

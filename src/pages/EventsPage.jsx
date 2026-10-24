@@ -66,6 +66,7 @@ import { useSecondTick } from "../utils/useGracePeriodTimer";
 import { determineJoinState } from "../utils/sessionJoinLogic";
 import { getBrowserTimezone, getNextUpcomingSession, formatSessionTimeRange, normalizeTimezoneName } from "../utils/timezoneUtils";
 import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast, isInPersonEvent } from "../utils/eventUtils";
+import { getAttendPrimaryLabel, getAttendSecondaryLabel, getListingAttendUrl } from "../utils/attendCta";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const API_BASE =
@@ -537,6 +538,9 @@ function toCard(ev, isPinnedTopCopy = false) {
     origins: Array.isArray(ev.origins) ? ev.origins : [],
     price: ev.price,
     price_label: ev.price_label,
+    attend_primary_button_text: ev.attend_primary_button_text,
+    attend_primary_button_url: ev.attend_primary_button_url,
+    attend_secondary_button_text: ev.attend_secondary_button_text,
     price_display_label: ev.price_display_label,
     allow_manual_price_display: !!ev.allow_manual_price_display,
     is_free: ev.is_free || false,
@@ -744,6 +748,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
   const applicationStatus = getApplicationStatus(myApplication || {});
+  const externalAttendUrl = getListingAttendUrl(ev, {
+    isEventOwner, isPaymentPending, isConfirmedRegistered, isEffectivelyPast,
+    status, isReplayEvent, applicationStatus,
+  });
 
   const openApplyModalAfterProfileCheck = async () => {
     if (!token) {
@@ -1287,8 +1295,10 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       {!isSecondaryDataReady ? (
         <CardFooterSkeleton />
       ) : (
-      <div className="flex items-center justify-between border-t p-6">
-        <div className="text-base font-semibold text-neutral-900">
+      <div className={`border-t p-4 sm:p-6 ${externalAttendUrl && ev.registration_type === 'apply'
+        ? "flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+        : "flex items-center justify-between gap-3"}`}>
+        <div className="min-w-0 break-words text-base font-semibold text-neutral-900">
           {isPaymentPending ? (
             <PaymentPendingSummary reg={reg} />
           ) : (isEventOwner || isConfirmedRegistered) ? (
@@ -1393,7 +1403,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               )}
             </div>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-end gap-2">
               {isEffectivelyPast && !isReplayEvent ? (
                 <Chip label="Event Ended" color="default" variant="outlined" />
               ) : ev.registration_type === 'apply' ? (
@@ -1401,17 +1411,37 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                 (<>
                   {applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined'
                     ? (
-                      <div className="flex flex-col items-start gap-1">
+                      <div className={externalAttendUrl
+                        ? "flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:max-w-full sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"
+                        : "flex flex-wrap items-center gap-2"}>
+                        {externalAttendUrl && (
+                          <Button
+                            component="a"
+                            href={externalAttendUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            variant="contained"
+                            size="medium"
+                            className="normal-case w-full min-w-0 rounded-full px-4 bg-teal-500 hover:bg-teal-600 sm:w-auto"
+                            sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
+                          >
+                            {getAttendPrimaryLabel(ev)}
+                          </Button>
+                        )}
                         <Button
-                          variant="contained"
+                          variant={externalAttendUrl ? "outlined" : "contained"}
                           size="medium"
                           color="primary"
                           onClick={openApplyModalAfterProfileCheck}
-                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          className="normal-case w-full min-w-0 rounded-full px-4 sm:w-auto"
+                          sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
                         >
                           {applicationStatus === 'declined'
                             ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
-                            : (token ? 'Apply Now' : ev.allow_guest_applications === true ? 'Apply as Guest' : 'Sign in to Apply')}
+                            : !token && ev.allow_guest_applications !== true
+                              ? 'Sign in to Apply'
+                              : getAttendSecondaryLabel(ev, Boolean(token))}
                         </Button>
                         {applicationStatus === 'cancelled' && (
                           <span className="text-sm text-gray-600">You previously cancelled this application</span>
@@ -1550,10 +1580,15 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         variant="contained"
                         size="medium"
                         color="primary"
-                        onClick={(e) => { e.stopPropagation(); handleRegisterCard(false); }}
-                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                        component={externalAttendUrl ? "a" : "button"}
+                        href={externalAttendUrl || undefined}
+                        target={externalAttendUrl ? "_blank" : undefined}
+                        rel={externalAttendUrl ? "noopener noreferrer" : undefined}
+                        onClick={(e) => { e.stopPropagation(); if (!externalAttendUrl) handleRegisterCard(false); }}
+                        className="normal-case min-w-0 rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                        sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
                       >
-                        Register Now
+                        {externalAttendUrl ? getAttendPrimaryLabel(ev) : "Register Now"}
                       </Button>
                       {!isAuthenticatedUser && isFreeEvent && isWithinGuestJoinWindow(ev.start) && (
                         <Button
@@ -1657,6 +1692,10 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
   // Apply modal state
   const [applyModalOpen, setApplyModalOpen] = React.useState(false);
   const applicationStatus = getApplicationStatus(myApplication || {});
+  const externalAttendUrl = getListingAttendUrl(ev, {
+    isEventOwner, isPaymentPending, isConfirmedRegistered, isEffectivelyPast,
+    status, isReplayEvent, applicationStatus,
+  });
 
   const openApplyModalAfterProfileCheck = async () => {
     if (!token) {
@@ -1829,7 +1868,9 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
 
         {/* Details */}
         <CardContent className="p-6 md:w-3/5">
-          <div className="flex items-start justify-between gap-4">
+          <div className={externalAttendUrl && ev.registration_type === 'apply'
+            ? "flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between"
+            : "flex items-start justify-between gap-4"}>
             <div className="min-w-0">
               <div className="flex items-start gap-2 mb-1">
                 <h3 className="text-xl md:text-2xl font-semibold text-neutral-900 leading-snug flex-1">
@@ -1950,9 +1991,13 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               </div>
             </div>
 
-            <div className="shrink-0">
+            <div className={externalAttendUrl && ev.registration_type === 'apply'
+              ? "w-full min-w-0 sm:w-auto sm:max-w-full"
+              : "shrink-0"}>
               {/* Show Join button for owner OR registered user, but hide register/apply for owner */}
-              {isPaymentPending ? (
+              {status === "cancelled" ? (
+                <Chip label="Event Cancelled" color="error" variant="outlined" />
+              ) : isPaymentPending ? (
                 <div className="flex flex-col items-end gap-2">
                   <Chip label="Payment Pending" color="warning" variant="outlined" />
                 </div>
@@ -2043,19 +2088,39 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                  : isEffectivelyPast && !isReplayEvent ? (
                   <Chip label="Event Ended" color="default" variant="outlined" />
                 ) : ev.registration_type === 'apply' ? (
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className={externalAttendUrl ? "w-full min-w-0" : "flex flex-wrap items-center gap-2"}>
                     {applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined' ? (
-                      <div className="flex flex-col items-start gap-1">
+                      <div className={externalAttendUrl
+                        ? "flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:max-w-full sm:flex-row sm:flex-wrap sm:items-center sm:justify-end"
+                        : "flex flex-wrap items-center gap-2"}>
+                        {externalAttendUrl && (
+                          <Button
+                            component="a"
+                            href={externalAttendUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={(e) => e.stopPropagation()}
+                            variant="contained"
+                            size="medium"
+                            className="normal-case w-full min-w-0 rounded-full px-4 bg-teal-500 hover:bg-teal-600 sm:w-auto"
+                            sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
+                          >
+                            {getAttendPrimaryLabel(ev)}
+                          </Button>
+                        )}
                         <Button
-                          variant="contained"
+                          variant={externalAttendUrl ? "outlined" : "contained"}
                           size="medium"
                           color="primary"
                           onClick={openApplyModalAfterProfileCheck}
-                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          className="normal-case w-full min-w-0 rounded-full px-4 sm:w-auto"
+                          sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
                         >
                           {applicationStatus === 'declined'
                             ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
-                            : (token ? 'Apply Now' : ev.allow_guest_applications === true ? 'Apply as Guest' : 'Sign in to Apply')}
+                            : !token && ev.allow_guest_applications !== true
+                              ? 'Sign in to Apply'
+                              : getAttendSecondaryLabel(ev, Boolean(token))}
                         </Button>
                         {applicationStatus === 'cancelled' && (
                           <span className="text-xs text-gray-600">You previously cancelled this application</span>
@@ -2142,10 +2207,15 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           variant="contained"
                           size="medium"
                           color="primary"
-                          onClick={(e) => { e.stopPropagation(); handleRegisterRow(false); }}
-                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          component={externalAttendUrl ? "a" : "button"}
+                          href={externalAttendUrl || undefined}
+                          target={externalAttendUrl ? "_blank" : undefined}
+                          rel={externalAttendUrl ? "noopener noreferrer" : undefined}
+                          onClick={(e) => { e.stopPropagation(); if (!externalAttendUrl) handleRegisterRow(false); }}
+                          className="normal-case min-w-0 rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
                         >
-                          Register Now
+                          {externalAttendUrl ? getAttendPrimaryLabel(ev) : "Register Now"}
                         </Button>
                         {!isAuthenticatedUser && isFreeEvent && (
                           <Button

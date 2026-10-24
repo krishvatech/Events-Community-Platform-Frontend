@@ -47,6 +47,7 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { normalizeTimezoneName, getBrowserTimezone } from "../utils/timezoneUtils";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
 import { getDisplayPrice, getReplayCtaText, isEventEffectivelyPast, isInPersonEvent, isReplayReadyForSignup } from "../utils/eventUtils";
+import { getExternalAttendUrl, getAttendPrimaryLabel, getAttendSecondaryLabel } from "../utils/attendCta";
 import { toast } from "react-toastify";
 import { Helmet } from "react-helmet-async";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
@@ -1619,6 +1620,8 @@ export default function EventDetailsPage() {
   const isHost = isEventOwner || Boolean(registration?.is_host);
   const paymentPending = isPaymentPendingRegistration(registration, event);
   const confirmedRegistered = isConfirmedRegistration(registration, event);
+  // External guaranteed-seat CTA is opt-in and only for pre-registration states.
+  const externalAttendUrl = getExternalAttendUrl(event);
 
   // DEBUG: Log payment status calculation
   if (event?.id) {
@@ -1639,6 +1642,8 @@ export default function EventDetailsPage() {
   const isEffectivelyPast = status === "past" || isEventEffectivelyPast(event);
   const isPostEventLounge = isPostEventLoungeOpen(event);
   const isPast = isEffectivelyPast && !isPostEventLounge;
+  const showExternalAttendCta = Boolean(externalAttendUrl) && !isEventOwner &&
+    !paymentPending && !confirmedRegistered && status !== "cancelled" && !isEffectivelyPast;
   const multiDayJoinLabel = event.is_multi_day ? joinState?.buttonText : null;
   const isWithinEarlyJoinWindow = canEarlyJoin(event);
   const isPreEventLounge = isPreEventLoungeOpen(event);
@@ -2206,7 +2211,9 @@ export default function EventDetailsPage() {
                             ? "Application approved — payment pending"
                             : confirmedRegistered
                               ? "You are registered for this event."
-                              : getDisplayPrice(event)}
+                              : showExternalAttendCta
+                                ? (String(event?.price_label || "").trim() || "Choose a registration option below.")
+                                : getDisplayPrice(event)}
                       </Typography>
                       <div className="mt-3 flex flex-col gap-2">
                         {/* Replay Info Badge */}
@@ -2291,13 +2298,31 @@ export default function EventDetailsPage() {
                               : (!myApplication || applicationStatus === 'none' || applicationStatus === 'cancelled' || applicationStatus === 'declined')
                               ? (
                                 <>
+                                  {showExternalAttendCta && (
+                                    <Button
+                                      component="a"
+                                      href={externalAttendUrl}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      variant="contained"
+                                      sx={{ textTransform: "none", backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" }, whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", minWidth: 0 }}
+                                      className="rounded-xl"
+                                    >
+                                      {getAttendPrimaryLabel(event)}
+                                    </Button>
+                                  )}
                                   <Button
                                     onClick={mustSignInToApply ? goToSignInForApply : openApplyModalAfterProfileCheck}
-                                    variant="contained"
+                                    variant={showExternalAttendCta ? "outlined" : "contained"}
                                     sx={{
                                       textTransform: "none",
-                                      backgroundColor: "#10b8a6",
-                                      "&:hover": { backgroundColor: "#0ea5a4" },
+                                      whiteSpace: "normal",
+                                      overflowWrap: "anywhere",
+                                      textAlign: "center",
+                                      minWidth: 0,
+                                      ...(showExternalAttendCta
+                                        ? { color: "#0f766e", borderColor: "#10b8a6", "&:hover": { borderColor: "#0ea5a4" } }
+                                        : { backgroundColor: "#10b8a6", "&:hover": { backgroundColor: "#0ea5a4" } }),
                                     }}
                                     className="rounded-xl"
                                   >
@@ -2305,7 +2330,7 @@ export default function EventDetailsPage() {
                                       ? (applicationStatus === 'declined' ? 'Sign in to Apply Again' : 'Sign in to Apply')
                                       : applicationStatus === 'declined'
                                         ? (token ? 'Apply Again' : 'Apply Again as Guest')
-                                        : (token ? 'Apply Now' : 'Apply as Guest')}
+                                        : getAttendSecondaryLabel(event, Boolean(token))}
                                   </Button>
                                   {applicationStatus === 'declined' && (
                                     <Typography variant="caption" sx={{ color: "#666" }}>
@@ -2445,7 +2470,7 @@ export default function EventDetailsPage() {
                                             }}
                                             className="rounded-xl"
                                           >
-                                            {token ? "Apply Now" : "Apply as Guest"}
+                                            {getAttendSecondaryLabel(event, Boolean(token))}
                                           </Button>
                                           <Typography variant="caption" sx={{ color: "#666", mt: 1 }}>
                                             You previously cancelled this application
@@ -2489,22 +2514,28 @@ export default function EventDetailsPage() {
                         ) : !isEventOwner && !canJoinEventNow && !isPast ? (
                           <>
                             <Button
-                              onClick={handleRegister}
+                              onClick={showExternalAttendCta ? undefined : handleRegister}
+                              component={showExternalAttendCta ? "a" : "button"}
+                              href={showExternalAttendCta ? externalAttendUrl : undefined}
+                              target={showExternalAttendCta ? "_blank" : undefined}
+                              rel={showExternalAttendCta ? "noopener noreferrer" : undefined}
                               variant="contained"
-                              disabled={addingPaidEventToCart}
+                              disabled={!showExternalAttendCta && addingPaidEventToCart}
                               sx={{
                                 textTransform: "none",
                                 backgroundColor: "#10b8a6",
                                 "&:hover": { backgroundColor: "#0ea5a4" },
                                 "&.Mui-disabled": { backgroundColor: "#9adbd3", color: "#ffffff" },
+                                whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", minWidth: 0,
                               }}
                               className="rounded-xl"
                             >
-                              {!event?.is_free && addingPaidEventToCart
-                                ? "Adding to cart..."
-                                : !event?.is_free && paidCartNotice
-                                  ? "Added to cart"
-                                  : "Register Now"}
+                              {showExternalAttendCta ? getAttendPrimaryLabel(event)
+                                : !event?.is_free && addingPaidEventToCart
+                                  ? "Adding to cart..."
+                                  : !event?.is_free && paidCartNotice
+                                    ? "Added to cart"
+                                    : "Register Now"}
                             </Button>
                             {!event?.is_free && paidCartNotice && (
                               <Alert

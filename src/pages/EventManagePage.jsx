@@ -609,6 +609,20 @@ export default function EventManagePage() {
   const [saleorName, setSaleorName] = useState("");
   const [saleorDescription, setSaleorDescription] = useState("");
   const [saleorPriceLabel, setSaleorPriceLabel] = useState(event?.price_label || "");
+  const [attendPrimaryText, setAttendPrimaryText] = useState(event?.attend_primary_button_text || "Register Here");
+  const [attendPrimaryUrl, setAttendPrimaryUrl] = useState(event?.attend_primary_button_url || "");
+  const [attendSecondaryText, setAttendSecondaryText] = useState(event?.attend_secondary_button_text || "");
+  const [attendSettingsSaving, setAttendSettingsSaving] = useState(false);
+
+  // Event details load asynchronously; hydrate editor values when the event arrives.
+  useEffect(() => {
+    if (!event?.id) return;
+    setSaleorPriceLabel(event.price_label || "");
+    setAttendPrimaryText(event.attend_primary_button_text || "Register Here");
+    setAttendPrimaryUrl(event.attend_primary_button_url || "");
+    setAttendSecondaryText(event.attend_secondary_button_text || "");
+  }, [event?.id, event?.price_label, event?.attend_primary_button_text,
+      event?.attend_primary_button_url, event?.attend_secondary_button_text]);
   const [targetChannelSlug, setTargetChannelSlug] = useState("default-channel");
 
   // Discount Management State
@@ -6397,24 +6411,84 @@ export default function EventManagePage() {
     }
   };
 
-  const handleSavePriceLabel = async () => {
-    if (!event?.id) return;
+  const handleSaveAttendSettings = async () => {
+    if (!event?.id || attendSettingsSaving) return;
+    if (attendPrimaryUrl.trim() && !/^https:\/\/[^\s]+$/i.test(attendPrimaryUrl.trim())) {
+      toast.error("Primary button URL must be a valid HTTPS link.");
+      return;
+    }
+    setAttendSettingsSaving(true);
     try {
       const token = getToken();
-      const res = await fetch(`${API_ROOT}/events/${event?.id}/`, {
+      const res = await fetch(`${API_ROOT}/events/${event.id}/`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ price_label: saleorPriceLabel.trim() })
+        body: JSON.stringify({
+          price_label: saleorPriceLabel.trim(),
+          attend_primary_button_text: attendPrimaryText.trim(),
+          attend_primary_button_url: attendPrimaryUrl.trim(),
+          attend_secondary_button_text: attendSecondaryText.trim(),
+        }),
       });
-      if (!res.ok) throw new Error("Failed to save price label");
-      toast.success("Price label saved!");
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const detail = typeof json.detail === "string" ? json.detail : JSON.stringify(json);
+        throw new Error(detail || "Failed to save Attend settings");
+      }
+      setEvent((prev) => ({ ...prev, ...json }));
+      toast.success("Attend settings saved!");
     } catch (err) {
       toast.error(err.message);
+    } finally {
+      setAttendSettingsSaving(false);
     }
   };
+
+  const renderAttendSettings = () => (
+    <Stack spacing={2} sx={{ width: "100%" }}>
+      <TextField
+        label="Attend description (Public price display text)"
+        fullWidth
+        value={saleorPriceLabel}
+        onChange={(e) => setSaleorPriceLabel(e.target.value)}
+        inputProps={{ maxLength: 100 }}
+        helperText="Existing description/fallback field. Keep registration links in the button URL field instead. Valid Saleor prices still take precedence."
+      />
+      <TextField
+        label="Primary button text"
+        fullWidth
+        value={attendPrimaryText}
+        onChange={(e) => setAttendPrimaryText(e.target.value)}
+        inputProps={{ maxLength: 80 }}
+        helperText="Example: Register Here"
+      />
+      <TextField
+        label="Primary button URL (HTTPS)"
+        type="url"
+        fullWidth
+        value={attendPrimaryUrl}
+        onChange={(e) => setAttendPrimaryUrl(e.target.value)}
+        inputProps={{ maxLength: 500 }}
+        helperText="Leave blank for existing registration behavior. External links are only used while Saleor pricing is unavailable."
+      />
+      <TextField
+        label="Secondary button text"
+        fullWidth
+        value={attendSecondaryText}
+        onChange={(e) => setAttendSecondaryText(e.target.value)}
+        inputProps={{ maxLength: 80 }}
+        helperText="Optional. Leave blank to preserve the current Apply as Guest / Apply Now labels."
+      />
+      <Box>
+        <Button variant="outlined" onClick={handleSaveAttendSettings} disabled={attendSettingsSaving}>
+          {attendSettingsSaving ? "Saving..." : "Save Attend settings"}
+        </Button>
+      </Box>
+    </Stack>
+  );
 
   const handlePublishEvent = async () => {
     if (!event?.id || publishing) return;
@@ -6898,11 +6972,18 @@ export default function EventManagePage() {
 
     if (saleorError && !saleorProduct) {
       return (
-        <Paper sx={{ p: 4, textAlign: 'center', borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
-          <WarningRoundedIcon sx={{ fontSize: 48, color: 'warning.main', mb: 2 }} />
-          <Typography variant="h6" gutterBottom>Unable to Load Product Data</Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>{saleorError}</Typography>
-          <Button variant="contained" onClick={fetchSaleorProduct} startIcon={<RefreshRoundedIcon />}>Retry</Button>
+        <Paper sx={{ p: 4, borderRadius: 3, border: '1px solid', borderColor: 'divider' }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>Attend Settings</Typography>
+          <Alert severity="info" sx={{ mb: 3 }}>
+            Saleor product data is unavailable. You can still edit the Attend description and registration buttons below.
+          </Alert>
+          <Box sx={{ maxWidth: 560, mb: 3 }}>
+            {renderAttendSettings()}
+          </Box>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            Saleor: {saleorError}
+          </Typography>
+          <Button variant="outlined" onClick={fetchSaleorProduct} startIcon={<RefreshRoundedIcon />}>Retry Saleor</Button>
         </Paper>
       );
     }
@@ -6915,19 +6996,9 @@ export default function EventManagePage() {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             This event does not have a linked Saleor product.
           </Typography>
-          {/* Public price display override shown even without a product */}
-          <Box sx={{ mb: 3, maxWidth: 400, mx: 'auto', textAlign: 'left' }}>
-            <TextField
-              label="Public price display text"
-              fullWidth
-              value={saleorPriceLabel}
-              onChange={(e) => setSaleorPriceLabel(e.target.value)}
-              helperText='Optional fallback shown before Saleor price is configured. Once a valid Saleor price exists, public pages show the Saleor checkout price to avoid mismatched pricing.'
-              inputProps={{ maxLength: 100 }}
-            />
-            <Button sx={{ mt: 2 }} variant="outlined" onClick={handleSavePriceLabel}>
-              Save label
-            </Button>
+          {/* IPDT-776: CTA controls are available even with no Saleor product. */}
+          <Box sx={{ mb: 3, maxWidth: 560, mx: "auto", textAlign: "left" }}>
+            {renderAttendSettings()}
           </Box>
           <Button variant="contained" onClick={handleSyncSaleorProduct} startIcon={<RefreshRoundedIcon />} disabled={saleorLoading}>
             Create / Re-sync Saleor Product
@@ -7005,14 +7076,10 @@ export default function EventManagePage() {
                   sx={{ mb: 4, width: 400, display: 'block' }}
                 />
 
-                <TextField
-                  label="Public price display text"
-                  value={saleorPriceLabel}
-                  onChange={(e) => { setSaleorPriceLabel(e.target.value); setProductDirty(true); }}
-                  helperText='Optional fallback shown before Saleor price is configured. Once a valid Saleor price exists, public pages show the Saleor checkout price to avoid mismatched pricing.'
-                  sx={{ mb: 4, width: 400, display: 'block' }}
-                  inputProps={{ maxLength: 100 }}
-                />
+                {/* Attend CTA settings save independently of Saleor inventory/pricing. */}
+                <Box sx={{ mb: 4, maxWidth: 560 }}>
+                  {renderAttendSettings()}
+                </Box>
 
                 <Box sx={{
                   p: 1.5,
