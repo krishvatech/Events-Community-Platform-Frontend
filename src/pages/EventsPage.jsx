@@ -1298,8 +1298,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
       ) : (
       <div className={`border-t p-4 sm:p-6 ${externalAttendUrl && ev.registration_type === 'apply'
         ? "flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
-        : "flex items-center justify-between gap-3"}`}>
-        <div className="min-w-0 break-words text-base font-semibold text-neutral-900">
+        : "flex flex-wrap items-center justify-between gap-3"}`}>
+        <div className="min-w-[8rem] max-w-full flex-1 break-words text-base font-semibold text-neutral-900" style={{ overflowWrap: "anywhere" }}>
           {isPaymentPending ? (
             <PaymentPendingSummary reg={reg} />
           ) : (isEventOwner || isConfirmedRegistered) ? (
@@ -1404,7 +1404,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
               )}
             </div>
           ) : (
-            <div className="flex flex-wrap items-center justify-end gap-2">
+            <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
               {isEffectivelyPast && !isReplayEvent ? (
                 <Chip label="Event Ended" color="default" variant="outlined" />
               ) : ev.registration_type === 'apply' ? (
@@ -1424,8 +1424,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                             onClick={(e) => e.stopPropagation()}
                             variant="contained"
                             size="medium"
-                            className="normal-case w-full min-w-0 rounded-full px-4 bg-teal-500 hover:bg-teal-600 sm:w-auto"
-                            sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
+                            className="normal-case w-full rounded-full px-4 bg-teal-500 hover:bg-teal-600 sm:w-auto"
+                            sx={{ whiteSpace: "normal", overflowWrap: "break-word", textAlign: "center", maxWidth: "100%", flexShrink: 0 }}
                           >
                             {getAttendPrimaryLabel(ev)}
                           </Button>
@@ -1435,8 +1435,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                           size="medium"
                           color="primary"
                           onClick={openApplyModalAfterProfileCheck}
-                          className="normal-case w-full min-w-0 rounded-full px-4 sm:w-auto"
-                          sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
+                          className="normal-case w-full rounded-full px-4 sm:w-auto"
+                          sx={{ whiteSpace: "normal", overflowWrap: "break-word", textAlign: "center", maxWidth: "100%", flexShrink: 0 }}
                         >
                           {applicationStatus === 'declined'
                             ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
@@ -1586,8 +1586,8 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
                         target={externalAttendUrl ? "_blank" : undefined}
                         rel={externalAttendUrl ? "noopener noreferrer" : undefined}
                         onClick={(e) => { e.stopPropagation(); if (!externalAttendUrl) handleRegisterCard(false); }}
-                        className="normal-case min-w-0 rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-                        sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
+                        className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                        sx={{ whiteSpace: "normal", overflowWrap: "break-word", textAlign: "center", maxWidth: "100%", flexShrink: 0 }}
                       >
                         {externalAttendUrl ? getAttendPrimaryLabel(ev) : "Register Now"}
                       </Button>
@@ -2103,8 +2103,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                             onClick={(e) => e.stopPropagation()}
                             variant="contained"
                             size="medium"
-                            className="normal-case w-full min-w-0 rounded-full px-4 bg-teal-500 hover:bg-teal-600 sm:w-auto"
-                            sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
+                            className="normal-case w-full rounded-full px-4 bg-teal-500 hover:bg-teal-600 sm:w-auto"
+                            sx={{ whiteSpace: "normal", overflowWrap: "break-word", textAlign: "center", maxWidth: "100%", flexShrink: 0 }}
                           >
                             {getAttendPrimaryLabel(ev)}
                           </Button>
@@ -2114,8 +2114,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           size="medium"
                           color="primary"
                           onClick={openApplyModalAfterProfileCheck}
-                          className="normal-case w-full min-w-0 rounded-full px-4 sm:w-auto"
-                          sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
+                          className="normal-case w-full rounded-full px-4 sm:w-auto"
+                          sx={{ whiteSpace: "normal", overflowWrap: "break-word", textAlign: "center", maxWidth: "100%", flexShrink: 0 }}
                         >
                           {applicationStatus === 'declined'
                             ? (token ? 'Apply Again' : ev.allow_guest_applications === true ? 'Apply Again as Guest' : 'Sign in to Apply Again')
@@ -2213,8 +2213,8 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
                           target={externalAttendUrl ? "_blank" : undefined}
                           rel={externalAttendUrl ? "noopener noreferrer" : undefined}
                           onClick={(e) => { e.stopPropagation(); if (!externalAttendUrl) handleRegisterRow(false); }}
-                          className="normal-case min-w-0 rounded-full px-4 bg-teal-500 hover:bg-teal-600"
-                          sx={{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 }}
+                          className="normal-case rounded-full px-4 bg-teal-500 hover:bg-teal-600"
+                          sx={{ whiteSpace: "normal", overflowWrap: "break-word", textAlign: "center", maxWidth: "100%", flexShrink: 0 }}
                         >
                           {externalAttendUrl ? getAttendPrimaryLabel(ev) : "Register Now"}
                         </Button>

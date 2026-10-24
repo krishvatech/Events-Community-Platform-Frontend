@@ -65,10 +65,10 @@ test('dual Attend CTAs stack on phones and wrap long labels in both layouts', ()
   for (const [layout, code] of [['grid card', card], ['list row', row]]) {
     assert.match(code, /flex w-full min-w-0 flex-col gap-2 sm:w-auto sm:max-w-full sm:flex-row sm:flex-wrap/,
       `${layout}: pair must stack at mobile sizes, wrap at desktop widths`);
-    assert.match(code, /className="normal-case w-full min-w-0 rounded-full px-4[^"\n]*sm:w-auto"/,
-      `${layout}: actions must fill available mobile width`);
-    assert.match(code, /sx=\{\{ whiteSpace: "normal", overflowWrap: "anywhere", textAlign: "center", maxWidth: "100%", minWidth: 0 \}\}/,
-      `${layout}: long words should wrap inside buttons`);
+    assert.match(code, /className="normal-case w-full rounded-full px-4[^"\n]*sm:w-auto"/,
+      `${layout}: actions must fill available mobile width without zero minimum`);
+    assert.match(code, /sx=\{\{ whiteSpace: "normal", overflowWrap: "break-word", textAlign: "center", maxWidth: "100%", flexShrink: 0 \}\}/,
+      `${layout}: button text wraps without letting actions collapse`);
   }
 });
 
@@ -91,4 +91,24 @@ test('detail view also wraps long configured Attend button labels', () => {
   assert.match(details, /overflowWrap: "anywhere"/, 'detail buttons must wrap long words');
   assert.match(details, /onClick=\{mustSignInToApply \? goToSignInForApply : openApplyModalAfterProfileCheck\}/,
     'detail secondary CTA must retain its existing guarded application action');
+});
+
+
+test('event card footer wraps long registration URLs without squeezing the Apply Now action', () => {
+  const listing = readFileSync(new URL('../EventsPage.jsx', import.meta.url), 'utf8');
+  const card = listing.slice(listing.indexOf('function EventCard('), listing.indexOf('function EventRow('));
+  assert.match(card, /: "flex flex-wrap items-center justify-between gap-3"/, 'ordinary footer must wrap instead of squeezing the CTA');
+  assert.match(card, /min-w-\[8rem\] max-w-full flex-1 break-words/, 'price description has a sensible minimum width');
+  assert.match(card, /style=\{\{ overflowWrap: "anywhere" \}\}/, 'a bare URL may break within its text region');
+  assert.match(card, /flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2/, 'actions should not shrink below their labels');
+});
+
+test('six listing CTA buttons resist shrinking and wrap custom text safely', () => {
+  const listing = readFileSync(new URL('../EventsPage.jsx', import.meta.url), 'utf8');
+  const card = listing.slice(listing.indexOf('function EventCard('), listing.indexOf('function EventRow('));
+  const row = listing.slice(listing.indexOf('function EventRow('), listing.indexOf('function CardFooterSkeleton('));
+  for (const [layout, code] of [['grid card', card], ['list row', row]]) {
+    assert.equal((code.match(/overflowWrap: "break-word", textAlign: "center", maxWidth: "100%", flexShrink: 0/g) || []).length, 3, `${layout}: three CTA positions`);
+    assert.doesNotMatch(code, /className="normal-case (?:w-full )?min-w-0 rounded-full px-4/, `${layout}: no zero-min-width CTA buttons`);
+  }
 });
