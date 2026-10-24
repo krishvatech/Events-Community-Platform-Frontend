@@ -3,6 +3,7 @@
 // Reuses existing Header/Footer and our MUI + Tailwind setup.
 
 import React, { useEffect, useMemo, useState } from "react";
+import { plainEventDescription } from "../components/EventDescription.jsx";
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
@@ -1031,7 +1032,7 @@ function EventCard({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSh
         </div>
 
         {ev.description && (
-          <p className="mt-2 text-neutral-600 text-sm three-line">{ev.description}</p>
+          <p className="mt-2 text-neutral-600 text-sm three-line">{plainEventDescription(ev.description)}</p>
         )}
 
         <FeaturedParticipantsStrip
@@ -1841,7 +1842,7 @@ function EventRow({ ev, myRegistrations, setMyRegistrations, setRawEvents, onSho
               </div>
               {ev.description && (
                 <p className="mt-2 text-neutral-600 text-sm md:text-base leading-relaxed">
-                  {truncate(ev.description, 220)}
+                  {truncate(plainEventDescription(ev.description), 220)}
                 </p>
               )}
 

@@ -1,5 +1,6 @@
 // src/pages/EventDetailsPage.jsx
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import EventDescription, { plainEventDescription } from "../components/EventDescription.jsx";
 import { Link, useParams, useLocation, useNavigate } from "react-router-dom";
 import {
   Box,
@@ -1732,7 +1733,7 @@ export default function EventDetailsPage() {
         <Helmet>
           <title>{event.title}</title>
           <meta property="og:title" content={event.title} />
-          <meta property="og:description" content={(event.description || '').slice(0, 160)} />
+          <meta property="og:description" content={plainEventDescription(event.description).slice(0, 160)} />
           {coverImageUrl && <meta property="og:image" content={coverImageUrl} />}
           <meta property="og:url" content={window.location.href} />
           <meta property="og:type" content="website" />
@@ -2175,9 +2176,7 @@ export default function EventDetailsPage() {
                             About this event
                           </Typography>
                           {desc?.trim() ? (
-                            <Typography variant="body1" sx={{ whiteSpace: "pre-wrap" }}>
-                              {desc}
-                            </Typography>
+                            <EventDescription value={desc} />
                           ) : (
                             <Typography variant="body1" color="text.secondary">
                               Event details will be announced soon.
