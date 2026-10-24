@@ -20,6 +20,7 @@ import {
   Typography,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import PublishRoundedIcon from "@mui/icons-material/PublishRounded";
 import UnpublishedRoundedIcon from "@mui/icons-material/UnpublishedRounded";
@@ -34,6 +35,7 @@ import { describeAction } from "./newsletterFormActions.js";
 import {
   CARD_BORDER,
   FORMS_PATH,
+  FormDeleteDialog,
   FormPublicationDialog,
   FormStatusChip,
   NAVY,
@@ -77,6 +79,7 @@ export default function AdminNewsletterFormDetailsPage() {
   const [form, setForm] = useState(null);
   const [load, setLoad] = useState({ loading: true, error: null });
   const [publicationOpen, setPublicationOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [usage, setUsage] = useState({ loading: true, data: null, error: "" });
   // ?preview=1 (from the editor's "Preview saved version") opens the preview.
   const [previewOpen, setPreviewOpen] = useState(() => new URLSearchParams(location.search).get("preview") === "1");
@@ -191,6 +194,9 @@ export default function AdminNewsletterFormDetailsPage() {
               sx={{ textTransform: "none" }}
             >
               {form.isPublished ? "Unpublish" : "Publish"}
+            </Button>
+            <Button color="error" variant="outlined" startIcon={<DeleteOutlineRoundedIcon />} onClick={() => setDeleteOpen(true)} sx={{ textTransform: "none" }}>
+              Delete
             </Button>
           </Stack>
         </Stack>
@@ -342,6 +348,13 @@ export default function AdminNewsletterFormDetailsPage() {
           setPublicationOpen(false);
           setSnack({ open: true, severity: "success", message });
         }}
+      />
+
+      <FormDeleteDialog
+        form={form}
+        open={deleteOpen}
+        onClose={() => setDeleteOpen(false)}
+        onDeleted={(_, message) => navigate(FORMS_PATH, { state: { flash: message } })}
       />
 
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack((current) => ({ ...current, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>

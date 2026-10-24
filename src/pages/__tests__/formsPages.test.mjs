@@ -3,7 +3,6 @@ import { afterEach, test } from "node:test";
 
 import {
   React,
-  act,
   all,
   chooseSelectOption,
   cleanup,
@@ -58,6 +57,14 @@ const makeForm = (overrides = {}) => ({
   ...overrides,
 });
 
+const makeUsage = (overrides = {}) => ({
+  campaignSources: [],
+  campaignEvents: [],
+  pointActions: [],
+  submissions: { total: 3, latest: null },
+  ...overrides,
+});
+
 const apiError = (status, data) => Object.assign(new Error(`HTTP ${status}`), { response: { status, data } });
 
 function installFormsApi({ forms = [makeForm()], handlers = {} } = {}) {
@@ -82,6 +89,10 @@ function installFormsApi({ forms = [makeForm()], handlers = {} } = {}) {
     if (method === "patch" && detail) return { data: { ...byId[detail[1]], ...payload } };
     const publication = url.match(/^\/newsletter\/admin\/forms\/([^/]+)\/(publish|unpublish)\/$/);
     if (method === "post" && publication) return { data: { ...byId[publication[1]], isPublished: publication[2] === "publish" } };
+    if (method === "get" && /^\/newsletter\/admin\/forms\/[^/]+\/usage\/$/.test(url)) return { data: makeUsage() };
+    if (method === "delete" && detail) {
+      return { data: { deleted: true, id: detail[1], name: byId[detail[1]]?.name || "", submissionsKept: 3 } };
+    }
     throw new Error(`unexpected ${method} ${url}`);
   };
   globalThis.__testApiClient = {
@@ -168,7 +179,7 @@ test("a list load failure is shown with Retry", async () => {
 
 // --------------------------------------------------------------- details --
 
-test("details show settings, read-only fields and actions, and no delete", async () => {
+test("details show settings, read-only fields and actions, and a Delete button", async () => {
   installFormsApi();
   await renderForms("/admin/newsletter/forms/31");
   await waitFor(() => assert.equal(hasText("Mautic Form #31"), true));
@@ -177,7 +188,7 @@ test("details show settings, read-only fields and actions, and no delete", async
   assert.equal(hasText("contact.email"), true);
   assert.equal(hasText("Submit Actions (1)"), true);
   assert.equal(hasText("Tag inquiry"), true);
-  assert.equal(queryByRole("button", /Delete/), null);
+  assert.equal(queryByRole("button", "Delete") !== null, true);
   assert.equal(queryByRole("button", "Publish") !== null, true);
   assert.equal(all("table[aria-label='Form fields'] input").length, 0);
 });
@@ -341,8 +352,89 @@ test("draft rules mirror the backend", () => {
   assert.equal("isPublished" in shared.draftToPayload(shared.formToDraft(original)), false);
 });
 
-test("nothing here can delete a Form", async () => {
-  const service = await loadSource("src/services/newsletterService.js");
-  assert.equal(Object.keys(service).some((name) => /delete.*form/i.test(name)), false);
-  await act(async () => {});
+// ---------------------------------------------------------------- delete --
+
+test("deleting from details checks usage, confirms, and returns to the list", async () => {
+  const api = installFormsApi();
+  await renderForms("/admin/newsletter/forms/31");
+  await waitFor(() => assert.equal(hasText("Mautic Form #31"), true));
+
+  await click(getByRole("button", "Delete"));
+  const dialog = await waitFor(() => getByRole("dialog"));
+  await waitFor(() => assert.equal(hasText(/3 stored submissions are kept in Mautic/), true));
+  assert.equal(api.writes("delete").length, 0);
+  await click(getByRole("button", "Delete", { scope: dialog }));
+
+  await waitFor(() => assert.equal(hasText('Form "Training Inquiry" deleted.'), true));
+  assert.deepEqual(api.writes("delete").map((c) => c.url), ["/newsletter/admin/forms/31/"]);
+  assert.equal(tableRows().length > 0, true);
+});
+
+test("a Form used by a Campaign cannot be deleted", async () => {
+  const api = installFormsApi({ handlers: { "get /newsletter/admin/forms/31/usage/": async () => ({ data: makeUsage({
+    campaignSources: [{ id: 4, name: "Welcome", published: true }],
+    campaignEvents: [{ id: 9, type: "form.submit", campaignId: 4, campaignName: "Welcome" }, { id: 10, type: "form.submit", campaignId: 5, campaignName: "Nurture" }],
+  }) }) } });
+  await renderForms("/admin/newsletter/forms/31");
+  await waitFor(() => assert.equal(hasText("Mautic Form #31"), true));
+
+  await click(getByRole("button", "Delete"));
+  const dialog = await waitFor(() => getByRole("dialog"));
+  await waitFor(() => assert.equal(hasText("This Form is used by a Campaign and cannot be deleted."), true));
+  assert.equal(hasText("Welcome (#4)"), true);
+  assert.equal(hasText("Nurture (#5)"), true);
+  assert.equal(getByRole("button", "Delete", { scope: dialog }).disabled, true);
+  assert.equal(api.writes("delete").length, 0);
+});
+
+test("Mautic refusing the delete explains the own/other permission", async () => {
+  installFormsApi({ handlers: { "delete /newsletter/admin/forms/31/": async () => {
+    throw apiError(403, { detail: "Your Mautic user is not allowed to perform this operation.", code: "mautic_permission_denied" });
+  } } });
+  await renderForms("/admin/newsletter/forms/31");
+  await waitFor(() => assert.equal(hasText("Mautic Form #31"), true));
+  await click(getByRole("button", "Delete"));
+  const dialog = await waitFor(() => getByRole("dialog"));
+  await waitFor(() => assert.equal(getByRole("button", "Delete", { scope: dialog }).disabled, false));
+  await click(getByRole("button", "Delete", { scope: dialog }));
+  await waitFor(() => assert.equal(hasText(/Mautic lets you delete Forms you created/), true));
+  assert.equal(hasText("Mautic Form #31"), true);
+});
+
+test("unchecked usage blocks the delete", async () => {
+  const api = installFormsApi({ handlers: { "get /newsletter/admin/forms/31/usage/": async () => {
+    throw apiError(502, { detail: "Mautic did not complete the Form request." });
+  } } });
+  await renderForms("/admin/newsletter/forms");
+  await waitFor(() => assert.equal(tableRows().length, 1));
+  await click(getByRole("button", "Delete Training Inquiry"));
+  const dialog = await waitFor(() => getByRole("dialog"));
+  await waitFor(() => assert.equal(hasText(/Nothing can be deleted until it is checked/), true));
+  assert.equal(getByRole("button", "Delete", { scope: dialog }).disabled, true);
+  assert.equal(api.writes("delete").length, 0);
+});
+
+test("deleting from the list reloads it and confirms", async () => {
+  const api = installFormsApi();
+  await renderForms("/admin/newsletter/forms");
+  await waitFor(() => assert.equal(tableRows().length, 1));
+  await click(getByRole("button", "Delete Training Inquiry"));
+  const dialog = await waitFor(() => getByRole("dialog"));
+  await waitFor(() => assert.equal(getByRole("button", "Delete", { scope: dialog }).disabled, false));
+  await click(getByRole("button", "Delete", { scope: dialog }));
+  await waitFor(() => assert.equal(hasText('Form "Training Inquiry" deleted.'), true));
+  const reloads = api.calls.filter((c) => c.method === "get" && c.url === "/newsletter/admin/forms/");
+  assert.equal(reloads.length, 2);
+  assert.equal(reloads[1].params.refresh, 1);
+});
+
+test("campaign usage is listed once per Campaign", () => {
+  assert.deepEqual(
+    shared.campaignsUsingForm({
+      campaignSources: [{ id: 4, name: "Welcome" }],
+      campaignEvents: [{ campaignId: 4, campaignName: "Welcome" }, { campaignId: 7, campaignName: "Nurture" }],
+    }),
+    [{ id: "4", name: "Welcome" }, { id: "7", name: "Nurture" }]
+  );
+  assert.deepEqual(shared.campaignsUsingForm(null), []);
 });

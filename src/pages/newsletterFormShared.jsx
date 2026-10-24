@@ -1,12 +1,13 @@
 // Shared pieces of the Marketing Hub Forms pages (list, details, editor).
-// Forms live in Mautic. Basic settings, publication and supported fields are
-// managed here (fields through NewsletterFormFieldBuilder); submit actions are
-// shown read-only and never sent. Every write runs as the admin's own Mautic
-// user through newsletterService.
+// Forms live in Mautic. Basic settings, publication, supported fields and
+// delete are managed here (fields through NewsletterFormFieldBuilder); submit
+// actions are shown read-only and never sent. Every write runs as the admin's
+// own Mautic user through newsletterService.
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Box,
   Button,
   Chip,
   CircularProgress,
@@ -14,10 +15,16 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Stack,
   Typography,
 } from "@mui/material";
 
-import { publishNewsletterForm, unpublishNewsletterForm } from "../services/newsletterService";
+import {
+  deleteNewsletterForm,
+  getNewsletterFormUsage,
+  publishNewsletterForm,
+  unpublishNewsletterForm,
+} from "../services/newsletterService";
 import { getErrorMessage } from "./newsletterTemplateShared.jsx";
 
 export { CARD_BORDER, NAVY, PAGE_SIZE, formatDateTime, getErrorMessage } from "./newsletterTemplateShared.jsx";
@@ -201,6 +208,135 @@ export function FormPublicationDialog({ form, open, onClose, onDone, onRefresh }
           startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
         >
           {publishing ? "Publish" : "Unpublish"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+/** Campaigns that start from the Form or name it in a decision/condition, once each. */
+export function campaignsUsingForm(usage) {
+  const campaigns = new Map();
+  (Array.isArray(usage?.campaignSources) ? usage.campaignSources : []).forEach((c) => campaigns.set(String(c.id), c.name || ""));
+  (Array.isArray(usage?.campaignEvents) ? usage.campaignEvents : []).forEach((e) => {
+    if (!campaigns.has(String(e.campaignId))) campaigns.set(String(e.campaignId), e.campaignName || "");
+  });
+  return [...campaigns].map(([id, name]) => ({ id, name }));
+}
+
+export function formDeleteErrorMessage(err) {
+  if (err?.response?.data?.code === "mautic_permission_denied") {
+    return "Your Mautic role does not allow deleting this Form. Mautic lets you delete Forms you created; deleting other people's Forms needs that permission in your Mautic role.";
+  }
+  return getErrorMessage(err, "The Form could not be deleted.");
+}
+
+/**
+ * Checks where the Form is used, then confirms and deletes it. Mautic decides
+ * whether this admin may delete it; a Form a Campaign uses cannot be deleted.
+ * `onDeleted` receives the backend's result and a message for the admin.
+ */
+export function FormDeleteDialog({ form, open, onClose, onDeleted }) {
+  const [usage, setUsage] = useState({ loading: false, data: null, error: "" });
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [blockedBy, setBlockedBy] = useState([]);
+  // `form` may already be cleared while the dialog animates closed.
+  const label = form?.name || (form?.id ? `Form #${form.id}` : "This Form");
+
+  useEffect(() => {
+    if (!open || !form?.id) return undefined;
+    let active = true;
+    setError("");
+    setBlockedBy([]);
+    setUsage({ loading: true, data: null, error: "" });
+    getNewsletterFormUsage(form.id)
+      .then((data) => active && setUsage({ loading: false, data, error: "" }))
+      .catch((err) => active && setUsage({ loading: false, data: null, error: getErrorMessage(err, "Where this Form is used could not be checked.") }));
+    return () => {
+      active = false;
+    };
+  }, [open, form?.id]);
+
+  const close = () => {
+    if (busy) return;
+    onClose();
+  };
+
+  const campaigns = blockedBy.length ? blockedBy : campaignsUsingForm(usage.data);
+  const submissions = Number(usage.data?.submissions?.total || 0);
+  const pointActions = Array.isArray(usage.data?.pointActions) ? usage.data.pointActions : [];
+  const canDelete = !usage.loading && !usage.error && campaigns.length === 0;
+
+  const confirm = async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const result = await deleteNewsletterForm(form.id);
+      onDeleted(result, `Form "${result?.name || label}" deleted.`);
+    } catch (err) {
+      const used = err?.response?.data?.campaigns;
+      if (Array.isArray(used) && used.length) setBlockedBy(used);
+      setError(formDeleteErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={close} maxWidth="sm" fullWidth>
+      <DialogTitle>Delete Form?</DialogTitle>
+      <DialogContent>
+        <Stack spacing={2}>
+          <Typography color="text.secondary">
+            {`"${label}" will be deleted from Mautic and stop working wherever it is embedded. This cannot be undone here.`}
+          </Typography>
+          {usage.loading && (
+            <Stack direction="row" spacing={1} alignItems="center">
+              <CircularProgress size={16} />
+              <Typography variant="body2" color="text.secondary">Checking where this Form is used…</Typography>
+            </Stack>
+          )}
+          {usage.error && <Alert severity="warning">{usage.error} Nothing can be deleted until it is checked.</Alert>}
+          {campaigns.length > 0 && (
+            <Alert severity="warning">
+              <strong>This Form is used by a Campaign and cannot be deleted.</strong> Remove it from these Campaigns first:
+              <Box component="ul" sx={{ m: 0, mt: 0.5, pl: 2.5 }}>
+                {campaigns.map((c) => <li key={c.id}>{`${c.name || "Campaign"} (#${c.id})`}</li>)}
+              </Box>
+            </Alert>
+          )}
+          {canDelete && (
+            <Box component="ul" sx={{ m: 0, pl: 2.5, color: "text.secondary" }}>
+              <li>
+                <Typography variant="body2">
+                  {submissions
+                    ? `Its ${submissions} stored submission${submissions === 1 ? " is" : "s are"} kept in Mautic but will no longer be shown here.`
+                    : "It has no stored submissions."}
+                </Typography>
+              </li>
+              {pointActions.length > 0 && (
+                <li>
+                  <Typography variant="body2">
+                    {`Point action${pointActions.length === 1 ? "" : "s"} ${pointActions.map((p) => `"${p.name}"`).join(", ")} will no longer award points for it.`}
+                  </Typography>
+                </li>
+              )}
+            </Box>
+          )}
+          {error && <Alert severity="error">{error}</Alert>}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={close} disabled={busy}>Cancel</Button>
+        <Button
+          variant="contained"
+          color="error"
+          onClick={confirm}
+          disabled={busy || !canDelete}
+          startIcon={busy ? <CircularProgress size={16} color="inherit" /> : null}
+        >
+          Delete
         </Button>
       </DialogActions>
     </Dialog>
