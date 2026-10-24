@@ -37,7 +37,6 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import MoreVertRoundedIcon from "@mui/icons-material/MoreVertRounded";
 import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
-import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import InsertPhotoRoundedIcon from "@mui/icons-material/InsertPhotoRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
@@ -4336,17 +4335,14 @@ export default function GroupDetailsPage() {
   const [groupLoading, setGroupLoading] = React.useState(true);
   const [groupError, setGroupError] = React.useState("");
   const groupRequestIdRef = React.useRef(0);
-  const [tab, setTab] = React.useState(0);
   const requestedTab = React.useMemo(() => {
     const value = new URLSearchParams(location.search).get("tab");
     return value ? value.toLowerCase().trim() : "";
   }, [location.search]);
   const [me, setMe] = React.useState(null);
   const [canSeeRequests, setCanSeeRequests] = React.useState(false);
-  // Member management (Settings tab, role menu) — owner/group admin/staff.
+  // Member management in the Members tab — owner/group admin/staff.
   const [canApproveRequests, setCanApproveRequests] = React.useState(false);
-  // Approving/declining join requests — also allowed for group moderators.
-  const [canReviewRequests, setCanReviewRequests] = React.useState(false);
   const [moderatorCanI, setModeratorCanI] = React.useState(null);
 
   const [toast, setToast] = React.useState({ open: false, msg: "", type: "info" });
@@ -4396,11 +4392,6 @@ export default function GroupDetailsPage() {
           const isModOrAdmin = Boolean(can?.is_moderator || can?.is_admin);
           setCanSeeRequests(Boolean(perms.can_manage_members || isModOrAdmin));
           setCanApproveRequests(Boolean(perms.can_manage_members ?? can?.is_admin));
-          // Moderators can act on join requests even though they cannot manage
-          // members or edit the group.
-          setCanReviewRequests(
-            Boolean(perms.can_review_join_requests ?? (perms.can_manage_members || isModOrAdmin))
-          );
           setModeratorCanI(can);
           return;
         }
@@ -4411,7 +4402,6 @@ export default function GroupDetailsPage() {
       if (requestId === groupRequestIdRef.current) {
         setCanSeeRequests(false);
         setCanApproveRequests(false);
-        setCanReviewRequests(false);
         setModeratorCanI(null);
       }
     })();
@@ -4675,14 +4665,10 @@ export default function GroupDetailsPage() {
   );
 
   const tabDefs = React.useMemo(() => {
-    const items = [
+    return [
       { key: "overview", label: "OVERVIEW", icon: <InfoOutlinedIcon />, render: () => <OverviewTab group={group} /> },
-    ];
-
-    if (canAccessGroupContent) {
-      items.push(
-        {
-          key: "members", label: "MEMBERS", icon: <PeopleOutlineIcon />, render: () => (
+      {
+        key: "members", label: "MEMBERS", icon: <PeopleOutlineIcon />, render: () => canAccessGroupContent ? (
             <MembersTab
               groupId={groupId}
               group={group}
@@ -4692,56 +4678,25 @@ export default function GroupDetailsPage() {
               onMembersAdded={(count) => setGroup((prev) => prev ? { ...prev, member_count: Number(prev.member_count || 0) + count } : prev)}
               onMemberRemoved={() => setGroup((prev) => prev ? { ...prev, member_count: Math.max(0, Number(prev.member_count || 0) - 1) } : prev)}
             />
-          )
-        },
-        { key: "posts", label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} onNotify={notify} /> },
-      );
-    }
-    if (canSeeRequests) {
-      items.push({
-        key: "requests",
-        label: "REQUESTS",
-        icon: <PeopleOutlineIcon />,
-        render: () => (
-          <RequestsTab
-            groupId={groupId}
-            canApprove={canReviewRequests}
-            onApproved={() =>
-              setGroup((prev) => prev ? { ...prev, member_count: Number(prev.member_count || 0) + 1 } : prev)
-            }
-          />
-        ),
-      });
-    }
-    // New Settings Tab
-    if (canApproveRequests) { // Owners/Admins
-      items.push({
-        key: "settings",
-        label: "SETTINGS",
-        icon: <SettingsRoundedIcon />,
-        render: () => <SettingsTab group={group} onUpdate={setGroup} />,
-      });
-    }
-    return items;
-  }, [canAccessGroupContent, canApproveRequests, canAssignAdmin, canReviewRequests, canSeeRequests, group, groupId, me, moderatorCanI]);
+          ) : <Alert severity="info">Join this group to view its members.</Alert>
+      },
+      { key: "posts", label: "POSTS", icon: <ArticleOutlinedIcon />, render: () => canAccessGroupContent ? <PostsTab groupId={groupId} group={group} moderatorCanI={moderatorCanI} onNotify={notify} /> : <Alert severity="info">Join this group to view its posts.</Alert> },
+    ];
+  }, [canAccessGroupContent, canApproveRequests, canAssignAdmin, group, groupId, me, moderatorCanI, notify]);
+
+  const tab = Math.max(0, tabDefs.findIndex((item) => item.key === requestedTab));
+
+  const navigateToTab = React.useCallback((key, replace = false) => {
+    const params = new URLSearchParams(location.search);
+    params.set("tab", key);
+    navigate({ pathname: location.pathname, search: `?${params}`, hash: location.hash }, { replace, state: location.state });
+  }, [location.pathname, location.search, location.hash, location.state, navigate]);
 
   React.useEffect(() => {
-    if (tab >= tabDefs.length) setTab(0);
-  }, [tab, tabDefs.length]);
-
-  React.useEffect(() => {
-    if (!requestedTab) return;
-
-    const nextIndex = tabDefs.findIndex((item) => {
-      const key = String(item.key || "").toLowerCase();
-      const label = String(item.label || "").toLowerCase();
-      return key === requestedTab || label === requestedTab;
-    });
-
-    if (nextIndex >= 0 && nextIndex !== tab) {
-      setTab(nextIndex);
+    if (requestedTab && !tabDefs.some((item) => item.key === requestedTab)) {
+      navigateToTab("overview", true);
     }
-  }, [requestedTab, tab, tabDefs]);
+  }, [requestedTab, tabDefs, navigateToTab]);
 
   // Filter Logic for Likes Dialog
   const likesFilteredUsers = likesFilter === "all" ? listUsers : listUsers.filter(u => u.reactionId === likesFilter);
@@ -4932,7 +4887,7 @@ export default function GroupDetailsPage() {
             sx={{ borderRadius: 3, borderColor: BORDER }}
           >
             <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-              <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ px: 2 }}>
+              <Tabs value={tab} onChange={(_, v) => navigateToTab(tabDefs[v].key)} sx={{ px: 2 }}>
                 {tabDefs.map((t) => (
                   <Tab key={t.label} icon={t.icon} iconPosition="start" label={t.label} />
                 ))}

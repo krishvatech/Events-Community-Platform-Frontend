@@ -211,6 +211,10 @@ export const publishNewsletterForm = (formId) =>
 export const unpublishNewsletterForm = (formId) =>
   unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/unpublish/`));
 
+// Mautic's own delete permissions decide; refused while a Campaign uses the Form.
+export const deleteNewsletterForm = (formId) =>
+  unwrap(apiClient.delete(`${adminFormsEndpoint}${formId}/`));
+
 // Form Field Builder: add, change and re-order supported fields (no delete).
 export const getNewsletterFormBuilderMetadata = () =>
   unwrap(apiClient.get(`${adminFormsEndpoint}builder/`));

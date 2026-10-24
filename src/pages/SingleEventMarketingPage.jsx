@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import EventDescription from "../components/EventDescription.jsx";
 import { useParams, useNavigate } from "react-router-dom";
 import { checkParticipantEmail, isEmailFormatValid } from "../utils/signupEmailCheck";
 import speakerImage from "../assets/prof-dr-aswath-damodaran-12b35a4e.png";
@@ -206,9 +207,7 @@ function Hero({ eventData = {}, eventId }) {
             <div style={{ fontFamily: F.display, fontSize: isMobile ? 24 : 42, fontWeight: 700, color: C.coral, margin: "0 0 20px", ...a(0.55) }}>
               {eventData.subtitle}
             </div>
-            <p style={{ fontFamily: F.body, fontSize: isMobile ? 14 : 16, lineHeight: 1.7, color: C.lightBlue, margin: "0 0 24px", maxWidth: 480, ...a(0.6) }}>
-              {eventData.description}
-            </p>
+            <EventDescription value={eventData.description} sx={{ fontFamily: F.body, fontSize: isMobile ? 14 : 16, lineHeight: 1.7, color: C.lightBlue, mb: 3, maxWidth: 480 }} />
 
             {/* Event benefits */}
             <div style={{ ...a(0.7), marginBottom: 24 }}>

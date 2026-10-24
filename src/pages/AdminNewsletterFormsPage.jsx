@@ -22,6 +22,7 @@ import {
   Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
@@ -32,6 +33,7 @@ import { listNewsletterForms } from "../services/newsletterService";
 import {
   CARD_BORDER,
   FORM_NEW_PATH,
+  FormDeleteDialog,
   FormStatusChip,
   NAVY,
   PAGE_SIZE,
@@ -76,6 +78,7 @@ export default function AdminNewsletterFormsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
+  const [deleting, setDeleting] = useState(null);
 
   // `refresh` asks the backend to bypass its list cache (Refresh button).
   const loadForms = useCallback(
@@ -150,7 +153,7 @@ export default function AdminNewsletterFormsPage() {
         <Box sx={{ minWidth: 0 }}>
           <Typography variant="h5" component="h1" sx={{ fontWeight: 850, color: NAVY }}>Forms</Typography>
           <Typography color="text.secondary">
-            Native Mautic Forms that capture contacts. Manage their settings and publication here.
+            Native Mautic Forms that capture contacts. Manage their settings, publication and deletion here.
           </Typography>
         </Box>
         <Stack direction="row" spacing={1} alignItems="center">
@@ -293,6 +296,11 @@ export default function AdminNewsletterFormsPage() {
                                   <EditRoundedIcon fontSize="small" />
                                 </IconButton>
                               </Tooltip>
+                              <Tooltip title="Delete">
+                                <IconButton aria-label={`Delete ${name}`} size="small" color="error" onClick={() => setDeleting(form)}>
+                                  <DeleteOutlineRoundedIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
                             </TableCell>
                           </TableRow>
                         );
@@ -315,6 +323,19 @@ export default function AdminNewsletterFormsPage() {
           </Paper>
         )
       )}
+
+      <FormDeleteDialog
+        form={deleting}
+        open={Boolean(deleting)}
+        onClose={() => setDeleting(null)}
+        onDeleted={(_, message) => {
+          setDeleting(null);
+          setSnack({ open: true, severity: "success", message });
+          // The last Form on a later page: step back rather than show an empty page.
+          if (rows.length === 1 && page > 1) setPage(page - 1);
+          else loadForms({ refresh: true });
+        }}
+      />
 
       <Snackbar open={snack.open} autoHideDuration={4000} onClose={() => setSnack((current) => ({ ...current, open: false }))} anchorOrigin={{ vertical: "bottom", horizontal: "right" }}>
         <Alert severity={snack.severity} onClose={() => setSnack((current) => ({ ...current, open: false }))}>{snack.message}</Alert>

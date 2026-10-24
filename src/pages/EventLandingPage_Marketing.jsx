@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import EventDescription, { plainEventDescription } from "../components/EventDescription.jsx";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button, Alert, Snackbar } from "@mui/material";
 import { Helmet } from "react-helmet-async";
@@ -335,7 +336,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
 
     return {
       title: data.title,
-      subtitle: data.description?.split('\n')[0] || 'Event',
+      subtitle: plainEventDescription(data.description).split('\n')[0] || 'Event',
       description: data.description || '',
       venue_name: data.venue_name || 'Venue',
       venue_location: `${data.location_city || ''}${data.location_country ? ', ' + data.location_country : ''}`.trim(),
@@ -389,7 +390,7 @@ function Hero({ onApplyClick, onJoinClick, eventData = {}, myApplication }) {
         <Helmet>
           <title>{eventData.title}</title>
           <meta property="og:title" content={eventData.title} />
-          <meta property="og:description" content={(eventData.description || '').slice(0, 160)} />
+          <meta property="og:description" content={plainEventDescription(eventData.description).slice(0, 160)} />
           <meta property="og:image" content={hero_image} />
           <meta property="og:url" content={window.location.href} />
           <meta property="og:type" content="website" />
@@ -2333,7 +2334,7 @@ function OxfordHeroReference({ onApplyClick, onJoinClick, eventData = {}, myAppl
         <Helmet>
           <title>{copy.title}</title>
           <meta property="og:title" content={copy.title} />
-          <meta property="og:description" content={copy.description.slice(0, 160)} />
+          <meta property="og:description" content={plainEventDescription(copy.description).slice(0, 160)} />
           <meta property="og:image" content={heroImage} />
           <meta property="og:url" content={window.location.href} />
           <meta property="og:type" content="website" />
@@ -2451,7 +2452,7 @@ function OxfordWhyAttend({ eventData = {} }) {
       <div className="ox-reference-container ox-reference-centered">
         <p className="ox-reference-kicker">Why Attend</p>
         <h2>Connecting Oxford's M&amp;A, private capital and corporate growth community</h2>
-        <p>{copy.description}</p>
+        <EventDescription value={copy.description} />
       </div>
     </section>
   );

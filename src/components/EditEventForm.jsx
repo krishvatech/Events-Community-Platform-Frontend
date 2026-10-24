@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
+import EventRichTextEditor, { hasEventDescriptionContent } from "./EventRichTextEditor.jsx";
 import {
     Box,
     Button,
@@ -1286,7 +1287,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
         } else if (["in_person", "hybrid"].includes(format) && !locationCity) {
             e.location = "Required";
         }
-        if (!description.trim()) e.description = "Description is required";
+        if (!hasEventDescriptionContent(description)) e.description = "Description is required";
         if (!selectedPlatformSlugs.length) e.platforms = "Select at least one platform";
         const priceValue = Number(price);
         if (!isFree) {
@@ -1619,14 +1620,7 @@ export default function EditEventForm({ event, onUpdated, onCancel, isOwner = fa
                     />
                 </Box>
 
-                <TextField
-                    label="Description *"
-                    multiline minRows={3}
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    fullWidth className="mb-3"
-                    error={!!errors.description} helperText={errors.description}
-                />
+                <EventRichTextEditor value={description} onChange={setDescription} error={!!errors.description} helperText={errors.description} />
 
                 <TextField
                     label="Slug *"
