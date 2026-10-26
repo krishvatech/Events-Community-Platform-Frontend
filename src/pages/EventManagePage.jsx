@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import RegisteredActions from "../components/RegisteredActions";
 import InviteUsersDialog from "../components/InviteUsersDialog";
 import InviteEmailsDialog from "../components/InviteEmailsDialog";
+import AttendeeImportDialog from "../components/AttendeeImportDialog";
 import QRCodeDisplay from "../components/QRCodeDisplay.jsx";
 import ParticipantsAttendanceTable from "../components/ParticipantsAttendanceTable.jsx";
 
@@ -86,6 +87,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import VerifiedIcon from "@mui/icons-material/Verified";
 import PersonAddRoundedIcon from "@mui/icons-material/PersonAddRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import ForwardToInboxRoundedIcon from "@mui/icons-material/ForwardToInboxRounded";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import PeopleTwoToneIcon from "@mui/icons-material/PeopleTwoTone";
@@ -411,6 +413,7 @@ export default function EventManagePage() {
   const [addParticipantLoading, setAddParticipantLoading] = useState(false);
   const [inviteUsersOpen, setInviteUsersOpen] = useState(false);
   const [inviteEmailsOpen, setInviteEmailsOpen] = useState(false);
+  const [attendeeImportOpen, setAttendeeImportOpen] = useState(false);
   const [regsRefresh, setRegsRefresh] = useState(0);
 
   // ---- Companion Tab State ----
@@ -4307,6 +4310,17 @@ export default function EventManagePage() {
             >
               Invite by Email
             </Button>
+            {Boolean(currentUser?.is_superuser || getBackendUserFromStorage()?.is_superuser) && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<UploadFileRoundedIcon />}
+                onClick={() => setAttendeeImportOpen(true)}
+                sx={{ textTransform: "none", borderRadius: 999 }}
+              >
+                Import Attendees
+              </Button>
+            )}
             <Button
               variant="outlined"
               size="small"
@@ -10166,6 +10180,12 @@ export default function EventManagePage() {
               onClose={() => setInviteEmailsOpen(false)}
               mode="event"
               targetIdOrSlug={event?.slug}
+            />
+            <AttendeeImportDialog
+              open={attendeeImportOpen}
+              onClose={() => setAttendeeImportOpen(false)}
+              event={event}
+              onImported={() => setRegsRefresh((n) => n + 1)}
             />
 
             {/* Resend Mail to All — Confirmation Dialog */}
