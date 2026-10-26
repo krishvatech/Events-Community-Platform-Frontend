@@ -593,6 +593,7 @@ export default function EventDetailsPage() {
   const [expandedSessionDescriptions, setExpandedSessionDescriptions] = useState({});
   const [loadingParticipants, setLoadingParticipants] = useState(false);
   const [participantError, setParticipantError] = useState(null);
+  const [participantLoginRequired, setParticipantLoginRequired] = useState(false);
   const [participantLoadingMore, setParticipantLoadingMore] = useState(false);
   const [participantNextOffset, setParticipantNextOffset] = useState(null);
   const [participantHasMore, setParticipantHasMore] = useState(false);
@@ -828,11 +829,24 @@ export default function EventDetailsPage() {
     setParticipantError(null);
     setParticipantNextOffset(null);
     setParticipantHasMore(false);
+    setParticipantLoginRequired(false);
+
+    // The participants API needs a logged-in member account.
+    if (!token || isGuest) {
+      setParticipantLoginRequired(true);
+      setLoadingParticipants(false);
+      return;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/events/${event.id}/participants/?limit=10&offset=0`, {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
+      if (res.status === 401) {
+        // Expired or invalid session
+        setParticipantLoginRequired(true);
+        return;
+      }
       if (res.status === 403) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data?.detail || "Participant list is not available right now.");
@@ -3387,6 +3401,8 @@ export default function EventDetailsPage() {
         loadingMore={participantLoadingMore}
         hasMore={participantHasMore}
         onLoadMore={loadMoreParticipants}
+        loginRequired={participantLoginRequired}
+        onLogin={() => navigate(`/signin?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`)}
       />
       {/* Guest Join Modal */}
       {event && (

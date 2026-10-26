@@ -13,7 +13,8 @@ import {
     Box,
     CircularProgress,
     Chip,
-    Tooltip
+    Tooltip,
+    Button
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import VerifiedIcon from '@mui/icons-material/Verified';
@@ -38,6 +39,8 @@ export default function ParticipantListDialog({
     loadingMore = false,
     hasMore = false,
     onLoadMore = null,
+    loginRequired = false,
+    onLogin = null,
 }) {
     const contentRef = useRef(null);
 
@@ -80,7 +83,18 @@ export default function ParticipantListDialog({
                 </IconButton>
             </DialogTitle>
             <DialogContent dividers ref={contentRef} sx={{ overflowY: 'auto', maxHeight: '60vh', height: '60vh' }}>
-                {loading && participants.length === 0 ? (
+                {loginRequired ? (
+                    <Box sx={{ p: 2, textAlign: 'center' }}>
+                        <Typography color="text.secondary" sx={{ mb: 2 }}>
+                            Log in to see the participants of this event.
+                        </Typography>
+                        {onLogin && (
+                            <Button variant="contained" onClick={onLogin} sx={{ textTransform: 'none' }}>
+                                Log in
+                            </Button>
+                        )}
+                    </Box>
+                ) : loading && participants.length === 0 ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
                         <CircularProgress />
                     </Box>
