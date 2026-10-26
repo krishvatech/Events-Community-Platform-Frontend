@@ -234,7 +234,7 @@ export default function AttendeeImportDialog({ open, onClose, event, onImported 
           <Stack spacing={2}>
             <Typography variant="body2" color="text.secondary">
               Upload a CSV or Excel file with <b>email</b>, <b>first_name</b>, <b>last_name</b> and <b>type</b>{" "}
-              (Attendee, Sponsor or Paid Attendee). <b>job_title</b>, <b>company</b>, <b>country</b> and{" "}
+              (Attendee, Sponsor, Sponsored Guest, Paid Attendee or any badge label of this event). <b>job_title</b>, <b>company</b>, <b>country</b> and{" "}
               <b>payment_reference</b> are optional. Missing accounts are created and emailed login details;
               everyone registered gets the registration confirmation email.
             </Typography>
@@ -317,6 +317,12 @@ export default function AttendeeImportDialog({ open, onClose, event, onImported 
               <Alert severity="warning">
                 This import takes the event to {preview.capacity_warning.after_import} registrations, over its limit of{" "}
                 {preview.capacity_warning.max_participants}.
+              </Alert>
+            )}
+            {preview.type_options?.length > 0 && preview.rows.some((row) => row.reason === "invalid_type") && (
+              <Alert severity="warning">
+                Types this event accepts: <b>{preview.type_options.join(", ")}</b>. To use another type, add it as a
+                badge label in the event's Companion tab, then upload the file again.
               </Alert>
             )}
             <RowsTable rows={preview.rows} />

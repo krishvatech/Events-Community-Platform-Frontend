@@ -7,7 +7,7 @@ export const REASON_LABELS = {
   missing_first_name: "First name is missing",
   missing_last_name: "Last name is missing",
   missing_type: "Type is missing",
-  invalid_type: "Type must be Attendee, Sponsor or Paid Attendee",
+  invalid_type: "Type is not a built-in type or a badge label of this event",
   multiple_accounts: "More than one account uses this email",
   application_linked_to_other_account: "The application belongs to another account",
   already_registered: "Already registered",
