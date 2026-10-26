@@ -36,6 +36,7 @@ import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import localizedFormat from "dayjs/plugin/localizedFormat";
 import { getAccessToken as getStoredAccessToken } from "../../utils/tokenStore";
+import EventFeedDescription from "../../components/EventFeedDescription.jsx";
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -1161,7 +1162,7 @@ function mapFeedItem(item) {
     return {
       ...base,
       type: "event",
-      text: m.description || m.summary || m.text || "",
+      text: m.event?.description || m.description || m.summary || m.text || "",
       event: {
         id: eventId,
         title: m.event_title || m.title || "Event",
@@ -1317,7 +1318,7 @@ function ClampedText({
 // ---- EVENT BLOCK ----
 function EventBlock({ post, onOpen }) {
   return (
-    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa" }}>
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: BORDER, bgcolor: "#fafafa", minWidth: 0, maxWidth: "100%", overflow: "hidden" }}>
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1} sx={{ gap: 1 }}>
         <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 700 }} noWrap>
@@ -1335,7 +1336,7 @@ function EventBlock({ post, onOpen }) {
         {post.event?.when ? formatWhen(post.event.when, post.userTimezone) : ""}{post.event?.where ? ` · ${post.event.where}` : ""}
       </Typography>
 
-      {post.text && <ClampedText text={post.text} maxLines={5} mt={1} />}
+      {post.text && <EventFeedDescription value={post.text} />}
     </Paper>
   );
 }
@@ -3098,6 +3099,11 @@ export default function LiveFeedPage({
   stats,
   tags = [],
 }) {
+  React.useEffect(() => {
+    const previous = document.documentElement.style.scrollbarGutter;
+    document.documentElement.style.scrollbarGutter = "stable";
+    return () => { document.documentElement.style.scrollbarGutter = previous; };
+  }, []);
   // SCOPE: all | mine
   const [scope, setScope] = React.useState("all");
 
@@ -4058,17 +4064,15 @@ export default function LiveFeedPage({
     <Grid
       container
       rowSpacing={2}
-      columnSpacing={{ xs: 2, md: 4 }}   // 🔹 more gap between feed and right rail on md+
+      columnSpacing={{ xs: 2, md: 4 }}
     >
       {/* Center: scope + search + feed */}
-      <Grid item xs={12} md={9}>
+      <Grid size={12} sx={{ minWidth: 0 }}>
         <Box
           sx={{
             width: "100%",
-            // 🔹 Mobile & tablet: full width
-            // 🔹 md+ (≥ 900px): clamp the feed to a fixed width and center it
-            maxWidth: { xs: "100%", md: "100%" },
-            mx: { xs: 0, md: "auto" },
+            minWidth: 0,
+            maxWidth: "100%",
           }}
         >
           {/* Scope toggle */}

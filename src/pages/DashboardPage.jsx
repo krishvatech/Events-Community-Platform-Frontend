@@ -17,6 +17,7 @@ import {
   ChevronRight as ChevronIcon,
 } from "@mui/icons-material";
 import { isOwnerUser, isStaffUser } from "../utils/adminRole";
+import { plainEventDescription } from "../components/EventDescription.jsx";
 
 const O = "#E8532F";
 const N = "#1B2A4A";
@@ -377,7 +378,7 @@ function FeaturedHero({ event }) {
             {event?.title}
           </h2>
           <p style={{ fontSize: 13, color: "#666", lineHeight: 1.65, margin: "0 0 16px", fontFamily: FONT }}>
-            {event?.description || event?.desc || event?.short_description || "Join fellow M&A professionals at this premier industry event."}
+            {plainEventDescription(event?.description || event?.desc || event?.short_description) || "Join fellow M&A professionals at this premier industry event."}
           </p>
           {(dateStr || eventLocation) && (
             <div style={{ fontSize: 12, color: "#888", marginBottom: 20, display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", fontFamily: FONT }}>

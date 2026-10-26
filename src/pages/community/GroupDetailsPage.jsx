@@ -7,6 +7,7 @@ import {
   validateDescriptionWords,
 } from "../../utils/groupValidation";
 import ClampedText from "../../components/ClampedText.jsx";
+import { plainEventDescription } from "../../components/EventDescription.jsx";
 import {
   Avatar, AvatarGroup, Box, Button, Card, CardContent,
   Chip, Dialog, DialogActions, DialogContent, DialogTitle, Divider,
@@ -515,7 +516,7 @@ function EventBlock({ post, onOpen }) {
       <Typography variant="caption" color="text.secondary">
         {post.event?.when ? new Date(post.event.when).toLocaleString() : ""} Â· {post.event?.where}
       </Typography>
-      {post.text && <ExpandableText text={post.text} maxLines={5} wrapperSx={{ mt: 1 }} />}
+      {post.text && <ExpandableText text={plainEventDescription(post.text)} maxLines={5} wrapperSx={{ mt: 1 }} />}
       <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
         <Button size="small" variant="contained" onClick={onOpen} startIcon={<ThumbUpAltOutlinedIcon />}>
           View Event

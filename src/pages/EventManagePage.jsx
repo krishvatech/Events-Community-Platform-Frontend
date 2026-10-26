@@ -57,6 +57,7 @@ import {
 } from "@mui/material";
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded";
 import EditEventForm from "../components/EditEventForm.jsx";
+import EventDescription from "../components/EventDescription.jsx";
 import EventPreApprovalManager from "../components/admin/EventPreApprovalManager.jsx";
 import EventSponsorsPartnersManager from "../components/admin/EventSponsorsPartnersManager.jsx";
 import EventQnAManager from "../components/admin/EventQnAManager.jsx";
@@ -3021,16 +3022,10 @@ export default function EventManagePage() {
               >
                 Description
               </Typography>
-              <Typography
-                variant="body2"
-                sx={{
-                  color: "text.secondary",
-                  whiteSpace: "pre-wrap",  // ✅ keep \n and \n\n exactly as typed
-                  wordBreak: "break-word", // ✅ long URLs / words won’t overflow
-                }}
-              >
-                {event.description || "No description provided."}
-              </Typography>
+              <EventDescription
+                value={event.description || "No description provided."}
+                sx={{ color: "text.secondary", fontSize: "0.875rem", lineHeight: 1.43 }}
+              />
 
               {/* Replay Info Badge - similar to EventDetailsPage */}
               {(replayReady || (event.replay_enabled && event.replay_available)) && (
