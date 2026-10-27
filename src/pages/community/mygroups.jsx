@@ -1279,7 +1279,7 @@ export default function MyGroupsPage() {
                         <Typography variant="body2" className="text-slate-500 mb-6">
                             You haven't joined any groups yet.
                         </Typography>
-                        <Button variant="outlined" onClick={() => navigate("/community/groups")}>
+                        <Button variant="outlined" onClick={() => navigate("/community?view=groups")}>
                             Explore Groups
                         </Button>
                     </Paper>
