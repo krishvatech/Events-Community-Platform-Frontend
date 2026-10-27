@@ -106,6 +106,8 @@ const STUBS = [
   // Imported (lazily) by pages: never load Templatical into jsdom. The editor's
   // own tests load the real module directly as their entry point.
   { match: /\/MarketingEmailVisualEditor(\.jsx)?$/, file: path.join(HERE, "FakeMarketingEmailVisualEditor.jsx") },
+  // Likewise GrapesJS: pages get the landing page builder's test double.
+  { match: /\/LandingPageVisualBuilder(\.jsx)?$/, file: path.join(HERE, "FakeLandingPageVisualBuilder.jsx") },
 ];
 
 // CommonJS packages whose named exports Node's ESM loader cannot detect are
@@ -269,6 +271,7 @@ export function queryByRole(role, name, { scope = document.body } = {}) {
     button: "button, [role='button']",
     link: "a[href], [role='link']",
     textbox: "input:not([type]), input[type='text'], input[type='search'], input[type='url'], textarea, [role='textbox']",
+    spinbutton: "input[type='number'], [role='spinbutton']",
     combobox: "[role='combobox']",
     option: "[role='option']",
     tab: "[role='tab']",

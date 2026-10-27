@@ -251,6 +251,60 @@ export const getNewsletterFormSubmission = (formId, submissionId) =>
 export const getNewsletterFormUsage = (formId) =>
   unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/usage/`));
 
+// Native Mautic landing pages. Writes run as the admin's own Mautic user;
+// scripts and preference-center pages are refused by the backend.
+const adminPagesEndpoint = "/newsletter/admin/pages/";
+
+export const listNewsletterPages = (params = {}) =>
+  unwrap(apiClient.get(adminPagesEndpoint, { params }));
+
+export const getNewsletterPage = (pageId) =>
+  unwrap(apiClient.get(`${adminPagesEndpoint}${pageId}/`));
+
+export const createNewsletterPage = (payload) =>
+  unwrap(apiClient.post(adminPagesEndpoint, payload));
+
+export const updateNewsletterPage = (pageId, payload) =>
+  unwrap(apiClient.patch(`${adminPagesEndpoint}${pageId}/`, payload));
+
+export const publishNewsletterPage = (pageId) =>
+  unwrap(apiClient.post(`${adminPagesEndpoint}${pageId}/publish/`));
+
+export const unpublishNewsletterPage = (pageId) =>
+  unwrap(apiClient.post(`${adminPagesEndpoint}${pageId}/unpublish/`));
+
+export const duplicateNewsletterPage = (pageId, payload = {}) =>
+  unwrap(apiClient.post(`${adminPagesEndpoint}${pageId}/duplicate/`, payload));
+
+// Refused while Campaigns, Segments or preference-center Emails use the page.
+export const deleteNewsletterPage = (pageId) =>
+  unwrap(apiClient.delete(`${adminPagesEndpoint}${pageId}/`));
+
+export const getNewsletterPageUsage = (pageId) =>
+  unwrap(apiClient.get(`${adminPagesEndpoint}${pageId}/usage/`));
+
+// A/B variants and translations hang off a main page. Variants and
+// translations start unpublished as copies of the main page.
+export const createNewsletterPageVariant = (pageId, payload) =>
+  unwrap(apiClient.post(`${adminPagesEndpoint}${pageId}/variants/`, payload));
+
+export const createNewsletterPageTranslation = (pageId, payload) =>
+  unwrap(apiClient.post(`${adminPagesEndpoint}${pageId}/translations/`, payload));
+
+export const getNewsletterPageAbTest = (pageId) =>
+  unwrap(apiClient.get(`${adminPagesEndpoint}${pageId}/abtest/`));
+
+// {weight} on a variant and/or {winnerCriteria} for the whole test.
+export const updateNewsletterPageAbTest = (pageId, payload) =>
+  unwrap(apiClient.patch(`${adminPagesEndpoint}${pageId}/abtest/`, payload));
+
+export const makeNewsletterPageWinner = (pageId) =>
+  unwrap(apiClient.post(`${adminPagesEndpoint}${pageId}/winner/`));
+
+// Page and global Mautic categories.
+export const listNewsletterPageCategories = () =>
+  unwrap(apiClient.get(`${adminPagesEndpoint}categories/`));
+
 // Read-only: the saved native render (sandboxed) and Mautic's own embed codes.
 export const getNewsletterFormPreview = (formId) =>
   unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/preview/`));

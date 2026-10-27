@@ -43,6 +43,9 @@ import AdminNewsletterFormDetailsPage from "./pages/AdminNewsletterFormDetailsPa
 import AdminNewsletterFormEditorPage from "./pages/AdminNewsletterFormEditorPage.jsx";
 import AdminNewsletterFormSubmissionsPage from "./pages/AdminNewsletterFormSubmissionsPage.jsx";
 import AdminNewsletterFormSubmissionDetailPage from "./pages/AdminNewsletterFormSubmissionDetailPage.jsx";
+import AdminNewsletterPagesPage from "./pages/AdminNewsletterPagesPage.jsx";
+import AdminNewsletterPageDetailsPage from "./pages/AdminNewsletterPageDetailsPage.jsx";
+import AdminNewsletterPageEditorPage from "./pages/AdminNewsletterPageEditorPage.jsx";
 import AdminNewsletterAnalyticsPage from "./pages/AdminNewsletterAnalyticsPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
 import AdminNewsletterContactDetailPage from "./pages/AdminNewsletterContactDetailPage.jsx";
@@ -393,6 +396,10 @@ const AppShell = () => {
               <Route path="templates/:templateId" element={<AdminNewsletterTemplateDetailsPage />} />
               <Route path="templates/:templateId/edit" element={<AdminNewsletterTemplateEditorPage />} />
               {/* Native Mautic Forms; static "forms/..." segments also rank above ":campaignId". */}
+              <Route path="pages" element={<AdminNewsletterPagesPage />} />
+              <Route path="pages/new" element={<AdminNewsletterPageEditorPage />} />
+              <Route path="pages/:pageId" element={<AdminNewsletterPageDetailsPage />} />
+              <Route path="pages/:pageId/edit" element={<AdminNewsletterPageEditorPage />} />
               <Route path="forms" element={<AdminNewsletterFormsPage />} />
               <Route path="forms/new" element={<AdminNewsletterFormEditorPage />} />
               <Route path="forms/:formId" element={<AdminNewsletterFormDetailsPage />} />

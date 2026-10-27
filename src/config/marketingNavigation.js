@@ -12,6 +12,7 @@ import SegmentRoundedIcon from "@mui/icons-material/SegmentRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
+import WebRoundedIcon from "@mui/icons-material/WebRounded";
 
 export const MARKETING_HOME_PATH = "/admin/newsletter";
 export const MARKETING_AUDIT_PATH = "/admin/marketing/activity";
@@ -58,6 +59,13 @@ export const marketingNavigationGroups = [
         path: `${MARKETING_HOME_PATH}/templates`,
         icon: ViewModuleRoundedIcon,
         match: [`${MARKETING_HOME_PATH}/templates`],
+      },
+      {
+        id: "pages",
+        label: "Landing Pages",
+        path: `${MARKETING_HOME_PATH}/pages`,
+        icon: WebRoundedIcon,
+        match: [`${MARKETING_HOME_PATH}/pages`],
       },
     ],
   },
