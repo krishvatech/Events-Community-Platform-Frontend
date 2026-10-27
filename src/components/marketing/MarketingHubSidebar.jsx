@@ -32,6 +32,7 @@ import {
   marketingNavigationGroups,
 } from "../../config/marketingNavigation";
 import { apiClient } from "../../utils/api";
+import MarketingNotificationsBell from "./MarketingNotificationsBell.jsx";
 import { logoutBrowserSession } from "../../utils/logoutSession";
 import { getAccessToken } from "../../utils/tokenStore";
 
@@ -106,6 +107,12 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
           <Typography sx={{ fontWeight: 800, fontSize: 14, color: "#1B2A4A", lineHeight: 1.2 }}>IMAA</Typography>
           <Typography sx={{ fontWeight: 700, fontSize: 10, color: "#0A9396", letterSpacing: "0.12em", textTransform: "uppercase", lineHeight: 1.2 }}>MARKETING HUB</Typography>
         </Box>
+        {/* Desktop only: on phones the bell sits in the top bar. Clicks never open the dashboard. */}
+        {!isMobile && (
+          <Box sx={{ ml: "auto" }} onClick={(event) => event.stopPropagation()}>
+            <MarketingNotificationsBell />
+          </Box>
+        )}
       </Box>
 
       <Box sx={{ flex: 1, overflowY: "auto", py: 1 }}>

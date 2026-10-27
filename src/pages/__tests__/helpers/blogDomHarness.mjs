@@ -272,6 +272,8 @@ export function queryByRole(role, name, { scope = document.body } = {}) {
     link: "a[href], [role='link']",
     textbox: "input:not([type]), input[type='text'], input[type='search'], input[type='url'], textarea, [role='textbox']",
     spinbutton: "input[type='number'], [role='spinbutton']",
+    radio: "input[type='radio'], [role='radio']",
+    checkbox: "input[type='checkbox'], [role='checkbox']",
     combobox: "[role='combobox']",
     option: "[role='option']",
     tab: "[role='tab']",
@@ -285,6 +287,8 @@ export function queryByRole(role, name, { scope = document.body } = {}) {
       (el.getAttribute("aria-labelledby") &&
         el.getAttribute("aria-labelledby").split(/\s+/).map((id) => nameText(document.getElementById(id))).join(" ")) ||
       nameText(labelFor(el)) ||
+      // A control wrapped in its <label> (MUI FormControlLabel) is named by it.
+      (el.tagName === "INPUT" ? nameText(el.closest("label")) : "") ||
       nameText(el)).trim();
   return all(implicit, scope).find((el) => name === undefined || matches(accessibleName(el), name)) || null;
 }

@@ -395,6 +395,35 @@ export const listNewsletterStages = (params = {}) =>
 export const bulkUpdateNewsletterAdminContactStage = (payload) =>
   unwrap(apiClient.post(`${adminContactsEndpoint}bulk-stage/`, payload));
 
+// Contact export (CSV or Excel), built in the background. The file is kept
+// encrypted for 24 hours and only the admin who started it can download it.
+const adminContactExportsEndpoint = `${adminContactsEndpoint}exports/`;
+
+// payload: {format: "csv"|"xlsx", search, stage_id} or {format, contact_ids}.
+export const startNewsletterContactExport = (payload) =>
+  unwrap(apiClient.post(adminContactExportsEndpoint, payload));
+
+export const listNewsletterContactExports = () =>
+  unwrap(apiClient.get(adminContactExportsEndpoint));
+
+export const getNewsletterContactExport = (jobId) =>
+  unwrap(apiClient.get(`${adminContactExportsEndpoint}${encodeURIComponent(jobId)}/`));
+
+export const deleteNewsletterContactExport = (jobId) =>
+  unwrap(apiClient.delete(`${adminContactExportsEndpoint}${encodeURIComponent(jobId)}/`));
+
+/** The finished file as a Blob. */
+export const downloadNewsletterContactExport = (jobId) =>
+  unwrap(apiClient.get(`${adminContactExportsEndpoint}${encodeURIComponent(jobId)}/download/`, { responseType: "blob" }));
+
+// Marketing Hub notifications (the admin's own, e.g. "Contact export ready").
+export const listMarketingNotifications = () =>
+  unwrap(apiClient.get("/newsletter/admin/notifications/"));
+
+// {ids: [...]} or {all: true}
+export const markMarketingNotificationsRead = (payload) =>
+  unwrap(apiClient.post("/newsletter/admin/notifications/read/", payload));
+
 // CSV contact import. The file is sent again at every step: ECP never stores it.
 const adminContactImportsEndpoint = `${adminContactsEndpoint}imports/`;
 

@@ -4,6 +4,7 @@ import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
 import { Outlet } from "react-router-dom";
 
 import MarketingHubSidebar from "./MarketingHubSidebar";
+import MarketingNotificationsBell from "./MarketingNotificationsBell.jsx";
 
 const SIDEBAR_WIDTH = 280;
 
@@ -57,6 +58,9 @@ export default function MarketingHubLayout() {
               <Typography sx={{ fontWeight: 800, color: "#1B2A4A", lineHeight: 1.1 }}>IMAA</Typography>
               <Typography sx={{ fontWeight: 700, fontSize: 11, color: "#0A9396", letterSpacing: "0.12em" }}>MARKETING HUB</Typography>
             </Stack>
+            <Box sx={{ ml: "auto" }}>
+              <MarketingNotificationsBell />
+            </Box>
           </Box>
         )}
 

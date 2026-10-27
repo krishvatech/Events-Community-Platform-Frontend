@@ -26,6 +26,7 @@ import {
   TableRow,
   Tabs,
   TextField,
+  Snackbar,
   Typography,
 } from "@mui/material";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
@@ -38,11 +39,13 @@ import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
+import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "react-router-dom";
 
 import ContactDeleteDialog from "../components/marketing/ContactDeleteDialog.jsx";
+import ContactExportDialog from "../components/marketing/ContactExportDialog.jsx";
 import ContactImportDialog from "../components/marketing/ContactImportDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 
@@ -98,6 +101,8 @@ export default function AdminNewsletterContactsPage() {
   const [bulkMessage, setBulkMessage] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportNotice, setExportNotice] = useState("");
   // null, "selected" (ticked contacts on this page) or "csv".
   const [deleteMode, setDeleteMode] = useState(null);
   const [customFieldDefs, setCustomFieldDefs] = useState([]);
@@ -332,6 +337,14 @@ export default function AdminNewsletterContactsPage() {
             sx={{ textTransform: "none" }}
           >
             Import CSV
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadRoundedIcon />}
+            onClick={() => setExportOpen(true)}
+            sx={{ textTransform: "none" }}
+          >
+            Export
           </Button>
           <Button
             variant="outlined"
@@ -742,6 +755,33 @@ export default function AdminNewsletterContactsPage() {
           loadContacts({ nextPage: page, nextSearch: search, nextStageFilter: stageFilter, refresh: true })
         }
       />
+
+      <ContactExportDialog
+        open={exportOpen}
+        onClose={() => setExportOpen(false)}
+        onStarted={() => {
+          setExportOpen(false);
+          setExportNotice("Export started. You can keep working; the bell at the top of the Marketing Hub tells you when it is ready.");
+        }}
+        selectedIds={selectedIds}
+        search={search}
+        stageFilter={stageFilter}
+        stageLabel={
+          stageFilter === "none"
+            ? "No stage"
+            : stages.find((stage) => String(stage.id) === stageFilter)?.name || ""
+        }
+        count={count}
+      />
+
+      <Snackbar
+        open={Boolean(exportNotice)}
+        autoHideDuration={8000}
+        onClose={() => setExportNotice("")}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+      >
+        <Alert severity="info" onClose={() => setExportNotice("")}>{exportNotice}</Alert>
+      </Snackbar>
 
       <ContactDeleteDialog
         open={Boolean(deleteMode)}
