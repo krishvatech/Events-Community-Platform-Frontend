@@ -316,6 +316,8 @@ export default function MyCartPage() {
     const tabMap = { cart: 0, orders: 1, addresses: 2, account: 3, account_details: 3 };
     if (requestedTab && Object.prototype.hasOwnProperty.call(tabMap, requestedTab)) {
       setTab((current) => (current === tabMap[requestedTab] ? current : tabMap[requestedTab]));
+    } else if (!requestedTab) {
+      setTab(0);
     }
   }, [location.search]);
 
@@ -761,10 +763,10 @@ export default function MyCartPage() {
             {/* Page Header */}
             <div className="mb-6">
               <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
-                My Cart
+                My Orders
               </h1>
               <p className="text-slate-600">
-                Manage your shopping cart and view your orders.
+                View your orders, manage your cart, and update your account details.
               </p>
             </div>
 
