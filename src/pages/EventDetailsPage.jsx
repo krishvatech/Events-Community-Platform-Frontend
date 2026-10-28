@@ -1001,9 +1001,11 @@ export default function EventDetailsPage() {
     return () => { cancelled = true; };
   }, [event?.id, event?.registration_type, token]);
 
-  // When application is accepted, generate guest JWT if not already in localStorage
+  // When application is accepted, generate guest JWT if not already in localStorage.
+  // Signed-in members never need guest access, and in-person events have no live
+  // room, so neither case may trigger a guest OTP email.
   useEffect(() => {
-    if (applicationStatus !== 'accepted' || !event?.id) return;
+    if (applicationStatus !== 'accepted' || !event?.id || token || isInPersonEvent(event)) return;
 
     const guestToken = localStorage.getItem("guest_token");
     // Only generate if no guest token exists
@@ -1051,7 +1053,7 @@ export default function EventDetailsPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [applicationStatus, myApplication?.email, event?.id]);
+  }, [applicationStatus, myApplication?.email, event?.id, event?.format, event?.event_format, token]);
 
   // When application is accepted, refresh registration status (for authenticated users)
   useEffect(() => {

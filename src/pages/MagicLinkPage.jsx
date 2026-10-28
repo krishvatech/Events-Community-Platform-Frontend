@@ -102,8 +102,9 @@ export default function MagicLinkPage() {
           });
           console.log("[MagicLink] 6. Stored approved guest session");
           console.log("[MagicLink] guest_id:", guest_id);
-        } else if (event?.id) {
-          // Fallback: If no guest token in response but event exists, call guest-join
+        } else if (event?.id && !access_token) {
+          // Fallback: If no guest token in response but event exists, call guest-join.
+          // Skipped for a signed-in member: guest-join only emails a guest OTP they never need.
           console.log("[MagicLink] 5. No guest token in response, calling guest-join API as fallback...");
           console.log("[MagicLink] Event ID:", event.id);
           console.log("[MagicLink] Guest data:", { first_name: user.first_name, last_name: user.last_name, email: user.email });
@@ -154,7 +155,7 @@ export default function MagicLinkPage() {
             // Continue even if guest join fails - user is authenticated
           }
         } else {
-          console.log("[MagicLink] No guest token or event in response, skipping guest setup");
+          console.log("[MagicLink] Signed in, or no guest token/event in response; skipping guest setup");
         }
 
         console.log("[MagicLink] 9. About to redirect...");
