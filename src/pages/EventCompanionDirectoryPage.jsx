@@ -29,7 +29,8 @@ import {
 } from 'lucide-react';
 import MyMeetingsView from '../components/MyMeetingsView';
 import ScheduleTab from '../components/ScheduleTab';
-import { toast } from 'react-toastify';
+import { toast, ToastContainer } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
@@ -91,6 +92,7 @@ function DesktopView({
   selectedSlot,
   setSelectedSlot,
   availableSlots,
+  isSlotBooked,
   slotsLoading,
   meetingNote,
   setMeetingNote,
@@ -457,9 +459,11 @@ function DesktopView({
                     const endDate = new Date(slotDate.getTime() + mins * 60_000);
                     const displayTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                     const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const booked = isSlotBooked(slot);
                     return (
                       <Button
                         key={i}
+                        disabled={booked}
                         onClick={() => setSelectedSlot(i)}
                         sx={{
                           display: 'flex', alignItems: 'center', gap: 1.5, width: '100%',
@@ -468,15 +472,16 @@ function DesktopView({
                           background: selectedSlot === i ? COLORS.teal + '06' : 'transparent',
                           cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
                           transition: 'all 0.15s',
+                          '&.Mui-disabled': { background: '#F7F6F4', cursor: 'not-allowed', opacity: 0.7 },
                         }}
                       >
                         <Clock size={16} color={selectedSlot === i ? COLORS.teal : '#CCC'} strokeWidth={2} />
                         <Box sx={{ flex: 1 }}>
-                          <Box sx={{ fontSize: 14.5, fontWeight: 620, color: COLORS.dark }}>
+                          <Box sx={{ fontSize: 14.5, fontWeight: 620, color: booked ? '#AAA' : COLORS.dark, textDecoration: booked ? 'line-through' : 'none' }}>
                             {displayTime} – {endTime}
                           </Box>
                           <Box sx={{ fontSize: 12, color: '#AAA' }}>
-                            During networking · {[5, 10, 15][selectedDuration]} min
+                            {booked ? 'Already booked' : `During networking · ${[5, 10, 15][selectedDuration]} min`}
                           </Box>
                         </Box>
                         {selectedSlot === i && <CheckCircle size={18} color={COLORS.teal} strokeWidth={2.5} />}
@@ -959,6 +964,7 @@ function MobileView({
   selectedSlot,
   setSelectedSlot,
   availableSlots,
+  isSlotBooked,
   slotsLoading,
   meetingNote,
   setMeetingNote,
@@ -1223,9 +1229,11 @@ function MobileView({
                 const endDate = new Date(slotDate.getTime() + mins * 60_000);
                 const displayTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                 const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+                const booked = isSlotBooked(slot);
                 return (
                   <Button
                     key={i}
+                    disabled={booked}
                     onClick={() => setSelectedSlot(i)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 1.25, width: '100%',
@@ -1233,15 +1241,16 @@ function MobileView({
                       border: `1.5px solid ${selectedSlot === i ? COLORS.teal : '#E8E4DF'}`,
                       background: selectedSlot === i ? COLORS.teal + '06' : '#fff',
                       cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
+                      '&.Mui-disabled': { background: '#F7F6F4', cursor: 'not-allowed', opacity: 0.7 },
                     }}
                   >
                     <Clock size={14} color={selectedSlot === i ? COLORS.teal : '#CCC'} strokeWidth={2} />
                     <Box sx={{ flex: 1 }}>
-                      <Box sx={{ fontSize: 13.5, fontWeight: 600, color: COLORS.dark }}>
+                      <Box sx={{ fontSize: 13.5, fontWeight: 600, color: booked ? '#AAA' : COLORS.dark, textDecoration: booked ? 'line-through' : 'none' }}>
                         {displayTime} – {endTime}
                       </Box>
                       <Box sx={{ fontSize: 11, color: '#BBB' }}>
-                        During networking · {[5, 10, 15][selectedDuration]} min
+                        {booked ? 'Already booked' : `During networking · ${[5, 10, 15][selectedDuration]} min`}
                       </Box>
                     </Box>
                     {selectedSlot === i && <CheckCircle size={16} color={COLORS.teal} strokeWidth={2.5} />}
@@ -1682,6 +1691,8 @@ function EventCompanionDirectoryPage() {
   const [selectedDuration, setSelectedDuration] = useState(1); // index: 0=5min, 1=10min, 2=15min
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [availableSlots, setAvailableSlots] = useState([]);
+  // Slot start times the server refused as taken (409), shown as "Already booked".
+  const [bookedSlotStarts, setBookedSlotStarts] = useState([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [meetingNote, setMeetingNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -2009,6 +2020,7 @@ function EventCompanionDirectoryPage() {
         futureSlots.sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
 
         setAvailableSlots(futureSlots);
+        setBookedSlotStarts([]);
         setSelectedSlot(null);
       } catch (err) {
         setAvailableSlots([]);
@@ -2097,6 +2109,19 @@ function EventCompanionDirectoryPage() {
   };
 
   // Handle send meeting request
+  // A slot is booked when it overlaps one of my accepted meetings (as requester
+  // or recipient), or when the server already refused it as taken.
+  const isSlotBooked = (slot) => {
+    if (bookedSlotStarts.includes(slot.start_time)) return true;
+    const start = new Date(slot.start_time).getTime();
+    const end = new Date(slot.end_time).getTime();
+    return myMeetings.some(m =>
+      m.status === 'accepted' &&
+      new Date(m.start_time).getTime() < end &&
+      new Date(m.end_time).getTime() > start
+    );
+  };
+
   const handleSendRequest = async () => {
     if (!selectedAttendee || selectedSlot === null || !event?.id) return;
 
@@ -2124,7 +2149,16 @@ function EventCompanionDirectoryPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data?.detail || data?.message || 'Failed to create meeting');
+        const detail = data?.detail || data?.message || '';
+        // 409 means the time is taken (either attendee busy, or the slot is gone),
+        // except the one-active-request-per-pair rule, which is not about the slot.
+        if (res.status === 409 && !detail.includes('active meeting request')) {
+          setBookedSlotStarts(prev => [...prev, slot.start_time]);
+          setSelectedSlot(null);
+          toast.error('This time slot is already booked. Please choose another time.');
+          return;
+        }
+        throw new Error(detail || 'Failed to create meeting');
       }
 
       const createdMeeting = await res.json();
@@ -2379,6 +2413,7 @@ function EventCompanionDirectoryPage() {
                 selectedSlot={selectedSlot}
                 setSelectedSlot={setSelectedSlot}
                 availableSlots={availableSlots}
+                isSlotBooked={isSlotBooked}
                 slotsLoading={slotsLoading}
                 meetingNote={meetingNote}
                 setMeetingNote={setMeetingNote}
@@ -2414,6 +2449,7 @@ function EventCompanionDirectoryPage() {
                 selectedSlot={selectedSlot}
                 setSelectedSlot={setSelectedSlot}
                 availableSlots={availableSlots}
+                isSlotBooked={isSlotBooked}
                 slotsLoading={slotsLoading}
                 meetingNote={meetingNote}
                 setMeetingNote={setMeetingNote}
@@ -2467,6 +2503,7 @@ function EventCompanionDirectoryPage() {
                 selectedSlot={selectedSlot}
                 setSelectedSlot={setSelectedSlot}
                 availableSlots={availableSlots}
+                isSlotBooked={isSlotBooked}
                 slotsLoading={slotsLoading}
                 meetingNote={meetingNote}
                 setMeetingNote={setMeetingNote}
@@ -2502,6 +2539,7 @@ function EventCompanionDirectoryPage() {
                 selectedSlot={selectedSlot}
                 setSelectedSlot={setSelectedSlot}
                 availableSlots={availableSlots}
+                isSlotBooked={isSlotBooked}
                 slotsLoading={slotsLoading}
                 meetingNote={meetingNote}
                 setMeetingNote={setMeetingNote}
@@ -2523,6 +2561,16 @@ function EventCompanionDirectoryPage() {
           )}
         </Box>
       </Box>
+      <ToastContainer
+        position="top-center"
+        autoClose={4000}
+        newestOnTop={false}
+        closeOnClick
+        pauseOnFocusLoss
+        draggable
+        pauseOnHover
+        theme="colored"
+      />
     </>
   );
 }
