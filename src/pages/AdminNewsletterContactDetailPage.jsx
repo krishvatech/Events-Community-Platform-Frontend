@@ -40,6 +40,7 @@ import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import InsightsRoundedIcon from "@mui/icons-material/InsightsRounded";
 import LinkOffRoundedIcon from "@mui/icons-material/LinkOffRounded";
 import ListAltRoundedIcon from "@mui/icons-material/ListAltRounded";
+import PersonRoundedIcon from "@mui/icons-material/PersonRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
@@ -66,6 +67,7 @@ import {
   listNewsletterAdminContactActivity,
   listNewsletterAdminContactNotes,
   listNewsletterAdminContactPointGroups,
+  listNewsletterContactOwners,
   listNewsletterPointGroups,
   listNewsletterStages,
   moveNewsletterAdminContactStage,
@@ -348,6 +350,11 @@ export default function AdminNewsletterContactDetailPage() {
   const [stagesLoading, setStagesLoading] = useState(true);
   const [stageActionLoading, setStageActionLoading] = useState(false);
   const [stageError, setStageError] = useState("");
+  const [owners, setOwners] = useState([]);
+  const [ownersLoading, setOwnersLoading] = useState(true);
+  const [selectedOwnerId, setSelectedOwnerId] = useState("");
+  const [ownerSaving, setOwnerSaving] = useState(false);
+  const [ownerMessage, setOwnerMessage] = useState(null);
   const [selectedStageId, setSelectedStageId] = useState("");
   const [pointAmount, setPointAmount] = useState("1");
   const [pointReason, setPointReason] = useState("");
@@ -458,6 +465,19 @@ export default function AdminNewsletterContactDetailPage() {
       setStageError(getErrorMessage(err, "Failed to load Mautic stages."));
     } finally {
       setStagesLoading(false);
+    }
+  }, []);
+
+  const loadOwners = useCallback(async () => {
+    setOwnersLoading(true);
+    try {
+      const response = await listNewsletterContactOwners();
+      setOwners(Array.isArray(response?.results) ? response.results : []);
+    } catch (err) {
+      setOwners([]);
+      setOwnerMessage({ severity: "error", text: getErrorMessage(err, "Failed to load Mautic users.") });
+    } finally {
+      setOwnersLoading(false);
     }
   }, []);
 
@@ -594,6 +614,7 @@ export default function AdminNewsletterContactDetailPage() {
     setActivityPage(1);
     loadContact();
     loadStages();
+    loadOwners();
     loadContactCompanies();
   }, [mauticContactId]);
 
@@ -632,6 +653,7 @@ export default function AdminNewsletterContactDetailPage() {
 
   useEffect(() => {
     setSelectedStageId(contact?.current_stage?.id ? String(contact.current_stage.id) : "");
+    setSelectedOwnerId(contact?.owner?.id ? String(contact.owner.id) : "");
     setEditContact({
       firstname: contact?.contact_info?.first_name || "",
       lastname: contact?.contact_info?.last_name || "",
@@ -688,6 +710,21 @@ export default function AdminNewsletterContactDetailPage() {
     }
     if (contactDetailTab === "communication") {
       loadContactNotes();
+    }
+  };
+
+  // "" clears the owner; Mautic users are the only valid owners.
+  const saveOwner = async () => {
+    setOwnerSaving(true);
+    setOwnerMessage(null);
+    try {
+      const updated = await updateNewsletterAdminContact(mauticContactId, { owner: selectedOwnerId });
+      setContact(updated);
+      setOwnerMessage({ severity: "success", text: selectedOwnerId ? "Owner assigned in Mautic." : "Owner cleared in Mautic." });
+    } catch (err) {
+      setOwnerMessage({ severity: "error", text: getErrorMessage(err, "Failed to change the owner.") });
+    } finally {
+      setOwnerSaving(false);
     }
   };
 
@@ -1328,6 +1365,69 @@ export default function AdminNewsletterContactDetailPage() {
                       >
                         Manage Stages
                       </Button>
+                    )}
+                  </Stack>
+                </Paper>
+                )}
+
+                {contactDetailTab === "overview" && (
+                <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
+                  <Stack spacing={1.75}>
+                    <Box>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <PersonRoundedIcon fontSize="small" color="action" />
+                        <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Owner</Typography>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        The Mautic user responsible for this contact.
+                      </Typography>
+                    </Box>
+
+                    {ownerMessage && <Alert severity={ownerMessage.severity}>{ownerMessage.text}</Alert>}
+
+                    <Typography variant="body2" sx={{ fontWeight: 700 }} aria-label="Current owner">
+                      {contact.owner
+                        ? contact.owner.name || contact.owner.email || `User #${contact.owner.id}`
+                        : "No owner assigned."}
+                    </Typography>
+
+                    {ownersLoading ? (
+                      <Skeleton height={48} />
+                    ) : (
+                      <>
+                        <FormControl fullWidth size="small">
+                          <InputLabel id="contact-owner-select-label">Assign owner</InputLabel>
+                          <Select
+                            labelId="contact-owner-select-label"
+                            label="Assign owner"
+                            value={selectedOwnerId}
+                            onChange={(event) => setSelectedOwnerId(String(event.target.value))}
+                            disabled={ownerSaving}
+                          >
+                            <MenuItem value="">No owner</MenuItem>
+                            {/* A deactivated user can still own a contact. */}
+                            {[
+                              ...owners,
+                              ...(contact.owner && !owners.some((owner) => String(owner.id) === String(contact.owner.id))
+                                ? [contact.owner]
+                                : []),
+                            ].map((owner) => (
+                              <MenuItem key={owner.id} value={String(owner.id)}>
+                                {owner.name || owner.email || `User #${owner.id}`}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <Button
+                          variant="contained"
+                          size="small"
+                          onClick={saveOwner}
+                          disabled={ownerSaving || String(contact.owner?.id || "") === selectedOwnerId}
+                          sx={{ textTransform: "none", alignSelf: "flex-start" }}
+                        >
+                          {ownerSaving ? <CircularProgress size={18} color="inherit" /> : "Save Owner"}
+                        </Button>
+                      </>
                     )}
                   </Stack>
                 </Paper>

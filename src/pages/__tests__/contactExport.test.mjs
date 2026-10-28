@@ -206,6 +206,9 @@ test("export helpers", () => {
     JSON.stringify({ format: "csv", search: "ada", stage_id: "none" }));
   assert.equal(JSON.stringify(exportPayload({ scope: "selected", format: "xlsx", selectedIds: ["3"], search: "ada", stageFilter: "" })),
     JSON.stringify({ format: "xlsx", contact_ids: ["3"] }));
+  assert.equal(JSON.stringify(exportPayload({ scope: "filter", format: "csv", selectedIds: [], search: "", stageFilter: "", ownerFilter: "6" })),
+    JSON.stringify({ format: "csv", owner_id: "6" }));
+  assert.equal(describeExport(job({ filters: { search: "", stage_id: "", owner_id: "none" } })), "Contacts matching no owner");
   assert.equal(describeExport(job({ filters: { search: "", stage_id: "" } })), "All contacts");
   assert.equal(describeExport(job({ filters: { search: "ada", stage_id: "none" } })), 'Contacts matching search "ada", no stage');
 });

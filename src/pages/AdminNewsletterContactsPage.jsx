@@ -12,6 +12,7 @@ import {
   DialogTitle,
   FormControl,
   InputLabel,
+  Menu,
   MenuItem,
   Paper,
   Select,
@@ -44,6 +45,7 @@ import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "react-router-dom";
 
+import ContactBulkActionDialog, { BULK_ACTIONS } from "../components/marketing/ContactBulkActionDialog.jsx";
 import ContactDeleteDialog from "../components/marketing/ContactDeleteDialog.jsx";
 import ContactExportDialog from "../components/marketing/ContactExportDialog.jsx";
 import ContactImportDialog from "../components/marketing/ContactImportDialog.jsx";
@@ -54,6 +56,7 @@ import {
   createNewsletterAdminContact,
   listNewsletterFields,
   listNewsletterAdminContacts,
+  listNewsletterContactOwners,
   listNewsletterStages,
 } from "../services/newsletterService";
 
@@ -92,6 +95,11 @@ export default function AdminNewsletterContactsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [stageFilter, setStageFilter] = useState("");
+  // "", "none" (no owner) or a Mautic user id.
+  const [ownerFilter, setOwnerFilter] = useState("");
+  const [owners, setOwners] = useState([]);
+  const [bulkMenuAnchor, setBulkMenuAnchor] = useState(null);
+  const [bulkAction, setBulkAction] = useState(null);
   const [stages, setStages] = useState([]);
   const [stagesLoading, setStagesLoading] = useState(true);
   const [stagesError, setStagesError] = useState("");
@@ -137,12 +145,23 @@ export default function AdminNewsletterContactsPage() {
     }
   }, []);
 
+  // Owner choices only feed the filter; the list still works without them.
+  const loadOwners = useCallback(async () => {
+    try {
+      const response = await listNewsletterContactOwners();
+      setOwners(Array.isArray(response?.results) ? response.results : []);
+    } catch {
+      setOwners([]);
+    }
+  }, []);
+
   // `refresh` asks the backend to bypass its list cache (Refresh button).
   const loadContacts = useCallback(
     async ({
       nextPage = page,
       nextSearch = search,
       nextStageFilter = stageFilter,
+      nextOwnerFilter = ownerFilter,
       refresh = false,
     } = {}) => {
       setLoading(true);
@@ -154,6 +173,7 @@ export default function AdminNewsletterContactsPage() {
           page_size: pageSize,
           ...(nextSearch ? { search: nextSearch } : {}),
           ...(nextStageFilter ? { stage_id: nextStageFilter } : {}),
+          ...(nextOwnerFilter ? { owner_id: nextOwnerFilter } : {}),
           ...(refresh ? { refresh: 1 } : {}),
         });
         setData(response);
@@ -165,12 +185,13 @@ export default function AdminNewsletterContactsPage() {
         setLoading(false);
       }
     },
-    [page, search, stageFilter]
+    [page, search, stageFilter, ownerFilter]
   );
 
   useEffect(() => {
-    loadContacts({ nextPage: 1, nextSearch: "", nextStageFilter: "" });
+    loadContacts({ nextPage: 1, nextSearch: "", nextStageFilter: "", nextOwnerFilter: "" });
     loadStages();
+    loadOwners();
   }, []);
 
   const contacts = Array.isArray(data?.results) ? data.results : [];
@@ -194,6 +215,14 @@ export default function AdminNewsletterContactsPage() {
       nextSearch: search,
       nextStageFilter,
     });
+  };
+
+  const handleOwnerFilterChange = (event) => {
+    const nextOwnerFilter = String(event.target.value || "");
+    setOwnerFilter(nextOwnerFilter);
+    setPage(1);
+    setBulkMessage(null);
+    loadContacts({ nextPage: 1, nextSearch: search, nextOwnerFilter });
   };
 
   const handlePageChange = (nextPage) => {
@@ -396,7 +425,7 @@ export default function AdminNewsletterContactsPage() {
           <Stack
             direction={{ xs: "column", sm: "row" }}
             spacing={1}
-            sx={{ minWidth: { md: 680 } }}
+            sx={{ minWidth: { md: 860 } }}
           >
             <FormControl size="small" sx={{ minWidth: { sm: 190 } }}>
               <InputLabel id="newsletter-contact-stage-filter-label">Stage</InputLabel>
@@ -412,6 +441,24 @@ export default function AdminNewsletterContactsPage() {
                 {stages.map((stage) => (
                   <MenuItem key={stage.id} value={String(stage.id)}>
                     {stage.name || `Stage #${stage.id}`}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl size="small" sx={{ minWidth: { sm: 170 } }}>
+              <InputLabel id="newsletter-contact-owner-filter-label">Owner</InputLabel>
+              <Select
+                labelId="newsletter-contact-owner-filter-label"
+                value={ownerFilter}
+                label="Owner"
+                onChange={handleOwnerFilterChange}
+                disabled={loading}
+              >
+                <MenuItem value="">All owners</MenuItem>
+                <MenuItem value="none">No owner</MenuItem>
+                {owners.map((owner) => (
+                  <MenuItem key={owner.id} value={String(owner.id)}>
+                    {owner.name || owner.email || `User #${owner.id}`}
                   </MenuItem>
                 ))}
               </Select>
@@ -515,6 +562,33 @@ export default function AdminNewsletterContactsPage() {
             </Button>
             <Button
               variant="outlined"
+              onClick={(event) => setBulkMenuAnchor(event.currentTarget)}
+              disabled={bulkLoading}
+              aria-haspopup="menu"
+              sx={{ textTransform: "none" }}
+            >
+              Bulk actions
+            </Button>
+            <Menu
+              anchorEl={bulkMenuAnchor}
+              open={Boolean(bulkMenuAnchor)}
+              onClose={() => setBulkMenuAnchor(null)}
+            >
+              {BULK_ACTIONS.map((item) => (
+                <MenuItem
+                  key={item.key}
+                  onClick={() => {
+                    setBulkMenuAnchor(null);
+                    setBulkMessage(null);
+                    setBulkAction(item.key);
+                  }}
+                >
+                  {item.label}
+                </MenuItem>
+              ))}
+            </Menu>
+            <Button
+              variant="outlined"
               color="error"
               onClick={() => setDeleteMode("selected")}
               disabled={bulkLoading || !selectedIds.length}
@@ -575,6 +649,7 @@ export default function AdminNewsletterContactsPage() {
                   <TableCell>Email</TableCell>
                   <TableCell>Location</TableCell>
                   <TableCell>Stage</TableCell>
+                  <TableCell>Owner</TableCell>
                   <TableCell>Subscription Lists</TableCell>
                   <TableCell>ECP Mapping</TableCell>
                   <TableCell>Last Active</TableCell>
@@ -647,6 +722,13 @@ export default function AdminNewsletterContactsPage() {
                         <Typography variant="body2" color="text.secondary">No stage</Typography>
                       )}
                     </TableCell>
+                    <TableCell sx={{ minWidth: 150 }}>
+                      {contact.owner ? (
+                        contact.owner.name || contact.owner.email || `User #${contact.owner.id}`
+                      ) : (
+                        <Typography variant="body2" color="text.secondary">No owner</Typography>
+                      )}
+                    </TableCell>
                     <TableCell sx={{ minWidth: 220 }}>
                       {Array.isArray(contact.subscription_lists) && contact.subscription_lists.length ? (
                         <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
@@ -694,9 +776,9 @@ export default function AdminNewsletterContactsPage() {
 
                 {contacts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
                       <Typography color="text.secondary">
-                        {search || stageFilter
+                        {search || stageFilter || ownerFilter
                           ? "No contacts match the current filters."
                           : "No Mautic contacts found."}
                       </Typography>
@@ -747,8 +829,9 @@ export default function AdminNewsletterContactsPage() {
             setSearchInput("");
             setSearch("");
             setStageFilter("");
+            setOwnerFilter("");
             setPage(1);
-            loadContacts({ nextPage: 1, nextSearch: "", nextStageFilter: "", refresh: true });
+            loadContacts({ nextPage: 1, nextSearch: "", nextStageFilter: "", nextOwnerFilter: "", refresh: true });
           }
         }}
         onFinished={() =>
@@ -771,7 +854,25 @@ export default function AdminNewsletterContactsPage() {
             ? "No stage"
             : stages.find((stage) => String(stage.id) === stageFilter)?.name || ""
         }
+        ownerFilter={ownerFilter}
+        ownerLabel={
+          ownerFilter === "none"
+            ? "No owner"
+            : owners.find((owner) => String(owner.id) === ownerFilter)?.name || ""
+        }
         count={count}
+      />
+
+      <ContactBulkActionDialog
+        open={Boolean(bulkAction)}
+        action={bulkAction}
+        contactIds={selectedIds}
+        onClose={(result) => {
+          setBulkAction(null);
+          if (result?.changed) {
+            loadContacts({ nextPage: page, nextSearch: search, nextStageFilter: stageFilter, refresh: true });
+          }
+        }}
       />
 
       <Snackbar

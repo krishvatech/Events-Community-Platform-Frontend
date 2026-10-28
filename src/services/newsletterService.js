@@ -395,6 +395,15 @@ export const listNewsletterStages = (params = {}) =>
 export const bulkUpdateNewsletterAdminContactStage = (payload) =>
   unwrap(apiClient.post(`${adminContactsEndpoint}bulk-stage/`, payload));
 
+// Segment, campaign, owner or Do Not Contact changes for up to 100 ticked
+// contacts. payload: {action, contact_ids, segment_id|campaign_id|owner_id|reason}.
+export const runNewsletterContactBulkAction = (payload) =>
+  unwrap(apiClient.post(`${adminContactsEndpoint}bulk/`, payload));
+
+// Active Mautic users a contact can be owned by.
+export const listNewsletterContactOwners = () =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}owners/`));
+
 // Contact export (CSV or Excel), built in the background. The file is kept
 // encrypted for 24 hours and only the admin who started it can download it.
 const adminContactExportsEndpoint = `${adminContactsEndpoint}exports/`;

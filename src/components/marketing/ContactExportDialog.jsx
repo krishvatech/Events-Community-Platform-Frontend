@@ -55,13 +55,19 @@ export function describeExport(job) {
   const parts = [];
   if (job.filters?.search) parts.push(`search "${job.filters.search}"`);
   if (job.filters?.stage_id) parts.push(job.filters.stage_id === "none" ? "no stage" : `stage #${job.filters.stage_id}`);
+  if (job.filters?.owner_id) parts.push(job.filters.owner_id === "none" ? "no owner" : `owner #${job.filters.owner_id}`);
   return parts.length ? `Contacts matching ${parts.join(", ")}` : "All contacts";
 }
 
 /** The request body for the chosen scope. */
-export function exportPayload({ scope, format, selectedIds, search, stageFilter }) {
+export function exportPayload({ scope, format, selectedIds, search, stageFilter, ownerFilter = "" }) {
   if (scope === "selected") return { format, contact_ids: selectedIds };
-  return { format, ...(search ? { search } : {}), ...(stageFilter ? { stage_id: stageFilter } : {}) };
+  return {
+    format,
+    ...(search ? { search } : {}),
+    ...(stageFilter ? { stage_id: stageFilter } : {}),
+    ...(ownerFilter ? { owner_id: ownerFilter } : {}),
+  };
 }
 
 function recentStatus(item) {
@@ -73,7 +79,8 @@ function recentStatus(item) {
 }
 
 export default function ContactExportDialog({
-  open, onClose, onStarted, selectedIds = [], search = "", stageFilter = "", stageLabel = "", count = 0,
+  open, onClose, onStarted, selectedIds = [], search = "", stageFilter = "", stageLabel = "",
+  ownerFilter = "", ownerLabel = "", count = 0,
 }) {
   const [scope, setScope] = useState("filter");
   const [format, setFormat] = useState("csv");
@@ -121,7 +128,7 @@ export default function ContactExportDialog({
     setStarting(true);
     setError("");
     try {
-      const created = await startNewsletterContactExport(exportPayload({ scope, format, selectedIds, search, stageFilter }));
+      const created = await startNewsletterContactExport(exportPayload({ scope, format, selectedIds, search, stageFilter, ownerFilter }));
       notifyMarketingWorkStarted();
       onStarted?.(created);
     } catch (err) {
@@ -156,7 +163,11 @@ export default function ContactExportDialog({
     }
   };
 
-  const filterParts = [search ? `search "${search}"` : "", stageFilter ? `stage: ${stageLabel || stageFilter}` : ""].filter(Boolean);
+  const filterParts = [
+    search ? `search "${search}"` : "",
+    stageFilter ? `stage: ${stageLabel || stageFilter}` : "",
+    ownerFilter ? `owner: ${ownerLabel || ownerFilter}` : "",
+  ].filter(Boolean);
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
