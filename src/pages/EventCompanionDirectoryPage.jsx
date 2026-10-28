@@ -52,6 +52,68 @@ const ROLE_CHIP_COLORS = {
   attendee: { backgroundColor: '#f5f5f5', color: '#424242' },
 };
 
+// Slots are grouped by the viewer's local calendar day — the same clock the slot
+// times are displayed in — so one day button never splits or mixes days.
+const getSlotDayKey = (slot) => {
+  const d = new Date(slot.start_time);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+
+// Day picker state for the slot list. Slots keep their index in availableSlots
+// (selectedSlot is that index), so the list is filtered at render time only.
+function useSlotDays(availableSlots, setSelectedSlot) {
+  const [activeDayKey, setActiveDayKey] = useState(null);
+  const days = [];
+  const seen = new Set();
+  availableSlots.forEach(slot => {
+    const key = getSlotDayKey(slot);
+    if (!seen.has(key)) {
+      seen.add(key);
+      days.push({ key, date: new Date(slot.start_time) });
+    }
+  });
+  days.sort((a, b) => a.key.localeCompare(b.key));
+  const currentDayKey = days.some(d => d.key === activeDayKey) ? activeDayKey : (days[0]?.key ?? null);
+  const selectDay = (key) => {
+    if (key === currentDayKey) return;
+    setActiveDayKey(key);
+    setSelectedSlot(null);
+  };
+  return { days, currentDayKey, selectDay };
+}
+
+function SlotDayPicker({ days, currentDayKey, onSelect, compact = false }) {
+  return (
+    <>
+      <Typography sx={{
+        fontSize: 10, fontWeight: 750, textTransform: 'uppercase',
+        letterSpacing: 1, color: COLORS.dark + '40', mb: compact ? 0.75 : 1,
+      }}>Select Day</Typography>
+      <Box sx={{ display: 'flex', gap: compact ? 0.75 : 1, mb: compact ? 1.75 : 2, flexWrap: 'wrap' }}>
+        {days.map((day, i) => {
+          const active = day.key === currentDayKey;
+          const dateStr = day.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          return (
+            <Button
+              key={day.key}
+              onClick={() => onSelect(day.key)}
+              sx={{
+                p: compact ? '7px 12px' : '9px 18px', borderRadius: 1, border: 'none',
+                background: active ? COLORS.dark : '#F0EEEB',
+                color: active ? '#fff' : '#888',
+                fontSize: compact ? 11 : 12, fontWeight: 620, cursor: 'pointer', fontFamily: 'inherit',
+                '&:hover': { background: active ? COLORS.dark : '#E6E3DF' },
+              }}
+            >
+              Day {i + 1} · {dateStr}
+            </Button>
+          );
+        })}
+      </Box>
+    </>
+  );
+}
+
 // Flow step indicator
 function FlowStep({ step, current, label }) {
   const done = step < current;
@@ -115,6 +177,7 @@ function DesktopView({
     { mins: 10, label: '10 min', desc: 'Focused chat' },
     { mins: 15, label: '15 min', desc: 'Deep discussion' },
   ];
+  const { days: slotDays, currentDayKey, selectDay } = useSlotDays(availableSlots, setSelectedSlot);
 
   return (
     <Box sx={{
@@ -395,48 +458,8 @@ function DesktopView({
                 </Box>
 
                 {/* Day picker - dynamically generated from available slots */}
-                {availableSlots.length > 0 && (
-                  <>
-                    <Typography sx={{
-                      fontSize: 10, fontWeight: 750, textTransform: 'uppercase',
-                      letterSpacing: 1, color: COLORS.dark + '40', mb: 1,
-                    }}>Select Day</Typography>
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                      {(() => {
-                        const groupedByDate = {};
-                        availableSlots.forEach(slot => {
-                          const date = new Date(slot.start_time);
-                          const dateKey = date.toISOString().split('T')[0];
-                          if (!groupedByDate[dateKey]) {
-                            groupedByDate[dateKey] = date;
-                          }
-                        });
-                        const uniqueDates = Object.entries(groupedByDate)
-                          .sort(([a], [b]) => a.localeCompare(b))
-                          .map(([, date]) => date);
-
-                        return uniqueDates.map((date, i) => {
-                          const dateStr = date.toLocaleDateString('en-US', {
-                            month: 'short',
-                            day: 'numeric'
-                          });
-                          return (
-                            <Button
-                              key={i}
-                              sx={{
-                                p: '9px 18px', borderRadius: 1, border: 'none',
-                                background: i === 0 ? COLORS.dark : '#F0EEEB',
-                                color: i === 0 ? '#fff' : '#888',
-                                fontSize: 12, fontWeight: 620, cursor: 'pointer', fontFamily: 'inherit',
-                              }}
-                            >
-                              Day {i + 1} · {dateStr}
-                            </Button>
-                          );
-                        });
-                      })()}
-                    </Box>
-                  </>
+                {!slotsLoading && slotDays.length > 0 && (
+                  <SlotDayPicker days={slotDays} currentDayKey={currentDayKey} onSelect={selectDay} />
                 )}
 
                 {/* Slots */}
@@ -454,12 +477,15 @@ function DesktopView({
                   <Alert severity="warning" sx={{ mb: 2 }}>No available slots found. Try a different duration.</Alert>
                 ) : (
                   availableSlots.map((slot, i) => {
+                    if (getSlotDayKey(slot) !== currentDayKey) return null;
                     const mins = [5, 10, 15][selectedDuration];
                     const slotDate = new Date(slot.start_time);
                     const endDate = new Date(slotDate.getTime() + mins * 60_000);
                     const displayTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                     const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                     const booked = isSlotBooked(slot);
+                    // Windows can span several days (pre/during/post-event), so show the date too.
+                    const slotDay = slotDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
                     return (
                       <Button
                         key={i}
@@ -481,7 +507,7 @@ function DesktopView({
                             {displayTime} – {endTime}
                           </Box>
                           <Box sx={{ fontSize: 12, color: '#AAA' }}>
-                            {booked ? 'Already booked' : `During networking · ${[5, 10, 15][selectedDuration]} min`}
+                            {booked ? `${slotDay} · Already booked` : `${slotDay} · ${[5, 10, 15][selectedDuration]} min`}
                           </Box>
                         </Box>
                         {selectedSlot === i && <CheckCircle size={18} color={COLORS.teal} strokeWidth={2.5} />}
@@ -980,6 +1006,8 @@ function MobileView({
   isSameMeetingDay,
   navigate,
 }) {
+  const { days: slotDays, currentDayKey, selectDay } = useSlotDays(availableSlots, setSelectedSlot);
+
   return (
     <Box sx={{
       width: '100%', height: '100%',
@@ -1210,6 +1238,10 @@ function MobileView({
               ))}
             </Box>
 
+            {!slotsLoading && slotDays.length > 0 && (
+              <SlotDayPicker days={slotDays} currentDayKey={currentDayKey} onSelect={selectDay} compact />
+            )}
+
             <Typography sx={{
               fontSize: 10, fontWeight: 750, textTransform: 'uppercase',
               letterSpacing: 1, color: COLORS.dark + '40', mb: 0.75,
@@ -1224,12 +1256,15 @@ function MobileView({
               <Alert severity="warning" sx={{ mb: 1.5 }}>No available slots found. Try a different duration.</Alert>
             ) : (
               availableSlots.map((slot, i) => {
+                if (getSlotDayKey(slot) !== currentDayKey) return null;
                 const mins = [5, 10, 15][selectedDuration];
                 const slotDate = new Date(slot.start_time);
                 const endDate = new Date(slotDate.getTime() + mins * 60_000);
                 const displayTime = slotDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                 const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
                 const booked = isSlotBooked(slot);
+                // Windows can span several days (pre/during/post-event), so show the date too.
+                const slotDay = slotDate.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
                 return (
                   <Button
                     key={i}
@@ -1250,7 +1285,7 @@ function MobileView({
                         {displayTime} – {endTime}
                       </Box>
                       <Box sx={{ fontSize: 11, color: '#BBB' }}>
-                        {booked ? 'Already booked' : `During networking · ${[5, 10, 15][selectedDuration]} min`}
+                        {booked ? `${slotDay} · Already booked` : `${slotDay} · ${[5, 10, 15][selectedDuration]} min`}
                       </Box>
                     </Box>
                     {selectedSlot === i && <CheckCircle size={16} color={COLORS.teal} strokeWidth={2.5} />}

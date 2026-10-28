@@ -8026,14 +8026,10 @@ export default function EventManagePage() {
       return dayjs(event.end_time);
     };
 
+    // Windows may be before, during or after the event (pre/post-event networking),
+    // so only the window's own date/time is validated here.
     const validateNetworkingWindows = (windows) => {
       const errors = [];
-      const eventStart = getEventStartDateTime();
-      const eventEnd = getEventEndDateTime();
-
-      if (!eventStart || !eventEnd || !eventStart.isValid() || !eventEnd.isValid()) {
-        return errors;
-      }
 
       for (let i = 0; i < windows.length; i++) {
         const window = windows[i];
@@ -8050,20 +8046,6 @@ export default function EventManagePage() {
           const windowStartTime = windowDate.hour(startHour).minute(startMin).second(0);
           const windowEndTime = windowDate.hour(endHour).minute(endMin).second(0);
 
-          // Check if date is within event bounds
-          if (windowDate.isBefore(eventStart, 'day') || windowDate.isAfter(eventEnd, 'day')) {
-            const eventDisplay = eventStart.format('MMM DD, YYYY, h:mm A') + " – " + eventEnd.format('h:mm A');
-            errors[i] = `Window ${i + 1} must be within event time: ${eventDisplay}.`;
-            continue;
-          }
-
-          // Check if window start/end times are within event bounds
-          if (windowStartTime.isBefore(eventStart) || windowEndTime.isAfter(eventEnd)) {
-            const eventDisplay = eventStart.format('MMM DD, YYYY, h:mm A') + " – " + eventEnd.format('h:mm A');
-            errors[i] = `Window ${i + 1} must be within event time: ${eventDisplay}.`;
-            continue;
-          }
-
           // Check if end > start
           if (windowEndTime.isSameOrBefore(windowStartTime)) {
             errors[i] = `Window ${i + 1} end time must be after start time.`;
@@ -8075,6 +8057,18 @@ export default function EventManagePage() {
       }
 
       return errors;
+    };
+
+    // Informational label for windows on a date outside the event's own dates.
+    const getNetworkingWindowPhase = (window) => {
+      const eventStart = getEventStartDateTime();
+      const eventEnd = getEventEndDateTime();
+      if (!window?.date || !eventStart?.isValid() || !eventEnd?.isValid()) return null;
+      const windowDate = dayjs(window.date, "YYYY-MM-DD");
+      if (!windowDate.isValid()) return null;
+      if (windowDate.isBefore(eventStart, 'day')) return "Pre-event window (before the event starts)";
+      if (windowDate.isAfter(eventEnd, 'day')) return "Post-event window (after the event ends)";
+      return null;
     };
 
     const addNetworkingWindow = () => {
@@ -8203,6 +8197,9 @@ export default function EventManagePage() {
                       <Typography variant="body2" sx={{ fontWeight: 600 }}>Allowed Networking Windows</Typography>
                       <Button size="small" startIcon={<AddIcon />} onClick={addNetworkingWindow} sx={{ textTransform: "none" }}>Add Window</Button>
                     </Box>
+                    <Typography variant="caption" sx={{ color: "text.secondary", display: "block", mb: 1.5 }}>
+                      Windows can be on any date — before, during or after the event.
+                    </Typography>
                     <Stack spacing={2}>
                       {networkingAllowedWindows.length === 0 ? (
                         <Typography variant="body2" sx={{ color: "text.secondary", fontStyle: "italic" }}>No windows added yet. Add one to enable networking.</Typography>
@@ -8217,7 +8214,6 @@ export default function EventManagePage() {
                                 value={window.date || ""}
                                 onChange={e => updateNetworkingWindow(idx, "date", e.target.value)}
                                 InputLabelProps={{ shrink: true }}
-                                inputProps={{ min: getEventStartDateValue(), max: getEventEndDateTime()?.format("YYYY-MM-DD") }}
                                 error={!!networkingWindowErrors[idx]}
                                 sx={{ flex: 1 }}
                               />
@@ -8243,9 +8239,13 @@ export default function EventManagePage() {
                               />
                               <IconButton size="small" onClick={() => removeNetworkingWindow(idx)} color="error"><DeleteOutlineRoundedIcon fontSize="small" /></IconButton>
                             </Stack>
-                            {networkingWindowErrors[idx] && (
+                            {networkingWindowErrors[idx] ? (
                               <Typography variant="caption" sx={{ color: "error.main", display: "block", mt: 0.5, ml: 2 }}>
                                 {networkingWindowErrors[idx]}
+                              </Typography>
+                            ) : getNetworkingWindowPhase(window) && (
+                              <Typography variant="caption" sx={{ color: "info.main", display: "block", mt: 0.5, ml: 2 }}>
+                                {getNetworkingWindowPhase(window)}
                               </Typography>
                             )}
                           </Box>

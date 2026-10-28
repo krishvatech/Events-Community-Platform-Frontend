@@ -125,9 +125,16 @@ function MeetingCard({
     return otherPersonName;
   };
 
+  const otherPartySubtitle = [otherParty?.job_title, otherParty?.company].filter(Boolean).join(' • ');
+
   return (
+    // Fills its grid cell so all cards in a row share one height; actions stay pinned to the bottom.
     <Card
       sx={{
+        flex: 1,
+        minWidth: 0,
+        display: 'flex',
+        flexDirection: 'column',
         borderRadius: 1.5,
         boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
         border: `1.5px solid ${statusInfo.color}20`,
@@ -139,9 +146,9 @@ function MeetingCard({
         },
       }}
     >
-      <CardContent sx={{ p: '16px 18px' }}>
+      <CardContent sx={{ p: '16px 18px', flex: 1, display: 'flex', flexDirection: 'column' }}>
         {/* Status-based title */}
-        <Typography sx={{ fontWeight: 700, fontSize: 14, mb: 1.5, color: COLORS.dark }}>
+        <Typography noWrap title={getCardTitle()} sx={{ fontWeight: 700, fontSize: 14, mb: 1.5, color: COLORS.dark }}>
           {getCardTitle()}
         </Typography>
 
@@ -163,11 +170,11 @@ function MeetingCard({
               {otherParty?.display_name?.split(' ').map(n => n[0]).join('').toUpperCase()}
             </Avatar>
             <Box sx={{ minWidth: 0, flex: 1 }}>
-              <Typography sx={{ fontWeight: 640, fontSize: 13.5, color: COLORS.dark }}>
+              <Typography noWrap title={otherParty?.display_name} sx={{ fontWeight: 640, fontSize: 13.5, color: COLORS.dark }}>
                 {otherParty?.display_name}
               </Typography>
-              <Typography sx={{ fontSize: 11.5, color: '#999', mt: 0.25 }}>
-                {[otherParty?.job_title, otherParty?.company].filter(Boolean).join(' • ')}
+              <Typography noWrap title={otherPartySubtitle} sx={{ fontSize: 11.5, color: '#999', mt: 0.25 }}>
+                {otherPartySubtitle}
               </Typography>
             </Box>
           </Box>
@@ -187,7 +194,7 @@ function MeetingCard({
           />
         </Box>
 
-        <Box sx={{ mb: 2, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+        <Box sx={{ mb: 2, flex: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 12, color: COLORS.dark }}>
             <Clock size={13} color={COLORS.teal} strokeWidth={2} />
             <Typography sx={{ fontSize: 12, color: COLORS.dark }}>
@@ -197,7 +204,8 @@ function MeetingCard({
           {meeting.table && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, fontSize: 12, color: COLORS.dark }}>
               <MapPin size={13} color={COLORS.teal} strokeWidth={2} />
-              <Typography sx={{ fontSize: 12, color: COLORS.dark }}>
+              <Typography noWrap sx={{ fontSize: 12, color: COLORS.dark, minWidth: 0 }}
+                title={[meeting.table.name, meeting.table.location_note].filter(Boolean).join(' • ')}>
                 {meeting.table.name}
                 {meeting.table.location_note && ` • ${meeting.table.location_note}`}
               </Typography>
@@ -205,7 +213,11 @@ function MeetingCard({
           )}
           {meeting.message && !currentUserIsRequester && (
             <Box sx={{ mt: 0.5, p: '8px 10px', bgcolor: COLORS.bg, borderRadius: 1, borderLeft: `2px solid ${COLORS.teal}` }}>
-              <Typography sx={{ fontSize: 11.5, color: COLORS.dark, fontStyle: 'italic' }}>
+              <Typography title={meeting.message} sx={{
+                fontSize: 11.5, color: COLORS.dark, fontStyle: 'italic',
+                display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+                wordBreak: 'break-word',
+              }}>
                 "{meeting.message}"
               </Typography>
             </Box>
@@ -816,7 +828,7 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, 
               const unreadCount = otherParty?.user_id ? (unreadCounts[otherParty.user_id] || 0) : 0;
 
               return (
-                <Box key={meeting.id}>
+                <Box key={meeting.id} sx={{ display: 'flex', minWidth: 0 }}>
                   <MeetingCard
                     meeting={meeting}
                     isIncoming={isIncoming}
@@ -937,7 +949,7 @@ function MyMeetingsView({ eventId, currentUserId, networkingSettings, isMobile, 
                     const unreadCount = otherParty?.user_id ? (unreadCounts[otherParty.user_id] || 0) : 0;
 
                     return (
-                      <Box key={meeting.id}>
+                      <Box key={meeting.id} sx={{ display: 'flex', minWidth: 0 }}>
                         <MeetingCard
                           meeting={meeting}
                           isIncoming={isIncoming}
