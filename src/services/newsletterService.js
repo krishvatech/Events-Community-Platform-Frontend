@@ -29,6 +29,30 @@ export const listNewsletterCampaigns = (params = {}) =>
 export const createNewsletterCampaign = (payload) =>
   unwrap(apiClient.post(adminCampaignsEndpoint, payload));
 
+// A/B variants and translations of a Broadcast (draft only). Each is a copy
+// of the broadcast's email in Mautic, sent only as part of its send.
+export const getNewsletterCampaignFamily = (uuid) =>
+  unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/family/`));
+
+export const createNewsletterCampaignVariant = (uuid, payload) =>
+  unwrap(apiClient.post(`${adminCampaignsEndpoint}${uuid}/variants/`, payload));
+
+export const createNewsletterCampaignTranslation = (uuid, payload) =>
+  unwrap(apiClient.post(`${adminCampaignsEndpoint}${uuid}/translations/`, payload));
+
+// payload: {emailId, weight} for one variant and/or {winnerCriteria} for the test.
+export const updateNewsletterCampaignAbTest = (uuid, payload) =>
+  unwrap(apiClient.patch(`${adminCampaignsEndpoint}${uuid}/abtest/`, payload));
+
+export const getNewsletterCampaignVersion = (uuid, emailId) =>
+  unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/versions/${emailId}/`));
+
+export const updateNewsletterCampaignVersion = (uuid, emailId, payload) =>
+  unwrap(apiClient.patch(`${adminCampaignsEndpoint}${uuid}/versions/${emailId}/`, payload));
+
+export const deleteNewsletterCampaignVersion = (uuid, emailId) =>
+  unwrap(apiClient.delete(`${adminCampaignsEndpoint}${uuid}/versions/${emailId}/`));
+
 export const getNewsletterCampaign = (uuid) =>
   unwrap(apiClient.get(`${adminCampaignsEndpoint}${uuid}/`));
 

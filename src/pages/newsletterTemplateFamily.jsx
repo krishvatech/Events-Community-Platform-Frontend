@@ -498,7 +498,8 @@ export function TranslationsSection({ template, onNavigate, onChanged }) {
       )}
       <Typography variant="caption" color="text.secondary">
         Mautic matches the contact&apos;s Preferred locale field (fr_FR gets fr if there is no fr_FR version). Contacts without a matching
-        locale get the main template.
+        locale get the main template. With an A/B test running, contacts given a variant get that variant as it is: translations only
+        replace the main version.
       </Typography>
       <AddTranslationDialog template={template} open={adding} onClose={() => setAdding(false)}
         onCreated={(created, message) => {

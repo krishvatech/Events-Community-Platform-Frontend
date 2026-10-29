@@ -38,6 +38,7 @@ import AdminNewsletterDashboardPage from "./pages/AdminNewsletterDashboardPage.j
 import AdminNewsletterPage from "./pages/AdminNewsletterPage.jsx";
 import AdminNewsletterTemplateDetailsPage from "./pages/AdminNewsletterTemplateDetailsPage.jsx";
 import AdminNewsletterTemplateEditorPage from "./pages/AdminNewsletterTemplateEditorPage.jsx";
+import AdminNewsletterBroadcastVersionEditorPage from "./pages/AdminNewsletterBroadcastVersionEditorPage.jsx";
 import AdminNewsletterFormsPage from "./pages/AdminNewsletterFormsPage.jsx";
 import AdminNewsletterFormDetailsPage from "./pages/AdminNewsletterFormDetailsPage.jsx";
 import AdminNewsletterFormEditorPage from "./pages/AdminNewsletterFormEditorPage.jsx";
@@ -422,6 +423,7 @@ const AppShell = () => {
               <Route path="points" element={<AdminNewsletterPointsPage />} />
               <Route path="lists/:slug" element={<AdminNewsletterListManagePage />} />
               <Route path=":campaignId" element={<AdminNewsletterPage />} />
+              <Route path=":campaignId/versions/:emailId" element={<AdminNewsletterBroadcastVersionEditorPage />} />
             </Route>
             <Route path="guide" element={<RequireStaffOrAdmin><AdminGuidePage /></RequireStaffOrAdmin>} />
             {blogAdminRoutes}

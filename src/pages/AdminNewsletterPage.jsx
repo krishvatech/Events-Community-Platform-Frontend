@@ -120,6 +120,7 @@ import MarketingEmailContentEditor, {
   savedDesignContent,
 } from "../components/marketing/MarketingEmailContentEditor.jsx";
 import { findUnknownFieldTokens, insertTokenAt, useMauticTokens } from "../components/marketing/marketingEmailTokens";
+import BroadcastFamilySection from "./newsletterBroadcastFamily.jsx";
 
 const STATUS_LABELS = {
   draft: "Draft",
@@ -1537,6 +1538,15 @@ export default function AdminNewsletterPage() {
         />
       ) : (
         <EmptyState title="Broadcast could not be loaded." action={<Button variant="contained" onClick={loadDetail}>Retry</Button>} />
+      )}
+
+      {detailLoaded && !isNew && (
+        <BroadcastFamilySection
+          key={`family-${campaignId}-${status}`}
+          campaignId={campaignId}
+          initialNotice={location.state?.flash || ""}
+          blockedReason={isDirty ? "Save the draft first: variants and translations start as a copy of the saved broadcast." : ""}
+        />
       )}
 
       {detailLoaded && !isNew && (
