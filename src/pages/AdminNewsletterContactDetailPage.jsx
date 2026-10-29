@@ -49,6 +49,7 @@ import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
 import ContactCampaignsPanel from "../components/marketing/ContactCampaignsPanel.jsx";
+import ContactLanguagePanel from "../components/marketing/ContactLanguagePanel.jsx";
 import ContactMergeDialog from "../components/marketing/ContactMergeDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 
@@ -1456,6 +1457,14 @@ export default function AdminNewsletterContactDetailPage() {
                     )}
                   </Stack>
                 </Paper>
+                )}
+
+                {contactDetailTab === "overview" && (
+                  <ContactLanguagePanel
+                    mauticContactId={mauticContactId}
+                    locale={contact.contact_info?.preferred_locale || ""}
+                    onSaved={(updated) => setContact(updated)}
+                  />
                 )}
 
                 {contactDetailTab === "overview" && (

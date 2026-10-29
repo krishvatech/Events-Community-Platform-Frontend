@@ -182,6 +182,25 @@ export const createNewsletterTemplate = (payload) =>
 export const updateNewsletterTemplate = (templateId, payload) =>
   unwrap(apiClient.patch(`${adminTemplatesEndpoint}${templateId}/`, payload));
 
+// A/B variants and translations of a template. Variants and translations are
+// unpublished copies of the main template, edited like any template.
+export const createNewsletterTemplateVariant = (templateId, payload) =>
+  unwrap(apiClient.post(`${adminTemplatesEndpoint}${templateId}/variants/`, payload));
+
+export const createNewsletterTemplateTranslation = (templateId, payload) =>
+  unwrap(apiClient.post(`${adminTemplatesEndpoint}${templateId}/translations/`, payload));
+
+export const getNewsletterTemplateAbTest = (templateId) =>
+  unwrap(apiClient.get(`${adminTemplatesEndpoint}${templateId}/abtest/`));
+
+// payload: {weight} on a variant or {winnerCriteria} on any template of the test.
+export const updateNewsletterTemplateAbTest = (templateId, payload) =>
+  unwrap(apiClient.patch(`${adminTemplatesEndpoint}${templateId}/abtest/`, payload));
+
+// Ends the test: the winner's content is copied onto the main template.
+export const makeNewsletterTemplateWinner = (templateId) =>
+  unwrap(apiClient.post(`${adminTemplatesEndpoint}${templateId}/winner/`));
+
 export const duplicateNewsletterTemplate = (templateId, payload = {}) =>
   unwrap(apiClient.post(`${adminTemplatesEndpoint}${templateId}/duplicate/`, payload));
 

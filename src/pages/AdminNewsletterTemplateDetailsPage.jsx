@@ -38,6 +38,7 @@ import {
   templateEditPath,
   useTemplateDuplicate,
 } from "./newsletterTemplateShared.jsx";
+import { AbTestSection, FamilyBanner, TemplateRoleChip, TranslationsSection } from "./newsletterTemplateFamily.jsx";
 
 const TOKEN_RE = /\{[a-z][a-z0-9_]*(?:=[A-Za-z0-9_]+)?\}/g;
 
@@ -164,6 +165,16 @@ export default function AdminNewsletterTemplateDetailsPage() {
   const html = template.customHtml || "";
   const tokensUsed = [...new Set(`${html}\n${template.plainText || ""}\n${template.subject || ""}`.match(TOKEN_RE) || [])];
 
+  // Opens another template of the family, or reloads this one (a winner keeps the main template's id).
+  const openFamilyMember = (id, flash) => {
+    if (String(id) === String(template.id)) {
+      setAttempt((value) => value + 1);
+      setSnack({ open: true, severity: "success", message: flash });
+      return;
+    }
+    navigate(templateDetailsPath(id), { state: { flash } });
+  };
+
   const handleDuplicate = async () => {
     const copy = await duplicate(template);
     if (copy?.id) {
@@ -185,6 +196,7 @@ export default function AdminNewsletterTemplateDetailsPage() {
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ minWidth: 0 }}>
             <Typography variant="h5" component="h1" sx={{ fontWeight: 850, color: NAVY, wordBreak: "break-word" }}>{name}</Typography>
             <TemplateStatusChip published={template.isPublished} />
+            <TemplateRoleChip template={template} />
           </Stack>
           <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Button startIcon={<ArrowBackRoundedIcon />} component={RouterLink} to={TEMPLATES_PATH} sx={{ textTransform: "none" }}>
@@ -217,6 +229,7 @@ export default function AdminNewsletterTemplateDetailsPage() {
             </Button>
           </Stack>
         </Stack>
+        <FamilyBanner template={template} />
       </Stack>
 
       <Box sx={{ display: "grid", gap: 3, gridTemplateColumns: { xs: "minmax(0, 1fr)", lg: "minmax(0, 5fr) minmax(0, 7fr)" }, alignItems: "start" }}>
@@ -287,6 +300,23 @@ export default function AdminNewsletterTemplateDetailsPage() {
           <EmailPreviewFrame title="Saved Newsletter Template preview" html={html} height={720} />
         </Section>
       </Box>
+
+      {template.role !== "translation" && (
+        <Section title="A/B Test">
+          <AbTestSection key={`${template.id}-${attempt}`} template={template} onNavigate={openFamilyMember}
+            onChanged={(message) => setSnack({ open: true, severity: "success", message })} />
+        </Section>
+      )}
+
+      {template.role === "main" && (
+        <Section title="Translations">
+          <TranslationsSection template={template} onNavigate={openFamilyMember}
+            onChanged={(saved, message) => {
+              setState({ loading: false, template: saved, error: null });
+              setSnack({ open: true, severity: "success", message });
+            }} />
+        </Section>
+      )}
 
       <Box ref={testSendRef} id="test-send">
         <TemplateTestSendPanel template={template} inputRef={testSendInput} />
