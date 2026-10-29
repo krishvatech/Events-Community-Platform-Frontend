@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { course, getFaculty, getTestimonials } from './courseData';
 import { contentSources } from './contentSources';
 
@@ -12,11 +12,16 @@ export function Brand({ light = false }) {
 }
 
 export function CourseNav({ light = false, compact = false }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuId = useId();
   return (
     <header className={`itdr-site-nav ${light ? 'itdr-site-nav-light' : ''} ${compact ? 'itdr-site-nav-compact' : ''}`}>
       <div className="itdr-wrap itdr-site-nav-inner">
         <Brand light={light} />
-        <nav aria-label="Training page sections">
+        <button className="itdr-nav-toggle" type="button" aria-expanded={menuOpen} aria-controls={menuId} onClick={() => setMenuOpen((open) => !open)}>
+          {menuOpen ? 'Close menu' : 'Menu'}
+        </button>
+        <nav id={menuId} className={menuOpen ? 'itdr-nav-open' : ''} aria-label="Training page sections" onClick={(event) => { if (event.target.closest('a')) setMenuOpen(false); }} onKeyDown={(event) => { if (event.key === 'Escape') { setMenuOpen(false); event.currentTarget.previousElementSibling.focus(); } }}>
           <a href="#overview">Overview</a>
           <a href="#curriculum">Curriculum</a>
           <a href="#formats">Formats</a>
