@@ -404,6 +404,18 @@ export const runNewsletterContactBulkAction = (payload) =>
 export const listNewsletterContactOwners = () =>
   unwrap(apiClient.get(`${adminContactsEndpoint}owners/`));
 
+// Every Campaign a contact is in, published or not. Add/remove go through
+// runNewsletterContactBulkAction with this one contact.
+export const listNewsletterContactCampaigns = (mauticContactId) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/campaigns/`));
+
+// Merge another contact into this one (the other is deleted by Mautic).
+export const previewNewsletterContactMerge = (mauticContactId, otherContactId) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/merge/`, { params: { other_contact_id: otherContactId } }));
+
+export const mergeNewsletterContact = (mauticContactId, otherContactId) =>
+  unwrap(apiClient.post(`${adminContactsEndpoint}${mauticContactId}/merge/`, { other_contact_id: otherContactId }));
+
 // Contact export (CSV or Excel), built in the background. The file is kept
 // encrypted for 24 hours and only the admin who started it can download it.
 const adminContactExportsEndpoint = `${adminContactsEndpoint}exports/`;

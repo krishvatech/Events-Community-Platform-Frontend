@@ -33,6 +33,7 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import CallMergeRoundedIcon from "@mui/icons-material/CallMergeRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
@@ -47,6 +48,8 @@ import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate, useParams } from "react-router-dom";
 
+import ContactCampaignsPanel from "../components/marketing/ContactCampaignsPanel.jsx";
+import ContactMergeDialog from "../components/marketing/ContactMergeDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 
 import {
@@ -355,6 +358,10 @@ export default function AdminNewsletterContactDetailPage() {
   const [selectedOwnerId, setSelectedOwnerId] = useState("");
   const [ownerSaving, setOwnerSaving] = useState(false);
   const [ownerMessage, setOwnerMessage] = useState(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeNotice, setMergeNotice] = useState("");
+  // Bumped after a merge so the Campaigns panel reloads what moved across.
+  const [mergeVersion, setMergeVersion] = useState(0);
   const [selectedStageId, setSelectedStageId] = useState("");
   const [pointAmount, setPointAmount] = useState("1");
   const [pointReason, setPointReason] = useState("");
@@ -971,10 +978,28 @@ export default function AdminNewsletterContactDetailPage() {
             <Typography color="text.secondary">{contact?.email || "Mautic contact activity and ECP subscription state."}</Typography>
           </Box>
         </Stack>
-        <Button startIcon={<RefreshRoundedIcon />} onClick={refreshAll} disabled={loading}>Refresh</Button>
+        <Stack direction="row" spacing={1} alignItems="flex-start">
+          <Button startIcon={<CallMergeRoundedIcon />} variant="outlined" onClick={() => setMergeOpen(true)} disabled={loading || !contact}>
+            Merge
+          </Button>
+          <Button startIcon={<RefreshRoundedIcon />} onClick={refreshAll} disabled={loading}>Refresh</Button>
+        </Stack>
       </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
+      {mergeNotice && <Alert severity="success" onClose={() => setMergeNotice("")}>{mergeNotice}</Alert>}
+
+      <ContactMergeDialog
+        open={mergeOpen}
+        mauticContactId={mauticContactId}
+        onClose={() => setMergeOpen(false)}
+        onMerged={(result) => {
+          setMergeOpen(false);
+          setMergeNotice(`${result?.merged_away?.name || "The other contact"} was merged into this contact and deleted.`);
+          setMergeVersion((version) => version + 1);
+          refreshAll();
+        }}
+      />
 
       <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: "#E7ECEF", overflow: "hidden" }}>
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
@@ -1431,6 +1456,14 @@ export default function AdminNewsletterContactDetailPage() {
                     )}
                   </Stack>
                 </Paper>
+                )}
+
+                {contactDetailTab === "overview" && (
+                  <ContactCampaignsPanel
+                    key={`campaigns-${mauticContactId}-${mergeVersion}`}
+                    mauticContactId={mauticContactId}
+                    contactName={contact.name || `Contact #${mauticContactId}`}
+                  />
                 )}
 
                 {contactDetailTab === "profile" && (
