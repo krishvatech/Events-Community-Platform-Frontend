@@ -480,6 +480,35 @@ export const deleteNewsletterContactExport = (jobId) =>
 export const downloadNewsletterContactExport = (jobId) =>
   unwrap(apiClient.get(`${adminContactExportsEndpoint}${encodeURIComponent(jobId)}/download/`, { responseType: "blob" }));
 
+// Assets: Mautic's downloadable files. Uploads and links go through the bridge
+// as the admin's own Mautic user; payloads are FormData when a file is sent.
+const adminAssetsEndpoint = "/newsletter/admin/assets/";
+
+export const getNewsletterAssetMetadata = () => unwrap(apiClient.get(`${adminAssetsEndpoint}metadata/`));
+
+export const listNewsletterAssets = (params = {}) => unwrap(apiClient.get(adminAssetsEndpoint, { params }));
+
+export const getNewsletterAsset = (assetId) => unwrap(apiClient.get(`${adminAssetsEndpoint}${assetId}/`));
+
+// The API client defaults to JSON; FormData must go as multipart or the file is lost.
+const assetFormConfig = (payload) =>
+  typeof FormData !== "undefined" && payload instanceof FormData ? { headers: { "Content-Type": "multipart/form-data" } } : undefined;
+
+export const createNewsletterAsset = (formData) => unwrap(apiClient.post(adminAssetsEndpoint, formData, assetFormConfig(formData)));
+
+export const updateNewsletterAsset = (assetId, payload) =>
+  unwrap(apiClient.patch(`${adminAssetsEndpoint}${assetId}/`, payload, assetFormConfig(payload)));
+
+export const deleteNewsletterAsset = (assetId) => unwrap(apiClient.delete(`${adminAssetsEndpoint}${assetId}/`));
+
+// params: {days, page, page_size}
+export const getNewsletterAssetDownloads = (assetId, params = {}) =>
+  unwrap(apiClient.get(`${adminAssetsEndpoint}${assetId}/downloads/`, { params }));
+
+/** The stored file as a Blob (not counted as a download in Mautic). */
+export const downloadNewsletterAssetFile = (assetId) =>
+  unwrap(apiClient.get(`${adminAssetsEndpoint}${assetId}/file/`, { responseType: "blob" }));
+
 // Reports: Mautic's report builder. Saves run as the admin's own Mautic user;
 // data and graphs are read for a date range (YYYY-MM-DD, UTC).
 const adminReportsEndpoint = "/newsletter/admin/reports/";

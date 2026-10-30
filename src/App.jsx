@@ -49,6 +49,9 @@ import AdminNewsletterPageDetailsPage from "./pages/AdminNewsletterPageDetailsPa
 import AdminNewsletterPageEditorPage from "./pages/AdminNewsletterPageEditorPage.jsx";
 import AdminNewsletterAnalyticsPage from "./pages/AdminNewsletterAnalyticsPage.jsx";
 import AdminNewsletterReportsPage from "./pages/AdminNewsletterReportsPage.jsx";
+import AdminNewsletterAssetsPage from "./pages/AdminNewsletterAssetsPage.jsx";
+import AdminNewsletterAssetEditorPage from "./pages/AdminNewsletterAssetEditorPage.jsx";
+import AdminNewsletterAssetDetailsPage from "./pages/AdminNewsletterAssetDetailsPage.jsx";
 import AdminNewsletterReportEditorPage from "./pages/AdminNewsletterReportEditorPage.jsx";
 import AdminNewsletterReportViewerPage from "./pages/AdminNewsletterReportViewerPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
@@ -413,6 +416,11 @@ const AppShell = () => {
               <Route path="lists" element={<AdminNewsletterPage />} />
               <Route path="segments" element={<AdminNewsletterPage />} />
               <Route path="analytics" element={<AdminNewsletterAnalyticsPage />} />
+              {/* Mautic assets; static "assets/..." segments rank above ":campaignId". */}
+              <Route path="assets" element={<AdminNewsletterAssetsPage />} />
+              <Route path="assets/new" element={<AdminNewsletterAssetEditorPage />} />
+              <Route path="assets/:assetId" element={<AdminNewsletterAssetDetailsPage />} />
+              <Route path="assets/:assetId/edit" element={<AdminNewsletterAssetEditorPage />} />
               {/* Mautic reports; static "reports/..." segments rank above ":campaignId". */}
               <Route path="reports" element={<AdminNewsletterReportsPage />} />
               <Route path="reports/new" element={<AdminNewsletterReportEditorPage />} />

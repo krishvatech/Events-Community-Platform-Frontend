@@ -154,7 +154,9 @@ afterEach(async () => {
 
 test("Landing Pages sits under Campaigns and owns its pages", () => {
   const campaigns = marketingNavigationGroups.find((group) => group.label === "Campaigns");
-  assert.deepEqual(campaigns.items.map((item) => item.id), ["campaigns", "broadcasts", "templates", "pages"]);
+  // Assets (downloadable files) follows the content items.
+  assert.deepEqual(campaigns.items.map((item) => item.id), ["campaigns", "broadcasts", "templates", "pages", "assets"]);
+  assert.equal(getMarketingSectionFromPath("/admin/newsletter/assets/12/edit"), "assets");
   for (const path of ["/admin/newsletter/pages", "/admin/newsletter/pages/new", "/admin/newsletter/pages/51", "/admin/newsletter/pages/51/edit"]) {
     assert.equal(getMarketingSectionFromPath(path), "pages", path);
   }

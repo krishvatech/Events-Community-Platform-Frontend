@@ -33,7 +33,8 @@ const formatNumber = (value) => {
 const columnLabel = (key) => String(key).replace(/_/g, " ").replace(/^\w/, (c) => c.toUpperCase());
 
 function niceMax(value) {
-  if (value <= 0) return 1;
+  // Small counts get whole-number ticks (0..4) rather than quarters.
+  if (value <= 4) return 4;
   const power = 10 ** Math.floor(Math.log10(value));
   const step = [1, 2, 2.5, 5, 10].find((s) => s * power >= value / 4) * power;
   return Math.ceil(value / step) * step;
