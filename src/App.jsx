@@ -50,6 +50,7 @@ import AdminNewsletterPageEditorPage from "./pages/AdminNewsletterPageEditorPage
 import AdminNewsletterAnalyticsPage from "./pages/AdminNewsletterAnalyticsPage.jsx";
 import AdminNewsletterReportsPage from "./pages/AdminNewsletterReportsPage.jsx";
 import AdminNewsletterAssetsPage from "./pages/AdminNewsletterAssetsPage.jsx";
+import AdminNewsletterCalendarPage from "./pages/AdminNewsletterCalendarPage.jsx";
 import AdminNewsletterAssetEditorPage from "./pages/AdminNewsletterAssetEditorPage.jsx";
 import AdminNewsletterAssetDetailsPage from "./pages/AdminNewsletterAssetDetailsPage.jsx";
 import AdminNewsletterReportEditorPage from "./pages/AdminNewsletterReportEditorPage.jsx";
@@ -416,6 +417,7 @@ const AppShell = () => {
               <Route path="lists" element={<AdminNewsletterPage />} />
               <Route path="segments" element={<AdminNewsletterPage />} />
               <Route path="analytics" element={<AdminNewsletterAnalyticsPage />} />
+              <Route path="calendar" element={<AdminNewsletterCalendarPage />} />
               {/* Mautic assets; static "assets/..." segments rank above ":campaignId". */}
               <Route path="assets" element={<AdminNewsletterAssetsPage />} />
               <Route path="assets/new" element={<AdminNewsletterAssetEditorPage />} />

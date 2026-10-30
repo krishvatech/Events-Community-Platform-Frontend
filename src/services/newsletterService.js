@@ -480,6 +480,9 @@ export const deleteNewsletterContactExport = (jobId) =>
 export const downloadNewsletterContactExport = (jobId) =>
   unwrap(apiClient.get(`${adminContactExportsEndpoint}${encodeURIComponent(jobId)}/download/`, { responseType: "blob" }));
 
+// Marketing calendar: dated work from ECP and Mautic for a UTC window (<= 93 days).
+export const getNewsletterCalendar = (params) => unwrap(apiClient.get("/newsletter/admin/calendar/", { params }));
+
 // Assets: Mautic's downloadable files. Uploads and links go through the bridge
 // as the admin's own Mautic user; payloads are FormData when a file is sent.
 const adminAssetsEndpoint = "/newsletter/admin/assets/";

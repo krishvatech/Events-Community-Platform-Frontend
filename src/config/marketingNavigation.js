@@ -4,6 +4,7 @@ import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
+import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import DynamicFormRoundedIcon from "@mui/icons-material/DynamicFormRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
@@ -35,6 +36,13 @@ export const marketingNavigationGroups = [
         icon: InsightsRoundedIcon,
         exact: true,
         match: [MARKETING_HOME_PATH],
+      },
+      {
+        id: "calendar",
+        label: "Calendar",
+        path: `${MARKETING_HOME_PATH}/calendar`,
+        icon: CalendarMonthRoundedIcon,
+        match: [`${MARKETING_HOME_PATH}/calendar`],
       },
     ],
   },
