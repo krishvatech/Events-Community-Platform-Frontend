@@ -1,5 +1,6 @@
 import AccountTreeRoundedIcon from "@mui/icons-material/AccountTreeRounded";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
+import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import DynamicFormRoundedIcon from "@mui/icons-material/DynamicFormRounded";
@@ -137,6 +138,13 @@ export const marketingNavigationGroups = [
         path: `${MARKETING_HOME_PATH}/analytics`,
         icon: AnalyticsRoundedIcon,
         match: [`${MARKETING_HOME_PATH}/analytics`],
+      },
+      {
+        id: "reports",
+        label: "Reports",
+        path: `${MARKETING_HOME_PATH}/reports`,
+        icon: AssessmentRoundedIcon,
+        match: [`${MARKETING_HOME_PATH}/reports`],
       },
     ],
   },

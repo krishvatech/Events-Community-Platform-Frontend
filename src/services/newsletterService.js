@@ -480,6 +480,44 @@ export const deleteNewsletterContactExport = (jobId) =>
 export const downloadNewsletterContactExport = (jobId) =>
   unwrap(apiClient.get(`${adminContactExportsEndpoint}${encodeURIComponent(jobId)}/download/`, { responseType: "blob" }));
 
+// Reports: Mautic's report builder. Saves run as the admin's own Mautic user;
+// data and graphs are read for a date range (YYYY-MM-DD, UTC).
+const adminReportsEndpoint = "/newsletter/admin/reports/";
+
+export const listNewsletterReports = () => unwrap(apiClient.get(adminReportsEndpoint));
+
+export const listNewsletterReportSources = () => unwrap(apiClient.get(`${adminReportsEndpoint}sources/`));
+
+export const getNewsletterReportSource = (source) =>
+  unwrap(apiClient.get(`${adminReportsEndpoint}sources/${encodeURIComponent(source)}/`));
+
+export const getNewsletterReport = (reportId) => unwrap(apiClient.get(`${adminReportsEndpoint}${reportId}/`));
+
+export const createNewsletterReport = (payload) => unwrap(apiClient.post(adminReportsEndpoint, payload));
+
+export const updateNewsletterReport = (reportId, payload) =>
+  unwrap(apiClient.patch(`${adminReportsEndpoint}${reportId}/`, payload));
+
+export const deleteNewsletterReport = (reportId) => unwrap(apiClient.delete(`${adminReportsEndpoint}${reportId}/`));
+
+// params: {dateFrom, dateTo, page, limit, graphs: 0|1, dynamicFilters: JSON string}
+export const getNewsletterReportData = (reportId, params = {}) =>
+  unwrap(apiClient.get(`${adminReportsEndpoint}${reportId}/data/`, { params }));
+
+// Report export (CSV or Excel), built in the background like the contact export.
+export const startNewsletterReportExport = (reportId, payload) =>
+  unwrap(apiClient.post(`${adminReportsEndpoint}${reportId}/exports/`, payload));
+
+export const listNewsletterReportExports = (reportId) =>
+  unwrap(apiClient.get(`${adminReportsEndpoint}${reportId}/exports/`));
+
+export const deleteNewsletterReportExport = (jobId) =>
+  unwrap(apiClient.delete(`${adminReportsEndpoint}exports/${encodeURIComponent(jobId)}/`));
+
+/** The finished file as a Blob. */
+export const downloadNewsletterReportExport = (jobId) =>
+  unwrap(apiClient.get(`${adminReportsEndpoint}exports/${encodeURIComponent(jobId)}/download/`, { responseType: "blob" }));
+
 // Marketing Hub notifications (the admin's own, e.g. "Contact export ready").
 export const listMarketingNotifications = () =>
   unwrap(apiClient.get("/newsletter/admin/notifications/"));

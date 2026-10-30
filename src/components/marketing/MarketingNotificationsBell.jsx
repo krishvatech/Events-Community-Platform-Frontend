@@ -22,6 +22,7 @@ import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneR
 
 import {
   downloadNewsletterContactExport,
+  downloadNewsletterReportExport,
   listMarketingNotifications,
   markMarketingNotificationsRead,
 } from "../../services/newsletterService";
@@ -43,7 +44,12 @@ const formatWhen = (value) => {
   return date.toLocaleString(undefined, { month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit" });
 };
 
-const isDownloadable = (n) => n.type === "marketing_contact_export" && n.data?.status === "done" && n.data?.job_id;
+// Finished exports download straight from the bell.
+const DOWNLOADERS = {
+  marketing_contact_export: downloadNewsletterContactExport,
+  marketing_report_export: downloadNewsletterReportExport,
+};
+const isDownloadable = (n) => Boolean(DOWNLOADERS[n.type]) && n.data?.status === "done" && n.data?.job_id;
 
 export default function MarketingNotificationsBell({ pollMs = POLL_MS, fastPollMs = FAST_POLL_MS }) {
   const [items, setItems] = useState([]);
@@ -113,7 +119,7 @@ export default function MarketingNotificationsBell({ pollMs = POLL_MS, fastPollM
     setBusyId(notification.id);
     setError("");
     try {
-      saveBlob(await downloadNewsletterContactExport(notification.data.job_id), notification.data.filename);
+      saveBlob(await DOWNLOADERS[notification.type](notification.data.job_id), notification.data.filename);
       if (!notification.is_read) markRead({ ids: [notification.id] });
     } catch (err) {
       setError(err?.response?.data?.detail || "The file could not be downloaded.");
