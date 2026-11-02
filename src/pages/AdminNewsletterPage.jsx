@@ -78,6 +78,7 @@ import {
   syncNewsletterCampaign,
   updateNewsletterCampaign,
   getNewsletterMauticDiagnostics,
+  getNewsletterCampaignLinkClicks,
 } from "../services/newsletterService";
 import {
   SAVE_STAGE_SYNC,
@@ -109,6 +110,7 @@ import AdminNewsletterNativeSegmentsPanel from "./AdminNewsletterNativeSegmentsP
 import AdminNewsletterTagsPanel from "./AdminNewsletterTagsPanel.jsx";
 import AdminNewsletterCustomFieldsPanel from "./AdminNewsletterCustomFieldsPanel.jsx";
 import AdminNewsletterSendOutcomePanel from "./AdminNewsletterSendOutcomePanel.jsx";
+import { BroadcastDeliveryOptionsPanel, EmailLinkClicksPanel } from "../components/marketing/EmailDeliveryOptions.jsx";
 import { getMarketingSectionFromPath } from "../config/marketingNavigation";
 import EmailPreviewFrame from "../components/marketing/EmailPreviewFrame.jsx";
 import MauticTokenPicker from "../components/marketing/MauticTokenPicker.jsx";
@@ -1552,6 +1554,12 @@ export default function AdminNewsletterPage() {
       {detailLoaded && !isNew && (
         <BroadcastAnalyticsPanel status={status} analyticsState={analyticsState} onRefresh={() => loadAnalytics(campaignId)} />
       )}
+
+      {detailLoaded && !isNew && broadcastHasSendData(status) && (
+        <EmailLinkClicksPanel key={`link-clicks-${campaignId}`} load={() => getNewsletterCampaignLinkClicks(campaignId)} />
+      )}
+
+      {detailLoaded && !isNew && activeStep === 3 && <BroadcastDeliveryOptionsPanel key={`delivery-${campaignId}`} campaignUuid={campaignId} />}
 
       {detailLoaded && activeStep === 3 && (
         <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>

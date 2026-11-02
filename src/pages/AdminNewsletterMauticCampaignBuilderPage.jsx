@@ -122,6 +122,7 @@ import {
   getNativeMauticCampaignBuilder,
   updateNativeMauticCampaign,
 } from "../services/newsletterService";
+import { CampaignContactsPanel, CampaignStatsPanel } from "../components/marketing/CampaignInsights.jsx";
 
 const getErrorMessage = (err, fallback = "Something went wrong. Please try again.") => {
   const data = err?.response?.data;
@@ -1611,10 +1612,22 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             <Tab label="Edit" value="edit" />
             <Tab label="Workflow Events" value="workflow-events" />
             <Tab label="Canvas" value="canvas" />
+            {isEditMode && <Tab label="Contacts" value="contacts" />}
+            {isEditMode && <Tab label="Statistics" value="stats" />}
           </Tabs>
         </Box>
 
-        <Stack spacing={2.5} component="form" onSubmit={createCampaign} sx={{ p: 2.5 }}>
+        {/* Read-only insights render outside the form so Enter never saves the
+            Campaign; the form stays mounted (hidden) so unsaved edits survive. */}
+        {isEditMode && builderTab === "contacts" && (
+          <Box sx={{ p: 2.5 }}><CampaignContactsPanel campaignId={campaignId} /></Box>
+        )}
+        {isEditMode && builderTab === "stats" && (
+          <Box sx={{ p: 2.5 }}><CampaignStatsPanel campaignId={campaignId} /></Box>
+        )}
+
+        <Stack spacing={2.5} component="form" onSubmit={createCampaign}
+          sx={{ p: 2.5, display: ["contacts", "stats"].includes(builderTab) ? "none" : undefined }}>
           {formError && <Alert severity="error">{formError}</Alert>}
           {graphBlockers.length > 0 && (
             <Alert severity="error">

@@ -61,6 +61,7 @@ function installApi() {
         return { data: { count: 1, results: [{ id: "21", name: "Welcome Series", isPublished: false }] } };
       }
       if (url === `${CONTACTS_URL}3/`) return { data: detail };
+      if (url === "/newsletter/admin/tags/directory/") return { data: { count: 2, results: [{ id: "5", tag: "VIP" }, { id: "6", tag: "Lead" }] } };
       return { data: {} };
     },
     post: async (url, payload) => {
@@ -246,11 +247,40 @@ test("the contact detail page shows and changes the owner", async () => {
 
 test("bulk helpers", () => {
   const { bulkPayload, manualSegments, describeBulkAction, BULK_ACTIONS } = dialogModule;
-  assert.equal(BULK_ACTIONS.map((item) => item.key).join(","), "segment_add,segment_remove,campaign_add,campaign_remove,owner_set,dnc_add");
+  assert.equal(BULK_ACTIONS.map((item) => item.key).join(","),
+    "segment_add,segment_remove,campaign_add,campaign_remove,owner_set,tags_add,tags_remove,dnc_add");
+  assert.equal(JSON.stringify(bulkPayload({ action: "tags_add", contactIds: ["3"], targetId: "", reason: "", tags: ["VIP", "Lead"] })),
+    JSON.stringify({ action: "tags_add", contact_ids: ["3"], tags: ["VIP", "Lead"] }));
   assert.equal(manualSegments(SEGMENTS).map((segment) => segment.id).join(","), "4");
   assert.equal(JSON.stringify(bulkPayload({ action: "owner_set", contactIds: ["3"], targetId: "6", reason: "" })),
     JSON.stringify({ action: "owner_set", contact_ids: ["3"], owner_id: "6" }));
   assert.equal(JSON.stringify(bulkPayload({ action: "dnc_add", contactIds: ["3"], targetId: "", reason: "   " })),
     JSON.stringify({ action: "dnc_add", contact_ids: ["3"] }));
   assert.equal(describeBulkAction("owner_set", 1, "Ravi Admin"), "Make Ravi Admin the owner of 1 contact.");
+});
+
+test("bulk tags: add takes existing or typed new tags and sends their names; remove offers existing ones only", async () => {
+  bulkResponse = result({ action: "tags_add", target: { type: "tags", id: null, name: "VIP, QA New Tag" } });
+  await openContacts();
+  await tickBoth();
+  let dialog = await chooseBulk("Add tags…");
+  await waitFor(() => assert.equal(requests.some((r) => r.url === "/newsletter/admin/tags/directory/"), true));
+  const input = getByRole("combobox", /Tags/, { scope: dialog });
+  await click(input);
+  await click(await waitFor(() => getByRole("option", "VIP")));
+  await typeInto(input, "QA New Tag");
+  input.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  await waitFor(() => assert.equal(hasText('Add the tags "VIP", "QA New Tag" to 2 contacts. Tags that do not exist yet are created.'), true));
+  await click(getByRole("button", "Add Tags", { scope: dialog }));
+  await waitFor(() => assert.equal(bulkPosts().length, 1));
+  assert.equal(JSON.stringify(bulkPosts()[0].payload), JSON.stringify({ action: "tags_add", contact_ids: ["3", "12"], tags: ["VIP", "QA New Tag"] }));
+  await click(getByRole("button", "Done"));
+
+  await waitFor(() => assert.equal(Boolean(queryByRole("checkbox", "Select Ada Lovelace")), true));
+  await click(getByRole("checkbox", "Select Ada Lovelace"));
+  dialog = await chooseBulk("Remove tags…");
+  const removeInput = getByRole("combobox", /Tags/, { scope: dialog });
+  await typeInto(removeInput, "Not A Tag");
+  removeInput.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  assert.equal(hasText(/Remove the tags/), false); // remove only takes existing tags
 });

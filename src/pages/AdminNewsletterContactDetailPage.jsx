@@ -34,6 +34,7 @@ import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AnalyticsRoundedIcon from "@mui/icons-material/AnalyticsRounded";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import CallMergeRoundedIcon from "@mui/icons-material/CallMergeRounded";
+import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import ApartmentRoundedIcon from "@mui/icons-material/ApartmentRounded";
 import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
@@ -51,6 +52,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import ContactCampaignsPanel from "../components/marketing/ContactCampaignsPanel.jsx";
 import ContactLanguagePanel from "../components/marketing/ContactLanguagePanel.jsx";
 import ContactMergeDialog from "../components/marketing/ContactMergeDialog.jsx";
+import ContactSendEmailDialog, { sendBlocker } from "../components/marketing/ContactSendEmailDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 
 import {
@@ -360,6 +362,7 @@ export default function AdminNewsletterContactDetailPage() {
   const [ownerSaving, setOwnerSaving] = useState(false);
   const [ownerMessage, setOwnerMessage] = useState(null);
   const [mergeOpen, setMergeOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
   const [mergeNotice, setMergeNotice] = useState("");
   // Bumped after a merge so the Campaigns panel reloads what moved across.
   const [mergeVersion, setMergeVersion] = useState(0);
@@ -980,6 +983,14 @@ export default function AdminNewsletterContactDetailPage() {
           </Box>
         </Stack>
         <Stack direction="row" spacing={1} alignItems="flex-start">
+          <Tooltip title={contact ? sendBlocker(contact) : ""}>
+            <span>
+              <Button startIcon={<SendRoundedIcon />} variant="outlined" onClick={() => setSendOpen(true)}
+                disabled={loading || !contact || Boolean(sendBlocker(contact))}>
+                Send email
+              </Button>
+            </span>
+          </Tooltip>
           <Button startIcon={<CallMergeRoundedIcon />} variant="outlined" onClick={() => setMergeOpen(true)} disabled={loading || !contact}>
             Merge
           </Button>
@@ -989,6 +1000,18 @@ export default function AdminNewsletterContactDetailPage() {
 
       {error && <Alert severity="error">{error}</Alert>}
       {mergeNotice && <Alert severity="success" onClose={() => setMergeNotice("")}>{mergeNotice}</Alert>}
+
+      <ContactSendEmailDialog
+        open={sendOpen}
+        contact={contact}
+        mauticContactId={mauticContactId}
+        onClose={() => setSendOpen(false)}
+        onSent={(result) => {
+          setSendOpen(false);
+          setMergeNotice(`“${result?.templateName || "The template"}” was sent to ${result?.to || "the contact"}.`);
+          refreshAll();
+        }}
+      />
 
       <ContactMergeDialog
         open={mergeOpen}

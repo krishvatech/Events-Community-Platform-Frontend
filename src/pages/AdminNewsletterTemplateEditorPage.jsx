@@ -28,6 +28,11 @@ import {
   updateNewsletterTemplate,
 } from "../services/newsletterService";
 import EmailPreviewFrame from "../components/marketing/EmailPreviewFrame.jsx";
+import {
+  EmailDeliveryOptionsFields,
+  deliveryOptionsPayload,
+  validateDeliveryOptions,
+} from "../components/marketing/EmailDeliveryOptions.jsx";
 import MarketingEmailContentEditor, {
   MODE_HTML,
   MODE_VISUAL,
@@ -155,6 +160,7 @@ export default function AdminNewsletterTemplateEditorPage() {
     if (!name) nextErrors.name = "Template name is required.";
     if (!subject) nextErrors.subject = "Subject is required.";
     if (fromAddress && !emailPattern.test(fromAddress)) nextErrors.fromAddress = "Enter a valid sender email.";
+    Object.assign(nextErrors, validateDeliveryOptions(form.delivery));
     setFormErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       setSaveError("Complete the required Template fields before saving.");
@@ -182,6 +188,7 @@ export default function AdminNewsletterTemplateEditorPage() {
         isPublished: Boolean(form.isPublished),
         category: form.category,
         template: form.template,
+        ...deliveryOptionsPayload(form.delivery),
       };
       if (visual) {
         // The server compiles the HTML from this MJML; never send both.
@@ -402,6 +409,19 @@ export default function AdminNewsletterTemplateEditorPage() {
             sx={{ alignSelf: "center" }}
           />
         </Box>
+      </Paper>
+
+      <Paper variant="outlined" component="section" aria-label="Delivery options" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: CARD_BORDER }}>
+        <Typography variant="h6" sx={{ fontWeight: 800, color: NAVY, mb: 2 }}>Delivery options</Typography>
+        <EmailDeliveryOptionsFields
+          value={form.delivery}
+          onChange={(next) => {
+            setForm((current) => ({ ...current, delivery: next }));
+            setDirty(true);
+          }}
+          disabled={saving}
+          errors={formErrors}
+        />
       </Paper>
 
       <Paper variant="outlined" component="section" aria-label="Email Content" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: CARD_BORDER }}>

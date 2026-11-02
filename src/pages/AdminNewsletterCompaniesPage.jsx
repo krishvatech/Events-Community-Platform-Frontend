@@ -44,6 +44,9 @@ import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import { useNavigate } from "react-router-dom";
 
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
+import { CompanyExportDialog, CompanyImportDialog } from "../components/marketing/CompanyTransferDialogs.jsx";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
+import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import {
   createNewsletterCompany,
   deleteNewsletterCompany,
@@ -187,6 +190,8 @@ export default function AdminNewsletterCompaniesPage() {
   const [error, setError] = useState("");
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
   const [searchInput, setSearchInput] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -252,7 +257,7 @@ export default function AdminNewsletterCompaniesPage() {
             Native Mautic companies. Mautic remains the source of truth for every value shown here.
           </Typography>
         </Box>
-        <Stack direction="row" spacing={1}>
+        <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ flexShrink: 0, "& .MuiButton-root": { whiteSpace: "nowrap" } }}>
           <Button
             startIcon={<RefreshRoundedIcon />}
             onClick={() => loadCompanies({ refresh: true })}
@@ -260,6 +265,12 @@ export default function AdminNewsletterCompaniesPage() {
             sx={{ textTransform: "none" }}
           >
             Refresh
+          </Button>
+          <Button variant="outlined" startIcon={<UploadFileRoundedIcon />} onClick={() => setImportOpen(true)} sx={{ textTransform: "none" }}>
+            Import CSV
+          </Button>
+          <Button variant="outlined" startIcon={<FileDownloadRoundedIcon />} onClick={() => setExportOpen(true)} sx={{ textTransform: "none" }}>
+            Export
           </Button>
           <Button
             variant="contained"
@@ -476,6 +487,8 @@ export default function AdminNewsletterCompaniesPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
+      <CompanyImportDialog open={importOpen} onClose={() => { setImportOpen(false); loadCompanies({ refresh: true }); }} />
+      <CompanyExportDialog open={exportOpen} onClose={() => setExportOpen(false)} search={search} />
     </Stack>
   );
 }

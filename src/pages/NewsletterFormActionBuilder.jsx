@@ -1,7 +1,8 @@
-// Submission Actions inside the Forms editor. Only tag and points actions are
-// offered; every other native action is shown read-only. Each save is one
-// provider write that the backend confirms against Mautic before this list
-// updates.
+// Submission Actions inside the Forms editor. Actions that email the
+// submitting contact, lift Do Not Contact or change segments are never offered;
+// other native actions are shown read-only. Any action can be removed. Each
+// save is one provider write that the backend confirms against Mautic before
+// this list updates.
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
@@ -15,14 +16,17 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Paper,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
+import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import ArrowDownwardRoundedIcon from "@mui/icons-material/ArrowDownwardRounded";
 import ArrowUpwardRoundedIcon from "@mui/icons-material/ArrowUpwardRounded";
@@ -32,6 +36,7 @@ import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 
 import {
   createNewsletterFormAction,
+  deleteNewsletterFormAction,
   getNewsletterFormActionMetadata,
   reorderNewsletterFormActions,
   updateNewsletterFormAction,
@@ -39,9 +44,15 @@ import {
 import { CARD_BORDER, NAVY, getErrorMessage } from "./newsletterFormShared.jsx";
 import { moveItem } from "./newsletterFormFields.js";
 import {
+  ASSET,
+  COMPANY_SCORE,
   DEFAULT_ACTION_TYPES,
   POINTS,
+  REPOST,
+  RESULTS_EMAIL,
   TAGS,
+  UPDATE_CONTACT,
+  USER_EMAIL,
   actionDraftToPayload,
   actionDraftsEqual,
   actionToDraft,
@@ -68,7 +79,52 @@ function TagPicker({ label, value, onChange, tags, disabled, error }) {
   );
 }
 
-function ActionPanel({ editing, draft, setDraft, errors, setErrors, types, tags, saving, onSave, onCancel }) {
+const byId = (rows) => Object.fromEntries((rows || []).map((row) => [String(row.id), row.name]));
+
+function ReferenceSelect({ label, value, onChange, rows, disabled, error, helperText, empty }) {
+  const known = (rows || []).some((row) => String(row.id) === String(value));
+  return (
+    <TextField select label={label} value={value} onChange={(event) => onChange(event.target.value)} disabled={disabled} fullWidth
+      error={Boolean(error)} helperText={error || helperText || ""}>
+      <MenuItem value="" disabled>{empty}</MenuItem>
+      {(rows || []).map((row) => <MenuItem key={row.id} value={String(row.id)}>{row.name}</MenuItem>)}
+      {value && !known && <MenuItem value={value}>#{value} (current)</MenuItem>}
+    </TextField>
+  );
+}
+
+function ContactFieldRows({ rows, onChange, fields, disabled, error }) {
+  const update = (index, key, value) => onChange(rows.map((row, at) => (at === index ? { ...row, [key]: value } : row)));
+  return (
+    <Stack spacing={1.25}>
+      <Typography variant="subtitle2" sx={{ fontWeight: 800, color: NAVY }}>Contact fields to set</Typography>
+      {rows.map((row, index) => (
+        <Stack key={row.key} direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "flex-start" }}>
+          <TextField select size="small" label="Contact field" value={row.alias} onChange={(event) => update(index, "alias", event.target.value)}
+            disabled={disabled} fullWidth>
+            {(fields || []).map((field) => <MenuItem key={field.id} value={field.id}>{field.name} ({field.id})</MenuItem>)}
+            {row.alias && !(fields || []).some((field) => field.id === row.alias) && <MenuItem value={row.alias}>{row.alias}</MenuItem>}
+          </TextField>
+          <TextField size="small" label="Value" value={row.value} onChange={(event) => update(index, "value", event.target.value)} disabled={disabled} fullWidth />
+          <IconButton size="small" aria-label={`Remove contact field ${index + 1}`} disabled={disabled || rows.length === 1}
+            onClick={() => onChange(rows.filter((_, at) => at !== index))}>
+            <DeleteOutlineRoundedIcon fontSize="small" />
+          </IconButton>
+        </Stack>
+      ))}
+      {error && <Typography variant="body2" color="error">{error}</Typography>}
+      <Box>
+        <Button size="small" startIcon={<AddRoundedIcon />} disabled={disabled}
+          onClick={() => onChange([...rows, { key: `row-new-${rows.length}-${Date.now()}`, alias: "", value: "" }])} sx={{ textTransform: "none" }}>
+          Add contact field
+        </Button>
+      </Box>
+      <Typography variant="caption" color="text.secondary">Email, consent and system fields are never offered.</Typography>
+    </Stack>
+  );
+}
+
+function ActionPanel({ editing, draft, setDraft, errors, setErrors, types, tags, references, saving, onSave, onCancel }) {
   const isNew = !editing.action;
   const locked = editing.action?.settingsLocked || "";
   const type = types.find((entry) => entry.type === draft.type) || {};
@@ -111,6 +167,76 @@ function ActionPanel({ editing, draft, setDraft, errors, setErrors, types, tags,
             <TagPicker label="Remove tags" value={draft.removeTags} onChange={(ids) => set("removeTags", ids)} tags={tags} disabled={Boolean(locked)} error={errors.removeTags} />
           </>
         )}
+        {draft.type === COMPANY_SCORE && (
+          <TextField label="Change the company score by" value={draft.score} onChange={(event) => set("score", event.target.value)}
+            disabled={Boolean(locked)} error={Boolean(errors.score)} helperText={errors.score || "Use a negative number to subtract."} fullWidth />
+        )}
+        {draft.type === UPDATE_CONTACT && (
+          <ContactFieldRows rows={draft.fieldValues} onChange={(rows) => set("fieldValues", rows)} fields={references.contactFields}
+            disabled={Boolean(locked)} error={errors.fieldValues} />
+        )}
+        {draft.type === ASSET && (
+          <ReferenceSelect label="Asset to download" value={draft.assetId} onChange={(value) => set("assetId", value)} rows={references.assets}
+            disabled={Boolean(locked)} error={errors.assetId} empty="Choose a published asset" helperText="The download starts after the visitor submits." />
+        )}
+        {draft.type === RESULTS_EMAIL && (
+          <>
+            <TextField label="Subject" value={draft.subject} onChange={(event) => set("subject", event.target.value)} required fullWidth
+              disabled={Boolean(locked)} error={Boolean(errors.subject)} helperText={errors.subject || ""} />
+            <TextField label="To" value={draft.to} onChange={(event) => set("to", event.target.value)} fullWidth disabled={Boolean(locked)}
+              error={Boolean(errors.to)} helperText={errors.to || "Team addresses, separated by commas. A copy is never sent to the contact."} />
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField label="Cc" value={draft.cc} onChange={(event) => set("cc", event.target.value)} fullWidth disabled={Boolean(locked)}
+                error={Boolean(errors.cc)} helperText={errors.cc || ""} />
+              <TextField label="Bcc" value={draft.bcc} onChange={(event) => set("bcc", event.target.value)} fullWidth disabled={Boolean(locked)}
+                error={Boolean(errors.bcc)} helperText={errors.bcc || ""} />
+            </Stack>
+            <FormControlLabel control={<Switch checked={draft.emailToOwner} onChange={(event) => set("emailToOwner", event.target.checked)} disabled={Boolean(locked)} />}
+              label="Also email the contact's owner" />
+            <FormControlLabel control={<Switch checked={draft.replyToSubmitter} onChange={(event) => set("replyToSubmitter", event.target.checked)} disabled={Boolean(locked)} />}
+              label="Replies go to the person who submitted" />
+            <TextField label="Message" value={draft.message} onChange={(event) => set("message", event.target.value)} fullWidth multiline minRows={4}
+              disabled={Boolean(locked)} error={Boolean(errors.message)}
+              helperText={errors.message || "HTML allowed. Use {formfield=alias} for submitted values; leave blank for Mautic's default list of all fields."} />
+          </>
+        )}
+        {draft.type === USER_EMAIL && (
+          <>
+            <ReferenceSelect label="Email to send" value={draft.emailId} onChange={(value) => set("emailId", value)} rows={references.emails}
+              disabled={Boolean(locked)} error={errors.emailId} empty="Choose a published email" />
+            <Autocomplete
+              multiple
+              options={references.users || []}
+              value={draft.userIds.map((id) => (references.users || []).find((user) => String(user.id) === id) || { id, name: `User ${id}` })}
+              onChange={(_, chosen) => set("userIds", chosen.map((user) => String(user.id)))}
+              getOptionLabel={(user) => user.name}
+              isOptionEqualToValue={(a, b) => String(a.id) === String(b.id)}
+              disabled={Boolean(locked)}
+              renderInput={(params) => (
+                <TextField {...params} label="Mautic users" error={Boolean(errors.userIds)}
+                  helperText={errors.userIds || "The email goes to these users only — never to the contact."} />
+              )}
+            />
+          </>
+        )}
+        {draft.type === REPOST && (
+          <>
+            <TextField label="Post to (https://)" value={draft.postUrl} onChange={(event) => set("postUrl", event.target.value)} required fullWidth
+              disabled={Boolean(locked)} error={Boolean(errors.postUrl)} helperText={errors.postUrl || "A public https:// address, such as a CRM webhook."} />
+            <TextField label="Notify this address if posting fails" value={draft.failureEmail} onChange={(event) => set("failureEmail", event.target.value)}
+              fullWidth disabled={Boolean(locked)} error={Boolean(errors.failureEmail)} helperText={errors.failureEmail || "Optional."} />
+            <TextField label="Authorization header" value={draft.authorizationHeader} type="password" autoComplete="off"
+              onChange={(event) => set("authorizationHeader", event.target.value)} fullWidth disabled={Boolean(locked)}
+              error={Boolean(errors.authorizationHeader)}
+              helperText={errors.authorizationHeader || (editing.action?.hasAuthorizationHeader
+                ? "A header is saved and never shown. Leave blank to keep it."
+                : "Optional, for example: Bearer <token>. It is never shown again.")} />
+            {editing.action?.hasAuthorizationHeader && (
+              <FormControlLabel control={<Switch checked={draft.clearHeader} onChange={(event) => set("clearHeader", event.target.checked)} disabled={Boolean(locked)} />}
+                label="Remove the saved authorization header" />
+            )}
+          </>
+        )}
         {draft.type === POINTS && (
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <TextField select label="Change" value={draft.operator} onChange={(event) => set("operator", event.target.value)}
@@ -136,7 +262,10 @@ function ActionPanel({ editing, draft, setDraft, errors, setErrors, types, tags,
 }
 
 export default function NewsletterFormActionBuilder({ form, onFormChange, onDirtyChange }) {
-  const [metadata, setMetadata] = useState({ actionTypes: DEFAULT_ACTION_TYPES, tags: [], note: "", error: "" });
+  const [metadata, setMetadata] = useState({
+    actionTypes: DEFAULT_ACTION_TYPES, tags: [], users: [], emails: [], assets: [], contactFields: [], note: "", error: "",
+  });
+  const [removing, setRemoving] = useState(null); // { action, busy, error }
   const [editing, setEditing] = useState(null); // { action } (null action = new)
   const [draft, setDraft] = useState(null);
   const [errors, setErrors] = useState({});
@@ -156,6 +285,10 @@ export default function NewsletterFormActionBuilder({ form, onFormChange, onDirt
       .then((data) => active && setMetadata({
         actionTypes: Array.isArray(data?.actionTypes) && data.actionTypes.length ? data.actionTypes : DEFAULT_ACTION_TYPES,
         tags: Array.isArray(data?.tags) ? data.tags : [],
+        users: Array.isArray(data?.users) ? data.users : [],
+        emails: Array.isArray(data?.emails) ? data.emails : [],
+        assets: Array.isArray(data?.assets) ? data.assets : [],
+        contactFields: Array.isArray(data?.contactFields) ? data.contactFields : [],
         note: data?.policyNote || "",
         error: "",
       }))
@@ -234,6 +367,23 @@ export default function NewsletterFormActionBuilder({ form, onFormChange, onDirt
   };
 
   const move = (index, delta) => setOrder(moveItem(shownActions.map((action) => action.id), index, delta));
+  const names = useMemo(() => ({ users: byId(metadata.users), emails: byId(metadata.emails), assets: byId(metadata.assets) }), [metadata]);
+
+  const removeAction = async () => {
+    const { action } = removing;
+    setRemoving((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const saved = await deleteNewsletterFormAction(form.id, action.id);
+      setRemoving(null);
+      if (editing?.action?.id === action.id) close();
+      onFormChange(saved);
+      setNotice({ severity: "success", message: `Submit action “${action.name || action.typeLabel}” removed and confirmed in Mautic.` });
+    } catch (err) {
+      const data = err?.response?.data;
+      if (data?.form?.id) onFormChange(data.form);
+      setRemoving((current) => ({ ...current, busy: false, error: getErrorMessage(err, "The submit action could not be removed.") }));
+    }
+  };
 
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: CARD_BORDER }}>
@@ -242,7 +392,7 @@ export default function NewsletterFormActionBuilder({ form, onFormChange, onDirt
           <Box sx={{ minWidth: 0 }}>
             <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 850, color: NAVY }}>Submission Actions ({actions.length})</Typography>
             <Typography variant="body2" color="text.secondary">
-              {metadata.note || "Run when a visitor submits the Form. Each change is saved straight to Mautic; actions cannot be removed here."}
+              Run when a visitor submits the Form. Each change is saved straight to Mautic. {metadata.note}
             </Typography>
           </Box>
           <Button variant="outlined" startIcon={<AddRoundedIcon />} onClick={() => open(null, TAGS)}
@@ -264,7 +414,7 @@ export default function NewsletterFormActionBuilder({ form, onFormChange, onDirt
                   sx={{ p: 1.25, border: 1, borderColor: warning ? "warning.main" : editing?.action?.id === action.id ? "primary.main" : CARD_BORDER, borderRadius: 1.5, minWidth: 0 }}>
                   <Box sx={{ minWidth: 0, flex: 1 }}>
                     <Typography sx={{ fontWeight: 700, wordBreak: "break-word" }}>{action.name || action.typeLabel}</Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-word" }}>{describeAction(action)}</Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ wordBreak: "break-word" }}>{describeAction(action, names)}</Typography>
                     <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
                       <Chip size="small" label={action.typeLabel || action.type} />
                       {warning && <Chip size="small" color="warning" icon={<WarningAmberRoundedIcon />} label={action.policyReason} />}
@@ -287,6 +437,12 @@ export default function NewsletterFormActionBuilder({ form, onFormChange, onDirt
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                     </span></Tooltip>
+                    <Tooltip title="Remove action"><span>
+                      <IconButton size="small" aria-label={`Remove ${action.name || action.typeLabel}`} disabled={saving || orderDirty || Boolean(removing)}
+                        onClick={() => setRemoving({ action, busy: false, error: "" })}>
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </span></Tooltip>
                   </Stack>
                 </Stack>
               );
@@ -307,9 +463,26 @@ export default function NewsletterFormActionBuilder({ form, onFormChange, onDirt
 
         {editing && draft && (
           <ActionPanel editing={editing} draft={draft} setDraft={setDraft} errors={errors} setErrors={setErrors} types={types}
-            tags={metadata.tags} saving={saving} onSave={save} onCancel={() => (draftDirty ? setPendingSwitch({ close: true }) : close())} />
+            tags={metadata.tags} references={metadata} saving={saving} onSave={save} onCancel={() => (draftDirty ? setPendingSwitch({ close: true }) : close())} />
         )}
       </Stack>
+
+      <Dialog open={Boolean(removing)} onClose={() => !removing?.busy && setRemoving(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Remove submit action “{removing?.action.name || removing?.action.typeLabel}”?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5}>
+            <Typography color="text.secondary">New submissions will no longer run it. Past submissions are not changed.</Typography>
+            {removing?.error && <Alert severity="error">{removing.error}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemoving(null)} disabled={removing?.busy}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={removeAction} disabled={removing?.busy}
+            startIcon={removing?.busy ? <CircularProgress size={16} color="inherit" /> : null}>
+            Remove action
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={Boolean(pendingSwitch)} onClose={() => setPendingSwitch(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Discard action changes?</DialogTitle>

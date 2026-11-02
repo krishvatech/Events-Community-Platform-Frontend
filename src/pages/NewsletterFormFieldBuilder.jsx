@@ -1,12 +1,13 @@
 // Form Field Builder inside the Forms editor. Every save is one provider write
-// (add, change or re-order) that the backend confirms against Mautic before
-// this list updates; nothing is shown as saved until then.
+// (add, change, re-order or remove) that the backend confirms against Mautic
+// before this list updates; nothing is shown as saved until then.
 
 import React, { useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -32,6 +33,7 @@ import LockRoundedIcon from "@mui/icons-material/LockRounded";
 
 import {
   createNewsletterFormField,
+  deleteNewsletterFormField,
   getNewsletterFormBuilderMetadata,
   reorderNewsletterFormFields,
   updateNewsletterFormField,
@@ -106,11 +108,58 @@ function OptionsEditor({ options, onChange, error }) {
   );
 }
 
+function SettingsEditor({ capability, settings, onChange, errors }) {
+  return (capability.settings || []).map((setting) => {
+    const value = settings?.[setting.key];
+    const common = {
+      label: setting.label,
+      fullWidth: true,
+      error: Boolean(errors[setting.key]),
+      helperText: errors[setting.key] || (setting.kind === "html" ? "Plain HTML formatting. Scripts and event handlers are refused." : ""),
+    };
+    if (setting.kind === "extensions") {
+      return (
+        <TextField
+          key={setting.key}
+          {...common}
+          select
+          value={Array.isArray(value) ? value : []}
+          onChange={(event) => onChange(setting.key, typeof event.target.value === "string" ? event.target.value.split(",") : event.target.value)}
+          SelectProps={{ multiple: true, renderValue: (selected) => selected.join(", ") }}
+          helperText={errors[setting.key] || "Uploads stay private: only Mautic users can download them."}
+        >
+          {(setting.choices || []).map((choice) => (
+            <MenuItem key={choice} value={choice}>
+              <Checkbox size="small" checked={Array.isArray(value) && value.includes(choice)} sx={{ p: 0.5, mr: 1 }} />
+              {choice}
+            </MenuItem>
+          ))}
+        </TextField>
+      );
+    }
+    return (
+      <TextField
+        key={setting.key}
+        {...common}
+        value={value ?? ""}
+        onChange={(event) => onChange(setting.key, event.target.value)}
+        multiline={setting.kind === "html"}
+        minRows={setting.kind === "html" ? 5 : undefined}
+        inputProps={setting.kind === "integer" ? { inputMode: "numeric" } : undefined}
+      />
+    );
+  });
+}
+
 function FieldPanel({ editing, draft, setDraft, errors, setErrors, types, contactFields, fields, saving, onSave, onCancel }) {
   const isNew = !editing.field;
   const capability = capabilityFor(types, draft.type) || {};
   const set = (key, value) => {
     setDraft((current) => ({ ...current, [key]: value }));
+    setErrors((current) => ({ ...current, [key]: "" }));
+  };
+  const setSetting = (key, value) => {
+    setDraft((current) => ({ ...current, settings: { ...current.settings, [key]: value } }));
     setErrors((current) => ({ ...current, [key]: "" }));
   };
   const compatible = contactFields.filter((field) => field.fieldTypes.includes(draft.type));
@@ -220,6 +269,7 @@ function FieldPanel({ editing, draft, setDraft, errors, setErrors, types, contac
         {capability.options && (
           <OptionsEditor options={draft.options} onChange={(options) => set("options", options)} error={errors.options} />
         )}
+        <SettingsEditor capability={capability} settings={draft.settings} onChange={setSetting} errors={errors} />
         {capability.defaultValue && (capability.options ? (
           <TextField
             select
@@ -298,6 +348,8 @@ export default function NewsletterFormFieldBuilder({ form, onFormChange, onDirty
   const [order, setOrder] = useState(null); // pending field id order
   const [notice, setNotice] = useState(null);
   const [pendingSwitch, setPendingSwitch] = useState(null);
+  // { field, submissions: null | n, understood, busy, error }
+  const [removing, setRemoving] = useState(null);
 
   const fields = useMemo(() => (Array.isArray(form?.fields) ? form.fields : []), [form]);
   const savedOrder = fields.map((field) => field.id);
@@ -319,7 +371,7 @@ export default function NewsletterFormFieldBuilder({ form, onFormChange, onDirty
     };
   }, []);
 
-  const baseline = editing ? (editing.field ? fieldToDraft(editing.field) : blankFieldDraft(editing.type)) : null;
+  const baseline = editing ? (editing.field ? fieldToDraft(editing.field) : blankFieldDraft(editing.type, types)) : null;
   const draftDirty = Boolean(editing && draft && !draftsEqual(draft, baseline));
   const orderDirty = Boolean(order && order.join() !== savedOrder.join());
 
@@ -334,7 +386,7 @@ export default function NewsletterFormFieldBuilder({ form, onFormChange, onDirty
       return;
     }
     setEditing(next);
-    setDraft(field ? fieldToDraft(field) : blankFieldDraft(type));
+    setDraft(field ? fieldToDraft(field) : blankFieldDraft(type, types));
     setErrors({});
     setNotice(null);
   };
@@ -396,6 +448,27 @@ export default function NewsletterFormFieldBuilder({ form, onFormChange, onDirty
 
   const move = (index, delta) => setOrder(moveItem(shownFields.map((field) => field.id), index, delta));
 
+  // Removal is asked once; only when the Form has stored submissions does the
+  // backend refuse (409) until the data loss is confirmed explicitly.
+  const removeField = async () => {
+    const { field, submissions } = removing;
+    setRemoving((current) => ({ ...current, busy: true, error: "" }));
+    try {
+      const saved = await deleteNewsletterFormField(form.id, field.id, { confirm: submissions > 0 });
+      setRemoving(null);
+      if (editing?.field?.id === field.id) close();
+      applySaved(saved, `Field “${field.label || field.alias}” removed and confirmed in Mautic.`);
+    } catch (err) {
+      const data = err?.response?.data;
+      if (data?.code === "form_field_removal_unconfirmed") {
+        setRemoving((current) => ({ ...current, busy: false, submissions: data.submissions || 1, understood: false }));
+        return;
+      }
+      if (data?.form?.id) onFormChange(data.form);
+      setRemoving((current) => ({ ...current, busy: false, error: getErrorMessage(err, "The field could not be removed.") }));
+    }
+  };
+
   return (
     <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: CARD_BORDER }}>
       <Stack spacing={2}>
@@ -403,7 +476,7 @@ export default function NewsletterFormFieldBuilder({ form, onFormChange, onDirty
           <Box sx={{ minWidth: 0 }}>
             <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 850, color: NAVY }}>Form Fields ({fields.length})</Typography>
             <Typography variant="body2" color="text.secondary">
-              Each change is saved straight to Mautic. Fields cannot be removed here.
+              Each change is saved straight to Mautic.
             </Typography>
           </Box>
           <Button
@@ -474,6 +547,18 @@ export default function NewsletterFormFieldBuilder({ form, onFormChange, onDirty
                       </IconButton>
                     </span>
                   </Tooltip>
+                  <Tooltip title="Remove field">
+                    <span>
+                      <IconButton
+                        size="small"
+                        aria-label={`Remove ${field.label || field.alias}`}
+                        disabled={!editable || saving || orderDirty || Boolean(removing)}
+                        onClick={() => setRemoving({ field, submissions: null, understood: false, busy: false, error: "" })}
+                      >
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
                 </Stack>
               </Stack>
             ))}
@@ -511,6 +596,43 @@ export default function NewsletterFormFieldBuilder({ form, onFormChange, onDirty
         )}
       </Stack>
 
+      <Dialog open={Boolean(removing)} onClose={() => !removing?.busy && setRemoving(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Remove field “{removing?.field.label || removing?.field.alias}”?</DialogTitle>
+        <DialogContent>
+          <Stack spacing={1.5}>
+            {removing?.submissions > 0 ? (
+              <>
+                <Alert severity="warning">
+                  This Form has {removing.submissions} stored submission{removing.submissions === 1 ? "" : "s"}. Mautic permanently
+                  deletes this field's value from every one of them. This cannot be undone.
+                </Alert>
+                <FormControlLabel
+                  control={<Checkbox checked={removing.understood} onChange={(event) => setRemoving((current) => ({ ...current, understood: event.target.checked }))} />}
+                  label="I understand the stored values of this field will be deleted."
+                />
+              </>
+            ) : (
+              <Typography color="text.secondary">
+                The field is removed from the Form in Mautic. Campaign conditions that check it must be changed first.
+              </Typography>
+            )}
+            {removing?.error && <Alert severity="error">{removing.error}</Alert>}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRemoving(null)} disabled={removing?.busy}>Cancel</Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={removeField}
+            disabled={removing?.busy || (removing?.submissions > 0 && !removing.understood)}
+            startIcon={removing?.busy ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            {removing?.submissions > 0 ? "Remove and delete values" : "Remove field"}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Dialog open={Boolean(pendingSwitch)} onClose={() => setPendingSwitch(null)} maxWidth="xs" fullWidth>
         <DialogTitle>Discard field changes?</DialogTitle>
         <DialogContent>
@@ -527,7 +649,7 @@ export default function NewsletterFormFieldBuilder({ form, onFormChange, onDirty
               close();
               if (!next.close) {
                 setEditing({ field: next.field, type: next.type });
-                setDraft(next.field ? fieldToDraft(next.field) : blankFieldDraft(next.type));
+                setDraft(next.field ? fieldToDraft(next.field) : blankFieldDraft(next.type, types));
               }
             }}
           >

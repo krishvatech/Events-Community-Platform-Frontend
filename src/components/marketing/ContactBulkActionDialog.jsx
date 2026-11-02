@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
   Alert,
+  Autocomplete,
   Button,
   CircularProgress,
   Dialog,
@@ -23,6 +24,7 @@ import {
   listMauticSegments,
   listNewsletterContactOwners,
   listNewsletterMauticCampaigns,
+  listNewsletterTagDirectory,
   runNewsletterContactBulkAction,
 } from "../../services/newsletterService";
 
@@ -33,10 +35,13 @@ export const BULK_ACTIONS = [
   { key: "campaign_add", label: "Add to campaign…", title: "Add to campaign", verb: "Add", target: "campaign" },
   { key: "campaign_remove", label: "Remove from campaign…", title: "Remove from campaign", verb: "Remove", target: "campaign" },
   { key: "owner_set", label: "Change owner…", title: "Change owner", verb: "Change Owner", target: "owner" },
+  { key: "tags_add", label: "Add tags…", title: "Add tags", verb: "Add Tags", target: "tags" },
+  { key: "tags_remove", label: "Remove tags…", title: "Remove tags", verb: "Remove Tags", target: "tags" },
   { key: "dnc_add", label: "Mark as Do Not Contact…", title: "Mark as Do Not Contact", verb: "Mark Do Not Contact", target: null },
 ];
 
-const TARGET_LABELS = { segment: "Segment", campaign: "Campaign", owner: "Owner" };
+const TARGET_LABELS = { segment: "Segment", campaign: "Campaign", owner: "Owner", tags: "Tags" };
+export const MAX_BULK_TAGS = 20;
 const NO_OWNER = "none";
 
 const plural = (count) => `${count} contact${count === 1 ? "" : "s"}`;
@@ -47,8 +52,9 @@ export const manualSegments = (segments) =>
     (segment) => segment?.is_static && !segment?.managed_by_subscription_list
   );
 
-export const bulkPayload = ({ action, contactIds, targetId, reason }) => {
+export const bulkPayload = ({ action, contactIds, targetId, reason, tags = [] }) => {
   const payload = { action, contact_ids: contactIds };
+  if (action.startsWith("tags_")) payload.tags = tags;
   if (action.startsWith("segment_")) payload.segment_id = targetId;
   if (action.startsWith("campaign_")) payload.campaign_id = targetId;
   if (action === "owner_set") payload.owner_id = targetId === NO_OWNER ? null : targetId;
@@ -64,6 +70,8 @@ export const describeBulkAction = (action, count, targetName) => {
     case "campaign_add": return `Add ${who} to the campaign "${targetName}". They start its events as Mautic runs them.`;
     case "campaign_remove": return `Remove ${who} from the campaign "${targetName}". Mautic stops their remaining events.`;
     case "owner_set": return targetName === "No owner" ? `Clear the owner of ${who}.` : `Make ${targetName} the owner of ${who}.`;
+    case "tags_add": return `Add the tags ${targetName} to ${who}. Tags that do not exist yet are created.`;
+    case "tags_remove": return `Remove the tags ${targetName} from ${who}. Segments and campaigns that use these tags will see the change.`;
     case "dnc_add": return `Mark ${who} as Do Not Contact for email. Mautic will stop sending them marketing email.`;
     default: return "";
   }
@@ -94,6 +102,10 @@ async function loadChoices(target) {
     }));
     return [{ id: NO_OWNER, name: "No owner" }, ...owners];
   }
+  if (target === "tags") {
+    const data = await listNewsletterTagDirectory({ page: 1, page_size: 100 });
+    return (Array.isArray(data?.results) ? data.results : []).map((tag) => ({ id: String(tag.tag), name: String(tag.tag) }));
+  }
   return [];
 }
 
@@ -109,6 +121,7 @@ export default function ContactBulkActionDialog({ open, action, contactIds = [],
   const [choicesError, setChoicesError] = useState("");
   const [targetId, setTargetId] = useState("");
   const [reason, setReason] = useState("");
+  const [tags, setTags] = useState([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [result, setResult] = useState(null);
@@ -117,6 +130,7 @@ export default function ContactBulkActionDialog({ open, action, contactIds = [],
     if (!open || !meta) return undefined;
     setTargetId("");
     setReason("");
+    setTags([]);
     setError("");
     setResult(null);
     setChoices([]);
@@ -135,7 +149,10 @@ export default function ContactBulkActionDialog({ open, action, contactIds = [],
 
   if (!meta) return null;
 
-  const target = choices.find((choice) => choice.id === targetId);
+  const tagMode = meta.target === "tags";
+  const target = tagMode
+    ? (tags.length ? { name: tags.map((tag) => `"${tag}"`).join(", ") } : null)
+    : choices.find((choice) => choice.id === targetId);
   const ready = !meta.target || Boolean(target);
   const count = contactIds.length;
 
@@ -149,7 +166,7 @@ export default function ContactBulkActionDialog({ open, action, contactIds = [],
     setBusy(true);
     setError("");
     try {
-      setResult(await runNewsletterContactBulkAction(bulkPayload({ action, contactIds, targetId, reason })));
+      setResult(await runNewsletterContactBulkAction(bulkPayload({ action, contactIds, targetId, reason, tags })));
     } catch (err) {
       setError(errorMessage(err, "The bulk action failed. Nothing more was changed."));
     } finally {
@@ -185,7 +202,23 @@ export default function ContactBulkActionDialog({ open, action, contactIds = [],
           <Stack spacing={2} sx={{ pt: 1 }}>
             {error && <Alert severity="error">{error}</Alert>}
             {choicesError && <Alert severity="error">{choicesError}</Alert>}
-            {meta.target && (
+            {tagMode && (
+              <Autocomplete
+                multiple
+                freeSolo={action === "tags_add"}
+                options={choices.map((choice) => choice.name)}
+                value={tags}
+                onChange={(_, chosen) => setTags(
+                  chosen.map((tag) => String(tag).trim()).filter((tag) => tag && !tag.startsWith("-")).slice(0, MAX_BULK_TAGS)
+                )}
+                disabled={busy || choicesLoading}
+                renderInput={(params) => (
+                  <TextField {...params} size="small" label="Tags"
+                    helperText={action === "tags_add" ? "Choose tags or type a new one and press Enter." : "Choose the tags to remove."} />
+                )}
+              />
+            )}
+            {meta.target && !tagMode && (
               <FormControl size="small" fullWidth disabled={busy || choicesLoading}>
                 <InputLabel id="contact-bulk-target-label">{TARGET_LABELS[meta.target]}</InputLabel>
                 <Select
@@ -223,7 +256,7 @@ export default function ContactBulkActionDialog({ open, action, contactIds = [],
               />
             )}
             {ready && (
-              <Alert severity={action === "dnc_add" || action === "campaign_remove" ? "warning" : "info"}>
+              <Alert severity={["dnc_add", "campaign_remove", "tags_remove"].includes(action) ? "warning" : "info"}>
                 {describeBulkAction(action, count, target?.name)}
                 {action === "dnc_add" ? " It can only be removed contact by contact." : ""}
               </Alert>

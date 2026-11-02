@@ -188,6 +188,62 @@ export const createNativeMauticCampaign = createNewsletterMauticCampaign;
 
 export const updateNativeMauticCampaign = updateNewsletterMauticCampaign;
 
+// Company CSV import on Mautic's own import queue, and company export.
+const adminCompanyImportsEndpoint = "/newsletter/admin/companies/imports/";
+const adminCompanyExportsEndpoint = "/newsletter/admin/companies/exports/";
+const companyImportForm = (file, extra = {}) => {
+  const form = new FormData();
+  form.append("file", file);
+  Object.entries(extra).forEach(([key, value]) => form.append(key, typeof value === "string" ? value : JSON.stringify(value)));
+  return form;
+};
+const multipartBody = { headers: { "Content-Type": "multipart/form-data" } };
+
+export const previewNewsletterCompanyImport = (file, mapping) =>
+  unwrap(apiClient.post(`${adminCompanyImportsEndpoint}preview/`, companyImportForm(file, mapping ? { mapping } : {}), multipartBody));
+
+export const startNewsletterCompanyImport = (file, mapping, mode) =>
+  unwrap(apiClient.post(adminCompanyImportsEndpoint, companyImportForm(file, { mapping, mode }), multipartBody));
+
+export const listNewsletterCompanyImports = () => unwrap(apiClient.get(adminCompanyImportsEndpoint));
+
+export const startNewsletterCompanyExport = (format, search = "") =>
+  unwrap(apiClient.post(adminCompanyExportsEndpoint, { format, search }));
+
+export const listNewsletterCompanyExports = () => unwrap(apiClient.get(adminCompanyExportsEndpoint));
+
+export const deleteNewsletterCompanyExport = (jobId) =>
+  unwrap(apiClient.delete(`${adminCompanyExportsEndpoint}${encodeURIComponent(jobId)}/`));
+
+/** The finished file as a Blob. */
+export const downloadNewsletterCompanyExport = (jobId) =>
+  unwrap(apiClient.get(`${adminCompanyExportsEndpoint}${encodeURIComponent(jobId)}/download/`, { responseType: "blob" }));
+
+// One published template to one contact (refused for email Do Not Contact).
+export const sendNewsletterContactEmail = (mauticContactId, emailId) =>
+  unwrap(apiClient.post(`/newsletter/admin/contacts/${encodeURIComponent(mauticContactId)}/send-email/`, { emailId }));
+
+// Reply-To, UTM tags and attachments live on the broadcast's Mautic email.
+export const getNewsletterCampaignDeliveryOptions = (campaignUuid) =>
+  unwrap(apiClient.get(`${adminCampaignsEndpoint}${campaignUuid}/delivery-options/`));
+
+export const updateNewsletterCampaignDeliveryOptions = (campaignUuid, payload) =>
+  unwrap(apiClient.patch(`${adminCampaignsEndpoint}${campaignUuid}/delivery-options/`, payload));
+
+// Clicks per tracked link (summed across A/B and language versions).
+export const getNewsletterCampaignLinkClicks = (campaignUuid) =>
+  unwrap(apiClient.get(`${adminCampaignsEndpoint}${campaignUuid}/link-clicks/`));
+
+export const getNewsletterTemplateLinkClicks = (templateId) =>
+  unwrap(apiClient.get(`${adminTemplatesEndpoint}${templateId}/link-clicks/`));
+
+// Read-only: contacts currently in the Campaign (paged) and per-step counts.
+export const getNativeMauticCampaignContacts = (campaignId, params = {}) =>
+  unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}${campaignId}/contacts/`, { params }));
+
+export const getNativeMauticCampaignStats = (campaignId) =>
+  unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}${campaignId}/stats/`));
+
 export const duplicateNativeMauticCampaign = (campaignId) =>
   unwrap(apiClient.post(`${adminMauticCampaignsEndpoint}${campaignId}/duplicate/`));
 
@@ -258,7 +314,7 @@ export const unpublishNewsletterForm = (formId) =>
 export const deleteNewsletterForm = (formId) =>
   unwrap(apiClient.delete(`${adminFormsEndpoint}${formId}/`));
 
-// Form Field Builder: add, change and re-order supported fields (no delete).
+// Form Field Builder: add, change, re-order and remove fields.
 export const getNewsletterFormBuilderMetadata = () =>
   unwrap(apiClient.get(`${adminFormsEndpoint}builder/`));
 
@@ -271,7 +327,13 @@ export const updateNewsletterFormField = (formId, fieldId, payload) =>
 export const reorderNewsletterFormFields = (formId, order) =>
   unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/fields/reorder/`, { order }));
 
-// Form submit actions: tags and points only (no delete); see newsletterFormActions.js.
+// Mautic deletes the field's stored submission values with it: with stored
+// submissions the backend answers 409 form_field_removal_unconfirmed (and the
+// count) until `confirm` is sent.
+export const deleteNewsletterFormField = (formId, fieldId, { confirm = false } = {}) =>
+  unwrap(apiClient.delete(`${adminFormsEndpoint}${formId}/fields/${fieldId}/`, { data: confirm ? { confirm: true } : {} }));
+
+// Form submit actions (see newsletterFormActions.js); any action may be removed.
 export const getNewsletterFormActionMetadata = () =>
   unwrap(apiClient.get(`${adminFormsEndpoint}actions/metadata/`));
 
@@ -284,12 +346,29 @@ export const updateNewsletterFormAction = (formId, actionId, payload) =>
 export const reorderNewsletterFormActions = (formId, order) =>
   unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/actions/reorder/`, { order }));
 
+export const deleteNewsletterFormAction = (formId, actionId) =>
+  unwrap(apiClient.delete(`${adminFormsEndpoint}${formId}/actions/${actionId}/`));
+
 // Read-only. Submissions hold personal data: the backend never caches them.
 export const listNewsletterFormSubmissions = (formId, params = {}) =>
   unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/submissions/`, { params }));
 
 export const getNewsletterFormSubmission = (formId, submissionId) =>
   unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/submissions/${submissionId}/`));
+
+// Submission export (CSV or Excel), built in the background like the report export.
+export const startNewsletterFormSubmissionExport = (formId, format) =>
+  unwrap(apiClient.post(`${adminFormsEndpoint}${formId}/submissions/exports/`, { format }));
+
+export const listNewsletterFormSubmissionExports = (formId) =>
+  unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/submissions/exports/`));
+
+export const deleteNewsletterFormSubmissionExport = (jobId) =>
+  unwrap(apiClient.delete(`/newsletter/admin/form-submission-exports/${encodeURIComponent(jobId)}/`));
+
+/** The finished file as a Blob. */
+export const downloadNewsletterFormSubmissionExport = (jobId) =>
+  unwrap(apiClient.get(`/newsletter/admin/form-submission-exports/${encodeURIComponent(jobId)}/download/`, { responseType: "blob" }));
 
 export const getNewsletterFormUsage = (formId) =>
   unwrap(apiClient.get(`${adminFormsEndpoint}${formId}/usage/`));

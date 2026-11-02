@@ -25,6 +25,8 @@ import {
   downloadNewsletterReportExport,
   listMarketingNotifications,
   markMarketingNotificationsRead,
+  downloadNewsletterFormSubmissionExport,
+  downloadNewsletterCompanyExport,
 } from "../../services/newsletterService";
 import { saveBlob } from "./saveBlob";
 
@@ -48,6 +50,8 @@ const formatWhen = (value) => {
 const DOWNLOADERS = {
   marketing_contact_export: downloadNewsletterContactExport,
   marketing_report_export: downloadNewsletterReportExport,
+  marketing_form_submission_export: downloadNewsletterFormSubmissionExport,
+  marketing_company_export: downloadNewsletterCompanyExport,
 };
 const isDownloadable = (n) => Boolean(DOWNLOADERS[n.type]) && n.data?.status === "done" && n.data?.job_id;
 

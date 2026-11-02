@@ -22,8 +22,11 @@ import PreviewRoundedIcon from "@mui/icons-material/PreviewRounded";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 import { Link as RouterLink, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
-import { getNewsletterTemplate } from "../services/newsletterService";
+import { getNewsletterTemplate,
+  getNewsletterTemplateLinkClicks,
+} from "../services/newsletterService";
 import EmailPreviewFrame from "../components/marketing/EmailPreviewFrame.jsx";
+import { EmailLinkClicksPanel } from "../components/marketing/EmailDeliveryOptions.jsx";
 import {
   CARD_BORDER,
   NAVY,
@@ -321,6 +324,18 @@ export default function AdminNewsletterTemplateDetailsPage() {
       <Box ref={testSendRef} id="test-send">
         <TemplateTestSendPanel template={template} inputRef={testSendInput} />
       </Box>
+
+      <Section title="Delivery options">
+        <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" } }}>
+          <Field label="Reply-To">{template.replyToAddress || "Sender address"}</Field>
+          <Field label="UTM tags">
+            {Object.entries(template.utmTags || {}).filter(([, value]) => value).map(([key, value]) => `${key.replace("utm", "utm_").toLowerCase()}=${value}`).join(" · ") || "None"}
+          </Field>
+          <Field label="Attachments">{(template.assetAttachments || []).map((asset) => asset.title).join(", ") || "None"}</Field>
+        </Box>
+      </Section>
+
+      <EmailLinkClicksPanel key={template.id} load={() => getNewsletterTemplateLinkClicks(template.id)} />
 
       <TemplateDeleteDialog
         template={template}

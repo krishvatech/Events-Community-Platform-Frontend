@@ -25,15 +25,32 @@ export const DEFAULT_FIELD_TYPES = [
   mapping: type !== "button",
   precision: type === "number",
   multiple: type === "select",
+  input: !["button", "hidden"].includes(type),
+  settings: [],
 }));
 
 export const capabilityFor = (types, type) =>
   (types || DEFAULT_FIELD_TYPES).find((entry) => entry.type === type) || null;
 
+// Type-specific settings (slider range, upload limits, captcha answer, text or
+// HTML content, page-break buttons): the backend catalogue lists them per type
+// as `settings`, and saved fields carry them under the same keys.
+export const SETTING_KEYS = [
+  "minValue", "maxValue", "step", "allowedExtensions", "maxFileSize",
+  "captchaAnswer", "errorMessage", "content", "nextLabel", "prevLabel",
+];
+// Mirrors the backend's active-content check for Form text and HTML blocks.
+const ACTIVE_CONTENT = /<\s*(script|object|embed|applet|base|frame|frameset)\b|<[^>]*?[\s/"']on[a-z]+\s*=|srcdoc\s*=|=\s*["']?\s*(javascript|vbscript)\s*:/i;
+
+const settingValue = (value) => (Array.isArray(value) ? [...value] : String(value ?? ""));
+
+export const defaultSettings = (types, type) =>
+  Object.fromEntries((capabilityFor(types, type)?.settings || []).map((setting) => [setting.key, settingValue(setting.default)]));
+
 let optionKey = 0;
 const withKey = (option) => ({ ...option, key: option.key || `option-${(optionKey += 1)}` });
 
-export const blankFieldDraft = (type = "text") => ({
+export const blankFieldDraft = (type = "text", types) => ({
   type,
   label: "",
   alias: "",
@@ -46,6 +63,7 @@ export const blankFieldDraft = (type = "text") => ({
   precision: "",
   multiple: false,
   options: OPTION_TYPES.has(type) ? [withKey({ label: "", value: "" })] : [],
+  settings: defaultSettings(types, type),
 });
 
 /** The editable state of a saved field (as the backend normalises it). */
@@ -62,6 +80,7 @@ export const fieldToDraft = (field) => ({
   precision: field.precision || "",
   multiple: Boolean(field.multiple),
   options: (field.options || []).map((option) => withKey({ label: option.label, value: option.value })),
+  settings: Object.fromEntries(SETTING_KEYS.filter((key) => key in field).map((key) => [key, settingValue(field[key])])),
 });
 
 /**
@@ -81,6 +100,7 @@ export function changeDraftType(draft, type, types) {
     next.options = draft.options.length ? draft.options : [withKey({ label: "", value: "" })];
   }
   if (!capability.defaultValue) next.defaultValue = "";
+  next.settings = defaultSettings(types, type);
   return next;
 }
 
@@ -154,6 +174,29 @@ export function validateFieldDraft(draft, { isNew, fields = [], types, contactFi
     }
   }
 
+  for (const setting of capability.settings || []) {
+    const value = draft.settings?.[setting.key];
+    if (setting.kind === "integer") {
+      const text = String(value ?? "").trim();
+      const low = setting.min ?? -1000000;
+      const high = setting.max ?? 1000000;
+      if (!/^-?\d+$/.test(text) || Number(text) < low || Number(text) > high) errors[setting.key] = `Use a whole number from ${low} to ${high}.`;
+    } else if (setting.kind === "extensions") {
+      if (!Array.isArray(value) || !value.length) errors[setting.key] = "Choose at least one file type.";
+    } else if (setting.kind === "html") {
+      const text = String(value ?? "");
+      if (setting.maxLength && text.length > setting.maxLength) errors[setting.key] = `Use ${setting.maxLength} characters or fewer.`;
+      else if (ACTIVE_CONTENT.test(text)) errors[setting.key] = "Scripts, event handlers and script links are not allowed: Forms are embedded on other sites.";
+    } else if (String(value ?? "").trim().length > TEXT_MAX_LENGTH) {
+      errors[setting.key] = `Use ${TEXT_MAX_LENGTH} characters or fewer.`;
+    }
+  }
+  if (draft.type === "slider" && !errors.minValue && !errors.maxValue && !errors.step) {
+    const [low, high, step] = ["minValue", "maxValue", "step"].map((key) => Number(draft.settings?.[key]));
+    if (low >= high) errors.maxValue = "The maximum must be greater than the minimum.";
+    else if (step < 1 || step > high - low) errors.step = "The step must be at least 1 and fit within the range.";
+  }
+
   if (draft.mappedField) {
     const target = contactFields.find((field) => field.alias === draft.mappedField);
     const taken = fields.find((field) => field.id !== fieldId && field.mappedField === draft.mappedField && (field.mappedObject || "contact") === "contact");
@@ -201,6 +244,12 @@ export function fieldDraftToPayload(draft, original, types) {
     if (before && JSON.stringify(value) === JSON.stringify(cleanValue(key, before[key]))) continue;
     if (!before && (value === "" || value === false)) continue;
     payload[key] = value;
+  }
+  for (const setting of capability?.settings || []) {
+    const value = settingValue(draft.settings?.[setting.key]);
+    const cleaned = Array.isArray(value) ? value : setting.kind === "html" ? value : value.trim();
+    if (before && JSON.stringify(cleaned) === JSON.stringify(settingValue(before.settings?.[setting.key]))) continue;
+    payload[setting.key] = cleaned;
   }
   return payload;
 }
