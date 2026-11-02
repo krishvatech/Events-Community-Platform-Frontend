@@ -1740,9 +1740,11 @@ export default function SaleorManager() {
                     <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
                       {tab === 0 ? "Slug / Currency" : tab === 1 ? "Location" : tab === 2 ? "Info" : tab === 3 ? "Slug" : tab === 4 ? "Last Name" : "Permissions"}
                     </TableCell>
-                    <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
-                      {tab === 4 ? "Email" : tab === 5 ? "Users" : tab === 0 ? "Status" : tab === 1 ? "Status" : tab === 2 ? "Status" : ""}
-                    </TableCell>
+                    {(tab === 4 || tab === 5) && (
+                      <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
+                        {tab === 4 ? "Email" : "Users"}
+                      </TableCell>
+                    )}
                     {tab !== 3 && tab !== 4 && tab !== 5 && (
                       <TableCell sx={{ fontWeight: 700, color: "#4b5563" }}>
                         Status
@@ -1801,28 +1803,20 @@ export default function SaleorManager() {
                           />
                         )}
                       </TableCell>
-                      <TableCell>
-                        {tab === 4 ? (
-                          <Typography variant="body2">{item.email}</Typography>
-                        ) : tab === 5 ? (
-                          <Chip
-                            label={`${item.user_count || 0} User${item.user_count !== 1 ? "s" : ""}`}
-                            size="small"
-                            variant="outlined"
-                            sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }}
-                          />
-                        ) : tab !== 3 ? (
-                          <Chip
-                            label={item.is_active ? "Active" : "Inactive"}
-                            size="small"
-                            sx={{
-                              fontWeight: 600,
-                              bgcolor: item.is_active ? "rgba(16, 185, 129, 0.1)" : "rgba(107, 114, 128, 0.1)",
-                              color: item.is_active ? "#059669" : "#4b5563",
-                            }}
-                          />
-                        ) : null}
-                      </TableCell>
+                      {(tab === 4 || tab === 5) && (
+                        <TableCell>
+                          {tab === 4 ? (
+                            <Typography variant="body2">{item.email}</Typography>
+                          ) : (
+                            <Chip
+                              label={`${item.user_count || 0} User${item.user_count !== 1 ? "s" : ""}`}
+                              size="small"
+                              variant="outlined"
+                              sx={{ bgcolor: "#f0fdf4", color: "#16a34a", borderColor: "#bbf7d0" }}
+                            />
+                          )}
+                        </TableCell>
+                      )}
                       {tab !== 3 && tab !== 4 && tab !== 5 && (
                         <TableCell>
                           <Chip
