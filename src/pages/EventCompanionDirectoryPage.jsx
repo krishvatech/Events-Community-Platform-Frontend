@@ -1717,6 +1717,7 @@ function EventCompanionDirectoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [userInitials, setUserInitials] = useState('');
   const [currentUserId, setCurrentUserId] = useState(null);
+  const [isSuperuser, setIsSuperuser] = useState(false);
   const [networkingSettings, setNetworkingSettings] = useState(null);
   const [activeTab, setActiveTab] = useState(() =>
     new URLSearchParams(location.search).get('tab') === 'meetings' ? 1 :
@@ -1887,6 +1888,7 @@ function EventCompanionDirectoryPage() {
           const initials = (firstName[0] + lastName[0]).toUpperCase();
           setUserInitials(initials);
           setCurrentUserId(user.id);
+          setIsSuperuser(user.is_superuser === true);
         }
       } catch (err) {
         setUserInitials('');
@@ -2432,8 +2434,8 @@ function EventCompanionDirectoryPage() {
           </Box>
         )}
 
-        {/* Eligible event participants can exceed networking-enabled registered profiles. */}
-        {activeTab === 0 && eligibleParticipantCount != null && (
+        {/* Eligible event participants can exceed networking-enabled registered profiles. Superusers only. */}
+        {isSuperuser && activeTab === 0 && eligibleParticipantCount != null && (
           <Typography variant="caption" sx={{ display: "block", px: 2, pt: 1, color: "text.secondary" }}>
             {eligibleParticipantCount} event participants · {allParticipants.filter(p => p.registration_id && p.user_id).length} networking profiles
           </Typography>
