@@ -181,6 +181,10 @@ export const deleteNativeMauticCampaignEvent = (campaignId, eventId) =>
 export const getNativeMauticCampaign = (campaignId) =>
   unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}${campaignId}/`));
 
+// Category, "contacts can restart" and publish window; saved apart from the workflow.
+export const updateNativeMauticCampaignSettings = (campaignId, payload) =>
+  unwrap(apiClient.patch(`${adminMauticCampaignsEndpoint}${campaignId}/settings/`, payload));
+
 export const getNativeMauticCampaignBuilder = (campaignId) =>
   unwrap(apiClient.get(`${adminMauticCampaignsEndpoint}${campaignId}/builder/`));
 
@@ -501,6 +505,16 @@ export const listNewsletterAdminContactNotes = (mauticContactId, params = {}) =>
 
 export const createNewsletterAdminContactNote = (mauticContactId, payload) =>
   unwrap(apiClient.post(`${adminContactsEndpoint}${mauticContactId}/notes/`, payload));
+
+export const updateNewsletterAdminContactNote = (mauticContactId, noteId, payload) =>
+  unwrap(apiClient.patch(`${adminContactsEndpoint}${mauticContactId}/notes/${noteId}/`, payload));
+
+export const deleteNewsletterAdminContactNote = (mauticContactId, noteId) =>
+  unwrap(apiClient.delete(`${adminContactsEndpoint}${mauticContactId}/notes/${noteId}/`));
+
+// Everything Mautic holds about the contact, as a ZIP (data-access requests).
+export const downloadNewsletterAdminContactData = (mauticContactId) =>
+  unwrap(apiClient.get(`${adminContactsEndpoint}${mauticContactId}/data-export/`, { responseType: "blob" }));
 
 export const addNewsletterAdminContactDnc = (mauticContactId, payload) =>
   unwrap(apiClient.post(`${adminContactsEndpoint}${mauticContactId}/dnc/`, payload));
@@ -894,6 +908,29 @@ export const updateNativeMauticSegment = (segmentId, payload) =>
 
 export const deleteNativeMauticSegment = (segmentId) =>
   unwrap(apiClient.delete(`/newsletter/admin/mautic/segments/${segmentId}/`));
+
+// Campaigns, emails, forms, other segments, reports and point triggers using it.
+export const getNativeMauticSegmentUsage = (segmentId) =>
+  unwrap(apiClient.get(`/newsletter/admin/mautic/segments/${segmentId}/usage/`));
+
+export const duplicateNativeMauticSegment = (segmentId, payload = {}) =>
+  unwrap(apiClient.post(`/newsletter/admin/mautic/segments/${segmentId}/duplicate/`, payload));
+
+// Mautic categories (not Subscription Lists). `bundle` returns the published
+// categories a picker of that type may offer, global ones included.
+const mauticCategoriesEndpoint = "/newsletter/admin/mautic-categories/";
+
+export const listMauticCategories = (params = {}) =>
+  unwrap(apiClient.get(mauticCategoriesEndpoint, { params }));
+
+export const createMauticCategory = (payload) =>
+  unwrap(apiClient.post(mauticCategoriesEndpoint, payload));
+
+export const updateMauticCategory = (categoryId, payload) =>
+  unwrap(apiClient.patch(`${mauticCategoriesEndpoint}${categoryId}/`, payload));
+
+export const deleteMauticCategory = (categoryId, { confirm = false } = {}) =>
+  unwrap(apiClient.delete(`${mauticCategoriesEndpoint}${categoryId}/`, { params: confirm ? { confirm: 1 } : {} }));
 
 export const listNativeMauticSegmentContacts = (segmentId, params = {}) =>
   unwrap(apiClient.get(`/newsletter/admin/mautic/segments/${segmentId}/contacts/`, { params }));

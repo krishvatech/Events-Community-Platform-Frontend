@@ -52,6 +52,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import ContactCampaignsPanel from "../components/marketing/ContactCampaignsPanel.jsx";
 import ContactLanguagePanel from "../components/marketing/ContactLanguagePanel.jsx";
 import ContactMergeDialog from "../components/marketing/ContactMergeDialog.jsx";
+import ContactNoteItem from "../components/marketing/ContactNoteItem.jsx";
+import { saveBlob } from "../components/marketing/saveBlob";
+import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import ContactSendEmailDialog, { sendBlocker } from "../components/marketing/ContactSendEmailDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
 
@@ -62,6 +65,7 @@ import {
   addNewsletterAdminContactTag,
   clearNewsletterAdminContactStage,
   createNewsletterAdminContactNote,
+  downloadNewsletterAdminContactData,
   getNewsletterAdminContact,
   getNewsletterAdminContactEngagement,
   addNewsletterCompanyContact,
@@ -397,6 +401,9 @@ export default function AdminNewsletterContactDetailPage() {
   const [notesLoading, setNotesLoading] = useState(true);
   const [noteText, setNoteText] = useState("");
   const [noteError, setNoteError] = useState("");
+  const [noteNotice, setNoteNotice] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const [tagInput, setTagInput] = useState("");
   const [tagLoading, setTagLoading] = useState(false);
   const [tagError, setTagError] = useState("");
@@ -982,7 +989,7 @@ export default function AdminNewsletterContactDetailPage() {
             <Typography color="text.secondary">{contact?.email || "Mautic contact activity and ECP subscription state."}</Typography>
           </Box>
         </Stack>
-        <Stack direction="row" spacing={1} alignItems="flex-start">
+        <Stack direction="row" spacing={1} alignItems="flex-start" flexWrap="wrap" useFlexGap>
           <Tooltip title={contact ? sendBlocker(contact) : ""}>
             <span>
               <Button startIcon={<SendRoundedIcon />} variant="outlined" onClick={() => setSendOpen(true)}
@@ -994,11 +1001,34 @@ export default function AdminNewsletterContactDetailPage() {
           <Button startIcon={<CallMergeRoundedIcon />} variant="outlined" onClick={() => setMergeOpen(true)} disabled={loading || !contact}>
             Merge
           </Button>
+          <Tooltip title="Everything Mautic holds about this contact (profile, tags, segments, campaigns, notes, activity), for data requests.">
+            <span>
+              <Button startIcon={exporting ? <CircularProgress size={16} /> : <FileDownloadRoundedIcon />} variant="outlined"
+                disabled={loading || !contact || exporting}
+                onClick={async () => {
+                  setExporting(true);
+                  setExportError("");
+                  try {
+                    saveBlob(await downloadNewsletterAdminContactData(mauticContactId), `contact-${mauticContactId}-data.zip`);
+                  } catch (err) {
+                    // A blob request gets its JSON error back as a Blob.
+                    const body = err?.response?.data;
+                    const detail = body instanceof Blob ? await body.text().then((text) => JSON.parse(text).detail).catch(() => "") : "";
+                    setExportError(detail || getErrorMessage(err, "The contact's data could not be exported."));
+                  } finally {
+                    setExporting(false);
+                  }
+                }}>
+                Export data
+              </Button>
+            </span>
+          </Tooltip>
           <Button startIcon={<RefreshRoundedIcon />} onClick={refreshAll} disabled={loading}>Refresh</Button>
         </Stack>
       </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
+      {exportError && <Alert severity="error" onClose={() => setExportError("")}>{exportError}</Alert>}
       {mergeNotice && <Alert severity="success" onClose={() => setMergeNotice("")}>{mergeNotice}</Alert>}
 
       <ContactSendEmailDialog
@@ -1558,14 +1588,15 @@ export default function AdminNewsletterContactDetailPage() {
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Notes</Typography>
                   {noteError && <Alert severity="error" sx={{ mb: 1.5 }}>{noteError}</Alert>}
+                  {noteNotice && <Alert severity="success" onClose={() => setNoteNotice("")} sx={{ mb: 1.5 }}>{noteNotice}</Alert>}
                   <Stack spacing={1.25} sx={{ mb: 2 }}>
                     {notesLoading ? <Skeleton height={80} /> : notes.length ? notes.map((note) => (
-                      <Box key={note.id} sx={{ borderBottom: "1px solid #EEF2F6", pb: 1 }}>
-                        <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{note.text || "—"}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {[note.type, note.createdByUser, formatDateTime(note.dateAdded)].filter(Boolean).join(" · ")}
-                        </Typography>
-                      </Box>
+                      <ContactNoteItem key={note.id} contactId={mauticContactId} note={note}
+                        meta={[note.type, note.createdByUser, formatDateTime(note.dateAdded)].filter(Boolean).join(" · ")}
+                        onChanged={(message) => {
+                          if (message) setNoteNotice(message);
+                          loadContactNotes();
+                        }} />
                     )) : <Typography variant="body2" color="text.secondary">No notes.</Typography>}
                   </Stack>
                   <TextField

@@ -1,5 +1,6 @@
-// Email delivery options Mautic keeps on the email itself (Reply-To, the UTM
-// tags it adds to tracked links, file attachments) and per-link click counts.
+// Email delivery options Mautic keeps on the email itself (Reply-To, BCC, the
+// UTM tags it adds to tracked links, file attachments and, for broadcasts only,
+// excluded segments) and per-link click counts.
 // Templates save the options with the template; a broadcast's are set on its
 // Mautic email once the broadcast has been saved (BroadcastDeliveryOptionsPanel).
 
@@ -26,6 +27,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 
 import {
   getNewsletterCampaignDeliveryOptions,
+  listNativeMauticSegments,
   listNewsletterAssets,
   updateNewsletterCampaignDeliveryOptions,
 } from "../../services/newsletterService";
@@ -42,10 +44,14 @@ const EMAIL_PATTERN = /^[^\s@,]+@[^\s@,]+\.[^\s@,]+$/;
 const UTM_PATTERN = /^[A-Za-z0-9 ._~+\-|:/{}]*$/;
 export const MAX_ATTACHMENTS = 10;
 
+export const MAX_EXCLUDED_SEGMENTS = 20;
+
 export const blankDeliveryOptions = () => ({
   replyToAddress: "",
+  bccAddress: "",
   utmTags: Object.fromEntries(UTM_FIELDS.map(([key]) => [key, ""])),
   assetAttachments: [],
+  excludedLists: [],
 });
 
 /** The options as the backend returns them on a template or broadcast. */
@@ -53,18 +59,26 @@ export const deliveryOptionsFrom = (source) => ({
   replyToAddress: source?.replyToAddress || "",
   utmTags: Object.fromEntries(UTM_FIELDS.map(([key]) => [key, source?.utmTags?.[key] || ""])),
   assetAttachments: (source?.assetAttachments || []).map((asset) => ({ id: String(asset.id), title: asset.title || `Asset ${asset.id}` })),
+  bccAddress: source?.bccAddress || "",
+  excludedLists: (source?.excludedLists || []).map((segment) => ({ id: String(segment.id), name: segment.name || `Segment ${segment.id}` })),
 });
 
-export const deliveryOptionsPayload = (value) => ({
+/** Excluded segments only for a broadcast: Mautic ignores them on templates. */
+export const deliveryOptionsPayload = (value, { exclusions = false } = {}) => ({
   replyToAddress: value.replyToAddress.trim(),
+  bccAddress: (value.bccAddress || "").trim(),
   utmTags: Object.fromEntries(UTM_FIELDS.map(([key]) => [key, (value.utmTags[key] || "").trim()])),
   assetAttachments: value.assetAttachments.map((asset) => asset.id),
+  ...(exclusions ? { excludedLists: (value.excludedLists || []).map((segment) => segment.id) } : {}),
 });
 
 export function validateDeliveryOptions(value) {
   const errors = {};
   const replyTo = value.replyToAddress.trim();
   if (replyTo && !EMAIL_PATTERN.test(replyTo)) errors.replyToAddress = "Use one valid email address.";
+  const bcc = (value.bccAddress || "").trim();
+  if (bcc && !EMAIL_PATTERN.test(bcc)) errors.bccAddress = "Use one valid email address.";
+  if ((value.excludedLists || []).length > MAX_EXCLUDED_SEGMENTS) errors.excludedLists = `Exclude up to ${MAX_EXCLUDED_SEGMENTS} segments.`;
   for (const [key, label] of UTM_FIELDS) {
     const text = (value.utmTags[key] || "").trim();
     if (text.length > 100 || !UTM_PATTERN.test(text)) {
@@ -75,8 +89,26 @@ export function validateDeliveryOptions(value) {
   return errors;
 }
 
-export function EmailDeliveryOptionsFields({ value, onChange, disabled = false, errors = {} }) {
+export function EmailDeliveryOptionsFields({ value, onChange, disabled = false, errors = {}, exclusions = false }) {
   const [assets, setAssets] = useState({ loading: true, rows: [], error: "" });
+  const [segments, setSegments] = useState({ loading: exclusions, rows: [], error: "" });
+
+  useEffect(() => {
+    if (!exclusions) return undefined;
+    let active = true;
+    // Mautic excludes published segments only.
+    listNativeMauticSegments()
+      .then((data) => active && setSegments({
+        loading: false,
+        error: "",
+        rows: (Array.isArray(data) ? data : []).filter((segment) => segment.isPublished)
+          .map((segment) => ({ id: String(segment.id), name: segment.name || `Segment ${segment.id}` })),
+      }))
+      .catch(() => active && setSegments({ loading: false, rows: [], error: "Segments could not be loaded; exclusions cannot be changed now." }));
+    return () => {
+      active = false;
+    };
+  }, [exclusions]);
 
   useEffect(() => {
     let active = true;
@@ -98,6 +130,11 @@ export function EmailDeliveryOptionsFields({ value, onChange, disabled = false, 
       <TextField label="Reply-To address" value={value.replyToAddress} onChange={(event) => set({ replyToAddress: event.target.value })}
         disabled={disabled} error={Boolean(errors.replyToAddress)}
         helperText={errors.replyToAddress || "Optional. Replies go here instead of the sender address."} fullWidth />
+      <TextField label="BCC address" value={value.bccAddress || ""} onChange={(event) => set({ bccAddress: event.target.value })}
+        disabled={disabled} error={Boolean(errors.bccAddress)}
+        helperText={errors.bccAddress || (exclusions
+          ? "Optional. A copy of every recipient's email goes to this address, so a large broadcast sends as many copies."
+          : "Optional. A copy of every email sent from this template goes to this address.")} fullWidth />
       <Box>
         <Typography variant="subtitle2" sx={{ fontWeight: 800, color: NAVY, mb: 1 }}>UTM tags</Typography>
         <Box sx={{ display: "grid", gap: 2, gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" } }}>
@@ -123,11 +160,28 @@ export function EmailDeliveryOptionsFields({ value, onChange, disabled = false, 
             helperText={errors.assetAttachments || assets.error || `Published assets sent as file attachments (up to ${MAX_ATTACHMENTS}).`} />
         )}
       />
+      {exclusions && (
+        <Autocomplete
+          multiple
+          options={segments.rows}
+          value={value.excludedLists || []}
+          onChange={(_, chosen) => set({ excludedLists: chosen })}
+          getOptionLabel={(segment) => segment.name}
+          isOptionEqualToValue={(a, b) => a.id === b.id}
+          disabled={disabled || Boolean(segments.error)}
+          loading={segments.loading}
+          renderInput={(params) => (
+            <TextField {...params} label="Excluded segments" error={Boolean(errors.excludedLists || segments.error)}
+              helperText={errors.excludedLists || segments.error || "Contacts in these segments are never sent this broadcast."} />
+          )}
+        />
+      )}
     </Stack>
   );
 }
 
-const sameOptions = (a, b) => JSON.stringify(deliveryOptionsPayload(a)) === JSON.stringify(deliveryOptionsPayload(b));
+const sameOptions = (a, b) => JSON.stringify(deliveryOptionsPayload(a, { exclusions: true }))
+  === JSON.stringify(deliveryOptionsPayload(b, { exclusions: true }));
 
 export function BroadcastDeliveryOptionsPanel({ campaignUuid }) {
   const [state, setState] = useState({ loading: true, error: "", available: false, editable: false });
@@ -161,7 +215,7 @@ export function BroadcastDeliveryOptionsPanel({ campaignUuid }) {
     setSaving(true);
     setNotice(null);
     try {
-      apply(await updateNewsletterCampaignDeliveryOptions(campaignUuid, deliveryOptionsPayload(value)));
+      apply(await updateNewsletterCampaignDeliveryOptions(campaignUuid, deliveryOptionsPayload(value, { exclusions: true })));
       setNotice({ severity: "success", message: "Delivery options saved and confirmed in Mautic." });
     } catch (err) {
       const data = err?.response?.data;
@@ -179,7 +233,8 @@ export function BroadcastDeliveryOptionsPanel({ campaignUuid }) {
         <Box>
           <Typography variant="h6" sx={{ fontWeight: 800, color: NAVY }}>Delivery options</Typography>
           <Typography variant="body2" color="text.secondary">
-            Reply-To, UTM tags and attachments are kept on the broadcast's Mautic email and shared by its A/B and language versions.
+            Reply-To, BCC, UTM tags, attachments and excluded segments are kept on the broadcast's Mautic email and shared by its A/B and
+            language versions.
           </Typography>
         </Box>
         {state.loading ? <Skeleton variant="rounded" height={120} /> : state.error ? <Alert severity="warning">{state.error}</Alert> : !state.available ? (
@@ -188,7 +243,7 @@ export function BroadcastDeliveryOptionsPanel({ campaignUuid }) {
           <>
             {!state.editable && <Alert severity="info" variant="outlined">Delivery options can only be changed while the broadcast is a draft.</Alert>}
             {notice && <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.message}</Alert>}
-            <EmailDeliveryOptionsFields value={value} onChange={setValue} disabled={!state.editable || saving} errors={errors} />
+            <EmailDeliveryOptionsFields value={value} onChange={setValue} disabled={!state.editable || saving} errors={errors} exclusions />
             {state.editable && (
               <Stack direction="row" spacing={1} justifyContent="flex-end">
                 <Button onClick={() => { setValue(saved); setErrors({}); }} disabled={!dirty || saving} sx={{ textTransform: "none" }}>Reset</Button>

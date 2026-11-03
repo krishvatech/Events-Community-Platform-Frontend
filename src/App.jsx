@@ -50,6 +50,7 @@ import AdminNewsletterPageEditorPage from "./pages/AdminNewsletterPageEditorPage
 import AdminNewsletterAnalyticsPage from "./pages/AdminNewsletterAnalyticsPage.jsx";
 import AdminNewsletterReportsPage from "./pages/AdminNewsletterReportsPage.jsx";
 import AdminNewsletterAssetsPage from "./pages/AdminNewsletterAssetsPage.jsx";
+import AdminNewsletterMauticCategoriesPage from "./pages/AdminNewsletterMauticCategoriesPage.jsx";
 import AdminNewsletterCalendarPage from "./pages/AdminNewsletterCalendarPage.jsx";
 import AdminNewsletterAssetEditorPage from "./pages/AdminNewsletterAssetEditorPage.jsx";
 import AdminNewsletterAssetDetailsPage from "./pages/AdminNewsletterAssetDetailsPage.jsx";
@@ -428,6 +429,8 @@ const AppShell = () => {
               <Route path="reports/new" element={<AdminNewsletterReportEditorPage />} />
               <Route path="reports/:reportId" element={<AdminNewsletterReportViewerPage />} />
               <Route path="reports/:reportId/edit" element={<AdminNewsletterReportEditorPage />} />
+              {/* Mautic categories; static, so it ranks above ":campaignId". */}
+              <Route path="categories" element={<AdminNewsletterMauticCategoriesPage />} />
               <Route path="settings" element={<AdminNewsletterPage />} />
               <Route path="new" element={<AdminNewsletterPage />} />
               <Route path="audiences/*" element={<Navigate to="/admin/newsletter" replace />} />

@@ -123,6 +123,7 @@ import {
   updateNativeMauticCampaign,
 } from "../services/newsletterService";
 import { CampaignContactsPanel, CampaignStatsPanel } from "../components/marketing/CampaignInsights.jsx";
+import CampaignSettingsPanel from "../components/marketing/CampaignSettingsPanel.jsx";
 
 const getErrorMessage = (err, fallback = "Something went wrong. Please try again.") => {
   const data = err?.response?.data;
@@ -1614,6 +1615,7 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
             <Tab label="Canvas" value="canvas" />
             {isEditMode && <Tab label="Contacts" value="contacts" />}
             {isEditMode && <Tab label="Statistics" value="stats" />}
+            {isEditMode && <Tab label="Settings" value="settings" />}
           </Tabs>
         </Box>
 
@@ -1625,9 +1627,12 @@ export default function AdminNewsletterMauticCampaignBuilderPage() {
         {isEditMode && builderTab === "stats" && (
           <Box sx={{ p: 2.5 }}><CampaignStatsPanel campaignId={campaignId} /></Box>
         )}
+        {isEditMode && builderTab === "settings" && (
+          <Box sx={{ p: 2.5 }}><CampaignSettingsPanel campaignId={campaignId} /></Box>
+        )}
 
         <Stack spacing={2.5} component="form" onSubmit={createCampaign}
-          sx={{ p: 2.5, display: ["contacts", "stats"].includes(builderTab) ? "none" : undefined }}>
+          sx={{ p: 2.5, display: ["contacts", "stats", "settings"].includes(builderTab) ? "none" : undefined }}>
           {formError && <Alert severity="error">{formError}</Alert>}
           {graphBlockers.length > 0 && (
             <Alert severity="error">

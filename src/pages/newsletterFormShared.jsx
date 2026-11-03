@@ -4,6 +4,7 @@
 // actions are shown read-only and never sent. Every write runs as the admin's
 // own Mautic user through newsletterService.
 
+import { fromLocalInput, toLocalInput, windowProblem } from "../components/marketing/PublishWindowFields.jsx";
 import React, { useEffect, useState } from "react";
 import {
   Alert,
@@ -54,13 +55,25 @@ export const POST_ACTIONS = [
 
 export const postActionLabel = (value) => POST_ACTIONS.find((option) => option.value === value)?.label || "Show a message";
 
-export const blankForm = { name: "", description: "", postAction: "message", postActionProperty: "" };
+export const PROGRESSIVE_LIMIT_MAX = 100;
+
+export const blankForm = {
+  name: "", description: "", postAction: "message", postActionProperty: "",
+  category: null, categoryInfo: null, publishUp: "", publishDown: "", inKioskMode: false, noIndex: false, progressiveProfilingLimit: "",
+};
 
 export const formToDraft = (form) => ({
   name: form?.name || "",
   description: form?.description || "",
   postAction: POST_ACTIONS.some((option) => option.value === form?.postAction) ? form.postAction : "message",
   postActionProperty: form?.postAction === "return" ? "" : form?.postActionProperty || "",
+  category: form?.category?.id ? Number(form.category.id) : null,
+  categoryInfo: form?.category || null,
+  publishUp: toLocalInput(form?.publishUp),
+  publishDown: toLocalInput(form?.publishDown),
+  inKioskMode: Boolean(form?.inKioskMode),
+  noIndex: Boolean(form?.noIndex),
+  progressiveProfilingLimit: form?.progressiveProfilingLimit ? String(form.progressiveProfilingLimit) : "",
 });
 
 // eslint-disable-next-line no-control-regex
@@ -104,8 +117,23 @@ export function validateFormDraft(draft) {
   } else if (draft?.postAction !== "return") {
     errors.postAction = "Choose what happens after submit.";
   }
+  const limit = String(draft?.progressiveProfilingLimit ?? "").trim();
+  if (limit && !(/^\d+$/.test(limit) && Number(limit) >= 1 && Number(limit) <= PROGRESSIVE_LIMIT_MAX)) {
+    errors.progressiveProfilingLimit = `Use a number from 1 to ${PROGRESSIVE_LIMIT_MAX}, or leave it empty for no limit.`;
+  }
+  const windowError = windowProblem(draft?.publishUp, draft?.publishDown);
+  if (windowError) errors.publishDown = windowError;
   return errors;
 }
+
+const extraSettings = (draft) => ({
+  category: draft.category || null,
+  publishUp: fromLocalInput(draft.publishUp),
+  publishDown: fromLocalInput(draft.publishDown),
+  inKioskMode: Boolean(draft.inKioskMode),
+  noIndex: Boolean(draft.noIndex),
+  progressiveProfilingLimit: String(draft.progressiveProfilingLimit ?? "").trim() ? Number(draft.progressiveProfilingLimit) : null,
+});
 
 /**
  * The request body for a save: every basic setting for a create, only what
@@ -118,9 +146,20 @@ export function draftToPayload(draft, original = null) {
     postAction: draft.postAction,
     postActionProperty: draft.postAction === "return" ? "" : String(draft.postActionProperty || "").trim(),
   };
-  if (!original) return clean;
+  const extras = extraSettings(draft);
+  if (!original) {
+    // A new Form sends only the extra settings the admin set.
+    Object.entries(extras).forEach(([key, value]) => {
+      if (value !== null && value !== false) clean[key] = value;
+    });
+    return clean;
+  }
   const before = formToDraft(original);
+  const beforeExtras = extraSettings(before);
   const payload = {};
+  Object.entries(extras).forEach(([key, value]) => {
+    if (value !== beforeExtras[key]) payload[key] = value;
+  });
   if (clean.name !== before.name.trim()) payload.name = clean.name;
   if (clean.description !== before.description.trim()) payload.description = clean.description;
   if (clean.postAction !== before.postAction || clean.postActionProperty !== before.postActionProperty.trim()) {

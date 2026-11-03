@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -13,6 +14,7 @@ import {
   FormControlLabel,
   Grid,
   IconButton,
+  Link,
   Paper,
   Skeleton,
   Stack,
@@ -29,6 +31,7 @@ import {
   Typography,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ContentCopyRoundedIcon from "@mui/icons-material/ContentCopyRounded";
 import DeleteRoundedIcon from "@mui/icons-material/DeleteRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
@@ -36,6 +39,7 @@ import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
 import MauticSegmentFilterEditor from "./MauticSegmentFilterEditor";
+import MauticCategoryPicker from "../components/marketing/MauticCategoryPicker.jsx";
 import {
   buildFilterMetadataIndex,
   hydrateFilterRows,
@@ -46,7 +50,9 @@ import {
   addNativeMauticSegmentContact,
   createNativeMauticSegment,
   deleteNativeMauticSegment,
+  duplicateNativeMauticSegment,
   getNativeMauticSegment,
+  getNativeMauticSegmentUsage,
   getNativeMauticSegmentFilterMetadata,
   listNewsletterAdminContacts,
   listNativeMauticSegmentContacts,
@@ -86,13 +92,18 @@ const formatCount = (value) => {
   return new Intl.NumberFormat().format(number);
 };
 
+// A Subscription List segment, or one in the Subscription List category (a
+// consent gate): both are managed by ECP.
+export const isProtectedSegment = (segment) =>
+  Boolean(segment?.protected || segment?.managed_by_subscription_list || segment?.mapped_in_ecp || segment?.consent_marked);
+
 function ManagementChip({ segment }) {
-  if (segment?.managed_by_subscription_list || segment?.mapped_in_ecp) {
+  if (isProtectedSegment(segment)) {
     return (
       <Chip
         size="small"
         color="warning"
-        label="Managed by Subscription List"
+        label={segment?.consent_marked && !segment?.managed_by_subscription_list ? "Consent gate" : "Managed by Subscription List"}
         sx={{ fontWeight: 800 }}
       />
     );
@@ -222,6 +233,105 @@ function SegmentContactsPanel({
   );
 }
 
+const USAGE_GROUPS = [
+  { key: "campaigns", label: "Campaigns" },
+  { key: "emails", label: "Emails" },
+  { key: "forms", label: "Forms" },
+  { key: "segments", label: "Other segments' filters" },
+  { key: "reports", label: "Reports" },
+  { key: "point_triggers", label: "Point triggers" },
+];
+const ROLE_LABELS = {
+  source: "Source",
+  condition: "Condition",
+  adds: "Adds contacts",
+  removes: "Removes contacts",
+  sends_to: "Sent to it",
+  excludes: "Excludes it",
+};
+
+export const usageTotal = (usage) => USAGE_GROUPS.reduce((sum, group) => sum + asArray(usage?.[group.key]).length, 0);
+
+const usageLink = (groupKey, item) => {
+  if (groupKey === "campaigns") return `/admin/newsletter/builder/${item.id}`;
+  if (groupKey === "emails") {
+    if (item.broadcast_uuid) return `/admin/newsletter/${item.broadcast_uuid}`;
+    return item.email_type === "template" ? `/admin/newsletter/templates/${item.id}` : null;
+  }
+  if (groupKey === "forms") return `/admin/newsletter/forms/${item.id}`;
+  if (groupKey === "reports") return `/admin/newsletter/reports/${item.id}`;
+  if (groupKey === "point_triggers") return "/admin/newsletter/points";
+  return null;
+};
+
+export function SegmentUsageList({ usage }) {
+  const groups = USAGE_GROUPS.filter((group) => asArray(usage?.[group.key]).length);
+  if (!groups.length) {
+    return <Alert severity="success" variant="outlined">Not used by any campaign, email, form, segment, report or point trigger.</Alert>;
+  }
+  return (
+    <Stack spacing={1.5} aria-label="Segment usage">
+      {groups.map((group) => (
+        <Box key={group.key}>
+          <Typography variant="body2" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 0.5 }}>
+            {group.label} ({asArray(usage[group.key]).length})
+          </Typography>
+          <Stack spacing={0.5} component="ul" sx={{ m: 0, pl: 2.5 }}>
+            {asArray(usage[group.key]).map((item) => {
+              const to = usageLink(group.key, item);
+              return (
+                <Box component="li" key={`${group.key}-${item.id}`}>
+                  {to ? <Link component={RouterLink} to={to} underline="hover">{item.name || `#${item.id}`}</Link> : (item.name || `#${item.id}`)}
+                  {item.broadcast_uuid && <Typography component="span" variant="caption" color="text.secondary"> · Broadcast</Typography>}
+                  {asArray(item.roles).map((role) => (
+                    <Chip key={role} size="small" variant="outlined" label={ROLE_LABELS[role] || role} sx={{ ml: 0.75, height: 20 }} />
+                  ))}
+                  {item.published === false && (
+                    <Typography component="span" variant="caption" color="text.secondary"> · unpublished</Typography>
+                  )}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Box>
+      ))}
+    </Stack>
+  );
+}
+
+function useSegmentUsage(segmentId, enabled) {
+  const [state, setState] = useState({ loading: false, usage: null, error: "" });
+  useEffect(() => {
+    if (!enabled || !segmentId) {
+      setState({ loading: false, usage: null, error: "" });
+      return undefined;
+    }
+    let active = true;
+    setState({ loading: true, usage: null, error: "" });
+    getNativeMauticSegmentUsage(segmentId)
+      .then((data) => active && setState({ loading: false, usage: data?.usage || {}, error: "" }))
+      .catch((err) => active && setState({ loading: false, usage: null, error: getErrorMessage(err, "We could not check where this segment is used.") }));
+    return () => {
+      active = false;
+    };
+  }, [segmentId, enabled]);
+  return state;
+}
+
+function SegmentUsagePanel({ segmentId }) {
+  const { loading, usage, error } = useSegmentUsage(segmentId, true);
+  if (loading) return <Skeleton variant="rectangular" height={80} />;
+  if (error) return <Alert severity="error">{error}</Alert>;
+  return (
+    <Stack spacing={1.5}>
+      <Typography variant="body2" color="text.secondary">
+        Changing or deleting this segment affects everything below.
+      </Typography>
+      <SegmentUsageList usage={usage} />
+    </Stack>
+  );
+}
+
 function SegmentDetailDialog({
   open,
   segment,
@@ -264,14 +374,14 @@ function SegmentDetailDialog({
               <SegmentTypeChip segment={segment} />
             </Stack>
             <Stack direction="row" spacing={1} sx={{ borderBottom: "1px solid #E7ECEF" }}>
-              {["details", "contacts", "filters"].map((tab) => (
+              {["details", "contacts", "filters", "usage"].map((tab) => (
                 <Button
                   key={tab}
                   variant={activeTab === tab ? "contained" : "text"}
                   onClick={() => onTabChange(tab)}
                   sx={{ textTransform: "none" }}
                 >
-                  {tab === "details" ? "Details" : tab === "contacts" ? "Contacts" : "Filters"}
+                  {{ details: "Details", contacts: "Contacts", filters: "Filters", usage: "Used in" }[tab]}
                 </Button>
               ))}
             </Stack>
@@ -282,6 +392,10 @@ function SegmentDetailDialog({
                 <Grid item xs={12} sm={6}><DetailField label="Alias" value={segment?.alias} /></Grid>
                 <Grid item xs={12} sm={6}><DetailField label="Contact Count" value={formatCount(segment?.contact_count)} /></Grid>
                 <Grid item xs={12}><DetailField label="Description" value={segment?.description} /></Grid>
+                <Grid item xs={12} sm={6}><DetailField label="Public Name" value={segment?.publicName} /></Grid>
+                <Grid item xs={12} sm={6}><DetailField label="Category" value={segment?.category?.title} /></Grid>
+                <Grid item xs={12} sm={6}><DetailField label="Global (visible to other Mautic users)" value={segment ? (segment.isGlobal ? "Yes" : "No") : ""} /></Grid>
+                <Grid item xs={12} sm={6}><DetailField label="Show in Preference Center" value={segment ? (segment.isPreferenceCenter ? "Yes" : "No") : ""} /></Grid>
                 <Grid item xs={12} sm={6}><DetailField label="Subscription List Owner" value={segment?.subscription_list_name} /></Grid>
                 <Grid item xs={12} sm={6}><DetailField label="Subscription List Slug" value={segment?.subscription_list_slug} /></Grid>
                 <Grid item xs={12} sm={6}><DetailField label="Created" value={formatDateTime(segment?.dateAdded)} /></Grid>
@@ -299,6 +413,7 @@ function SegmentDetailDialog({
                 onRemoveOpen={onRemoveContactOpen}
               />
             )}
+            {activeTab === "usage" && segment?.id && <SegmentUsagePanel segmentId={segment.id} />}
             {activeTab === "filters" && (
               <Box>
                 <Typography sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1 }}>
@@ -334,6 +449,11 @@ const blankSegmentForm = {
   name: "",
   alias: "",
   description: "",
+  publicName: "",
+  category: null,
+  categoryInfo: null,
+  isGlobal: true,
+  isPreferenceCenter: false,
   isPublished: false,
   filters: [],
 };
@@ -342,6 +462,11 @@ const segmentToForm = (segment) => ({
   name: segment?.name || "",
   alias: segment?.alias || "",
   description: segment?.description || "",
+  publicName: segment?.publicName || "",
+  category: segment?.category?.id || null,
+  categoryInfo: segment?.category || null,
+  isGlobal: Boolean(segment?.isGlobal),
+  isPreferenceCenter: Boolean(segment?.isPreferenceCenter),
   isPublished: Boolean(segment?.isPublished),
   // Saved filters are read back exactly as Mautic evaluates them.
   filters: hydrateFilterRows(segment?.filters),
@@ -421,6 +546,30 @@ function SegmentFormDialog({
               minRows={3}
               fullWidth
             />
+            <TextField
+              label="Public Name"
+              value={form.publicName}
+              onChange={(event) => updateField("publicName", event.target.value)}
+              helperText="What contacts see in the preference center. Leave blank to use the name."
+              inputProps={{ maxLength: 190 }}
+              fullWidth
+            />
+            <MauticCategoryPicker
+              bundle="segment"
+              value={form.category}
+              current={form.categoryInfo}
+              disabled={loading}
+              onChange={(category) => updateField("category", category)}
+              helperText="Manage categories under Administration → Categories."
+            />
+            <FormControlLabel
+              control={<Switch checked={form.isGlobal} onChange={(event) => updateField("isGlobal", event.target.checked)} />}
+              label="Global: visible to other Mautic users"
+            />
+            <FormControlLabel
+              control={<Switch checked={form.isPreferenceCenter} onChange={(event) => updateField("isPreferenceCenter", event.target.checked)} />}
+              label="Show in preference center: contacts can join or leave this segment themselves"
+            />
           </Stack>
           <FormControlLabel
             control={
@@ -455,9 +604,12 @@ function SegmentFormDialog({
   );
 }
 
-function DeleteSegmentDialog({ open, segment, loading, error, onClose, onConfirm }) {
+function DeleteSegmentDialog({ open, segment, loading, error, serverUsage, onClose, onConfirm }) {
+  const usageState = useSegmentUsage(segment?.id, open);
+  const usage = serverUsage || usageState.usage;
+  const inUse = usageTotal(usage) > 0;
   return (
-    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="xs" fullWidth>
+    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="sm" fullWidth>
       <DialogTitle>Delete Segment</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
@@ -465,15 +617,56 @@ function DeleteSegmentDialog({ open, segment, loading, error, onClose, onConfirm
           <Typography>
             Delete native Mautic segment "{segment?.name || `Segment #${segment?.id}`}"?
           </Typography>
-          <Alert severity="warning" variant="outlined">
-            This only deletes the native segment in Mautic. It does not delete any ECP Subscription List or consent record.
+          {usageState.loading && !serverUsage ? (
+            <Skeleton variant="rectangular" height={60} />
+          ) : usageState.error && !serverUsage ? (
+            <Alert severity="error">{usageState.error}</Alert>
+          ) : inUse ? (
+            <>
+              <Alert severity="warning">This segment is in use, so it can't be deleted. Remove it from these items first:</Alert>
+              <SegmentUsageList usage={usage} />
+            </>
+          ) : (
+            <Alert severity="warning" variant="outlined">
+              This only deletes the native segment in Mautic. It does not delete any ECP Subscription List or consent record.
+            </Alert>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} disabled={loading}>Cancel</Button>
+        <Button color="error" variant="contained" onClick={onConfirm}
+          disabled={loading || inUse || (usageState.loading && !serverUsage) || Boolean(usageState.error && !serverUsage)}>
+          {loading ? <CircularProgress size={20} color="inherit" /> : "Delete"}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
+function DuplicateSegmentDialog({ open, segment, loading, error, onClose, onConfirm }) {
+  const [name, setName] = useState("");
+  useEffect(() => {
+    if (open) setName(`Copy of ${segment?.name || `Segment #${segment?.id}`}`.slice(0, 190));
+  }, [open, segment]);
+  return (
+    <Dialog open={open} onClose={loading ? undefined : onClose} maxWidth="sm" fullWidth>
+      <DialogTitle>Duplicate Segment</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          {error && <Alert severity="error">{error}</Alert>}
+          <TextField autoFocus label="Name of the copy" value={name} onChange={(event) => setName(event.target.value)}
+            inputProps={{ maxLength: 190 }} required fullWidth />
+          <Alert severity="info" variant="outlined">
+            The copy gets the same filters, description and category. It starts unpublished, is not shown in the preference
+            center, and does not copy contacts added by hand.
           </Alert>
         </Stack>
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>Cancel</Button>
-        <Button color="error" variant="contained" onClick={onConfirm} disabled={loading}>
-          {loading ? <CircularProgress size={20} color="inherit" /> : "Delete"}
+        <Button variant="contained" onClick={() => onConfirm(name.trim())} disabled={loading || !name.trim()}>
+          {loading ? <CircularProgress size={20} color="inherit" /> : "Duplicate"}
         </Button>
       </DialogActions>
     </Dialog>
@@ -610,7 +803,9 @@ export default function AdminNewsletterNativeSegmentsPanel() {
     segment: null,
     loading: false,
     error: "",
+    usage: null,
   });
+  const [duplicateState, setDuplicateState] = useState({ open: false, segment: null, loading: false, error: "" });
   const [snack, setSnack] = useState({ open: false, severity: "success", message: "" });
   const [addContactState, setAddContactState] = useState({
     open: false,
@@ -627,6 +822,13 @@ export default function AdminNewsletterNativeSegmentsPanel() {
     loading: false,
     error: "",
   });
+
+  // Stable per open dialog: a new object each render would reset what the
+  // admin typed whenever the panel re-renders (e.g. filter options loading).
+  const formValue = useMemo(
+    () => (formState.mode === "edit" ? segmentToForm(formState.segment) : blankSegmentForm),
+    [formState.mode, formState.segment]
+  );
 
   const loadSegments = async () => {
     setLoading(true);
@@ -761,6 +963,10 @@ export default function AdminNewsletterNativeSegmentsPanel() {
     const payload = {
       name: form.name.trim(),
       description: form.description,
+      publicName: form.publicName.trim(),
+      category: form.category || null,
+      isGlobal: Boolean(form.isGlobal),
+      isPreferenceCenter: Boolean(form.isPreferenceCenter),
       isPublished: Boolean(form.isPublished),
     };
     if (form.alias.trim() || formState.mode === "edit") {
@@ -791,11 +997,25 @@ export default function AdminNewsletterNativeSegmentsPanel() {
   };
 
   const openDelete = (segment) => {
-    setDeleteState({ open: true, segment, loading: false, error: "" });
+    setDeleteState({ open: true, segment, loading: false, error: "", usage: null });
   };
 
   const closeDelete = () => {
-    setDeleteState({ open: false, segment: null, loading: false, error: "" });
+    setDeleteState({ open: false, segment: null, loading: false, error: "", usage: null });
+  };
+
+  const openDuplicate = (segment) => setDuplicateState({ open: true, segment, loading: false, error: "" });
+  const closeDuplicate = () => setDuplicateState({ open: false, segment: null, loading: false, error: "" });
+  const confirmDuplicate = async (name) => {
+    setDuplicateState((state) => ({ ...state, loading: true, error: "" }));
+    try {
+      const copy = await duplicateNativeMauticSegment(duplicateState.segment.id, { name });
+      closeDuplicate();
+      setSnack({ open: true, severity: "success", message: `Segment duplicated as "${copy?.name || name}".` });
+      loadSegments();
+    } catch (err) {
+      setDuplicateState((state) => ({ ...state, loading: false, error: getErrorMessage(err, "We could not duplicate this segment.") }));
+    }
   };
 
   const confirmDelete = async () => {
@@ -810,6 +1030,8 @@ export default function AdminNewsletterNativeSegmentsPanel() {
         ...state,
         loading: false,
         error: getErrorMessage(err, "We could not delete this Mautic segment."),
+        // The segment came into use after the dialog opened.
+        usage: err?.response?.data?.code === "segment_in_use" ? err.response.data.usage : state.usage,
       }));
     }
   };
@@ -1006,7 +1228,7 @@ export default function AdminNewsletterNativeSegmentsPanel() {
                           <VisibilityRoundedIcon fontSize="small" />
                         </IconButton>
                       </Tooltip>
-                      {segment.managed_by_subscription_list || segment.mapped_in_ecp ? (
+                      {isProtectedSegment(segment) ? (
                         <Typography variant="caption" color="text.secondary">
                           Protected
                         </Typography>
@@ -1015,6 +1237,11 @@ export default function AdminNewsletterNativeSegmentsPanel() {
                           <Tooltip title="Edit segment">
                             <IconButton onClick={() => openEdit(segment)}>
                               <EditRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="Duplicate segment">
+                            <IconButton aria-label={`Duplicate ${segment.name || `segment ${segment.id}`}`} onClick={() => openDuplicate(segment)}>
+                              <ContentCopyRoundedIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
                           <Tooltip title="Delete segment">
@@ -1061,7 +1288,7 @@ export default function AdminNewsletterNativeSegmentsPanel() {
         filterMetadata={filterMetadata}
         open={formState.open}
         mode={formState.mode}
-        value={formState.mode === "edit" ? segmentToForm(formState.segment) : blankSegmentForm}
+        value={formValue}
         loading={formState.loading}
         error={formState.error}
         onClose={closeForm}
@@ -1072,8 +1299,17 @@ export default function AdminNewsletterNativeSegmentsPanel() {
         segment={deleteState.segment}
         loading={deleteState.loading}
         error={deleteState.error}
+        serverUsage={deleteState.usage}
         onClose={closeDelete}
         onConfirm={confirmDelete}
+      />
+      <DuplicateSegmentDialog
+        open={duplicateState.open}
+        segment={duplicateState.segment}
+        loading={duplicateState.loading}
+        error={duplicateState.error}
+        onClose={closeDuplicate}
+        onConfirm={confirmDuplicate}
       />
       <AddContactDialog
         open={addContactState.open}

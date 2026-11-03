@@ -33,6 +33,7 @@ import {
   deliveryOptionsPayload,
   validateDeliveryOptions,
 } from "../components/marketing/EmailDeliveryOptions.jsx";
+import PublishWindowFields, { fromLocalInput, windowProblem } from "../components/marketing/PublishWindowFields.jsx";
 import MarketingEmailContentEditor, {
   MODE_HTML,
   MODE_VISUAL,
@@ -161,6 +162,8 @@ export default function AdminNewsletterTemplateEditorPage() {
     if (!subject) nextErrors.subject = "Subject is required.";
     if (fromAddress && !emailPattern.test(fromAddress)) nextErrors.fromAddress = "Enter a valid sender email.";
     Object.assign(nextErrors, validateDeliveryOptions(form.delivery));
+    const windowError = windowProblem(form.publishUp, form.publishDown);
+    if (windowError) nextErrors.publishDown = windowError;
     setFormErrors(nextErrors);
     if (Object.keys(nextErrors).length) {
       setSaveError("Complete the required Template fields before saving.");
@@ -189,6 +192,8 @@ export default function AdminNewsletterTemplateEditorPage() {
         category: form.category,
         template: form.template,
         ...deliveryOptionsPayload(form.delivery),
+        publishUp: fromLocalInput(form.publishUp),
+        publishDown: fromLocalInput(form.publishDown),
       };
       if (visual) {
         // The server compiles the HTML from this MJML; never send both.
@@ -422,6 +427,14 @@ export default function AdminNewsletterTemplateEditorPage() {
           disabled={saving}
           errors={formErrors}
         />
+        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: NAVY, mt: 3, mb: 1 }}>Sending window</Typography>
+        <PublishWindowFields start={form.publishUp} end={form.publishDown} disabled={saving} errors={formErrors}
+          onChange={({ start, end }) => {
+            setForm((current) => ({ ...current, publishUp: start, publishDown: end }));
+            setDirty(true);
+          }}
+          startHelp="Campaigns can send this template from then on. Your local time."
+          endHelp="After this, campaign steps using it stop sending it. Your local time." />
       </Paper>
 
       <Paper variant="outlined" component="section" aria-label="Email Content" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: CARD_BORDER }}>

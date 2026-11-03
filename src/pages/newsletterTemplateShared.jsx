@@ -19,6 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import { blankDeliveryOptions, deliveryOptionsFrom } from "../components/marketing/EmailDeliveryOptions.jsx";
+import { toLocalInput } from "../components/marketing/PublishWindowFields.jsx";
 import SendRoundedIcon from "@mui/icons-material/SendRounded";
 
 import {
@@ -68,6 +69,8 @@ export const blankTemplate = {
   category: "",
   template: "",
   delivery: blankDeliveryOptions(),
+  publishUp: "",
+  publishDown: "",
 };
 
 export const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -120,6 +123,8 @@ export const templateToForm = (template) => ({
   category: template?.category?.id || "",
   template: template?.template || "",
   delivery: deliveryOptionsFrom(template),
+  publishUp: toLocalInput(template?.publishUp),
+  publishDown: toLocalInput(template?.publishDown),
 });
 
 export const tokenGroups = (tokens) =>

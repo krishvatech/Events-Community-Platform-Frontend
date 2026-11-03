@@ -5,11 +5,13 @@ import {
   Breadcrumbs,
   Button,
   CircularProgress,
+  FormControlLabel,
   Link,
   MenuItem,
   Paper,
   Skeleton,
   Stack,
+  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -22,6 +24,8 @@ import { UnsavedChangesDialog, useUnsavedChangesGuard } from "../components/mark
 import { createNewsletterForm, getNewsletterForm, updateNewsletterForm } from "../services/newsletterService";
 import NewsletterFormActionBuilder from "./NewsletterFormActionBuilder.jsx";
 import NewsletterFormFieldBuilder from "./NewsletterFormFieldBuilder.jsx";
+import MauticCategoryPicker from "../components/marketing/MauticCategoryPicker.jsx";
+import PublishWindowFields from "../components/marketing/PublishWindowFields.jsx";
 import {
   CARD_BORDER,
   DESCRIPTION_MAX_LENGTH,
@@ -45,7 +49,8 @@ import {
 const serverFieldErrors = (data) => {
   const errors = data?.errors && typeof data.errors === "object" ? data.errors : {};
   return Object.fromEntries(
-    Object.entries(errors).filter(([key]) => ["name", "description", "postAction", "postActionProperty"].includes(key))
+    Object.entries(errors).filter(([key]) => ["name", "description", "postAction", "postActionProperty", "category", "publishUp",
+      "publishDown", "progressiveProfilingLimit"].includes(key))
   );
 };
 
@@ -328,6 +333,28 @@ export default function AdminNewsletterFormEditorPage() {
               slotProps={{ htmlInput: { maxLength: propertyIsUrl ? REDIRECT_MAX_LENGTH : MESSAGE_MAX_LENGTH } }}
             />
           )}
+          <Typography component="h2" variant="subtitle1" sx={{ fontWeight: 850, color: NAVY, pt: 1 }}>Publishing and Behaviour</Typography>
+          <MauticCategoryPicker bundle="form" value={draft.category} current={draft.categoryInfo} disabled={saving}
+            onChange={(category) => setField("category", category)} helperText={fieldErrors.category || "Manage categories under Administration → Categories."} />
+          <PublishWindowFields start={draft.publishUp} end={draft.publishDown} disabled={saving} errors={fieldErrors}
+            onChange={({ start, end }) => {
+              if (start !== draft.publishUp) setField("publishUp", start);
+              if (end !== draft.publishDown) setField("publishDown", end);
+            }}
+            startHelp="The published Form is shown from then on. Your local time." endHelp="After this the Form stops showing. Your local time." />
+          <TextField
+            label="Progressive profiling: questions per visit"
+            value={draft.progressiveProfilingLimit}
+            onChange={(event) => setField("progressiveProfilingLimit", event.target.value.replace(/[^0-9]/g, "").slice(0, 3))}
+            error={Boolean(fieldErrors.progressiveProfilingLimit)}
+            helperText={fieldErrors.progressiveProfilingLimit || "Show at most this many unanswered fields to a known contact. Empty: no limit."}
+            slotProps={{ htmlInput: { inputMode: "numeric" } }}
+            sx={{ maxWidth: 360 }}
+          />
+          <FormControlLabel control={<Switch checked={draft.inKioskMode} onChange={(event) => setField("inKioskMode", event.target.checked)} />}
+            label="Kiosk mode: don't track or recognise the visitor (for shared devices such as event check-in)" />
+          <FormControlLabel control={<Switch checked={draft.noIndex} onChange={(event) => setField("noIndex", event.target.checked)} />}
+            label="Ask search engines not to index the Form's page" />
           {isNew && (
             <Alert severity="info" variant="outlined">
               The Form is created unpublished with no fields. After creating it, add its fields and a submit button, then publish it.
