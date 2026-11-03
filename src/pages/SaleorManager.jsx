@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Container,
   Paper,
@@ -100,6 +100,11 @@ export default function SaleorManager() {
     countries: [],
     shipping_zones: [],
   });
+  const [warehouseOptionsStatus, setWarehouseOptionsStatus] = useState("loading");
+  const warehouseOptionsRequest = useRef(0);
+  const warehouseListRequest = useRef(0);
+  const currentTab = useRef(tab);
+  currentTab.current = tab;
 
   // Channel options
   const [channelOptions, setChannelOptions] = useState({
@@ -222,10 +227,19 @@ export default function SaleorManager() {
   };
 
   const fetchWarehouseOptions = async () => {
+    const requestId = ++warehouseOptionsRequest.current;
+    setWarehouseOptionsStatus("loading");
     try {
       const res = await apiClient.get("/events/saleor/warehouse-options/");
+      if (requestId !== warehouseOptionsRequest.current) return;
+      if (!Array.isArray(res.data?.shipping_zones)) {
+        throw new Error("Invalid shipping zone lookup response");
+      }
       setWarehouseOptions(res.data);
+      setWarehouseOptionsStatus("loaded");
     } catch (err) {
+      if (requestId !== warehouseOptionsRequest.current) return;
+      setWarehouseOptionsStatus("error");
       console.error("Failed to fetch warehouse options:", err);
     }
   };
@@ -259,6 +273,7 @@ export default function SaleorManager() {
 
   const fetchData = async (tabIndex) => {
     if (!saleorStatus?.connected || !saleorStatus?.can_manage_staff) return;
+    const warehouseRequestId = tabIndex === 1 ? ++warehouseListRequest.current : null;
     setLoading(true);
     setError(null);
     let endpoint = "";
@@ -276,6 +291,26 @@ export default function SaleorManager() {
     }
 
     try {
+      if (tabIndex === 1) {
+        // Refresh cached relationship names without triggering any additional sync.
+        const optionsRequest = fetchWarehouseOptions();
+        const allWarehouses = [];
+        let page = 1;
+        let hasNextPage = true;
+        while (hasNextPage) {
+          const response = await apiClient.get(endpoint, { params: { page } });
+          if (warehouseRequestId !== warehouseListRequest.current) return;
+          const data = Array.isArray(response.data) ? response.data : response.data?.results;
+          if (!Array.isArray(data)) throw new Error("Invalid warehouse list response");
+          allWarehouses.push(...data);
+          hasNextPage = !Array.isArray(response.data) && Boolean(response.data.next);
+          page += 1;
+        }
+        await optionsRequest;
+        if (warehouseRequestId !== warehouseListRequest.current) return;
+        setWarehouses(allWarehouses);
+        return;
+      }
       const response = await apiClient.get(endpoint);
       const data = Array.isArray(response.data) ? response.data : response.data.results || [];
       if (tabIndex === 0) setChannels(data);
@@ -285,10 +320,31 @@ export default function SaleorManager() {
       else if (tabIndex === 4) setStaffUsers(data);
       else if (tabIndex === 5) setPermissionGroups(data);
     } catch (err) {
+      if (tabIndex === 1 && (warehouseRequestId !== warehouseListRequest.current || currentTab.current !== 1)) return;
       setError(`Failed to fetch data: ${err.message}`);
     } finally {
-      setLoading(false);
+      if (tabIndex !== 1 || (warehouseRequestId === warehouseListRequest.current && currentTab.current === 1)) {
+        setLoading(false);
+      }
     }
+  };
+
+  const renderWarehouseLinkedZones = (warehouse) => {
+    if (warehouseOptionsStatus === "loading") {
+      return <CircularProgress size={16} aria-label="Loading linked shipping zones" />;
+    }
+    if (warehouseOptionsStatus === "error") {
+      return <Typography variant="body2">Shipping zones unavailable</Typography>;
+    }
+    const linkedZones = warehouseOptions.shipping_zones.filter(
+      zone => warehouse.saleor_id && Array.isArray(zone.warehouse_ids)
+        && zone.warehouse_ids.includes(warehouse.saleor_id)
+    );
+    return linkedZones.length > 0 ? linkedZones.map(zone => (
+      <Tooltip key={zone.saleor_id} title="Linked Shipping Zone">
+        <Chip label={zone.name} size="small" variant="outlined" />
+      </Tooltip>
+    )) : <Typography variant="body2">—</Typography>;
   };
 
   const handleTabChange = (event, newValue) => {
@@ -1868,6 +1924,7 @@ export default function SaleorManager() {
                           </Box>
                         ) : (
                           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                            {tab === 1 && renderWarehouseLinkedZones(item)}
                             {tab === 0 && (item.warehouse_ids || []).length > 0 && (
                               <Tooltip title="Linked Warehouses">
                                 <Chip icon={<InfoIcon style={{ fontSize: 14 }} />} label={`${item.warehouse_ids.length} WH`} size="small" />
