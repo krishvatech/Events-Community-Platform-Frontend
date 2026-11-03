@@ -154,7 +154,7 @@ export function CompanyImportDialog({ open, onClose, onQueued }) {
     setBusy("start");
     setError("");
     try {
-      const result = await startNewsletterCompanyImport(file, mapping, mode);
+      const result = await startNewsletterCompanyImport(file, mapping, mode, preview?.attempt);
       setQueued(result);
       setRefreshKey((n) => n + 1);
       onQueued?.(result);

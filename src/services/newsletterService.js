@@ -202,8 +202,8 @@ const multipartBody = { headers: { "Content-Type": "multipart/form-data" } };
 export const previewNewsletterCompanyImport = (file, mapping) =>
   unwrap(apiClient.post(`${adminCompanyImportsEndpoint}preview/`, companyImportForm(file, mapping ? { mapping } : {}), multipartBody));
 
-export const startNewsletterCompanyImport = (file, mapping, mode) =>
-  unwrap(apiClient.post(adminCompanyImportsEndpoint, companyImportForm(file, { mapping, mode }), multipartBody));
+export const startNewsletterCompanyImport = (file, mapping, mode, attempt) =>
+  unwrap(apiClient.post(adminCompanyImportsEndpoint, companyImportForm(file, { mapping, mode, ...(attempt ? { attempt } : {}) }), multipartBody));
 
 export const listNewsletterCompanyImports = () => unwrap(apiClient.get(adminCompanyImportsEndpoint));
 

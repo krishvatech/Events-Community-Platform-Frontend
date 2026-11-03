@@ -44,10 +44,10 @@ test("the import needs a name column and queues the chosen mapping and mode", as
     get: async () => ({ data: { results: [] } }),
     post: async (url, form) => {
       const mapping = form.get("mapping");
-      posts.push({ url, mapping, mode: form.get("mode"), hasFile: form.has("file") });
+      posts.push({ url, mapping, mode: form.get("mode"), attempt: form.get("attempt"), hasFile: form.has("file") });
       if (url.endsWith("/preview/")) {
         const chosen = mapping ? JSON.parse(mapping) : { Name: "companyname", Site: "companywebsite" };
-        return { data: preview(chosen, Object.values(chosen).includes("companyname") ? CHECKS : null) };
+        return { data: { ...preview(chosen, Object.values(chosen).includes("companyname") ? CHECKS : null), attempt: "f".repeat(32) } };
       }
       return { data: { import: { id: 7 }, duplicate: false } };
     },
@@ -71,6 +71,7 @@ test("the import needs a name column and queues the chosen mapping and mode", as
   const queued = posts.at(-1);
   assert.equal(queued.url, "/newsletter/admin/companies/imports/");
   assert.equal(queued.mode, "skip_existing");
+  assert.equal(queued.attempt, "f".repeat(32));
   // The harness's FormData stringifies jsdom Files; the real upload is covered in Chrome.
   assert.equal(queued.hasFile, true);
   assert.equal(hasText(/Change file \(co\.csv\)/), true);
