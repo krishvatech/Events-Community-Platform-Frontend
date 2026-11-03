@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { apiClient } from '../../utils/api';
 import {
   Box,
@@ -39,6 +39,8 @@ import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 
 export default function ParticipantInformationManager({ eventId }) {
   const [assignments, setAssignments] = useState([]);
+  const [assignmentCount, setAssignmentCount] = useState(0);
+  const requestId = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(0);
@@ -70,6 +72,7 @@ export default function ParticipantInformationManager({ eventId }) {
   }, [eventId, page, rowsPerPage, searchText, filterStatus, filterRole, filterAttendanceMode, filterVisaSupport, filterAccessibilityNeed, filterPhotoConcent]);
 
   const fetchAssignments = async () => {
+    const currentRequest = ++requestId.current;
     try {
       setLoading(true);
       const params = new URLSearchParams();
@@ -102,13 +105,17 @@ export default function ParticipantInformationManager({ eventId }) {
       const { data } = await apiClient.get(
         `/events/${eventId}/post-acceptance-form-assignments-admin/?${params.toString()}`
       );
-      setAssignments(Array.isArray(data.results) ? data.results : data);
+      if (currentRequest !== requestId.current) return;
+      const rows = Array.isArray(data.results) ? data.results : data;
+      setAssignments(rows);
+      setAssignmentCount(typeof data.count === 'number' ? data.count : rows.length);
       setError(null);
     } catch (err) {
+      if (currentRequest !== requestId.current) return;
       setError(err.response?.data?.detail || 'Failed to load assignments');
       console.error('Error fetching assignments:', err);
     } finally {
-      setLoading(false);
+      if (currentRequest === requestId.current) setLoading(false);
     }
   };
 
@@ -171,12 +178,13 @@ export default function ParticipantInformationManager({ eventId }) {
   };
 
   const handleSelectAllClick = (event) => {
+    const newSelected = new Set(selectedAssignments);
     if (event.target.checked) {
-      const newSelected = new Set(assignments.map(a => a.id));
-      setSelectedAssignments(newSelected);
+      assignments.forEach(a => newSelected.add(a.id));
     } else {
-      setSelectedAssignments(new Set());
+      assignments.forEach(a => newSelected.delete(a.id));
     }
+    setSelectedAssignments(newSelected);
   };
 
   const handleSelectClick = (id) => {
@@ -484,8 +492,8 @@ export default function ParticipantInformationManager({ eventId }) {
             <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
               <TableCell padding="checkbox">
                 <Checkbox
-                  indeterminate={selectedAssignments.size > 0 && selectedAssignments.size < assignments.length}
-                  checked={selectedAssignments.size === assignments.length && assignments.length > 0}
+                  indeterminate={assignments.some(a => selectedAssignments.has(a.id)) && !assignments.every(a => selectedAssignments.has(a.id))}
+                  checked={assignments.length > 0 && assignments.every(a => selectedAssignments.has(a.id))}
                   onChange={handleSelectAllClick}
                 />
               </TableCell>
@@ -560,7 +568,7 @@ export default function ParticipantInformationManager({ eventId }) {
       <TablePagination
         rowsPerPageOptions={[25, 50, 100]}
         component="div"
-        count={summary.total}
+        count={assignmentCount}
         rowsPerPage={rowsPerPage}
         page={page}
         onPageChange={handlePageChange}
