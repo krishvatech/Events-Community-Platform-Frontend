@@ -296,8 +296,8 @@ function DesktopView({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, mb: 0.25, flexWrap: 'wrap' }}>
                         <Typography sx={{ fontSize: 15, fontWeight: 640, color: COLORS.dark }}>
                           {p.display_name}
-                          {['accepted_application', 'verified_guest'].includes(p.source) && (
-                            <Chip component="span" label={p.source === 'accepted_application' ? 'Accepted application' : 'Verified guest'} size="small" variant="outlined" sx={{ ml: 0.75, height: 18, fontSize: '0.65rem' }} />
+                          {p.source === 'verified_guest' && (
+                            <Chip component="span" label="Verified guest" size="small" variant="outlined" sx={{ ml: 0.75, height: 18, fontSize: '0.65rem' }} />
                           )}
                           {Boolean(p.user_id) && p.user_id === currentUserId && (
                             <Typography component="span" sx={{ fontSize: 13, color: '#999', fontWeight: 400, ml: 0.75 }}>
@@ -1107,8 +1107,8 @@ function MobileView({
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.25, flexWrap: 'wrap' }}>
                         <Typography sx={{ fontSize: 14, fontWeight: 600, color: COLORS.dark }}>
                           {p.display_name}
-                          {['accepted_application', 'verified_guest'].includes(p.source) && (
-                            <Chip component="span" label={p.source === 'accepted_application' ? 'Accepted application' : 'Verified guest'} size="small" variant="outlined" sx={{ ml: 0.75, height: 18, fontSize: '0.65rem' }} />
+                          {p.source === 'verified_guest' && (
+                            <Chip component="span" label="Verified guest" size="small" variant="outlined" sx={{ ml: 0.75, height: 18, fontSize: '0.65rem' }} />
                           )}
                           {Boolean(p.user_id) && p.user_id === currentUserId && (
                             <Typography component="span" sx={{ fontSize: 12, color: '#999', fontWeight: 400, ml: 0.625 }}>
