@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Component, useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -52,26 +52,26 @@ function EventCompanionAccessPage() {
   const [leadGenModalOpen, setLeadGenModalOpen] = useState(false);
   const [missingLeadGenFields, setMissingLeadGenFields] = useState({});
   const [showApplicationForm, setShowApplicationForm] = useState(false);
+  const accessInviteToken = new URLSearchParams(location.search).get('invite_token');
 
   useEffect(() => {
-    // Extract invite_token from URL and call checkAccess with it
-    const params = new URLSearchParams(location.search);
-    const token = params.get('invite_token');
-    setInviteToken(token || null);
-    // Note: checkAccess will use the token from location.search directly, not from state
-    checkAccess(token);
-  }, [slug, location]);
+    const controller = new AbortController();
+    setInviteToken(accessInviteToken || null);
+    checkAccess(accessInviteToken, controller.signal);
+    return () => controller.abort();
+  }, [slug, accessInviteToken]);
 
-  const checkAccess = async (inviteTokenParam = null) => {
+  const checkAccess = async (inviteTokenParam = null, signal) => {
     setLoading(true);
     setError('');
 
     try {
       // Get event details
-      const eventRes = await fetch(`${API_BASE}/events/?slug=${slug}`);
+      const eventRes = await fetch(`${API_BASE}/events/?slug=${slug}`, { signal });
       if (!eventRes.ok) throw new Error('Event not found');
 
       const eventData = await eventRes.json();
+      if (signal?.aborted) return;
       const eventItem = Array.isArray(eventData) ? eventData[0] : eventData.results?.[0];
       if (!eventItem) throw new Error('Event not found');
 
@@ -91,17 +91,26 @@ function EventCompanionAccessPage() {
       // Get current user
       const userRes = await fetch(`${API_BASE}/users/me/`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal,
       });
+      if (signal?.aborted) return;
 
       if (!userRes.ok) {
-        removeAccessToken();
-        localStorage.removeItem('access');
-        setIsAuthenticated(false);
-        setLoading(false);
+        if (userRes.status === 401) {
+          removeAccessToken();
+          localStorage.removeItem('access');
+          setIsAuthenticated(false);
+          setError('Your session has expired. Please sign in again.');
+        } else if (userRes.status === 403) {
+          setError('You do not have permission to access the Event Companion.');
+        } else {
+          setError('Unable to verify your access right now. Please try again.');
+        }
         return;
       }
 
       const user = await userRes.json();
+      if (signal?.aborted) return;
       setUserData(user);
       setIsAuthenticated(true);
 
@@ -118,11 +127,14 @@ function EventCompanionAccessPage() {
                 Authorization: `Bearer ${token}`,
               },
               body: JSON.stringify({ token: inviteTokenParam }),
+              signal,
             }
           );
+          if (signal?.aborted) return;
 
           if (acceptRes.ok) {
             const acceptData = await acceptRes.json();
+            if (signal?.aborted) return;
             setIsRegistered(true);
             setRegistrationStatus(acceptData.registration_status || 'registered');
             setProcessingInvite(false);
@@ -133,6 +145,7 @@ function EventCompanionAccessPage() {
             setProcessingInvite(false);
           }
         } catch (err) {
+          if (signal?.aborted) return;
           console.error('Failed to process invite token:', err);
           setProcessingInvite(false);
         }
@@ -141,12 +154,14 @@ function EventCompanionAccessPage() {
       // Check registration first (for all events, regardless of type)
       const regRes = await fetch(
         `${API_BASE}/event-registrations/?event=${eventItem.id}&user=${user.id}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` }, signal }
       );
+      if (signal?.aborted) return;
 
       let hasRegistration = false;
       if (regRes.ok) {
         const regData = await regRes.json();
+        if (signal?.aborted) return;
         const registrations = Array.isArray(regData) ? regData : regData.results || [];
 
         if (registrations.length > 0) {
@@ -164,11 +179,13 @@ function EventCompanionAccessPage() {
       if (!hasRegistration && eventItem.registration_type === 'apply') {
         const appRes = await fetch(
           `${API_BASE}/events/${eventItem.id}/apply/`,
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` }, signal }
         );
+        if (signal?.aborted) return;
 
         if (appRes.ok) {
           const appData = await appRes.json();
+          if (signal?.aborted) return;
           // Backend returns {"status":"none"} if no application exists
           if (appData && appData.status && appData.status !== 'none') {
             setIsRegistered(true);
@@ -189,9 +206,9 @@ function EventCompanionAccessPage() {
         setRegistrationStatus(null);
       }
     } catch (err) {
-      setError(err.message || 'Failed to check access');
+      if (!signal?.aborted) setError(err.message || 'Failed to check access');
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
   };
 
@@ -318,14 +335,14 @@ function EventCompanionAccessPage() {
     );
   }
 
-  if (error && !event) {
+  if (error) {
     return (
       <Container maxWidth="sm" sx={{ py: 6 }}>
         <Alert severity="error" sx={{ mb: 3 }}>
           {error}
         </Alert>
-        <Button variant="contained" onClick={() => navigate('/')}>
-          Back to Home
+        <Button variant="contained" onClick={() => checkAccess(accessInviteToken)}>
+          Try Again
         </Button>
       </Container>
     );
@@ -612,6 +629,69 @@ function EventCompanionAccessPage() {
       </>
     );
   }
+
+  return (
+    <Container maxWidth="sm" sx={{ py: 6 }}>
+      <Alert severity="warning" sx={{ mb: 3 }}>
+        Unable to determine your Event Companion access. Please sign in or try again.
+      </Alert>
+      <Stack direction="row" spacing={2}>
+        <Button variant="contained" onClick={() => checkAccess(accessInviteToken)}>Try Again</Button>
+        <Button onClick={handleLoginClick}>Sign In</Button>
+      </Stack>
+    </Container>
+  );
 }
 
-export default EventCompanionAccessPage;
+class CompanionErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, errorMessage: '', componentStack: '' };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, info) {
+    if (import.meta.env.DEV) {
+      console.error('Event Companion rendering failed:', error);
+      console.error('Exception stack:', error?.stack);
+      console.error('React component stack:', info?.componentStack);
+    } else {
+      console.error('Event Companion rendering failed.');
+    }
+    this.setState({
+      errorMessage: error?.message || String(error),
+      componentStack: info?.componentStack || '',
+    });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <Container maxWidth="sm" sx={{ py: 6 }}>
+          <Alert severity="error" sx={{ mb: 3 }}>
+            The Event Companion could not be displayed. Please refresh the page or try again later.
+          </Alert>
+          {import.meta.env.DEV && (
+            <Paper sx={{ p: 2, mb: 3, overflow: 'auto' }}>
+              <Typography variant="subtitle2">Development diagnostics</Typography>
+              <Typography component="pre" sx={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontSize: 12 }}>
+                {this.state.errorMessage}{'\n'}{this.state.componentStack}
+              </Typography>
+            </Paper>
+          )}
+          <Button variant="contained" onClick={() => this.setState({ hasError: false, errorMessage: '', componentStack: '' })}>
+            Try Again
+          </Button>
+        </Container>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+export default function EventCompanionAccessPageWithBoundary() {
+  return <CompanionErrorBoundary><EventCompanionAccessPage /></CompanionErrorBoundary>;
+}

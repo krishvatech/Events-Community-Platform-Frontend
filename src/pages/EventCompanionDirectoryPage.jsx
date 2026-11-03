@@ -162,6 +162,7 @@ function DesktopView({
   handleSendRequest,
   handleMessageAttendee,
   myMeetings,
+  unreadCounts,
   onHoveredAttendee,
   showCancelDialog,
   setShowCancelDialog,
@@ -998,6 +999,7 @@ function MobileView({
   handleSendRequest,
   handleMessageAttendee,
   myMeetings,
+  unreadCounts,
   showCancelDialog,
   setShowCancelDialog,
   handleCancelMeetingConfirm,
@@ -1716,7 +1718,10 @@ function EventCompanionDirectoryPage() {
   const [userInitials, setUserInitials] = useState('');
   const [currentUserId, setCurrentUserId] = useState(null);
   const [networkingSettings, setNetworkingSettings] = useState(null);
-  const [activeTab, setActiveTab] = useState(0);
+  const [activeTab, setActiveTab] = useState(() =>
+    new URLSearchParams(location.search).get('tab') === 'meetings' ? 1 :
+      new URLSearchParams(location.search).get('tab') === 'schedule' ? 2 : 0
+  );
   const [scheduleAvailable, setScheduleAvailable] = useState(false);
   const [myMeetings, setMyMeetings] = useState([]);
 
@@ -1778,9 +1783,13 @@ function EventCompanionDirectoryPage() {
     const tab = params.get('tab');
     if (tab === 'meetings') {
       setActiveTab(1);
-    } else if (tab === 'directory') {
+    } else if (tab === 'schedule') {
+      setActiveTab(2);
+    } else if (tab === 'directory' || !tab) {
       setActiveTab(0);
-      setFlowStep(1);
+      if (tab === 'directory') {
+        setFlowStep(1);
+      }
     }
   }, [location.search]);
 
@@ -2198,6 +2207,9 @@ function EventCompanionDirectoryPage() {
 
       const createdMeeting = await res.json();
       setActiveMeeting(createdMeeting);
+      if (createdMeeting?.id) {
+        setMyMeetings(prev => [createdMeeting, ...prev.filter(m => m?.id !== createdMeeting.id)]);
+      }
       toast.success('Meeting request sent!');
       setFlowStep(3);
       loadMyMeetingsCount();  // Update the meetings count badge
@@ -2377,7 +2389,7 @@ function EventCompanionDirectoryPage() {
                 } else if (newValue === 2) {
                   // Schedule tab clicked
                   setActiveTab(2);
-                  navigate('');
+                  navigate('?tab=schedule');
                 }
               }}
               sx={{
@@ -2456,6 +2468,7 @@ function EventCompanionDirectoryPage() {
                 handleSendRequest={handleSendRequest}
                 handleMessageAttendee={handleMessageAttendee}
                 myMeetings={myMeetings}
+                unreadCounts={unreadCounts}
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
@@ -2492,6 +2505,7 @@ function EventCompanionDirectoryPage() {
                 handleSendRequest={handleSendRequest}
                 handleMessageAttendee={handleMessageAttendee}
                 myMeetings={myMeetings}
+                unreadCounts={unreadCounts}
                 onHoveredAttendee={setHoveredAttendee}
                 hoveredAttendee={hoveredAttendee}
                 showCancelDialog={showCancelDialog}
@@ -2546,6 +2560,7 @@ function EventCompanionDirectoryPage() {
                 handleSendRequest={handleSendRequest}
                 handleMessageAttendee={handleMessageAttendee}
                 myMeetings={myMeetings}
+                unreadCounts={unreadCounts}
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
@@ -2582,6 +2597,7 @@ function EventCompanionDirectoryPage() {
                 handleSendRequest={handleSendRequest}
                 handleMessageAttendee={handleMessageAttendee}
                 myMeetings={myMeetings}
+                unreadCounts={unreadCounts}
                 onHoveredAttendee={setHoveredAttendee}
                 hoveredAttendee={hoveredAttendee}
                 showCancelDialog={showCancelDialog}
