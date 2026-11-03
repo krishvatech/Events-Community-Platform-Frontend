@@ -158,11 +158,11 @@ function ScheduleTab({ eventId, token, isMobile, currentUserId }) {
     );
   }
 
-  if (!schedule || schedule.length === 0) {
+  if (!schedule || !schedule.some(day => day.sessions?.length > 0)) {
     return (
       <Box sx={{ p: { xs: 2, sm: 3 }, textAlign: 'center' }}>
         <Typography variant="body1" sx={{ color: '#999' }}>
-          No schedule available for this event
+          No schedule available for this event yet
         </Typography>
       </Box>
     );

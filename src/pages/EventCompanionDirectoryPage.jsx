@@ -15,6 +15,8 @@ import {
   Tooltip,
   Tabs,
   Tab,
+  BottomNavigation,
+  BottomNavigationAction,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -32,6 +34,9 @@ import ScheduleTab from '../components/ScheduleTab';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
+import EventAvailableIcon from '@mui/icons-material/EventAvailable';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
@@ -1723,7 +1728,6 @@ function EventCompanionDirectoryPage() {
     new URLSearchParams(location.search).get('tab') === 'meetings' ? 1 :
       new URLSearchParams(location.search).get('tab') === 'schedule' ? 2 : 0
   );
-  const [scheduleAvailable, setScheduleAvailable] = useState(false);
   const [myMeetings, setMyMeetings] = useState([]);
 
   // New flow state
@@ -1748,6 +1752,24 @@ function EventCompanionDirectoryPage() {
   const pollingInterval = useRef(null);
   const unreadPollInterval = useRef(null);
   const [unreadCounts, setUnreadCounts] = useState({});
+
+  const handleTabChange = (_event, newValue) => {
+    if (newValue === 0) {
+      setActiveTab(0);
+      setFlowStep(1);
+      setSelectedAttendee(null);
+      setSelectedSlot(null);
+      setMeetingNote('');
+      setSelectedDuration(null);
+      navigate('?tab=directory');
+    } else if (newValue === 1) {
+      setActiveTab(1);
+      navigate('?tab=meetings');
+    } else if (newValue === 2) {
+      setActiveTab(2);
+      navigate('?tab=schedule');
+    }
+  };
 
   // Handle the ?meeting=<id> deep link. This needs the loaded meetings list,
   // so it depends on myMeetings (which refreshes on a background poll).
@@ -1919,29 +1941,6 @@ function EventCompanionDirectoryPage() {
     };
 
     fetchNetworkingSettings();
-  }, [event?.id, token]);
-
-  // Check schedule availability
-  useEffect(() => {
-    if (!event?.id || !token) return;
-
-    const checkSchedule = async () => {
-      try {
-        const res = await fetch(`${API_BASE}/events/${event.id}/schedule/`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        if (!res.ok) {
-          setScheduleAvailable(false);
-          return;
-        }
-        const data = await res.json();
-        setScheduleAvailable(data.days && data.days.some(d => d.sessions && d.sessions.length > 0));
-      } catch (err) {
-        setScheduleAvailable(false);
-      }
-    };
-
-    checkSchedule();
   }, [event?.id, token]);
 
   // Fetch directory
@@ -2361,39 +2360,21 @@ function EventCompanionDirectoryPage() {
         display: 'flex',
         flexDirection: 'column',
         height: '100vh',
+        '@supports (height: 100dvh)': { height: '100dvh' },
         bgcolor: COLORS.bg,
       }}>
-        {/* Tab Navigation - Always visible */}
-        {networkingSettings?.enabled && (
+        {/* Desktop and tablet tab navigation */}
+        {networkingSettings?.enabled && !isMobile && (
           <Box sx={{
             bgcolor: '#fff',
             borderBottom: '1px solid #F0EEEB',
             display: 'flex',
             alignItems: 'center',
-            px: isMobile ? 2 : 3,
+            px: 3,
           }}>
             <Tabs
               value={activeTab}
-              onChange={(e, newValue) => {
-                if (newValue === 0) {
-                  // Directory tab clicked - reset flow state
-                  setActiveTab(0);
-                  setFlowStep(1);
-                  setSelectedAttendee(null);
-                  setSelectedSlot(null);
-                  setMeetingNote('');
-                  setSelectedDuration(null);
-                  navigate(`?tab=directory`);
-                } else if (newValue === 1) {
-                  // My Meetings tab clicked
-                  setActiveTab(1);
-                  navigate(`?tab=meetings`);
-                } else if (newValue === 2) {
-                  // Schedule tab clicked
-                  setActiveTab(2);
-                  navigate('?tab=schedule');
-                }
-              }}
+              onChange={handleTabChange}
               sx={{
                 '& .MuiTabs-indicator': { backgroundColor: COLORS.teal, height: 3 },
               }}
@@ -2418,18 +2399,16 @@ function EventCompanionDirectoryPage() {
                   minHeight: 50,
                 }}
               />
-              {scheduleAvailable && (
-                <Tab
-                  label="Schedule"
-                  sx={{
-                    textTransform: 'none',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: activeTab === 2 ? COLORS.teal : '#999',
-                    minHeight: 50,
-                  }}
-                />
-              )}
+              <Tab
+                label="Schedule"
+                sx={{
+                  textTransform: 'none',
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: activeTab === 2 ? COLORS.teal : '#999',
+                  minHeight: 50,
+                }}
+              />
             </Tabs>
           </Box>
         )}
@@ -2441,7 +2420,7 @@ function EventCompanionDirectoryPage() {
           </Typography>
         )}
         {/* Content */}
-        <Box sx={{ flex: 1, overflowY: 'auto', p: isMobile ? 0 : 2 }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: isMobile ? 0 : 2 }}>
           {activeTab === 0 && flowStep > 1 ? (
             // Show flow views
             isMobile ? (
@@ -2613,6 +2592,15 @@ function EventCompanionDirectoryPage() {
             )
           )}
         </Box>
+        {networkingSettings?.enabled && isMobile && (
+          <Box component="nav" aria-label="Event Companion navigation" sx={{ flexShrink: 0, bgcolor: '#fff', borderTop: '1px solid #F0EEEB', pb: 'env(safe-area-inset-bottom, 0px)' }}>
+            <BottomNavigation value={activeTab} onChange={handleTabChange} showLabels sx={{ width: '100%', height: 64, '& .MuiBottomNavigationAction-root': { minWidth: 0, px: 0.5, color: '#777' }, '& .Mui-selected': { color: COLORS.teal } }}>
+              <BottomNavigationAction label="Directory" icon={<PeopleOutlineIcon />} aria-label="Directory" />
+              <BottomNavigationAction label={activeTab !== 1 && myMeetingsCount > 0 ? `My Meetings (${myMeetingsCount})` : 'My Meetings'} icon={<EventAvailableIcon />} aria-label="My Meetings" />
+              <BottomNavigationAction label="Schedule" icon={<CalendarMonthIcon />} aria-label="Schedule" />
+            </BottomNavigation>
+          </Box>
+        )}
       </Box>
       <ToastContainer
         position="top-center"
