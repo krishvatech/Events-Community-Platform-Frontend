@@ -54,6 +54,9 @@ import AdminNewsletterMauticCategoriesPage from "./pages/AdminNewsletterMauticCa
 import AdminNewsletterCalendarPage from "./pages/AdminNewsletterCalendarPage.jsx";
 import AdminNewsletterAssetEditorPage from "./pages/AdminNewsletterAssetEditorPage.jsx";
 import AdminNewsletterAssetDetailsPage from "./pages/AdminNewsletterAssetDetailsPage.jsx";
+import AdminNewsletterFocusItemsPage from "./pages/AdminNewsletterFocusItemsPage.jsx";
+import AdminNewsletterFocusEditorPage from "./pages/AdminNewsletterFocusEditorPage.jsx";
+import AdminNewsletterFocusDetailsPage from "./pages/AdminNewsletterFocusDetailsPage.jsx";
 import AdminNewsletterReportEditorPage from "./pages/AdminNewsletterReportEditorPage.jsx";
 import AdminNewsletterReportViewerPage from "./pages/AdminNewsletterReportViewerPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
@@ -424,6 +427,11 @@ const AppShell = () => {
               <Route path="assets/new" element={<AdminNewsletterAssetEditorPage />} />
               <Route path="assets/:assetId" element={<AdminNewsletterAssetDetailsPage />} />
               <Route path="assets/:assetId/edit" element={<AdminNewsletterAssetEditorPage />} />
+              {/* Mautic Focus Items; static "focus-items/..." segments rank above ":campaignId". */}
+              <Route path="focus-items" element={<AdminNewsletterFocusItemsPage />} />
+              <Route path="focus-items/new" element={<AdminNewsletterFocusEditorPage />} />
+              <Route path="focus-items/:focusId" element={<AdminNewsletterFocusDetailsPage />} />
+              <Route path="focus-items/:focusId/edit" element={<AdminNewsletterFocusEditorPage />} />
               {/* Mautic reports; static "reports/..." segments rank above ":campaignId". */}
               <Route path="reports" element={<AdminNewsletterReportsPage />} />
               <Route path="reports/new" element={<AdminNewsletterReportEditorPage />} />

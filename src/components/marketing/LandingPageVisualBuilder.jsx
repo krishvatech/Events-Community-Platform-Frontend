@@ -2,9 +2,11 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } f
 import { Alert, Box, CircularProgress } from "@mui/material";
 
 import {
+  FOCUS_BLOCK_ATTR,
   FORM_BLOCK_ATTR,
   builderBodyContent,
   composePageDocument,
+  focusBlockMarkup,
   formBlockMarkup,
   headStyleMarkup,
   splitPageDocument,
@@ -20,8 +22,10 @@ export async function loadGrapesBuilder() {
   return { grapesjs: core.default || core, blocksBasic: blocks.default || blocks };
 }
 
-// Canvas only (never exported): makes a Mautic Form token visible as a placeholder.
-const FORM_PLACEHOLDER_STYLE = `<style>[${FORM_BLOCK_ATTR}]{border:1px dashed #1B2A4A;background:#F7F9FA;padding:16px;font-family:monospace;color:#1B2A4A}[${FORM_BLOCK_ATTR}]::before{content:attr(title) " — shown on the live page";display:block;font-family:Arial,sans-serif;font-weight:700;margin-bottom:4px}</style>`;
+// Canvas only (never exported): makes Mautic Form and Focus Item tokens visible as placeholders.
+const PLACEHOLDERS = `[${FORM_BLOCK_ATTR}],[${FOCUS_BLOCK_ATTR}]`;
+const PLACEHOLDER_TITLES = `[${FORM_BLOCK_ATTR}]::before,[${FOCUS_BLOCK_ATTR}]::before`;
+const FORM_PLACEHOLDER_STYLE = `<style>${PLACEHOLDERS}{border:1px dashed #1B2A4A;background:#F7F9FA;padding:16px;font-family:monospace;color:#1B2A4A}${PLACEHOLDER_TITLES}{content:attr(title) " — shown on the live page";display:block;font-family:Arial,sans-serif;font-weight:700;margin-bottom:4px}</style>`;
 
 // Line icons in the style of the basic blocks' own.
 const blockIcon = (paths) =>
@@ -102,18 +106,21 @@ const LandingPageVisualBuilder = forwardRef(function LandingPageVisualBuilder(
       return exportDocument(editor);
     },
     /** Adds a Mautic Form after the selected element, or at the end of the page. */
-    insertForm: (formId, name) => {
-      const editor = editorRef.current;
-      if (!editor || !readyRef.current) return;
-      const markup = formBlockMarkup(formId, name);
-      const selected = editor.getSelected();
-      const parent = selected?.parent?.();
-      const [added] = parent
-        ? parent.components().add(markup, { at: selected.index() + 1 })
-        : editor.getWrapper().append(markup);
-      if (added) editor.select(added);
-    },
+    insertForm: (formId, name) => insertMarkup(formBlockMarkup(formId, name)),
+    /** Adds a Focus Item (its token) after the selected element, or at the end of the page. */
+    insertFocus: (focusId, name) => insertMarkup(focusBlockMarkup(focusId, name)),
   }));
+
+  function insertMarkup(markup) {
+    const editor = editorRef.current;
+    if (!editor || !readyRef.current) return;
+    const selected = editor.getSelected();
+    const parent = selected?.parent?.();
+    const [added] = parent
+      ? parent.components().add(markup, { at: selected.index() + 1 })
+      : editor.getWrapper().append(markup);
+    if (added) editor.select(added);
+  }
 
   useEffect(() => {
     let cancelled = false;

@@ -605,6 +605,31 @@ export const getNewsletterAssetDownloads = (assetId, params = {}) =>
 export const downloadNewsletterAssetFile = (assetId) =>
   unwrap(apiClient.get(`${adminAssetsEndpoint}${assetId}/file/`, { responseType: "blob" }));
 
+// Focus Items: Mautic's website pop-ups and bars. Saves run as the admin's own
+// Mautic user; the preview is Mautic's own rendering of unsaved settings.
+const adminFocusEndpoint = "/newsletter/admin/focus-items/";
+
+// params: {page, page_size, search, status: "published" | "unpublished"}
+export const listNewsletterFocusItems = (params = {}) => unwrap(apiClient.get(adminFocusEndpoint, { params }));
+
+export const getNewsletterFocusItem = (focusId) => unwrap(apiClient.get(`${adminFocusEndpoint}${encodeURIComponent(focusId)}/`));
+
+export const createNewsletterFocusItem = (payload) => unwrap(apiClient.post(adminFocusEndpoint, payload));
+
+export const updateNewsletterFocusItem = (focusId, payload) =>
+  unwrap(apiClient.patch(`${adminFocusEndpoint}${encodeURIComponent(focusId)}/`, payload));
+
+export const deleteNewsletterFocusItem = (focusId) => unwrap(apiClient.delete(`${adminFocusEndpoint}${encodeURIComponent(focusId)}/`));
+
+export const duplicateNewsletterFocusItem = (focusId) =>
+  unwrap(apiClient.post(`${adminFocusEndpoint}${encodeURIComponent(focusId)}/duplicate/`));
+
+export const previewNewsletterFocusItem = (payload, config = {}) => unwrap(apiClient.post(`${adminFocusEndpoint}preview/`, payload, config));
+
+// params: {days}
+export const getNewsletterFocusInsights = (focusId, params = {}) =>
+  unwrap(apiClient.get(`${adminFocusEndpoint}${encodeURIComponent(focusId)}/insights/`, { params }));
+
 // Reports: Mautic's report builder. Saves run as the admin's own Mautic user;
 // data and graphs are read for a date range (YYYY-MM-DD, UTC).
 const adminReportsEndpoint = "/newsletter/admin/reports/";

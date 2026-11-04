@@ -7,6 +7,7 @@
 
 export const BUILDER_CSS_MARKER = "/* ecp-page-builder */";
 export const FORM_BLOCK_ATTR = "data-ecp-mautic-form";
+export const FOCUS_BLOCK_ATTR = "data-ecp-mautic-focus";
 
 const builderStylesOf = (doc) =>
   Array.from(doc.head.querySelectorAll("style")).filter((node) => node.textContent.trimStart().startsWith(BUILDER_CSS_MARKER));
@@ -117,4 +118,11 @@ export function formBlockMarkup(formId, name = "") {
   const id = String(formId || "").replace(/\D/g, "");
   if (!id) throw new Error("A Mautic Form ID is required.");
   return `<div ${FORM_BLOCK_ATTR}="${id}" title="${escapeAttr(name ? `Mautic Form: ${name}` : `Mautic Form #${id}`)}">{form=${id}}</div>`;
+}
+
+/** Markup the builder inserts for a Focus Item; Mautic turns the token into its script on the live page. */
+export function focusBlockMarkup(focusId, name = "") {
+  const id = String(focusId || "").replace(/\D/g, "");
+  if (!id) throw new Error("A Focus Item ID is required.");
+  return `<div ${FOCUS_BLOCK_ATTR}="${id}" title="${escapeAttr(name ? `Focus Item: ${name}` : `Focus Item #${id}`)}">{focus=${id}}</div>`;
 }

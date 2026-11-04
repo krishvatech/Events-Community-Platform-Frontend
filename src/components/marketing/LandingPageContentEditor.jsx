@@ -16,11 +16,12 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import AdsClickRoundedIcon from "@mui/icons-material/AdsClickRounded";
 import CodeRoundedIcon from "@mui/icons-material/CodeRounded";
 import DashboardCustomizeRoundedIcon from "@mui/icons-material/DashboardCustomizeRounded";
 import DynamicFormRoundedIcon from "@mui/icons-material/DynamicFormRounded";
 
-import { listNewsletterForms } from "../../services/newsletterService";
+import { listNewsletterFocusItems, listNewsletterForms } from "../../services/newsletterService";
 import { findActiveContent, hasBuilderStyle } from "./landingPageDocument";
 
 const LandingPageVisualBuilder = lazy(() => import("./LandingPageVisualBuilder.jsx"));
@@ -79,6 +80,51 @@ function FormPickerDialog({ open, onClose, onPick }) {
   );
 }
 
+/** Lists published Focus Items and returns the chosen one. */
+function FocusPickerDialog({ open, onClose, onPick }) {
+  const [state, setState] = useState({ loading: false, items: [], error: "" });
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let active = true;
+    setState({ loading: true, items: [], error: "" });
+    listNewsletterFocusItems({ status: "published", page_size: 100 })
+      .then((data) => active && setState({ loading: false, items: Array.isArray(data?.results) ? data.results : [], error: "" }))
+      .catch(() => active && setState({ loading: false, items: [], error: "Published Focus Items could not be loaded from Mautic." }));
+    return () => {
+      active = false;
+    };
+  }, [open]);
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Insert a Focus Item</DialogTitle>
+      <DialogContent>
+        {state.loading && <CircularProgress size={24} aria-label="Loading Focus Items" />}
+        {state.error && <Alert severity="error">{state.error}</Alert>}
+        {!state.loading && !state.error && state.items.length === 0 && (
+          <Typography color="text.secondary">There are no published Focus Items. Publish one under Focus Items first.</Typography>
+        )}
+        {state.items.length > 0 && (
+          <List dense aria-label="Published Focus Items">
+            {state.items.map((item) => (
+              <ListItemButton key={item.id} onClick={() => onPick(item)}>
+                <ListItemText primary={item.name || `Focus Item #${item.id}`} secondary={`Focus Item #${item.id}`} />
+              </ListItemButton>
+            ))}
+          </List>
+        )}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          The builder shows a placeholder; the Focus Item itself appears on the live page.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /**
  * Visual Builder / HTML Editor switch for one landing page. The HTML editor is
  * the caller's `htmlEditor` node; the page HTML is the only saved copy, so the
@@ -93,6 +139,7 @@ const LandingPageContentEditor = forwardRef(function LandingPageContentEditor(
   const [nonce, setNonce] = useState(0);
   const [confirmTidy, setConfirmTidy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [focusPickerOpen, setFocusPickerOpen] = useState(false);
   const [error, setError] = useState("");
   const activeContent = useMemo(() => findActiveContent(html), [html]);
   const visual = mode === MODE_VISUAL && !readOnly && activeContent.length === 0;
@@ -162,6 +209,11 @@ const LandingPageContentEditor = forwardRef(function LandingPageContentEditor(
               Insert Mautic Form
             </Button>
           )}
+          {visual && (
+            <Button size="small" variant="outlined" startIcon={<AdsClickRoundedIcon />} onClick={() => setFocusPickerOpen(true)} sx={{ textTransform: "none" }}>
+              Insert Focus Item
+            </Button>
+          )}
         </Stack>
       )}
       {error && <Alert severity="warning" onClose={() => setError("")}>{error}</Alert>}
@@ -213,6 +265,14 @@ const LandingPageContentEditor = forwardRef(function LandingPageContentEditor(
         onPick={(form) => {
           setPickerOpen(false);
           builderRef.current?.insertForm(form.id, form.name);
+        }}
+      />
+      <FocusPickerDialog
+        open={focusPickerOpen}
+        onClose={() => setFocusPickerOpen(false)}
+        onPick={(item) => {
+          setFocusPickerOpen(false);
+          builderRef.current?.insertFocus(item.id, item.name);
         }}
       />
     </Stack>

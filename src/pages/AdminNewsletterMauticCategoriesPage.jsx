@@ -56,6 +56,7 @@ export const CATEGORY_TYPES = [
   ["campaign", "Campaigns"],
   ["segment", "Segments"],
   ["asset", "Assets"],
+  ["plugin:focus", "Focus Items"],
   ["global", "Global (every type)"],
 ];
 const typeLabel = (bundle) => CATEGORY_TYPES.find(([key]) => key === bundle)?.[1] || bundle || "";
