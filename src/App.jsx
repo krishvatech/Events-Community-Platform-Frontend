@@ -57,6 +57,9 @@ import AdminNewsletterAssetDetailsPage from "./pages/AdminNewsletterAssetDetails
 import AdminNewsletterFocusItemsPage from "./pages/AdminNewsletterFocusItemsPage.jsx";
 import AdminNewsletterFocusEditorPage from "./pages/AdminNewsletterFocusEditorPage.jsx";
 import AdminNewsletterFocusDetailsPage from "./pages/AdminNewsletterFocusDetailsPage.jsx";
+import AdminNewsletterDynamicContentListPage from "./pages/AdminNewsletterDynamicContentListPage.jsx";
+import AdminNewsletterDynamicContentEditorPage from "./pages/AdminNewsletterDynamicContentEditorPage.jsx";
+import AdminNewsletterDynamicContentDetailsPage from "./pages/AdminNewsletterDynamicContentDetailsPage.jsx";
 import AdminNewsletterReportEditorPage from "./pages/AdminNewsletterReportEditorPage.jsx";
 import AdminNewsletterReportViewerPage from "./pages/AdminNewsletterReportViewerPage.jsx";
 import AdminNewsletterContactsPage from "./pages/AdminNewsletterContactsPage.jsx";
@@ -432,6 +435,11 @@ const AppShell = () => {
               <Route path="focus-items/new" element={<AdminNewsletterFocusEditorPage />} />
               <Route path="focus-items/:focusId" element={<AdminNewsletterFocusDetailsPage />} />
               <Route path="focus-items/:focusId/edit" element={<AdminNewsletterFocusEditorPage />} />
+              {/* Mautic Dynamic Content; static "dynamic-content/..." segments rank above ":campaignId". */}
+              <Route path="dynamic-content" element={<AdminNewsletterDynamicContentListPage />} />
+              <Route path="dynamic-content/new" element={<AdminNewsletterDynamicContentEditorPage />} />
+              <Route path="dynamic-content/:itemId" element={<AdminNewsletterDynamicContentDetailsPage />} />
+              <Route path="dynamic-content/:itemId/edit" element={<AdminNewsletterDynamicContentEditorPage />} />
               {/* Mautic reports; static "reports/..." segments rank above ":campaignId". */}
               <Route path="reports" element={<AdminNewsletterReportsPage />} />
               <Route path="reports/new" element={<AdminNewsletterReportEditorPage />} />

@@ -57,6 +57,7 @@ export const CATEGORY_TYPES = [
   ["segment", "Segments"],
   ["asset", "Assets"],
   ["plugin:focus", "Focus Items"],
+  ["dynamicContent", "Dynamic Content"],
   ["global", "Global (every type)"],
 ];
 const typeLabel = (bundle) => CATEGORY_TYPES.find(([key]) => key === bundle)?.[1] || bundle || "";

@@ -120,6 +120,17 @@ export function formBlockMarkup(formId, name = "") {
   return `<div ${FORM_BLOCK_ATTR}="${id}" title="${escapeAttr(name ? `Mautic Form: ${name}` : `Mautic Form #${id}`)}">{form=${id}}</div>`;
 }
 
+/**
+ * Markup the builder inserts for a Dynamic Content slot. Mautic replaces the
+ * whole element with the matching content on the live page; visitors with no
+ * match keep the default text inside it.
+ */
+export function dynamicContentBlockMarkup(slot) {
+  const name = String(slot || "");
+  if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/.test(name)) throw new Error("A valid Dynamic Content slot name is required.");
+  return `<div data-slot="dwc" data-param-slot-name="${name}" title="Dynamic Content: ${name}">Default content for visitors who match no rule</div>`;
+}
+
 /** Markup the builder inserts for a Focus Item; Mautic turns the token into its script on the live page. */
 export function focusBlockMarkup(focusId, name = "") {
   const id = String(focusId || "").replace(/\D/g, "");

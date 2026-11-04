@@ -249,7 +249,7 @@ export default function AdminNewsletterPageEditorPage() {
           minRows={22}
           maxRows={40}
           error={Boolean(fieldErrors.customHtml)}
-          helperText={fieldErrors.customHtml || "A full HTML document. {form=ID} embeds a published Mautic Form and {focus=ID} shows a published Focus Item when the page is viewed. Contact tokens such as {contactfield=…} are not filled in on landing pages."}
+          helperText={fieldErrors.customHtml || "A full HTML document. {form=ID} embeds a published Mautic Form and {focus=ID} shows a published Focus Item and {dwc=slot} shows Dynamic Content when the page is viewed. Contact tokens such as {contactfield=…} are not filled in on landing pages."}
           slotProps={{
             htmlInput: { spellCheck: false, readOnly: htmlLocked, style: { fontFamily: "monospace", fontSize: 13 } },
           }}

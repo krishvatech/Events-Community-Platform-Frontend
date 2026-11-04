@@ -630,6 +630,36 @@ export const previewNewsletterFocusItem = (payload, config = {}) => unwrap(apiCl
 export const getNewsletterFocusInsights = (focusId, params = {}) =>
   unwrap(apiClient.get(`${adminFocusEndpoint}${encodeURIComponent(focusId)}/insights/`, { params }));
 
+// Dynamic Content: Mautic page blocks that change per visitor (by rules or by a
+// campaign). Saves run as the admin's own Mautic user.
+const adminDynamicContentEndpoint = "/newsletter/admin/dynamic-content/";
+
+// params: {page, page_size, search, status: "published" | "unpublished", mode: "rules" | "campaign"}
+export const listNewsletterDynamicContents = (params = {}) => unwrap(apiClient.get(adminDynamicContentEndpoint, { params }));
+
+export const getNewsletterDynamicContent = (itemId) =>
+  unwrap(apiClient.get(`${adminDynamicContentEndpoint}${encodeURIComponent(itemId)}/`));
+
+export const createNewsletterDynamicContent = (payload) => unwrap(apiClient.post(adminDynamicContentEndpoint, payload));
+
+export const updateNewsletterDynamicContent = (itemId, payload) =>
+  unwrap(apiClient.patch(`${adminDynamicContentEndpoint}${encodeURIComponent(itemId)}/`, payload));
+
+export const deleteNewsletterDynamicContent = (itemId) =>
+  unwrap(apiClient.delete(`${adminDynamicContentEndpoint}${encodeURIComponent(itemId)}/`));
+
+export const duplicateNewsletterDynamicContent = (itemId) =>
+  unwrap(apiClient.post(`${adminDynamicContentEndpoint}${encodeURIComponent(itemId)}/duplicate/`));
+
+// params: {days}
+export const getNewsletterDynamicContentInsights = (itemId, params = {}) =>
+  unwrap(apiClient.get(`${adminDynamicContentEndpoint}${encodeURIComponent(itemId)}/insights/`, { params }));
+
+export const listNewsletterDynamicContentSlots = () => unwrap(apiClient.get(`${adminDynamicContentEndpoint}slots/`));
+
+/** Fields and conditions a rule can use (contact fields Mautic can check for a visitor). */
+export const getNewsletterDynamicContentRuleMetadata = () => unwrap(apiClient.get(`${adminDynamicContentEndpoint}rule-metadata/`));
+
 // Reports: Mautic's report builder. Saves run as the admin's own Mautic user;
 // data and graphs are read for a date range (YYYY-MM-DD, UTC).
 const adminReportsEndpoint = "/newsletter/admin/reports/";

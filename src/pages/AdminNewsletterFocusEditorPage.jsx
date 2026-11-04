@@ -5,7 +5,6 @@ import {
   Button,
   CircularProgress,
   FormControlLabel,
-  IconButton,
   MenuItem,
   Paper,
   Stack,
@@ -13,20 +12,14 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
-import FormatBoldRoundedIcon from "@mui/icons-material/FormatBoldRounded";
-import FormatItalicRoundedIcon from "@mui/icons-material/FormatItalicRounded";
-import FormatListBulletedRoundedIcon from "@mui/icons-material/FormatListBulletedRounded";
-import LinkRoundedIcon from "@mui/icons-material/LinkRounded";
 import SaveRoundedIcon from "@mui/icons-material/SaveRounded";
-import { EditorContent, useEditor } from "@tiptap/react";
-import StarterKit from "@tiptap/starter-kit";
 import { Link as RouterLink, useNavigate, useParams } from "react-router-dom";
 
 import MauticCategoryPicker from "../components/marketing/MauticCategoryPicker.jsx";
+import MarketingRichTextEditor from "../components/marketing/MarketingRichTextEditor.jsx";
 import PublishWindowFields from "../components/marketing/PublishWindowFields.jsx";
 import { UnsavedChangesDialog, useUnsavedChangesGuard } from "../components/marketing/UnsavedChangesGuard.jsx";
 import {
@@ -101,57 +94,6 @@ function ColorField({ label, value, onChange, error, disabled }) {
             sx={{ width: 28, height: 28, p: 0, mr: 1, border: 0, bgcolor: "transparent", cursor: "pointer", flexShrink: 0 }} />
         ),
       }} />
-  );
-}
-
-/** Rich text for the "Editor" content mode: formatting only, never script. */
-function FocusContentEditor({ value, onChange, disabled, error }) {
-  const emitted = useRef(value || "");
-  const editor = useEditor({
-    extensions: [StarterKit.configure({ heading: { levels: [2, 3] }, codeBlock: false, link: { openOnClick: false, protocols: ["http", "https"] } })],
-    content: value || "",
-    editable: !disabled,
-    onUpdate: ({ editor: current }) => {
-      const html = current.isEmpty ? "" : current.getHTML();
-      emitted.current = html;
-      onChange(html);
-    },
-  });
-  useEffect(() => {
-    if (editor && (value || "") !== emitted.current) {
-      emitted.current = value || "";
-      editor.commands.setContent(value || "", { emitUpdate: false });
-    }
-  }, [editor, value]);
-  const addLink = () => {
-    const url = window.prompt("Link address (https://…)", editor?.getAttributes("link")?.href || "https://");
-    if (url === null || !editor) return;
-    if (!url.trim()) editor.chain().focus().unsetLink().run();
-    else if (/^https?:\/\//i.test(url.trim())) editor.chain().focus().extendMarkRange("link").setLink({ href: url.trim() }).run();
-  };
-  const tool = (label, icon, onClick, active) => (
-    <Tooltip title={label}>
-      <span><IconButton size="small" aria-label={label} aria-pressed={Boolean(active)} onClick={onClick} disabled={disabled || !editor}
-        color={active ? "primary" : "default"}>{icon}</IconButton></span>
-    </Tooltip>
-  );
-  return (
-    <Box>
-      <Paper variant="outlined" sx={{ borderRadius: 2, borderColor: error ? "error.main" : CARD_BORDER }}>
-        <Stack direction="row" spacing={0.5} sx={{ p: 0.5, borderBottom: `1px solid ${CARD_BORDER}` }}>
-          {tool("Bold", <FormatBoldRoundedIcon fontSize="small" />, () => editor.chain().focus().toggleBold().run(), editor?.isActive("bold"))}
-          {tool("Italic", <FormatItalicRoundedIcon fontSize="small" />, () => editor.chain().focus().toggleItalic().run(), editor?.isActive("italic"))}
-          {tool("Bulleted list", <FormatListBulletedRoundedIcon fontSize="small" />, () => editor.chain().focus().toggleBulletList().run(), editor?.isActive("bulletList"))}
-          {tool("Link", <LinkRoundedIcon fontSize="small" />, addLink, editor?.isActive("link"))}
-        </Stack>
-        <Box sx={{ p: 1.5, minHeight: 140, "& .ProseMirror": { outline: "none", minHeight: 120 } }} aria-label="Focus Item content">
-          <EditorContent editor={editor} />
-        </Box>
-      </Paper>
-      <Typography variant="caption" color={error ? "error" : "text.secondary"}>
-        {error || "Formatted text and links. The colours and font below still apply."}
-      </Typography>
-    </Box>
   );
 }
 
@@ -404,7 +346,8 @@ export default function AdminNewsletterFocusEditorPage() {
                   inputProps={{ maxLength: TEXT_MAX_LENGTH }} error={Boolean(fieldErrors.tagline)} helperText={fieldErrors.tagline || "Optional second line."} />
               </>
             ) : (
-              <FocusContentEditor value={draft.editor} onChange={(value) => set("editor", value)} disabled={saving} error={fieldErrors.editor} />
+              <MarketingRichTextEditor label="Focus Item content" value={draft.editor} onChange={(value) => set("editor", value)} disabled={saving}
+                error={fieldErrors.editor} helperText="Formatted text and links. The colours and font below still apply." />
             )}
             {draft.type === "link" && (
               <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>

@@ -78,6 +78,7 @@ import {
 import {
   getEventPropertyFields,
   getNestedValue,
+  isSelectableEntityChoice,
   optionLabel,
   optionValue,
   setNestedValue,
@@ -456,7 +457,11 @@ function EventConfigurationPanel({
               }
 
               if (field.kind === "select") {
-                const options = withSavedChoices(field.choices, selectedValueList(value, field.multiple));
+                // Mautic's "Create new…" entry opens a Mautic window; it is never a choice here
+                // (kept only when it is what the step already holds, so that stays visible).
+                const held = selectedValueList(value, field.multiple).map(String);
+                const options = withSavedChoices(field.choices, selectedValueList(value, field.multiple)).filter((choice) =>
+                  !field.entity || isSelectableEntityChoice(choice) || held.includes(String(optionValue(choice))));
                 return (
                   <FormControl key={field.path} fullWidth error={fieldError}>
                     <InputLabel id={`${event.id}-${field.path}-label`}>

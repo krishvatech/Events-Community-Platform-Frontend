@@ -19,9 +19,10 @@ import {
 import AdsClickRoundedIcon from "@mui/icons-material/AdsClickRounded";
 import CodeRoundedIcon from "@mui/icons-material/CodeRounded";
 import DashboardCustomizeRoundedIcon from "@mui/icons-material/DashboardCustomizeRounded";
+import DynamicFeedRoundedIcon from "@mui/icons-material/DynamicFeedRounded";
 import DynamicFormRoundedIcon from "@mui/icons-material/DynamicFormRounded";
 
-import { listNewsletterFocusItems, listNewsletterForms } from "../../services/newsletterService";
+import { listNewsletterDynamicContentSlots, listNewsletterFocusItems, listNewsletterForms } from "../../services/newsletterService";
 import { findActiveContent, hasBuilderStyle } from "./landingPageDocument";
 
 const LandingPageVisualBuilder = lazy(() => import("./LandingPageVisualBuilder.jsx"));
@@ -125,6 +126,58 @@ function FocusPickerDialog({ open, onClose, onPick }) {
   );
 }
 
+/** Lists the Dynamic Content slots a page can show and returns the chosen one. */
+function SlotPickerDialog({ open, onClose, onPick }) {
+  const [state, setState] = useState({ loading: false, slots: [], error: "" });
+
+  useEffect(() => {
+    if (!open) return undefined;
+    let active = true;
+    setState({ loading: true, slots: [], error: "" });
+    listNewsletterDynamicContentSlots()
+      .then((data) => active && setState({ loading: false, slots: Array.isArray(data?.results) ? data.results : [], error: "" }))
+      .catch(() => active && setState({ loading: false, slots: [], error: "Dynamic Content slots could not be loaded from Mautic." }));
+    return () => {
+      active = false;
+    };
+  }, [open]);
+
+  const describe = (slot) => {
+    const parts = [];
+    if (slot.items) parts.push(`${slot.items} published item${slot.items === 1 ? "" : "s"} by rules`);
+    if (slot.campaigns?.length) parts.push(`asked for by ${slot.campaigns.map((campaign) => campaign.name).join(", ")}`);
+    return parts.join(" · ");
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
+      <DialogTitle>Insert Dynamic Content</DialogTitle>
+      <DialogContent>
+        {state.loading && <CircularProgress size={24} aria-label="Loading Dynamic Content slots" />}
+        {state.error && <Alert severity="error">{state.error}</Alert>}
+        {!state.loading && !state.error && state.slots.length === 0 && (
+          <Typography color="text.secondary">No slots yet. Publish a Dynamic Content item shown by rules, or add a "Request dynamic content" step to a campaign.</Typography>
+        )}
+        {state.slots.length > 0 && (
+          <List dense aria-label="Dynamic Content slots">
+            {state.slots.map((slot) => (
+              <ListItemButton key={slot.slot} onClick={() => onPick(slot)}>
+                <ListItemText primary={slot.slot} secondary={describe(slot)} />
+              </ListItemButton>
+            ))}
+          </List>
+        )}
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+          The builder shows the slot's default text, which you can edit; visitors see the matching content on the live page.
+        </Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+      </DialogActions>
+    </Dialog>
+  );
+}
+
 /**
  * Visual Builder / HTML Editor switch for one landing page. The HTML editor is
  * the caller's `htmlEditor` node; the page HTML is the only saved copy, so the
@@ -140,6 +193,7 @@ const LandingPageContentEditor = forwardRef(function LandingPageContentEditor(
   const [confirmTidy, setConfirmTidy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [focusPickerOpen, setFocusPickerOpen] = useState(false);
+  const [slotPickerOpen, setSlotPickerOpen] = useState(false);
   const [error, setError] = useState("");
   const activeContent = useMemo(() => findActiveContent(html), [html]);
   const visual = mode === MODE_VISUAL && !readOnly && activeContent.length === 0;
@@ -214,6 +268,11 @@ const LandingPageContentEditor = forwardRef(function LandingPageContentEditor(
               Insert Focus Item
             </Button>
           )}
+          {visual && (
+            <Button size="small" variant="outlined" startIcon={<DynamicFeedRoundedIcon />} onClick={() => setSlotPickerOpen(true)} sx={{ textTransform: "none" }}>
+              Insert Dynamic Content
+            </Button>
+          )}
         </Stack>
       )}
       {error && <Alert severity="warning" onClose={() => setError("")}>{error}</Alert>}
@@ -273,6 +332,14 @@ const LandingPageContentEditor = forwardRef(function LandingPageContentEditor(
         onPick={(item) => {
           setFocusPickerOpen(false);
           builderRef.current?.insertFocus(item.id, item.name);
+        }}
+      />
+      <SlotPickerDialog
+        open={slotPickerOpen}
+        onClose={() => setSlotPickerOpen(false)}
+        onPick={(slot) => {
+          setSlotPickerOpen(false);
+          builderRef.current?.insertDynamicContent(slot.slot);
         }}
       />
     </Stack>

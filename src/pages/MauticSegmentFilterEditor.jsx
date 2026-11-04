@@ -61,6 +61,10 @@ export default function MauticSegmentFilterEditor({
   error,
   disabled,
   onChange,
+  // The segment wording by default; other rule builders (Dynamic Content) pass their own.
+  title = "Filters",
+  help = "Contacts join this segment automatically when they match. Leave empty for a static segment whose members you manage by hand.",
+  noun = "filter",
 }) {
   const fields = useMemo(() => filterFieldList(metadataIndex), [metadataIndex]);
   const issues = useMemo(
@@ -95,12 +99,13 @@ export default function MauticSegmentFilterEditor({
     <Stack spacing={2}>
       <Box>
         <Typography variant="subtitle2" sx={{ fontWeight: 750 }}>
-          Filters
+          {title}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          Contacts join this segment automatically when they match. Leave empty for
-          a static segment whose members you manage by hand.
-        </Typography>
+        {help && (
+          <Typography variant="body2" color="text.secondary">
+            {help}
+          </Typography>
+        )}
       </Box>
 
       {(rows || []).map((row, position) => {
@@ -217,7 +222,7 @@ export default function MauticSegmentFilterEditor({
                 <Tooltip title="Remove this filter">
                   <span>
                     <IconButton
-                      aria-label="Remove this filter"
+                      aria-label={`Remove this ${noun}`}
                       color="error"
                       size="small"
                       disabled={disabled}
@@ -256,7 +261,7 @@ export default function MauticSegmentFilterEditor({
             option.alias === selected?.alias && option.object === selected?.object
           }
           onChange={(event, nextField) => setFieldToAdd(nextField)}
-          renderInput={(params) => <TextField {...params} label="Add a filter on…" />}
+          renderInput={(params) => <TextField {...params} label={`Add a ${noun} on…`} />}
         />
         <Button
           variant="outlined"
@@ -268,7 +273,7 @@ export default function MauticSegmentFilterEditor({
             setFieldToAdd(null);
           }}
         >
-          Add filter
+          {`Add ${noun}`}
         </Button>
       </Stack>
     </Stack>

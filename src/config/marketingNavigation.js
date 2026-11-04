@@ -7,6 +7,7 @@ import ContactsRoundedIcon from "@mui/icons-material/ContactsRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
 import CalendarMonthRoundedIcon from "@mui/icons-material/CalendarMonthRounded";
 import LabelRoundedIcon from "@mui/icons-material/LabelRounded";
+import DynamicFeedRoundedIcon from "@mui/icons-material/DynamicFeedRounded";
 import DynamicFormRoundedIcon from "@mui/icons-material/DynamicFormRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import FlagRoundedIcon from "@mui/icons-material/FlagRounded";
@@ -85,6 +86,13 @@ export const marketingNavigationGroups = [
         path: `${MARKETING_HOME_PATH}/focus-items`,
         icon: AdsClickRoundedIcon,
         match: [`${MARKETING_HOME_PATH}/focus-items`],
+      },
+      {
+        id: "dynamic-content",
+        label: "Dynamic Content",
+        path: `${MARKETING_HOME_PATH}/dynamic-content`,
+        icon: DynamicFeedRoundedIcon,
+        match: [`${MARKETING_HOME_PATH}/dynamic-content`],
       },
       {
         id: "assets",
