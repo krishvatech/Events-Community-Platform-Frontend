@@ -1,5 +1,6 @@
 import { getToken, refreshMemberAccessToken } from "./api";
 import { clearAuth } from "./authStorage";
+import { SECURE_AUTH_ROUTES } from "./secureAuthSession";
 
 // Store original fetch
 const originalFetch = window.fetch;
@@ -43,6 +44,25 @@ const isExpiredTokenError = (status, responseBody) => {
     ];
 
     return expiredPatterns.some(pattern => text.includes(pattern));
+};
+
+// The secure-session endpoints ARE the refresh: a 401 from them (session
+// missing/expired/revoked) is the refresh result. Recovering it with another
+// refresh would wait on the refresh already in flight and never settle.
+const SECURE_AUTH_PATHS = new Set(Object.values(SECURE_AUTH_ROUTES));
+const isSecureAuthRequest = (resource) => {
+    try {
+        const href =
+            resource instanceof URL ? resource.href
+                : typeof resource === "string" ? resource
+                    : resource?.url || "";
+        const parsed = new URL(href, window.location.origin);
+        // The auth Worker also accepts these routes with one trailing slash.
+        const path = parsed.pathname.replace(/\/$/, "");
+        return parsed.origin === window.location.origin && SECURE_AUTH_PATHS.has(path);
+    } catch {
+        return false;
+    }
 };
 
 const processQueue = (error, token = null) => {
@@ -150,7 +170,8 @@ window.fetch = async (...args) => {
     const shouldAttemptRefresh =
         response.status === 401 &&
         hasAuthenticatedSession &&
-        !isGuest;
+        !isGuest &&
+        !isSecureAuthRequest(resource);
 
     if (shouldAttemptRefresh) {
         // Check if we are already refreshing
