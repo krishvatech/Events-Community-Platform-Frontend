@@ -3,7 +3,6 @@ import {
   Alert,
   Box,
   Button,
-  Checkbox,
   Chip,
   CircularProgress,
   Dialog,
@@ -11,10 +10,6 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
-  FormControl,
-  FormControlLabel,
-  FormGroup,
-  FormHelperText,
   Grid,
   IconButton,
   Paper,
@@ -70,7 +65,7 @@ import {
   getNewsletterCampaignAnalytics,
   getNewsletterCampaignAnalyticsSummary,
   listNewsletterCampaigns,
-  listNewsletterCategories,
+  listNativeMauticSegments,
   previewNewsletterCampaign,
   scheduleNewsletterCampaign,
   sendNewsletterCampaign,
@@ -115,6 +110,7 @@ import { getMarketingSectionFromPath } from "../config/marketingNavigation";
 import EmailPreviewFrame from "../components/marketing/EmailPreviewFrame.jsx";
 import MauticTokenPicker from "../components/marketing/MauticTokenPicker.jsx";
 import NewsletterTemplatePickerDialog from "../components/marketing/NewsletterTemplatePickerDialog.jsx";
+import BroadcastSegmentPicker, { selectedSegmentNames } from "../components/marketing/BroadcastSegmentPicker.jsx";
 import MarketingEmailContentEditor, {
   MODE_HTML,
   MODE_VISUAL,
@@ -153,6 +149,11 @@ const starterHtml = `<table role="presentation" width="100%" cellspacing="0" cel
       </p>
     </td>
   </tr>
+  <tr>
+    <td style="padding: 0 24px 24px; font-size: 12px; line-height: 1.6;">
+      <a href="{unsubscribe_url}" style="color: #6b7280;">Unsubscribe</a>
+    </td>
+  </tr>
 </table>`;
 
 const starterPlainText = `Newsletter headline
@@ -161,7 +162,9 @@ Write a short introduction for this newsletter.
 
 Add the most important update, event, article, or deal alert here.
 
-Read more: https://imaa-institute.org`;
+Read more: https://imaa-institute.org
+
+Unsubscribe: {unsubscribe_url}`;
 
 const blankForm = {
   name: "",
@@ -171,7 +174,7 @@ const blankForm = {
   from_email: "eventncommunity@gmail.com",
   html_content: starterHtml,
   plain_text: starterPlainText,
-  audience_slugs: [],
+  segment_ids: [],
 };
 
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -205,15 +208,10 @@ const formatNumber = (value) => {
 };
 
 
-const getCampaignAudienceSlugs = (campaign) => {
-  const raw = campaign?.audience_slugs || campaign?.audiences || [];
-  return raw.map((item) => (typeof item === "string" ? item : item?.slug)).filter(Boolean);
-};
+const getCampaignSegmentIds = (campaign) => (campaign?.segments || []).map((segment) => String(segment.id));
 
-const getCampaignAudienceLabels = (campaign) => {
-  const raw = campaign?.audiences || campaign?.audience_slugs || [];
-  return raw.map((item) => (typeof item === "string" ? item : item?.name || item?.slug)).filter(Boolean);
-};
+const getCampaignSegmentLabels = (campaign) =>
+  (campaign?.segments || []).map((segment) => segment.name || `Segment ${segment.id}`);
 
 const campaignToForm = (campaign) => ({
   name: campaign?.name || "",
@@ -223,7 +221,7 @@ const campaignToForm = (campaign) => ({
   from_email: campaign?.from_email || "",
   html_content: campaign?.html_content || "",
   plain_text: campaign?.plain_text || "",
-  audience_slugs: getCampaignAudienceSlugs(campaign),
+  segment_ids: getCampaignSegmentIds(campaign),
 });
 
 const getErrorMessage = (err, fallback = "Something went wrong. Please try again.") => {
@@ -427,7 +425,7 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
       <Stack direction={{ xs: "column", sm: "row" }} justifyContent="space-between" spacing={2}>
         <Box>
           <Typography variant="h5" sx={{ fontWeight: 850, color: "#1B2A4A" }}>Email Broadcasts</Typography>
-          <Typography color="text.secondary">Create, schedule, and review newsletter emails sent to subscription lists.</Typography>
+          <Typography color="text.secondary">Create, schedule, and review emails sent to your segments.</Typography>
         </Box>
         <Button variant="contained" startIcon={<AddRoundedIcon />} onClick={onCreate} sx={{ textTransform: "none", alignSelf: "flex-start" }}>
           Create Broadcast
@@ -477,7 +475,7 @@ function CampaignList({ campaigns, analyticsByUuid, loading, error, filter, onFi
                       <Typography sx={{ fontWeight: 800, color: "#1B2A4A" }}>{row.name || "Untitled broadcast"}</Typography>
                       <Typography variant="body2" color="text.secondary">{row.subject || "-"}</Typography>
                     </TableCell>
-                    <TableCell>{getCampaignAudienceLabels(row).join(", ") || "-"}</TableCell>
+                    <TableCell>{getCampaignSegmentLabels(row).join(", ") || "-"}</TableCell>
                     <TableCell><StatusChip status={row.status} uncertain={isOutcomeUncertain(row)} /></TableCell>
                     <TableCell>{formatDateTime(row.created_at)}</TableCell>
                     <TableCell>{formatDateTime(row.scheduled_at)}</TableCell>
@@ -973,26 +971,26 @@ function BroadcastContentStep({ value, readOnly, errors, onChange, design }) {
   );
 }
 
-function CampaignForm({ value, categories, readOnly, errors, onChange, activeStep, onStepChange, design }) {
+function CampaignForm({ value, segmentsState, savedSegments, onRetrySegments, readOnly, errors, onChange, activeStep, onStepChange, design }) {
   const setField = (field, nextValue) => onChange({ ...value, [field]: nextValue });
-  const toggleAudience = (slug) => {
-    const set = new Set(value.audience_slugs || []);
-    if (set.has(slug)) set.delete(slug);
-    else set.add(slug);
-    setField("audience_slugs", Array.from(set));
+  const toggleSegment = (id) => {
+    const set = new Set(value.segment_ids || []);
+    if (set.has(id)) set.delete(id);
+    else set.add(id);
+    setField("segment_ids", Array.from(set));
   };
 
   return (
     <Stack spacing={3}>
       <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: "#E7ECEF" }}>
         <Stepper activeStep={activeStep} alternativeLabel sx={{ display: { xs: "none", md: "flex" } }}>
-          {["Broadcast Information", "Subscription Lists", "Email Content", "Review & Actions"].map((label) => (
+          {["Broadcast Information", "Segments", "Email Content", "Review & Actions"].map((label) => (
             <Step key={label}><StepLabel>{label}</StepLabel></Step>
           ))}
         </Stepper>
         <Tabs value={activeStep} onChange={(_, value) => onStepChange(value)} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ display: { xs: "flex", md: "none" }, "& .MuiTab-root": { textTransform: "none" } }}>
           <Tab label="Info" value={0} />
-          <Tab label="Lists" value={1} />
+          <Tab label="Segments" value={1} />
           <Tab label="Content" value={2} />
           <Tab label="Review" value={3} />
         </Tabs>
@@ -1022,28 +1020,15 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
       )}
 
       {activeStep === 1 && (
-        <Paper variant="outlined" sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, borderColor: errors.audience_slugs ? "error.main" : "#E7ECEF" }}>
-          <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 1 }}>Subscription Lists</Typography>
-          <Typography color="text.secondary" sx={{ mb: 2 }}>Choose the newsletter lists this broadcast should be sent to.</Typography>
-          <FormControl component="fieldset" fullWidth disabled={readOnly} error={Boolean(errors.audience_slugs)}>
-            <FormGroup>
-              <Grid container spacing={1}>
-                {categories.map((category) => (
-                  <Grid item xs={12} md={6} key={category.slug}>
-                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, borderColor: (value.audience_slugs || []).includes(category.slug) ? "#0f766e" : "#E7ECEF" }}>
-                      <FormControlLabel
-                        control={<Checkbox checked={(value.audience_slugs || []).includes(category.slug)} onChange={() => toggleAudience(category.slug)} />}
-                        label={<Box><Typography sx={{ fontWeight: 800 }}>{category.name || category.slug}</Typography>{category.description && <Typography variant="body2" color="text.secondary">{category.description}</Typography>}</Box>}
-                      />
-                    </Paper>
-                  </Grid>
-                ))}
-              </Grid>
-            </FormGroup>
-            {errors.audience_slugs && <FormHelperText>{errors.audience_slugs}</FormHelperText>}
-            {categories.length === 0 && <FormHelperText>No active subscription lists found.</FormHelperText>}
-          </FormControl>
-        </Paper>
+        <BroadcastSegmentPicker
+          state={segmentsState}
+          selectedIds={value.segment_ids || []}
+          savedSegments={savedSegments}
+          readOnly={readOnly}
+          error={errors.segment_ids}
+          onToggle={toggleSegment}
+          onRetry={onRetrySegments}
+        />
       )}
 
       {/* Mounted from the first visit on and only hidden afterwards, so moving
@@ -1059,7 +1044,7 @@ function CampaignForm({ value, categories, readOnly, errors, onChange, activeSte
           <Typography variant="h6" sx={{ fontWeight: 800, color: "#1B2A4A", mb: 2 }}>Review & Actions</Typography>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}><MetricCard label="Broadcast Name" value={value.name || "No data available"} /></Grid>
-            <Grid item xs={12} md={6}><MetricCard label="Subscription Lists" value={(value.audience_slugs || []).join(", ") || "No data available"} /></Grid>
+            <Grid item xs={12} md={6}><MetricCard label="Segments" value={selectedSegmentNames({ options: segmentsState?.rows, selectedIds: value.segment_ids || [], savedSegments }).join(", ") || "No data available"} /></Grid>
             <Grid item xs={12} md={6}><MetricCard label="Subject" value={value.subject || "No data available"} /></Grid>
             <Grid item xs={12} md={6}><MetricCard label="Sender" value={value.from_name || "No data available"} /></Grid>
           </Grid>
@@ -1082,7 +1067,7 @@ export default function AdminNewsletterPage() {
 
   const [campaigns, setCampaigns] = useState([]);
   const [campaign, setCampaign] = useState(null);
-  const [categories, setCategories] = useState([]);
+  const [segmentsState, setSegmentsState] = useState({ loading: true, error: "", rows: [] });
   const [form, setForm] = useState(blankForm);
   const [savedForm, setSavedForm] = useState(blankForm);
   const [filter, setFilter] = useState("all");
@@ -1136,17 +1121,25 @@ export default function AdminNewsletterPage() {
     }
   };
 
-  const loadCategories = async () => {
-    const data = await listNewsletterCategories();
-    const rows = Array.isArray(data) ? data : data?.results || data?.categories || [];
-    setCategories(rows.filter((category) => category.is_active !== false));
+  // Not awaited by the page: a slow or unavailable Mautic must not stop an
+  // existing draft from opening.
+  const loadSegments = async () => {
+    setSegmentsState((state) => ({ ...state, loading: true, error: "" }));
+    try {
+      const data = await listNativeMauticSegments();
+      const rows = Array.isArray(data) ? data : [];
+      // Mautic's email form accepts published segments only.
+      setSegmentsState({ loading: false, error: "", rows: rows.filter((segment) => segment.isPublished) });
+    } catch (err) {
+      setSegmentsState({ loading: false, error: getErrorMessage(err, "We could not load your segments."), rows: [] });
+    }
   };
 
   const loadDetail = async () => {
     setLoading(true);
     setError("");
+    loadSegments();
     try {
-      await loadCategories();
       if (isNew) {
         setCampaign(null);
         setForm(blankForm);
@@ -1253,9 +1246,9 @@ export default function AdminNewsletterPage() {
     if (!form.from_email.trim()) errors.from_email = "Sender email is required.";
     else if (!emailPattern.test(form.from_email.trim())) errors.from_email = "Enter a valid sender email.";
     if (!form.html_content.trim()) errors.html_content = "HTML content is required.";
-    if (!form.audience_slugs?.length) errors.audience_slugs = "Select at least one subscription list.";
+    if (!form.segment_ids?.length) errors.segment_ids = "Select at least one segment.";
     setFormErrors(errors);
-    if (Object.keys(errors).length) setError("Complete the required newsletter fields before continuing.");
+    if (Object.keys(errors).length) setError("Complete the required broadcast fields before continuing.");
     return Object.keys(errors).length === 0;
   };
 
@@ -1271,7 +1264,7 @@ export default function AdminNewsletterPage() {
       from_email: form.from_email.trim(),
       html_content: form.html_content,
       plain_text: form.plain_text,
-      audience_slugs: form.audience_slugs,
+      segment_ids: form.segment_ids.map(Number),
     };
     // In Visual Builder the server compiles html_content from this design. An
     // editor never opened in this visit has no changes, so the saved design
@@ -1519,7 +1512,9 @@ export default function AdminNewsletterPage() {
       ) : detailLoaded ? (
         <CampaignForm
           value={form}
-          categories={categories}
+          segmentsState={segmentsState}
+          savedSegments={campaign?.segments || []}
+          onRetrySegments={loadSegments}
           readOnly={!editable}
           errors={formErrors}
           onChange={setForm}
@@ -1616,7 +1611,7 @@ export default function AdminNewsletterPage() {
       <ScheduleDialog open={scheduleState.open} loading={scheduleState.loading} error={scheduleState.error} initialValue={status === "scheduled" ? campaign?.scheduled_at : ""} onClose={() => setScheduleState({ open: false, loading: false, error: "" })} onSchedule={scheduleCampaign} />
 
       <ConfirmDialog open={confirmState.type === "send"} title="Send Broadcast Now?" confirmLabel="Send Now" confirmColor="success" loading={confirmState.loading} onClose={() => setConfirmState({ type: "", loading: false })} onConfirm={sendNow}>
-        <Typography>This broadcast will be sent immediately to the selected subscription lists.</Typography>
+        <Typography>This broadcast will be sent immediately to the selected segments.</Typography>
       </ConfirmDialog>
       <ConfirmDialog open={confirmState.type === "cancel"} title="Cancel Scheduled Broadcast?" confirmLabel="Cancel Broadcast" confirmColor="warning" loading={confirmState.loading} onClose={() => setConfirmState({ type: "", loading: false })} onConfirm={async () => {
         setConfirmState((state) => ({ ...state, loading: true }));

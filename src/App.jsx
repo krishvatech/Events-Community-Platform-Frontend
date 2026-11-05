@@ -10,7 +10,7 @@ import KYCNotification from "./components/KYCNotification";
 import Header from "./components/Header.jsx";
 import UnifiedSidebar from "./components/UnifiedSidebar.jsx"; // [NEW]
 import MarketingHubLayout from "./components/marketing/MarketingHubLayout.jsx";
-import { isMarketingHubPath } from "./config/marketingNavigation";
+import { CONNECT_HOME_PATH, ECP_NEWSLETTER_ENABLED, MARKETING_HOME_PATH, isMarketingHubPath } from "./config/marketingNavigation";
 import { isBlogReaderPath } from "./config/blogNavigation";
 import { blogAdminRoutes, blogReaderRoutes } from "./routes/blogRoutes.jsx";
 
@@ -421,7 +421,7 @@ const AppShell = () => {
               <Route path="forms/:formId/edit" element={<AdminNewsletterFormEditorPage />} />
               <Route path="forms/:formId/submissions" element={<AdminNewsletterFormSubmissionsPage />} />
               <Route path="forms/:formId/submissions/:submissionId" element={<AdminNewsletterFormSubmissionDetailPage />} />
-              <Route path="lists" element={<AdminNewsletterPage />} />
+              <Route path="lists" element={ECP_NEWSLETTER_ENABLED ? <AdminNewsletterPage /> : <Navigate to={MARKETING_HOME_PATH} replace />} />
               <Route path="segments" element={<AdminNewsletterPage />} />
               <Route path="analytics" element={<AdminNewsletterAnalyticsPage />} />
               <Route path="calendar" element={<AdminNewsletterCalendarPage />} />
@@ -458,7 +458,7 @@ const AppShell = () => {
               <Route path="builder/:campaignId" element={<AdminNewsletterPage />} />
               <Route path="stages" element={<AdminNewsletterStagesPage />} />
               <Route path="points" element={<AdminNewsletterPointsPage />} />
-              <Route path="lists/:slug" element={<AdminNewsletterListManagePage />} />
+              <Route path="lists/:slug" element={ECP_NEWSLETTER_ENABLED ? <AdminNewsletterListManagePage /> : <Navigate to={MARKETING_HOME_PATH} replace />} />
               <Route path=":campaignId" element={<AdminNewsletterPage />} />
               <Route path=":campaignId/versions/:emailId" element={<AdminNewsletterBroadcastVersionEditorPage />} />
             </Route>
@@ -502,7 +502,7 @@ const AppShell = () => {
           <Route path="/account/set-password" element={<RequireAuth><ForgotPassword authedMode /></RequireAuth>} />
           <Route path="/account/recordings" element={<RequireAuth><MyRecordingsPage /></RequireAuth>} />
           <Route path="/account/settings" element={<RequireAuth><SettingsPage /></RequireAuth>} />
-          <Route path="/newsletter" element={<RequireAuth><NewsletterPage /></RequireAuth>} />
+          <Route path="/newsletter" element={ECP_NEWSLETTER_ENABLED ? <RequireAuth><NewsletterPage /></RequireAuth> : <Navigate to={CONNECT_HOME_PATH} replace />} />
 
           {/* Blogs: Explore Blogs + reader (signed-in members) */}
           {blogReaderRoutes}

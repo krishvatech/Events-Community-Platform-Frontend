@@ -57,6 +57,7 @@ import { saveBlob } from "../components/marketing/saveBlob";
 import FileDownloadRoundedIcon from "@mui/icons-material/FileDownloadRounded";
 import ContactSendEmailDialog, { sendBlocker } from "../components/marketing/ContactSendEmailDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
+import { ECP_NEWSLETTER_ENABLED } from "../config/marketingNavigation";
 
 import {
   adjustNewsletterAdminContactPointGroup,
@@ -1738,7 +1739,7 @@ export default function AdminNewsletterContactDetailPage() {
                 </Paper>
                 )}
 
-                {contactDetailTab === "overview" && (
+                {ECP_NEWSLETTER_ENABLED && contactDetailTab === "overview" && (
                 <Paper variant="outlined" sx={{ p: 2.5, borderRadius: 2, borderColor: "#E7ECEF" }}>
                   <Typography variant="h6" sx={{ fontWeight: 850, color: "#1B2A4A", mb: 1.5 }}>Segments</Typography>
                   {contact.mapped_in_ecp ? (

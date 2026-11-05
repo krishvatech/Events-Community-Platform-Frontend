@@ -46,6 +46,7 @@ import {
   toFilterPayload,
   validateSegmentFilters,
 } from "./mauticSegmentFilters";
+import { ECP_NEWSLETTER_ENABLED } from "../config/marketingNavigation";
 import {
   addNativeMauticSegmentContact,
   createNativeMauticSegment,
@@ -365,7 +366,9 @@ function SegmentDetailDialog({
           <Stack spacing={2.5}>
             {segment?.managed_by_subscription_list && (
               <Alert severity="warning" icon={<InfoOutlinedIcon />}>
-                This Mautic segment is managed by the ECP Subscription List "{segment.subscription_list_name}". Edit subscription-list settings from Subscription Lists to avoid breaking consent synchronization.
+                This Mautic segment is managed by the ECP Subscription List "{segment.subscription_list_name}". {ECP_NEWSLETTER_ENABLED
+                  ? "Edit subscription-list settings from Subscription Lists to avoid breaking consent synchronization."
+                  : "It cannot be edited here, to avoid breaking consent synchronization."}
               </Alert>
             )}
             <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
@@ -396,8 +399,8 @@ function SegmentDetailDialog({
                 <Grid item xs={12} sm={6}><DetailField label="Category" value={segment?.category?.title} /></Grid>
                 <Grid item xs={12} sm={6}><DetailField label="Global (visible to other Mautic users)" value={segment ? (segment.isGlobal ? "Yes" : "No") : ""} /></Grid>
                 <Grid item xs={12} sm={6}><DetailField label="Show in Preference Center" value={segment ? (segment.isPreferenceCenter ? "Yes" : "No") : ""} /></Grid>
-                <Grid item xs={12} sm={6}><DetailField label="Subscription List Owner" value={segment?.subscription_list_name} /></Grid>
-                <Grid item xs={12} sm={6}><DetailField label="Subscription List Slug" value={segment?.subscription_list_slug} /></Grid>
+                {ECP_NEWSLETTER_ENABLED && <Grid item xs={12} sm={6}><DetailField label="Subscription List Owner" value={segment?.subscription_list_name} /></Grid>}
+                {ECP_NEWSLETTER_ENABLED && <Grid item xs={12} sm={6}><DetailField label="Subscription List Slug" value={segment?.subscription_list_slug} /></Grid>}
                 <Grid item xs={12} sm={6}><DetailField label="Created" value={formatDateTime(segment?.dateAdded)} /></Grid>
                 <Grid item xs={12} sm={6}><DetailField label="Modified" value={formatDateTime(segment?.dateModified)} /></Grid>
               </Grid>

@@ -29,7 +29,7 @@ import {
   CONNECT_HOME_PATH,
   MARKETING_HOME_PATH,
   isMarketingNavItemActive,
-  marketingNavigationGroups,
+  visibleMarketingNavigationGroups,
 } from "../../config/marketingNavigation";
 import { apiClient } from "../../utils/api";
 import MarketingNotificationsBell from "./MarketingNotificationsBell.jsx";
@@ -116,7 +116,7 @@ export default function MarketingHubSidebar({ mobileOpen, onMobileClose }) {
       </Box>
 
       <Box sx={{ flex: 1, overflowY: "auto", py: 1 }}>
-        {marketingNavigationGroups.map((group) => (
+        {visibleMarketingNavigationGroups.map((group) => (
           <Box key={group.label} sx={{ mb: 1.5 }}>
             <Typography variant="overline" sx={{ px: 2.5, pt: 1.5, pb: 0.5, display: "block", color: "#C0BAB4", fontWeight: 800, fontSize: 10, letterSpacing: "0.1em" }}>
               {group.label}

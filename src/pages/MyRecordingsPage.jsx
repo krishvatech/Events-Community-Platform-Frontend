@@ -13,6 +13,7 @@ import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import PlaceIcon from "@mui/icons-material/Place";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
+import { replayDurationToDays } from "../utils/replayDuration";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
 const RAW_API = (import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000").toString().replace(/\/+$/, "");
@@ -67,8 +68,8 @@ const computeReplayState = (ev) => {
   // Check if expired
   let isExpired = false;
   if (isAvailable && ev.replay_availability_duration && ev.replay_availability_duration !== "Unlimited") {
-    const days = parseInt(ev.replay_availability_duration);
-    if (!isNaN(days) && days > 0) {
+    const days = replayDurationToDays(ev.replay_availability_duration);
+    if (days) {
       const endTime = ev.end_time ? new Date(ev.end_time).getTime() : (ev.live_ended_at ? new Date(ev.live_ended_at).getTime() : 0);
       if (endTime > 0) {
         const expiryTime = endTime + (days * 24 * 60 * 60 * 1000);

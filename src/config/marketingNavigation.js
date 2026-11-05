@@ -20,6 +20,12 @@ import StarsRoundedIcon from "@mui/icons-material/StarsRounded";
 import ViewModuleRoundedIcon from "@mui/icons-material/ViewModuleRounded";
 import WebRoundedIcon from "@mui/icons-material/WebRounded";
 
+// ECP's own newsletter (the members' /newsletter page and Subscription Lists) is
+// switched off: the Hub is a UI over Mautic. Their code and data are kept; build
+// with VITE_ECP_NEWSLETTER_ENABLED=true to bring both back.
+export const ECP_NEWSLETTER_ENABLED =
+  String(import.meta.env?.VITE_ECP_NEWSLETTER_ENABLED || "false").toLowerCase() === "true";
+
 export const MARKETING_HOME_PATH = "/admin/newsletter";
 export const MARKETING_AUDIT_PATH = "/admin/marketing/activity";
 // Segment/list newsletter emails (ECP NewsletterCampaign). Distinct from
@@ -126,6 +132,7 @@ export const marketingNavigationGroups = [
         path: `${MARKETING_HOME_PATH}/lists`,
         icon: ListAltRoundedIcon,
         match: [`${MARKETING_HOME_PATH}/lists`],
+        hidden: !ECP_NEWSLETTER_ENABLED,
       },
       {
         id: "segments",
@@ -210,6 +217,11 @@ export const marketingNavigationGroups = [
 ];
 
 export const marketingNavigationItems = marketingNavigationGroups.flatMap((group) => group.items);
+
+/** What the sidebar shows. */
+export const visibleMarketingNavigationGroups = marketingNavigationGroups
+  .map((group) => ({ ...group, items: group.items.filter((item) => !item.hidden) }))
+  .filter((group) => group.items.length);
 
 export function isMarketingHubPath(pathname = "") {
   return pathname === MARKETING_HOME_PATH ||

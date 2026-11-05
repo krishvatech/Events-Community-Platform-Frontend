@@ -50,6 +50,7 @@ import InfoIcon from "@mui/icons-material/Info";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { resolveRecordingUrl } from "../utils/recordingUrl";
+import { replayDurationToDays } from "../utils/replayDuration";
 import { isOwnerUser } from "../utils/adminRole";
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
 
@@ -100,8 +101,8 @@ const getExpiryInfo = (event) => {
 
     // If no duration set, use default of 7 days
     const durationStr = event?.replay_availability_duration || "7";
-    const days = parseInt(durationStr);
-    if (isNaN(days) || days <= 0) return null;
+    const days = replayDurationToDays(durationStr);
+    if (!days) return null;
 
     const endTime = new Date(eventEndTime).getTime();
     const expiryTime = endTime + (days * 24 * 60 * 60 * 1000);
@@ -324,7 +325,7 @@ export default function AdminRecordingDetailsPage() {
     // Sync expiry days when event loads
     useEffect(() => {
         if (event?.replay_availability_duration) {
-            setExpiryDays(parseInt(event.replay_availability_duration) || 7);
+            setExpiryDays(replayDurationToDays(event.replay_availability_duration) || 7);
         }
     }, [event?.replay_availability_duration]);
 
@@ -877,7 +878,7 @@ export default function AdminRecordingDetailsPage() {
                                             variant="outlined"
                                             onClick={() => {
                                                 setEditingExpiry(false);
-                                                setExpiryDays(parseInt(event?.replay_availability_duration) || 7);
+                                                setExpiryDays(replayDurationToDays(event?.replay_availability_duration) || 7);
                                                 setExpiryError("");
                                             }}
                                             disabled={savingExpiry}
