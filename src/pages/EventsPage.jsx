@@ -3075,6 +3075,7 @@ export default function EventsPage() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
         const data = await res.json();
+        if (controller.signal.aborted) return;
         const items = data.results || [];
         const now = Date.now();
 
@@ -3094,12 +3095,15 @@ export default function EventsPage() {
 
         setRawEvents(filtered);
         setEventCountFromAPI(Number(data.count ?? filtered.length));
+        setError("");
       } catch (e) {
-        if (e.name !== "AbortError") setError(String(e?.message || e));
+        if (!controller.signal.aborted && e.name !== "AbortError") setError(String(e?.message || e));
       } finally {
-        setInitialLoading(false);
-        setRefreshing(false);
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setInitialLoading(false);
+          setRefreshing(false);
+          setLoading(false);
+        }
       }
     })();
     return () => controller.abort();
