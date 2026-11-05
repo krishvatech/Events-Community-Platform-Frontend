@@ -3481,7 +3481,7 @@ export default function EventsPage() {
     if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const heroBg = cmsPage?.hero_image_url || "/images/events-hero-bg.png";
+  const heroBg = cmsPage?.hero_image_url;
   const heroTitle = cmsPage?.hero_title || "Explore M&A Events";
   const heroSubtitle =
     cmsPage?.hero_subtitle ||
@@ -3543,7 +3543,8 @@ export default function EventsPage() {
         <div
           className="relative text-white text-center"
           style={{
-            backgroundImage: `url("${heroBg}")`,
+            backgroundColor: "#0d2046",
+            ...(heroBg ? { backgroundImage: `url("${heroBg}")` } : {}),
             backgroundSize: "cover",
             backgroundPosition: "center",
           }}
