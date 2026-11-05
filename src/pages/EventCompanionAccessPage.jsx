@@ -1,4 +1,5 @@
 import { Component, useEffect, useState } from 'react';
+import * as Sentry from '@sentry/react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
@@ -654,6 +655,16 @@ class CompanionErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    // Error boundaries handle render exceptions, so report them explicitly.
+    // Never let a monitoring failure interfere with the existing fallback UI.
+    try {
+      Sentry.captureReactException(error, info || { componentStack: '' }, {
+        tags: { area: 'event_companion' },
+      });
+    } catch {
+      // Best-effort telemetry only; keep the existing fallback behavior.
+    }
+
     if (import.meta.env.DEV) {
       console.error('Event Companion rendering failed:', error);
       console.error('Exception stack:', error?.stack);
