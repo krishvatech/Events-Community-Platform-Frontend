@@ -84,10 +84,10 @@ const ENDPOINTS = {
 
 // ---- Helpers ----
 // Returns the best display name for a user_details object.
-// Priority: first+last name → full_name → username → "User"
+// Priority: first+last name → full_name → username → name → "User"
 const getUserDisplayName = (u) => {
   const name = `${u?.first_name || ""} ${u?.last_name || ""}`.trim();
-  return name || u?.full_name || u?.username || "User";
+  return name || u?.full_name || u?.username || u?.name?.trim() || "User";
 };
 
 const getCurrentUserId = () => {
