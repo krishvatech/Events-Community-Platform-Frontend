@@ -125,9 +125,9 @@ test("a Django superuser without is_staff still sees My Blogs, as the backend al
 test("non-Blog sidebar items are identical to before for every role", async () => {
   const blogLabels = new Set(["Explore Blogs", "My Blogs"]);
   const roles = [
-    ["normal", {}, ["Messages", "Notifications", "Newsletter", "My Events", "My Groups", "My Contacts", "My Posts", "My Orders", "Profile"]],
-    ["staff", { staff: true }, ["Messages", "Notifications", "Newsletter", "My Events", "My Groups", "My Contacts", "My Posts", "Profile", "Moderation", "Admin Guide"]],
-    ["platform_admin", { platformAdmin: true, staff: true }, ["My Posts", "My Events", "My Series", "Virtual Speakers", "My Groups", "Messages", "Notifications", "Newsletter", "My Contacts", "Profile", "Moderation", "Identity Verification", "Users", "Email Templates", "CMS", "Admin Guide"]],
+    ["normal", {}, ["Messages", "Notifications", "My Events", "My Groups", "My Contacts", "My Posts", "My Orders", "Profile"]],
+    ["staff", { staff: true }, ["Messages", "Notifications", "My Events", "My Groups", "My Contacts", "My Posts", "Profile", "Moderation", "Admin Guide"]],
+    ["platform_admin", { platformAdmin: true, staff: true }, ["My Posts", "My Events", "My Series", "Virtual Speakers", "My Groups", "Messages", "Notifications", "My Contacts", "Profile", "Moderation", "Identity Verification", "Users", "Email Templates", "CMS", "Admin Guide"]],
   ];
   const discover = ["Dashboard", "Upcoming Events", "Live Feed", "Discussion Forum", "Explore Groups", "Explore Members"];
   for (const [name, flags, expected] of roles) {

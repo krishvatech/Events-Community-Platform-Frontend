@@ -50,6 +50,7 @@ import ContactDeleteDialog from "../components/marketing/ContactDeleteDialog.jsx
 import ContactExportDialog from "../components/marketing/ContactExportDialog.jsx";
 import ContactImportDialog from "../components/marketing/ContactImportDialog.jsx";
 import MauticDynamicFields from "../components/marketing/MauticDynamicFields.jsx";
+import { ECP_NEWSLETTER_ENABLED } from "../config/marketingNavigation";
 
 import {
   bulkUpdateNewsletterAdminContactStage,
@@ -352,7 +353,9 @@ export default function AdminNewsletterContactsPage() {
             Contacts
           </Typography>
           <Typography color="text.secondary">
-            All contacts currently available in Mautic, enriched with ECP mapping and newsletter subscription data.
+            {ECP_NEWSLETTER_ENABLED
+              ? "All contacts currently available in Mautic, enriched with ECP mapping and newsletter subscription data."
+              : "All contacts currently available in Mautic, enriched with ECP mapping."}
           </Typography>
         </Box>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
@@ -650,7 +653,7 @@ export default function AdminNewsletterContactsPage() {
                   <TableCell>Location</TableCell>
                   <TableCell>Stage</TableCell>
                   <TableCell>Owner</TableCell>
-                  <TableCell>Subscription Lists</TableCell>
+                  {ECP_NEWSLETTER_ENABLED && <TableCell>Subscription Lists</TableCell>}
                   <TableCell>ECP Mapping</TableCell>
                   <TableCell>Last Active</TableCell>
                   <TableCell align="right">Mautic ID</TableCell>
@@ -729,6 +732,7 @@ export default function AdminNewsletterContactsPage() {
                         <Typography variant="body2" color="text.secondary">No owner</Typography>
                       )}
                     </TableCell>
+                    {ECP_NEWSLETTER_ENABLED && (
                     <TableCell sx={{ minWidth: 220 }}>
                       {Array.isArray(contact.subscription_lists) && contact.subscription_lists.length ? (
                         <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
@@ -748,6 +752,7 @@ export default function AdminNewsletterContactsPage() {
                         </Typography>
                       )}
                     </TableCell>
+                    )}
                     <TableCell sx={{ minWidth: 155 }}>
                       {contact.mapped_in_ecp ? (
                         <Stack spacing={0.25} alignItems="flex-start">
@@ -776,7 +781,7 @@ export default function AdminNewsletterContactsPage() {
 
                 {contacts.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={10} align="center" sx={{ py: 5 }}>
+                    <TableCell colSpan={ECP_NEWSLETTER_ENABLED ? 10 : 9} align="center" sx={{ py: 5 }}>
                       <Typography color="text.secondary">
                         {search || stageFilter || ownerFilter
                           ? "No contacts match the current filters."

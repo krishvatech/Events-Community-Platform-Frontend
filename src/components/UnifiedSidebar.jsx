@@ -57,6 +57,7 @@ import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import AutoStoriesRoundedIcon from "@mui/icons-material/AutoStoriesRounded"; // Explore Blogs
 import EditNoteRoundedIcon from "@mui/icons-material/EditNoteRounded"; // My Blogs
 import { getBlogSidebarItems } from "../config/blogNavigation";
+import { ECP_NEWSLETTER_ENABLED } from "../config/marketingNavigation";
 import { canManageBlogs } from "../utils/blogAccess";
 
 import { isOwnerUser, isStaffUser, canEditProfilesUser } from "../utils/adminRole";
@@ -248,6 +249,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
 
     let manageItems = [];
     let adminItems = [];
+    const newsletterItems = ECP_NEWSLETTER_ENABLED ? [{ label: "Newsletter", to: "/newsletter", icon: NewspaperRoundedIcon }] : [];
 
     if (isSuperUser) {
         // Super User [Platform Admin]
@@ -260,7 +262,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/admin/notifications", icon: NotificationsRoundedIcon, badge: "notifications" },
-            { label: "Newsletter", to: "/newsletter", icon: NewspaperRoundedIcon },
+            ...newsletterItems,
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
             { label: "Profile", to: "/account/profile", icon: PersonIcon },
         ];
@@ -280,7 +282,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         manageItems = [
             { label: "Messages", to: "/admin/messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
-            { label: "Newsletter", to: "/newsletter", icon: NewspaperRoundedIcon },
+            ...newsletterItems,
             { label: "My Events", to: "/admin/events", icon: EventNoteRoundedIcon },
             { label: "My Groups", to: "/admin/groups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
@@ -299,7 +301,7 @@ export default function UnifiedSidebar({ mobileOpen, onMobileClose }) {
         manageItems = [
             { label: "Messages", to: "/community?view=messages", icon: ChatBubbleRoundedIcon, badge: "messages" },
             { label: "Notifications", to: "/community?view=notify", icon: NotificationsRoundedIcon, badge: "notifications" },
-            { label: "Newsletter", to: "/newsletter", icon: NewspaperRoundedIcon },
+            ...newsletterItems,
             { label: "My Events", to: "/account/events", icon: EventNoteRoundedIcon },
             { label: "My Groups", to: "/community/mygroups", icon: GroupsRoundedIcon },
             { label: "My Contacts", to: "/community?view=contacts", icon: Diversity3RoundedIcon },
