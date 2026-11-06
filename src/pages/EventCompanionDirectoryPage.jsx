@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import {
   Box,
@@ -8,7 +8,6 @@ import {
   Chip,
   Avatar,
   Paper,
-  Stack,
   Button,
   useMediaQuery,
   useTheme,
@@ -24,6 +23,7 @@ import {
   Badge,
 } from '@mui/material';
 import { Helmet } from 'react-helmet-async';
+import { Virtuoso } from 'react-virtuoso';
 import {
   Coffee, Clock, MapPin, Search, Send, Check, X, CheckCircle,
   Building2, ArrowRight, Users, Bell, MessageSquare,
@@ -34,12 +34,33 @@ import ScheduleTab from '../components/ScheduleTab';
 import { toast, ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { getAccessToken as getStoredAccessToken } from "../utils/tokenStore";
+import { filterCompanionParticipants } from "../utils/companionDirectorySearch";
 import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline';
 import EventAvailableIcon from '@mui/icons-material/EventAvailable';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 
 const RAW_BASE = (import.meta.env.VITE_API_BASE_URL || '').trim();
 const API_BASE = RAW_BASE.endsWith('/') ? RAW_BASE.slice(0, -1) : RAW_BASE;
+
+// Directory rows are drawn only near the screen, because an event can have hundreds
+// of participants. This is the extra height, in pixels, to keep drawn around it.
+const DIRECTORY_OVERSCAN_PX = 400;
+
+// While the Directory is on screen, it refreshes quietly so new registrations and
+// cancellations appear without a page reload. It also refreshes when someone comes
+// back to the page, but not more often than the minimum gap.
+const DIRECTORY_REFRESH_MS = 5 * 60 * 1000;
+const DIRECTORY_REFRESH_MIN_GAP_MS = 60 * 1000;
+
+const getParticipantKey = (_index, p) =>
+  p.participant_key || `${p.registration_id || 'v'}-${p.user_id || p.display_name}`;
+
+// The gap between rows has to be padding, because the list doesn't measure margins.
+const DIRECTORY_LIST_COMPONENTS = {
+  Item: ({ children, item: _item, context: _context, style, ...props }) => (
+    <div {...props} style={{ ...style, paddingBottom: 4 }}>{children}</div>
+  ),
+};
 
 const COLORS = {
   primary: '#E8532F',
@@ -168,11 +189,10 @@ function DesktopView({
   handleMessageAttendee,
   myMeetings,
   unreadCounts,
-  onHoveredAttendee,
   showCancelDialog,
   setShowCancelDialog,
   handleCancelMeetingConfirm,
-  hoveredAttendee,
+  scrollParent,
   activeMeeting,
   getOtherParty,
   isSameMeetingDay,
@@ -270,19 +290,23 @@ function DesktopView({
               </Paper>
             )}
 
-            {!loading && allParticipants.length > 0 && (
-              <Stack spacing={0.5}>
-                {allParticipants.map((p, i) => (
+            {!loading && allParticipants.length > 0 && scrollParent && (
+              <Virtuoso
+                customScrollParent={scrollParent}
+                data={allParticipants}
+                increaseViewportBy={DIRECTORY_OVERSCAN_PX}
+                computeItemKey={getParticipantKey}
+                components={DIRECTORY_LIST_COMPONENTS}
+                itemContent={(_index, p) => (
                   <Box
-                    key={p.participant_key || `${p.registration_id || 'v'}-${p.user_id || p.display_name}`}
-                    onMouseEnter={() => onHoveredAttendee(i)}
-                    onMouseLeave={() => onHoveredAttendee(null)}
+                    className="directory-row"
                     onClick={() => p.user_id && p.registration_id && navigate(`/community/rich-profile/${p.user_id}`)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 2,
                       p: '14px 16px', borderRadius: 1.5, transition: 'all 0.15s',
-                      background: hoveredAttendee === i ? COLORS.bg : 'transparent',
-                      border: '1px solid ' + (hoveredAttendee === i ? '#E8E4DF' : 'transparent'),
+                      background: 'transparent',
+                      border: '1px solid transparent',
+                      '&:hover': { background: COLORS.bg, borderColor: '#E8E4DF' },
                       cursor: p.user_id && p.registration_id ? 'pointer' : 'default',
                       '&:active': { opacity: 0.9 },
                     }}
@@ -362,7 +386,8 @@ function DesktopView({
                         display: 'flex', alignItems: 'center', gap: 1, p: '10px 18px',
                         borderRadius: 1.25, border: `1.5px solid ${COLORS.teal}30`, background: COLORS.teal + '06',
                         cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 640, color: COLORS.teal,
-                        opacity: hoveredAttendee === i ? 1 : 0, transition: 'opacity 0.15s',
+                        opacity: 0, transition: 'opacity 0.15s',
+                        '.directory-row:hover &:not(:disabled)': { opacity: 1 },
                         textTransform: 'none',
                         '&:disabled': { opacity: 0.5, cursor: 'not-allowed' },
                       }}
@@ -370,8 +395,8 @@ function DesktopView({
                       <Coffee size={15} strokeWidth={2} /> Request 1:1
                     </Button>
                   </Box>
-                ))}
-              </Stack>
+                )}
+              />
             )}
           </Box>
         )}
@@ -1014,6 +1039,7 @@ function MobileView({
   navigate,
 }) {
   const { days: slotDays, currentDayKey, selectDay } = useSlotDays(availableSlots, setSelectedSlot);
+  const [listScroller, setListScroller] = useState(null);
 
   return (
     <Box sx={{
@@ -1052,7 +1078,7 @@ function MobileView({
         </Typography>
       </Box>
 
-      <Box sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
+      <Box ref={setListScroller} sx={{ flex: 1, overflowY: 'auto', overflowX: 'hidden' }}>
         {/* STEP 1: Browse */}
         {flowStep === 1 && (
           <Box sx={{ p: '12px 12px' }}>
@@ -1083,11 +1109,15 @@ function MobileView({
               </Paper>
             )}
 
-            {!loading && allParticipants.length > 0 && (
-              <Stack spacing={0.5}>
-                {allParticipants.map((p) => (
+            {!loading && allParticipants.length > 0 && listScroller && (
+              <Virtuoso
+                customScrollParent={listScroller}
+                data={allParticipants}
+                increaseViewportBy={DIRECTORY_OVERSCAN_PX}
+                computeItemKey={getParticipantKey}
+                components={DIRECTORY_LIST_COMPONENTS}
+                itemContent={(_index, p) => (
                   <Box
-                    key={p.participant_key || `${p.registration_id || 'v'}-${p.user_id || p.display_name}`}
                     onClick={() => p.user_id && p.registration_id && navigate(`/community/rich-profile/${p.user_id}`)}
                     sx={{
                       display: 'flex', alignItems: 'center', gap: 1.25,
@@ -1175,8 +1205,8 @@ function MobileView({
                       <Coffee size={16} color={COLORS.teal} strokeWidth={2} />
                     </Button>
                   </Box>
-                ))}
-              </Stack>
+                )}
+              />
             )}
           </Box>
         )}
@@ -1741,17 +1771,23 @@ function EventCompanionDirectoryPage() {
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [meetingNote, setMeetingNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [hoveredAttendee, setHoveredAttendee] = useState(null);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [activeMeeting, setActiveMeeting] = useState(null);
   const [pollingMeeting, setPollingMeeting] = useState(false);
   const [myMeetingsCount, setMyMeetingsCount] = useState(0);
 
-  const debounceTimer = useRef(null);
   const slotsAbortController = useRef(null);
   const pollingInterval = useRef(null);
   const unreadPollInterval = useRef(null);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [directoryScroller, setDirectoryScroller] = useState(null);
+  const directoryLoadedForEvent = useRef(null);
+
+  // Search runs in the browser, over the list loaded once below.
+  const visibleParticipants = useMemo(
+    () => filterCompanionParticipants(allParticipants, searchQuery),
+    [allParticipants, searchQuery]
+  );
 
   const handleTabChange = (_event, newValue) => {
     if (newValue === 0) {
@@ -1943,19 +1979,26 @@ function EventCompanionDirectoryPage() {
     fetchNetworkingSettings();
   }, [event?.id, token]);
 
-  // Fetch directory
+  // Fetch directory, then keep it fresh quietly: no spinner, and the list stays on screen.
   useEffect(() => {
     if (!event?.id) return;
 
-    const fetchDirectory = async () => {
-      setLoading(true);
-      try {
-        const params = new URLSearchParams();
-        if (searchQuery) params.append('q', searchQuery);
+    const controller = new AbortController();
+    let lastBody = null;
+    let lastLoadedAt = 0;
+    let inFlight = false;
 
+    const fetchDirectory = async ({ quiet }) => {
+      if (inFlight) return;
+      inFlight = true;
+      if (!quiet) setLoading(true);
+      try {
         const res = await fetch(
-          `${API_BASE}/events/${event.id}/companion-directory/?${params.toString()}`,
-          { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+          `${API_BASE}/events/${event.id}/companion-directory/`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+            signal: controller.signal,
+          }
         );
 
         if (res.status === 403) {
@@ -1964,21 +2007,44 @@ function EventCompanionDirectoryPage() {
         }
         if (!res.ok) throw new Error('Failed to load directory');
 
-        const data = await res.json();
-        setAllParticipants(data.participants || []);
-        setEligibleParticipantCount(data.public_participant_count ?? null);
+        const body = await res.text();
+        lastLoadedAt = Date.now();
+        directoryLoadedForEvent.current = event.id;
+        // Nothing changed, so don't redraw the list.
+        if (body !== lastBody) {
+          lastBody = body;
+          const data = JSON.parse(body);
+          setAllParticipants(data.participants || []);
+          setEligibleParticipantCount(data.public_participant_count ?? null);
+        }
         setError(null);
       } catch (err) {
-        setError(err.message);
+        if (controller.signal.aborted) return;
+        // A failed quiet refresh keeps the current list. The next one can recover.
+        if (!quiet) setError(err.message);
       } finally {
-        setLoading(false);
+        inFlight = false;
+        if (!quiet && !controller.signal.aborted) setLoading(false);
       }
     };
 
-    if (debounceTimer.current) clearTimeout(debounceTimer.current);
-    debounceTimer.current = setTimeout(fetchDirectory, 300);
-    return () => clearTimeout(debounceTimer.current);
-  }, [event?.id, token, searchQuery]);
+    const refreshIfDue = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastLoadedAt < DIRECTORY_REFRESH_MIN_GAP_MS) return;
+      fetchDirectory({ quiet: true });
+    };
+
+    // A renewed login token re-runs this effect. Once the list is loaded, stay quiet.
+    fetchDirectory({ quiet: directoryLoadedForEvent.current === event.id });
+    const refreshTimer = setInterval(refreshIfDue, DIRECTORY_REFRESH_MS);
+    document.addEventListener('visibilitychange', refreshIfDue);
+
+    return () => {
+      controller.abort();
+      clearInterval(refreshTimer);
+      document.removeEventListener('visibilitychange', refreshIfDue);
+    };
+  }, [event?.id, token]);
 
   // Poll meeting status when on Step 3 (Awaiting)
   useEffect(() => {
@@ -2416,16 +2482,16 @@ function EventCompanionDirectoryPage() {
         {/* Eligible event participants can exceed networking-enabled registered profiles. Superusers only. */}
         {isSuperuser && activeTab === 0 && eligibleParticipantCount != null && (
           <Typography variant="caption" sx={{ display: "block", px: 2, pt: 1, color: "text.secondary" }}>
-            {eligibleParticipantCount} event participants · {allParticipants.filter(p => p.registration_id && p.user_id).length} networking profiles
+            {eligibleParticipantCount} event participants · {visibleParticipants.filter(p => p.registration_id && p.user_id).length} networking profiles
           </Typography>
         )}
         {/* Content */}
-        <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: isMobile ? 0 : 2 }}>
+        <Box ref={setDirectoryScroller} sx={{ flex: 1, minHeight: 0, overflowY: 'auto', p: isMobile ? 0 : 2 }}>
           {activeTab === 0 && flowStep > 1 ? (
             // Show flow views
             isMobile ? (
               <MobileView
-                allParticipants={allParticipants}
+                allParticipants={visibleParticipants}
                 loading={loading}
                 error={error}
                 searchQuery={searchQuery}
@@ -2461,7 +2527,7 @@ function EventCompanionDirectoryPage() {
             ) : (
               <DesktopView
                 event={event}
-                allParticipants={allParticipants}
+                allParticipants={visibleParticipants}
                 loading={loading}
                 error={error}
                 userInitials={userInitials}
@@ -2487,8 +2553,7 @@ function EventCompanionDirectoryPage() {
                 handleMessageAttendee={handleMessageAttendee}
                 myMeetings={myMeetings}
                 unreadCounts={unreadCounts}
-                onHoveredAttendee={setHoveredAttendee}
-                hoveredAttendee={hoveredAttendee}
+                scrollParent={directoryScroller}
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
@@ -2517,7 +2582,7 @@ function EventCompanionDirectoryPage() {
             // Default directory view
             isMobile ? (
               <MobileView
-                allParticipants={allParticipants}
+                allParticipants={visibleParticipants}
                 loading={loading}
                 error={error}
                 searchQuery={searchQuery}
@@ -2553,7 +2618,7 @@ function EventCompanionDirectoryPage() {
             ) : (
               <DesktopView
                 event={event}
-                allParticipants={allParticipants}
+                allParticipants={visibleParticipants}
                 loading={loading}
                 error={error}
                 userInitials={userInitials}
@@ -2579,8 +2644,7 @@ function EventCompanionDirectoryPage() {
                 handleMessageAttendee={handleMessageAttendee}
                 myMeetings={myMeetings}
                 unreadCounts={unreadCounts}
-                onHoveredAttendee={setHoveredAttendee}
-                hoveredAttendee={hoveredAttendee}
+                scrollParent={directoryScroller}
                 showCancelDialog={showCancelDialog}
                 setShowCancelDialog={setShowCancelDialog}
                 handleCancelMeetingConfirm={handleCancelMeetingConfirm}
