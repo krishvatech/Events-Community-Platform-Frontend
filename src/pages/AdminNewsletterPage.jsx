@@ -171,7 +171,7 @@ const blankForm = {
   subject: "",
   preview_text: "",
   from_name: "IMAA Connect",
-  from_email: "eventncommunity@gmail.com",
+  from_email: "no-reply@news.imaa-institute.org",
   html_content: starterHtml,
   plain_text: starterPlainText,
   segment_ids: [],

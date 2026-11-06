@@ -62,7 +62,7 @@ export const blankTemplate = {
   subject: "",
   preheaderText: "",
   fromName: "IMAA Connect",
-  fromAddress: "eventncommunity@gmail.com",
+  fromAddress: "no-reply@news.imaa-institute.org",
   plainText: starterPlainText,
   customHtml: starterHtml,
   isPublished: false,

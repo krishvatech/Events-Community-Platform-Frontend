@@ -23,8 +23,13 @@ const {
   getMarketingSectionFromPath,
   visibleMarketingNavigationGroups,
 } = await loadSource("src/config/marketingNavigation.js");
+const { blankTemplate } = await loadSource("src/pages/newsletterTemplateShared.jsx");
 const { Route } = router;
 const h = React.createElement;
+
+// Mautic's own "E-mail address to send mail from" setting. The Hub saves a sender
+// on every email, which overrides that setting, so the two have to match.
+const DEFAULT_SENDER = { name: "IMAA Connect", email: "no-reply@news.imaa-institute.org" };
 
 // Assertions compare strings/booleans only: a failing assert on a live jsdom
 // node serializes the whole DOM graph and exhausts memory.
@@ -212,4 +217,11 @@ test("the default email carries an unsubscribe link", async () => {
   const body = calls.find((call) => call.method === "post" && call.url === "/newsletter/admin/campaigns/").payload;
   assert.equal(body.html_content.includes('href="{unsubscribe_url}"'), true);
   assert.equal(body.plain_text.includes("{unsubscribe_url}"), true);
+  assert.equal(body.from_name, DEFAULT_SENDER.name);
+  assert.equal(body.from_email, DEFAULT_SENDER.email);
+});
+
+test("a new Template starts with the same sender as a new Broadcast", () => {
+  assert.equal(blankTemplate.fromName, DEFAULT_SENDER.name);
+  assert.equal(blankTemplate.fromAddress, DEFAULT_SENDER.email);
 });
